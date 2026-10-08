@@ -590,33 +590,175 @@ The backend exposes 26 RESTful resource domains grouped under the `/api` root:
 
 ## 14. Authentication Flow
 
+The BSC Textiles HRMS implements a multi-tier, zero-trust authentication architecture combining **NextAuth.js (App Router)** on the client, **stateless JSON Web Tokens (JWT)** on the API gateway, **HttpOnly/SameSite session cookies**, and fresh database-backed permission validation on every protected request.
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+graph TB
+    subgraph CLIENT_AUTH["1. Client Layer (Next.js 14 / NextAuth)"]
+        UI_LOGIN["Login Form (/login)"]:::cBlue
+        PERSONAS["1-Click Test Persona Selector"]:::cBlue
+        NEXTAUTH_CRED["NextAuth CredentialsProvider"]:::cBlue
+        SESSION_STORE["NextAuth JWT Session Store"]:::cBlue
+        AXIOS_INTERCEPT["Axios Bearer Interceptor"]:::cBlue
+    end
+
+    subgraph API_AUTH["2. Ingress & Auth Gateway (/api/auth)"]
+        RATE_LIMIT["Rate Limiter (1,000 req / 15 min)"]:::cDark
+        ZOD_LOGIN["Zod Body Validation (email, password >= 6)"]:::cDark
+        BCRYPT_EVAL["Bcrypt Hash Verification (12 Salt Rounds)"]:::cOrange
+        JWT_ISSUER_ENG["JWT Token Generator (TTL: 12h, ISS: bsc-textiles-hrms)"]:::cDark
+    end
+
+    subgraph DB_AUTH["3. Persistence & Audit Layer (MySQL 8.0)"]
+        USER_TABLE[("User Master Table")]:::cDb
+        EMP_TABLE[("Linked Employee Record")]:::cDb
+        AUDIT_LOGIN[("AuditLog (Action: LOGIN / LOGOUT)")]:::cDb
+    end
+
+    UI_LOGIN --> NEXTAUTH_CRED
+    PERSONAS --> NEXTAUTH_CRED
+    NEXTAUTH_CRED --> RATE_LIMIT --> ZOD_LOGIN --> BCRYPT_EVAL
+    BCRYPT_EVAL <--> USER_TABLE
+    USER_TABLE <--> EMP_TABLE
+    BCRYPT_EVAL --> JWT_ISSUER_ENG
+    JWT_ISSUER_ENG --> AUDIT_LOGIN
+    JWT_ISSUER_ENG --> SESSION_STORE
+    SESSION_STORE --> AXIOS_INTERCEPT
+
+    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
+    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
+    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
+    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
+    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
+    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
+```
+
+---
+
+### 14.1 Complete Login Sequence & Audit Flow
+
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
 sequenceDiagram
     autonumber
-    actor User as User / Staff
-    participant Browser as Browser Client
-    participant AuthAPI as Auth Router (/api/auth)
-    participant DB as MySQL User Store
+    actor User as User / Store Staff
+    participant Browser as Browser Client (/login)
+    participant NextAuth as NextAuth Gateway
+    participant AuthAPI as Express API (/api/auth)
+    participant DB as MySQL Database
 
-    User->>Browser: Enters Email & Password
-    Browser->>AuthAPI: POST /api/auth/login {email, password}
-    AuthAPI->>DB: SELECT * FROM User WHERE email = ?
-    alt User Not Found or Inactive
-        DB-->>AuthAPI: null
-        AuthAPI-->>Browser: 401 Unauthorized ("Invalid credentials")
-    else User Exists & Active
-        AuthAPI->>AuthAPI: bcrypt.compare(password, passwordHash)
-        alt Password Hash Mismatch
-            AuthAPI-->>Browser: 401 Unauthorized ("Invalid credentials")
-        else Password Verified
-            AuthAPI->>AuthAPI: jwt.sign({userId: user.id}, JWT_SECRET, {expiresIn: '12h'})
-            AuthAPI->>DB: UPDATE User SET lastLoginAt = NOW()
-            AuthAPI-->>Browser: Set-Cookie: token=...; HttpOnly; SameSite=Lax<br/>JSON {user: {id, email, fullName, role, permissions, locationId}}
-            Browser-->>User: Redirect to Authorized Dashboard
-        end
+    User->>Browser: Enters email and password (or selects 1-click persona)
+    Browser->>NextAuth: signIn('credentials', { email, password })
+    NextAuth->>AuthAPI: POST /api/auth/login { email, password }
+    AuthAPI->>AuthAPI: Zod Schema Validation (email format, password min length)
+    alt Invalid Schema Format
+        AuthAPI-->>NextAuth: 400 Bad Request ({ error: "Invalid email or password format" })
+        NextAuth-->>Browser: Display Validation Error Toast
+    end
+
+    AuthAPI->>DB: SELECT * FROM User WHERE email = ? (include employee)
+    alt User Not Found OR User.isActive == false
+        DB-->>AuthAPI: null or isActive=false
+        AuthAPI-->>NextAuth: 401 Unauthorized ("Invalid credentials")
+        NextAuth-->>Browser: Display: "Invalid email or password"
+    end
+
+    AuthAPI->>AuthAPI: bcrypt.compare(password, user.passwordHash)
+    alt Password Hash Mismatch
+        AuthAPI-->>NextAuth: 401 Unauthorized ("Invalid credentials")
+        NextAuth-->>Browser: Display: "Invalid email or password"
+    else Password Hash Verified
+        AuthAPI->>AuthAPI: jwt.sign({ userId: user.id, iss: 'bsc-textiles-hrms' }, JWT_SECRET, { expiresIn: '12h' })
+        AuthAPI->>DB: UPDATE User SET lastLoginAt = NOW() WHERE id = user.id
+        AuthAPI->>DB: INSERT INTO AuditLog (userId, action: 'LOGIN', entityType: 'User', ipAddress, userAgent)
+        AuthAPI-->>NextAuth: 200 OK + Set-Cookie: token=... (HttpOnly, SameSite=Lax, Secure)<br/>JSON: { user: { id, email, fullName, role, permissions, locationId, employeeId }, token }
+        NextAuth->>Browser: Session Cookie Established (JWT Strategy)
+        Browser-->>User: Redirect to Authorized Workspace (/dashboard or /my-desk)
     end
 ```
+
+---
+
+### 14.2 Session Hydration & Current User Profile (`GET /api/auth/me`)
+
+When an authenticated client mounts or navigates, the app validates session state against `/api/auth/me`:
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+flowchart TD
+    APP_MOUNT["Client Component Mount / Navigation"]:::cBlue --> REQ_ME["GET /api/auth/me (Bearer Token or Cookie)"]:::cBlue
+    REQ_ME --> VERIFY_TOKEN{"jwt.verify(token, JWT_SECRET)"}:::cDark
+
+    VERIFY_TOKEN -- "Invalid / Expired" --> RET_401["401 Unauthorized<br/>Purge Client Session & Redirect /login"]:::cRed
+    VERIFY_TOKEN -- "Valid Signature" --> FETCH_USER["Query MySQL: User + Employee + Location + Shift"]:::cDb
+
+    FETCH_USER --> USER_ACTIVE{"user.isActive == true?"}:::cOrange
+    USER_ACTIVE -- "NO (Deactivated)" --> RET_INACTIVE["401 User Inactive"]:::cRed
+    USER_ACTIVE -- "YES" --> HYDRATE_CLIENT["200 OK: Return Enriched User Profile<br/>(fullName, role, permissions, location, floor, department, shift)"]:::cGreen
+
+    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
+    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
+    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
+    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
+    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
+    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
+```
+
+---
+
+### 14.3 Token Lifecycle & Rolling Session Refresh (`POST /api/auth/refresh`)
+
+To prevent abrupt mid-shift session expiration while maintaining strict token TTLs:
+1. Tokens carry a **12-hour expiration window** (`JWT_EXPIRES_IN="12h"`).
+2. The client or background worker sends a `POST /api/auth/refresh` request before expiration.
+3. The server validates the existing token, re-reads the latest permissions from MySQL, and issues a fresh token with an updated 12-hour expiration window and updated `HttpOnly` cookie.
+
+---
+
+### 14.4 Logout & Session Revocation (`POST /api/auth/logout`)
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+sequenceDiagram
+    autonumber
+    actor User as Staff Member
+    participant Client as Web App Shell
+    participant AuthAPI as /api/auth/logout
+    participant DB as MySQL Audit Ledger
+
+    User->>Client: Clicks "Sign Out"
+    Client->>AuthAPI: POST /api/auth/logout (Bearer Token or Cookie)
+    AuthAPI->>DB: INSERT INTO AuditLog (userId, action: 'LOGOUT', ipAddress, userAgent)
+    AuthAPI-->>Client: Clear-Cookie: token=; Max-Age=0<br/>JSON: { message: "Logged out successfully" }
+    Client->>Client: NextAuth signOut({ redirect: true, callbackUrl: '/login' })
+    Client-->>User: Redirect to /login
+```
+
+---
+
+### 14.5 Password Rotation & Security Policy (`PUT /api/auth/change-password`)
+
+- Requires active authentication via `authenticate` middleware.
+- Validates current password against `user.passwordHash` via bcrypt.
+- Enforces new password minimum length ($\ge 6$ characters).
+- Computes new bcrypt hash using **12 salt rounds**.
+- Commits update to MySQL and records an immutable `AuditLog` entry (`action: 'UPDATE'`).
+
+---
+
+### 14.6 Authentication Security Matrix & Error Handling
+
+| Scenario | HTTP Status | Response Contract | Security Action |
+|---|---|---|---|
+| **Invalid Email / Non-Existent Account** | `401 Unauthorized` | `{"error": "Invalid credentials"}` | Generic message prevents username enumeration. |
+| **Incorrect Password** | `401 Unauthorized` | `{"error": "Invalid credentials"}` | Increments failed attempts; preserves non-disclosure. |
+| **Account Deactivated (`isActive: false`)** | `401 Unauthorized` | `{"error": "User not found or inactive"}` | Blocks login even with correct password credentials. |
+| **Missing Token on Protected Route** | `401 Unauthorized` | `{"error": "Authentication required"}` | Rejects request before reaching business logic controllers. |
+| **Forged or Tampered JWT Signature** | `401 Unauthorized` | `{"error": "Invalid token"}` | Rejected by `jwt.verify` cryptographic signature check. |
+| **Expired JWT Token** | `401 Unauthorized` | `{"error": "Invalid token"}` | Client Axios interceptor redirects user to `/login`. |
+| **Rate Limit Threshold Exceeded** | `429 Too Many Requests` | `{"error": "Too many requests, please try again later"}` | Ingress rate limiter caps requests at 1,000 per 15-minute window. |
+
 
 ---
 

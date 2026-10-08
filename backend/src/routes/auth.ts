@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { prisma } from '../index.js';
 import { authenticate, AuthRequest, generateToken } from '../middleware/auth.js';
 import { validate, schemas } from '../middleware/validation.js';
+import { JWT_SECRET } from '../config/env.js';
 
 const router = Router();
 
@@ -39,6 +40,18 @@ router.post('/login', validate(schemas.login), async (req: AuthRequest, res) => 
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        locationId: user.locationId,
+        action: 'LOGIN',
+        entityType: 'User',
+        entityId: user.id,
+        ipAddress: req.ip || req.socket.remoteAddress || '127.0.0.1',
+        userAgent: (req.headers['user-agent'] as string) || 'Internal Client',
+      },
+    }).catch((err) => console.error('Failed to log login audit event:', err));
     
     res.cookie('token', token, {
       httpOnly: true,
@@ -122,9 +135,39 @@ router.post('/register', validate(schemas.register), async (req: AuthRequest, re
   }
 });
 
-router.post('/logout', (req: AuthRequest, res) => {
-  res.clearCookie('token');
-  res.json({ message: 'Logged out successfully' });
+router.post('/logout', async (req: AuthRequest, res) => {
+  try {
+    const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET) as any;
+        if (decoded?.userId) {
+          const user = await prisma.user.findUnique({
+            where: { id: decoded.userId },
+            select: { id: true, locationId: true },
+          });
+          if (user) {
+            await prisma.auditLog.create({
+              data: {
+                userId: user.id,
+                locationId: user.locationId,
+                action: 'LOGOUT',
+                entityType: 'User',
+                entityId: user.id,
+                ipAddress: req.ip || req.socket.remoteAddress || '127.0.0.1',
+                userAgent: (req.headers['user-agent'] as string) || 'Internal Client',
+              },
+            }).catch((err) => console.error('Failed to log logout audit event:', err));
+          }
+        }
+      } catch {
+        // Token was invalid or expired, continue normal cookie clear
+      }
+    }
+  } finally {
+    res.clearCookie('token');
+    res.json({ message: 'Logged out successfully' });
+  }
 });
 
 router.get('/me', authenticate, async (req: AuthRequest, res) => {
@@ -216,7 +259,19 @@ router.put('/change-password', authenticate, async (req: AuthRequest, res) => {
       where: { id: req.user!.id },
       data: { passwordHash },
     });
-    
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.id,
+        locationId: req.user!.locationId,
+        action: 'UPDATE',
+        entityType: 'User',
+        entityId: req.user!.id,
+        ipAddress: req.ip || req.socket.remoteAddress || '127.0.0.1',
+        userAgent: (req.headers['user-agent'] as string) || 'Internal Client',
+      },
+    }).catch((err) => console.error('Failed to log password change audit event:', err));
+
     res.json({ message: 'Password changed successfully' });
   } catch (error) {
     console.error('Change password error:', error);
