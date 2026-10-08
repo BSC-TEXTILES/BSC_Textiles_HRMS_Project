@@ -70,9 +70,19 @@ export default function FaceVerificationDashboardPage() {
     setToDate(today);
   }, []);
 
+  // Deep-link support: /operations/face-verification?result=failed&location=all
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const result = q.get('result');
+    const loc = q.get('location');
+    if (result) setResultFilter(result);
+    if (loc) setLocationId(loc);
+  }, []);
+
   const fetchStats = async () => {
     try {
-      const res = await api.get<FaceDashboardStats>(`/face-verification/stats/${locationId}?from=${fromDate}&to=${toDate}`);
+      const statsPath = locationId === 'all' ? '/face-verification/stats' : `/face-verification/stats/${locationId}`;
+      const res = await api.get<FaceDashboardStats>(`${statsPath}?from=${fromDate}&to=${toDate}`);
       setStats(res.data);
     } catch (err) {
       console.error('Failed to fetch face verification stats:', err);
@@ -82,7 +92,8 @@ export default function FaceVerificationDashboardPage() {
   const fetchRecords = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ locationId });
+      const params = new URLSearchParams();
+      if (locationId !== 'all') params.set('locationId', locationId);
       if (fromDate) params.set('from', fromDate);
       if (toDate) params.set('to', toDate);
       if (resultFilter !== 'all') params.set('result', resultFilter);
@@ -173,6 +184,7 @@ export default function FaceVerificationDashboardPage() {
               value={locationId}
               onChange={(e) => setLocationId(e.target.value)}
               options={[
+                { value: 'all', label: 'All Locations' },
                 { value: 'bel', label: 'Belagavi (BEL)' },
                 { value: 'dav', label: 'Davanagere (DAV)' },
                 { value: 'shi', label: 'Shivamogga (SHI)' },

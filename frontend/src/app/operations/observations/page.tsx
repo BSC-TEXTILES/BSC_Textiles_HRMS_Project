@@ -71,7 +71,8 @@ const OBS_TYPES = [
 ];
 
 const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
-const STATUSES = ['new', 'open', 'in_review', 'action_required', 'completed', 'closed'];
+const STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'];
+const LEVELS = ['EXCELLENT', 'VERY_GOOD', 'GOOD', 'NEEDS_IMPROVEMENT', 'CRITICAL'];
 const REACTIONS = [
   { code: 'acknowledged', label: 'Acknowledged', icon: CheckCircle },
   { code: 'completed', label: 'Completed', icon: CheckCircle },
@@ -87,6 +88,7 @@ export default function ObservationsPage() {
   const [locationId, setLocationId] = useState<string>('bel');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [levelFilter, setLevelFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedObs, setSelectedObs] = useState<Observation | null>(null);
@@ -118,6 +120,7 @@ export default function ObservationsPage() {
       const params = new URLSearchParams({ locationId });
       if (statusFilter !== 'all') params.set('status', statusFilter);
       if (typeFilter !== 'all') params.set('observationType', typeFilter);
+      if (levelFilter !== 'all') params.set('level', levelFilter);
       
       const [obsRes, levelsRes] = await Promise.all([
         api.get<{ rows: Observation[]; total: number }>(`/observations?${params}`),
@@ -132,9 +135,18 @@ export default function ObservationsPage() {
     }
   };
 
+  // Deep-link support: /operations/observations?status=OPEN&level=CRITICAL
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const s = q.get('status');
+    const l = q.get('level');
+    if (s) setStatusFilter(s);
+    if (l) setLevelFilter(l);
+  }, []);
+
   useEffect(() => {
     fetchData();
-  }, [locationId, statusFilter, typeFilter]);
+  }, [locationId, statusFilter, typeFilter, levelFilter]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -202,7 +214,7 @@ export default function ObservationsPage() {
 
   const handleStatusChange = async (obsId: number, status: string) => {
     try {
-      await api.patch(`/observations/${obsId}`, { status });
+      await api.put(`/observations/${obsId}`, { status });
       fetchData();
       if (selectedObs?.id === obsId) {
         const res = await api.get<Observation>(`/observations/${obsId}`);
@@ -234,7 +246,7 @@ export default function ObservationsPage() {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'new': return 'bg-blue-100 text-blue-700';
       case 'open': return 'bg-indigo-100 text-indigo-700';
       case 'in_review': return 'bg-purple-100 text-purple-700';
@@ -321,6 +333,11 @@ export default function ObservationsPage() {
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
               options={[{ value: 'all', label: 'All Types' }, ...OBS_TYPES.map(t => ({ value: t, label: t.replace('_', ' ') }))]}
+            />
+            <Select
+              value={levelFilter}
+              onChange={(e) => setLevelFilter(e.target.value)}
+              options={[{ value: 'all', label: 'All Levels' }, ...LEVELS.map(l => ({ value: l, label: l.replace(/_/g, ' ') }))]}
             />
             <Input
               placeholder="Search observations..."
@@ -702,7 +719,7 @@ function getPriorityColor(priority: string) {
 }
 
 function getStatusColor(status: string) {
-  switch (status) {
+  switch (status.toLowerCase()) {
     case 'new': return 'bg-blue-100 text-blue-700';
     case 'open': return 'bg-indigo-100 text-indigo-700';
     case 'in_review': return 'bg-purple-100 text-purple-700';

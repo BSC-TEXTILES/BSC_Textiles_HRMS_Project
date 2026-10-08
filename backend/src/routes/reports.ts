@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../index.js';
+import { dbDate } from '../utils/dates.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
@@ -80,6 +81,19 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
       prisma.sellingPoint.count({ where: sellingPointWhere }),
     ]);
 
+    // On Lunch / Tea cards count ACTIVE break sessions (source of truth),
+    // not attendance.status, which the seed leaves at PRESENT during breaks.
+    const activeBreaks = await prisma.employeeBreak.findMany({
+      where: {
+        status: 'ACTIVE',
+        breakDate: dbDate(),
+        ...(locationId ? { employee: { locationId } } : {}),
+      },
+      select: { breakType: true },
+    });
+    const onLunch = activeBreaks.filter((b) => b.breakType === 'LUNCH').length;
+    const onTeaBreak = activeBreaks.filter((b) => b.breakType === 'TEA').length;
+
     const checkedInStatuses = [
       'PRESENT', 'EARLY', 'LATE', 'OVERTIME', 'LEFT_STORE', 'FACE_VERIFIED',
       'FACE_VERIFICATION_FAILED', 'ON_LUNCH', 'ON_TEA_BREAK', 'ON_OTHER_BREAK',
@@ -96,8 +110,8 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
       present,
       absent,
       late: countStatus('LATE'),
-      onLunch: countStatus('ON_LUNCH'),
-      onTeaBreak: countStatus('ON_TEA_BREAK'),
+      onLunch,
+      onTeaBreak,
       weeklyOff,
       overtime: countStatus('OVERTIME'),
       faceVerified,
