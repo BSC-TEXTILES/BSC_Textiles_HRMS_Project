@@ -15,6 +15,7 @@ import {
   Calculator, DollarSign
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Logo } from '@/components/ui/Logo';
 
 const navigation = [
   {
@@ -172,9 +173,7 @@ export function Sidebar({ isOpen, onToggle }: { isOpen: boolean; onToggle: () =>
         {/* Logo */}
         <div className={cn('flex items-center justify-between h-16 px-4 border-b border-gray-200', !isOpen && 'justify-center')}>
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-white" />
-            </div>
+            <Logo variant="full" size="md" />
             {isOpen && (
               <span className="font-bold text-gray-900">BSC Textiles</span>
             )}

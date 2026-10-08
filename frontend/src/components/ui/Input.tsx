@@ -101,7 +101,7 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   error?: string;
   label?: string;
   helperText?: string;
-  options: { value: string; label: string }[];
+  options: { value: string | number; label: string }[];
   placeholder?: string;
 }
 
