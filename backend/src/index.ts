@@ -123,11 +123,15 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 4000;
-httpServer.listen(PORT, () => {
+console.log('Starting server...');
+const PORT = Number(process.env.PORT) || 4001;
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 WebSocket server ready`);
+}).on('error', (err) => {
+  console.error('Server listen error:', err);
 });
+console.log('Listen called, waiting for callback...');
 
 process.on('SIGINT', async () => {
   await prisma.$disconnect();
