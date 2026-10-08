@@ -1,17 +1,17 @@
 /**
- * BSC Textiles HRMS — Native MySQL Schema Runner
- * Zero Prisma Dependency. Applies schema.sql to MySQL 8.0.
+ * BSC Textiles HRMS — Native MySQL Consolidated Schema Runner
+ * Applies full schema.sql (all 38 tables) directly to MySQL 8.0.
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { pool } from './pool.js';
+import { pool } from '../src/pool.js';
 
-async function runMigration() {
+async function runSchema() {
   console.log('================================================================');
-  console.log('🚀 BSC TEXTILES HRMS — NATIVE MYSQL SCHEMA RUNNER');
+  console.log('🚀 BSC TEXTILES HRMS — CONSOLIDATED SCHEMA RUNNER');
   console.log('================================================================');
-  
+
   const schemaPath = path.resolve(process.cwd(), 'schema.sql');
   if (!fs.existsSync(schemaPath)) {
     throw new Error(`Schema file not found at: ${schemaPath}`);
@@ -32,7 +32,7 @@ async function runMigration() {
   process.exit(0);
 }
 
-runMigration().catch((err) => {
-  console.error('❌ Migration failed:', err.message);
+runSchema().catch((err) => {
+  console.error('❌ Schema application failed:', err.message);
   process.exit(1);
 });

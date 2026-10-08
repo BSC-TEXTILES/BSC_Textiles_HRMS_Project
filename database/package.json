@@ -9,7 +9,7 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "db:setup": "tsx scripts/migrate.ts && tsx scripts/seed.ts",
-    "db:schema": "tsx src/migrate.ts",
+    "db:schema": "tsx scripts/schema.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
