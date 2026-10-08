@@ -6,7 +6,7 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/', authorize('VIEW_SENSITIVE_DATA'), async (req: AuthRequest, res) => {
+router.get(['/', '/logs'], authorize('VIEW_SENSITIVE_DATA'), async (req: AuthRequest, res) => {
   try {
     const { locationId, userId, action, entityType, startDate, endDate, page = 1, limit = 50 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);

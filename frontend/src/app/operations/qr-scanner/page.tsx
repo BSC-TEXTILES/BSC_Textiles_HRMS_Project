@@ -11,7 +11,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Input, Select } from '@/components/ui/Field';
+import { Input, Select } from '@/components/ui/Input';
 import { api } from '@/lib/api';
 
 interface QRScanResult {

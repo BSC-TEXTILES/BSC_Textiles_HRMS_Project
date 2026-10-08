@@ -91,7 +91,7 @@ router.get('/', async (req: AuthRequest, res) => {
         id,
         title: 'Break Overrun Warning',
         message: `${brk.employee.fullName} exceeded ${brk.breakType} break by ${Math.round(
-          (brk.overtimeSeconds || 0) / 60
+          (brk.excessDuration || 0) / 60
         )} mins.`,
         type: 'DANGER',
         createdAt: brk.endTime || brk.startTime,
@@ -104,7 +104,7 @@ router.get('/', async (req: AuthRequest, res) => {
       notifications.push({
         id,
         title: 'Critical Observation Logged',
-        message: `${obs.title} for ${obs.employee?.fullName || 'Floor'}: ${obs.description.substring(0, 60)}...`,
+        message: `${obs.observationType} for ${obs.employee?.fullName || 'Floor'}: ${obs.description.substring(0, 60)}...`,
         type: 'CRITICAL',
         createdAt: obs.createdAt,
         isRead: readNotificationIds.has(id),

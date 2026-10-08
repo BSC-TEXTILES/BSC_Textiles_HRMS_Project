@@ -12,7 +12,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Input, Select, Textarea } from '@/components/ui/Field';
+import { Input, Select, Textarea } from '@/components/ui/Input';
 import { DataTable } from '@/components/ui/DataTable';
 import { api } from '@/lib/api';
 import { formatDateTime, cn } from '@/lib/utils';
@@ -404,7 +404,7 @@ export default function ObservationsPage() {
                     label="Level *"
                     value={formData.levelId}
                     onChange={(e) => setFormData({ ...formData, levelId: e.target.value })}
-                    options={levels.map(l => ({ value: l.id, label: `${l.name} (${l.ratingLabel})` }))}
+                    options={levels.map(l => ({ value: l.id.toString(), label: `${l.name} (${l.ratingLabel})` }))}
                     required
                   />
                   <Select

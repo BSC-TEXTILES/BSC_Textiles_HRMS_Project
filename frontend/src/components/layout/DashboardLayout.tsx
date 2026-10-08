@@ -15,6 +15,7 @@ import {
   Calculator, DollarSign
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Logo } from '@/components/ui/Logo';
 
 const navigation = [
   {
@@ -172,9 +173,7 @@ export function Sidebar({ isOpen, onToggle }: { isOpen: boolean; onToggle: () =>
         {/* Logo */}
         <div className={cn('flex items-center justify-between h-16 px-4 border-b border-gray-200', !isOpen && 'justify-center')}>
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center">
-              <Building2 className="w-5 h-5 text-white" />
-            </div>
+            <Logo variant="full" size="md" />
             {isOpen && (
               <span className="font-bold text-gray-900">BSC Textiles</span>
             )}
@@ -217,7 +216,14 @@ export function Sidebar({ isOpen, onToggle }: { isOpen: boolean; onToggle: () =>
             </div>
           </div>
           <button
-            onClick={() => signOut({ callbackUrl: '/login' })}
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('bsc_token');
+                localStorage.removeItem('token');
+                localStorage.removeItem('bsc_user');
+              }
+              signOut({ callbackUrl: '/login' });
+            }}
             className="w-full mt-3 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <LogOut className="w-4 h-4" />

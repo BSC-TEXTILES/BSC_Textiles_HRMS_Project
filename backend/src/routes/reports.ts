@@ -122,12 +122,8 @@ router.get('/attendance-summary', authorize('VIEW'), async (req: AuthRequest, re
   try {
     const { locationId, startDate, endDate, shiftId, departmentId } = req.query;
     
-    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? locationId : req.user!.locationId;
-    if (!targetLocationId) {
-      return res.status(400).json({ error: 'Location ID required' });
-    }
-    
-    const where: any = { locationId: targetLocationId };
+    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? (locationId as string | undefined) : req.user!.locationId;
+    const where: any = targetLocationId ? { locationId: targetLocationId } : {};
     if (startDate || endDate) {
       where.attendanceDate = {};
       if (startDate) where.attendanceDate.gte = new Date(String(startDate));
@@ -149,21 +145,18 @@ router.get('/attendance-summary', authorize('VIEW'), async (req: AuthRequest, re
       const key = a.employeeId;
       if (!acc[key]) {
         acc[key] = {
-          employee: a.employee,
+          employeeCode: a.employee?.employeeCode || '',
+          employeeName: a.employee?.fullName || '',
+          department: a.employee?.department?.name || 'Retail Store',
           totalDays: 0,
           present: 0,
           absent: 0,
           late: 0,
           early: 0,
           overtime: 0,
-          onLunch: 0,
-          onTeaBreak: 0,
-          weeklyOff: 0,
           totalWorkingHours: 0,
-          totalOvertimeHours: 0,
           totalEarlyIncentive: 0,
           totalLatePenalty: 0,
-          totalOvertimeIncentive: 0,
         };
       }
       acc[key].totalDays++;
@@ -173,19 +166,14 @@ router.get('/attendance-summary', authorize('VIEW'), async (req: AuthRequest, re
         case 'LATE': acc[key].late++; break;
         case 'EARLY': acc[key].early++; break;
         case 'OVERTIME': acc[key].overtime++; break;
-        case 'ON_LUNCH': acc[key].onLunch++; break;
-        case 'ON_TEA_BREAK': acc[key].onTeaBreak++; break;
-        case 'WEEKLY_OFF': acc[key].weeklyOff++; break;
       }
-      acc[key].totalWorkingHours += a.totalWorkingSeconds / 3600;
-      acc[key].totalOvertimeHours += a.overtimeSeconds / 3600;
-      acc[key].totalEarlyIncentive += Number(a.earlyLoginIncentive);
-      acc[key].totalLatePenalty += Number(a.lateLoginPenalty);
-      acc[key].totalOvertimeIncentive += Number(a.overtimeIncentive);
+      acc[key].totalWorkingHours = Math.round(((acc[key].totalWorkingHours || 0) + (a.totalWorkingSeconds / 3600)) * 10) / 10;
+      acc[key].totalEarlyIncentive += Number(a.earlyLoginIncentive || 0);
+      acc[key].totalLatePenalty += Number(a.lateLoginPenalty || 0);
       return acc;
     }, {} as Record<string, any>);
     
-    res.json({ summary: Object.values(summary) });
+    res.json({ summary: Object.values(summary), data: Object.values(summary) });
   } catch (error) {
     console.error('Attendance summary report error:', error);
     res.status(500).json({ error: 'Failed to generate attendance summary' });
@@ -232,13 +220,13 @@ router.get('/employee-performance', authorize('VIEW'), async (req: AuthRequest, 
   }
 });
 
-router.get('/incentive-summary', authorize('VIEW'), async (req: AuthRequest, res) => {
+router.get(['/incentive-summary', '/incentives-summary'], authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
     const { locationId, startDate, endDate, incentiveRuleId } = req.query;
     
-    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? locationId : req.user!.locationId;
+    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? (locationId as string | undefined) : req.user!.locationId;
     
-    const where: any = { employee: { locationId: targetLocationId } };
+    const where: any = targetLocationId ? { employee: { locationId: targetLocationId } } : {};
     if (incentiveRuleId) where.incentiveRuleId = incentiveRuleId;
     if (startDate || endDate) {
       where.transactionDate = {};
@@ -252,20 +240,19 @@ router.get('/incentive-summary', authorize('VIEW'), async (req: AuthRequest, res
         employee: { select: { id: true, employeeCode: true, fullName: true } },
         incentiveRule: { select: { id: true, name: true, incentiveType: true } },
       },
+      orderBy: { transactionDate: 'desc' },
     });
     
-    const summary = transactions.reduce((acc: any, t: any) => {
-      const key = t.employeeId;
-      if (!acc[key]) {
-        acc[key] = { employee: t.employee, totalAmount: 0, byType: {} };
-      }
-      acc[key].totalAmount += Number(t.calculatedAmount);
-      const type = t.incentiveRule.incentiveType;
-      acc[key].byType[type] = (acc[key].byType[type] || 0) + Number(t.calculatedAmount);
-      return acc;
-    }, {} as Record<string, any>);
-    
-    res.json({ summary: Object.values(summary) });
+    const records = transactions.map((t: any) => ({
+      employeeCode: t.employee?.employeeCode || '',
+      employeeName: t.employee?.fullName || '',
+      rule: t.incentiveRule?.name || 'Daily Performance',
+      type: t.incentiveRule?.incentiveType || 'EARLY_LOGIN',
+      amount: `₹${Number(t.calculatedAmount || 0)}`,
+      date: t.transactionDate ? new Date(t.transactionDate).toLocaleDateString() : '',
+    }));
+
+    res.json({ summary: records, records, data: records });
   } catch (error) {
     console.error('Incentive summary report error:', error);
     res.status(500).json({ error: 'Failed to generate incentive summary' });
@@ -276,9 +263,9 @@ router.get('/break-analysis', authorize('VIEW'), async (req: AuthRequest, res) =
   try {
     const { locationId, startDate, endDate, breakType } = req.query;
     
-    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? locationId : req.user!.locationId;
+    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? (locationId as string | undefined) : req.user!.locationId;
     
-    const where: any = { employee: { locationId: targetLocationId } };
+    const where: any = targetLocationId ? { employee: { locationId: targetLocationId } } : {};
     if (breakType) where.breakType = breakType;
     if (startDate || endDate) {
       where.breakDate = {};
@@ -311,31 +298,52 @@ router.get('/break-analysis', authorize('VIEW'), async (req: AuthRequest, res) =
   }
 });
 
-router.get('/face-verification-stats', authorize('VIEW'), async (req: AuthRequest, res) => {
+router.get(['/face-verification-stats', '/face-verification-accuracy'], authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
     const { locationId, startDate, endDate } = req.query;
     
-    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? locationId : req.user!.locationId;
+    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? (locationId as string | undefined) : req.user!.locationId;
     
-    const where: any = { locationId: targetLocationId };
+    const where: any = targetLocationId ? { locationId: targetLocationId } : {};
     if (startDate || endDate) {
       where.verifiedAt = {};
       if (startDate) where.verifiedAt.gte = new Date(String(startDate));
       if (endDate) where.verifiedAt.lte = new Date(String(endDate));
     }
     
-    const [verified, failed, avgMatch] = await Promise.all([
+    const [verified, failed, avgMatch, logs] = await Promise.all([
       prisma.faceVerification.count({ where: { ...where, result: 'VERIFIED' } }),
       prisma.faceVerification.count({ where: { ...where, result: 'FAILED' } }),
       prisma.faceVerification.aggregate({ where: { ...where, result: 'VERIFIED' }, _avg: { matchPercentage: true } }),
+      prisma.faceVerification.findMany({
+        where,
+        take: 50,
+        orderBy: { verifiedAt: 'desc' },
+        include: {
+          employee: { select: { employeeCode: true, fullName: true } },
+          location: { select: { name: true, code: true } },
+        },
+      }),
     ]);
+
+    const records = logs.map((v: any) => ({
+      employeeCode: v.employee?.employeeCode || '',
+      employeeName: v.employee?.fullName || '',
+      location: v.location?.name || 'Retail Flagship',
+      matchPercentage: `${Number(v.matchPercentage)}%`,
+      status: v.result,
+      verifiedAt: v.verifiedAt ? new Date(v.verifiedAt).toLocaleTimeString() : '',
+    }));
     
     res.json({
       verified,
       failed,
       total: verified + failed,
       successRate: verified + failed > 0 ? (verified / (verified + failed)) * 100 : 0,
-      averageMatchPercentage: avgMatch._avg.matchPercentage || 0,
+      averageMatchPercentage: avgMatch._avg?.matchPercentage || 0,
+      records,
+      rows: records,
+      data: records,
     });
   } catch (error) {
     console.error('Face verification stats error:', error);
@@ -343,13 +351,13 @@ router.get('/face-verification-stats', authorize('VIEW'), async (req: AuthReques
   }
 });
 
-router.get('/qr-scan-analytics', authorize('VIEW'), async (req: AuthRequest, res) => {
+router.get(['/qr-scan-analytics', '/qr-scans-summary'], authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
     const { locationId, startDate, endDate, purpose } = req.query;
     
-    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? locationId : req.user!.locationId;
+    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? (locationId as string | undefined) : req.user!.locationId;
     
-    const where: any = { locationId: targetLocationId };
+    const where: any = targetLocationId ? { locationId: targetLocationId } : {};
     if (purpose) where.purpose = purpose;
     if (startDate || endDate) {
       where.scannedAt = {};
@@ -357,11 +365,27 @@ router.get('/qr-scan-analytics', authorize('VIEW'), async (req: AuthRequest, res
       if (endDate) where.scannedAt.lte = new Date(String(endDate));
     }
     
-    const [success, failed, byPurpose] = await Promise.all([
+    const [success, failed, byPurpose, scanLogs] = await Promise.all([
       prisma.qRScanRecord.count({ where: { ...where, result: 'SUCCESS' } }),
       prisma.qRScanRecord.count({ where: { ...where, result: { not: 'SUCCESS' } } }),
       prisma.qRScanRecord.groupBy({ by: ['purpose'], where, _count: true }),
+      prisma.qRScanRecord.findMany({
+        where,
+        take: 50,
+        orderBy: { scannedAt: 'desc' },
+        include: {
+          employee: { select: { employeeCode: true, fullName: true } },
+        },
+      }),
     ]);
+
+    const records = scanLogs.map((s: any) => ({
+      employeeCode: s.employee?.employeeCode || '',
+      employeeName: s.employee?.fullName || '',
+      purpose: s.purpose,
+      result: s.result,
+      scannedAt: s.scannedAt ? new Date(s.scannedAt).toLocaleTimeString() : '',
+    }));
     
     res.json({
       success,
@@ -369,6 +393,10 @@ router.get('/qr-scan-analytics', authorize('VIEW'), async (req: AuthRequest, res
       total: success + failed,
       successRate: success + failed > 0 ? (success / (success + failed)) * 100 : 0,
       byPurpose,
+      records,
+      scans: records,
+      rows: records,
+      data: records,
     });
   } catch (error) {
     console.error('QR scan analytics error:', error);

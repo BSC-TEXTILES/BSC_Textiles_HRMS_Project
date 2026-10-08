@@ -37,24 +37,27 @@ export default function ReportsPage() {
   const fetchReportData = async () => {
     try {
       setLoading(true);
+      let rows: any[] = [];
       if (activeTab === 'attendance') {
-        const res = await api.get('/reports/attendance-summary');
-        setData(res.data || []);
+        const res = await api.get(selectedLocation ? `/reports/attendance-summary?locationId=${selectedLocation}` : '/reports/attendance-summary');
+        rows = Array.isArray(res.data) ? res.data : (res.data?.summary || res.data?.data || []);
       } else if (activeTab === 'face') {
-        const res = await api.get('/reports/face-verification-accuracy');
-        setData(res.data || []);
+        const res = await api.get(selectedLocation ? `/reports/face-verification-accuracy?locationId=${selectedLocation}` : '/reports/face-verification-accuracy');
+        rows = Array.isArray(res.data) ? res.data : (res.data?.records || res.data?.rows || res.data?.data || []);
       } else if (activeTab === 'qr') {
-        const res = await api.get('/reports/qr-scans-summary');
-        setData(res.data || []);
+        const res = await api.get(selectedLocation ? `/reports/qr-scans-summary?locationId=${selectedLocation}` : '/reports/qr-scans-summary');
+        rows = Array.isArray(res.data) ? res.data : (res.data?.records || res.data?.scans || res.data?.data || []);
       } else if (activeTab === 'incentives') {
-        const res = await api.get('/reports/incentives-summary');
-        setData(res.data || []);
+        const res = await api.get(selectedLocation ? `/reports/incentives-summary?locationId=${selectedLocation}` : '/reports/incentives-summary');
+        rows = Array.isArray(res.data) ? res.data : (res.data?.summary || res.data?.records || res.data?.data || []);
       } else if (activeTab === 'payroll') {
         const res = await api.get('/payroll/runs');
-        setData(res.data?.runs || []);
+        rows = res.data?.runs || (Array.isArray(res.data) ? res.data : []);
       }
+      setData(rows);
     } catch (e) {
       console.error('Fetch report error:', e);
+      setData([]);
     } finally {
       setLoading(false);
     }
