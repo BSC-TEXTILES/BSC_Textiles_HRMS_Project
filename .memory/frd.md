@@ -34,32 +34,29 @@ There must be:
 
 # 2. FUNCTIONAL ARCHITECTURE
 
-The system must operate using the following flow:
+The system operates using the following transaction pipeline:
 
-```text
-User
- ↓
-Frontend
- ↓
-Authentication
- ↓
-Role & Permission Validation
- ↓
-Location / Organizational Scope Validation
- ↓
-API
- ↓
-Business Logic
- ↓
-Database Transaction
- ↓
-Realtime Event
- ↓
-Notification
- ↓
-Audit Log
- ↓
-Reports / Analytics
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+flowchart TD
+    U["1. User Interaction (Web / Kiosk / Scanner)"]:::cBlue --> FE["2. Frontend Validation & Token Ingress"]:::cBlue
+    FE --> AUTH["3. Authentication (JWT Verification)"]:::cDark
+    AUTH --> RBAC["4. Role & Permission Matrix Validation"]:::cDark
+    RBAC --> SCOPE["5. Location & Organizational Scope Isolation"]:::cDark
+    SCOPE --> API["6. Domain API Gateway Controller"]:::cBlue
+    API --> BIZ["7. Business Logic & Calculation Engines"]:::cOrange
+    BIZ --> DB["8. MySQL ACID Database Transaction"]:::cDb
+    DB --> RT["9. Realtime Socket.IO Event Broadcast"]:::cPurple
+    DB --> NOTIF["10. Targeted In-App Notifications"]:::cPurple
+    DB --> AUDIT["11. Append-Only Audit Trail Ledger"]:::cDark
+    DB --> REP["12. Reports & Analytics Aggregation"]:::cGreen
+
+    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
+    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
+    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
+    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
+    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
+    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
 ```
 
 Every important transaction must follow this architecture.
@@ -217,12 +214,23 @@ Frontend visibility alone is not sufficient.
 
 Every location-sensitive API must determine the current user's permitted scope before querying data.
 
-Example:
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+flowchart TD
+    REQ["Incoming API Request"]:::cBlue --> CHECK_ROLE{"req.user.role == 'SUPER_ADMIN'?"}:::cOrange
+    CHECK_ROLE -- "YES" --> ALLOW_ALL["Unrestricted Query Scope (All Branches)"]:::cGreen
+    CHECK_ROLE -- "NO" --> EVAL_SCOPE{"Requested locationId == req.user.locationId?"}:::cOrange
 
-```text
-User → Shivamogga
-API request → locationId=Belagavi
-Result → ACCESS DENIED
+    EVAL_SCOPE -- "MATCH (e.g. Shivamogga == Shivamogga)" --> INJECT_FILTER["Inject `where: { locationId: user.locationId }` into Prisma Query"]:::cGreen
+    EVAL_SCOPE -- "MISMATCH (e.g. Shivamogga != Belagavi)" --> REJECT_403["Reject: 403 Forbidden ('Access denied to this location')"]:::cRed
+
+    INJECT_FILTER --> EXEC_QUERY["Execute Query on MySQL (Branch Records Only)"]:::cDb
+
+    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
+    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
+    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
+    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
+    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
 ```
 
 The backend must not query unrestricted records and then filter them in the browser.
@@ -589,24 +597,30 @@ But all durations must be configurable.
 
 Lunch workflow:
 
-```text
-Start Lunch
- ↓
-Create Break Record
- ↓
-Calculate Allowed Duration
- ↓
-Display Timer
- ↓
-End Lunch
- ↓
-Calculate Used Duration
- ↓
-Calculate Overrun
- ↓
-Update Attendance
- ↓
-Audit
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+flowchart TD
+    START["1. Employee Initiates Lunch (QR / Portal)"]:::cBlue --> CREATE["2. Create Break Record in MySQL (status: ACTIVE)"]:::cDb
+    CREATE --> CALC_ALLOWED["3. Calculate Allowed Duration (Male: 100m, Female: 40m)"]:::cOrange
+    CALC_ALLOWED --> TIMER["4. Socket.IO Broadcast: Start Realtime Countdown Clock"]:::cPurple
+
+    TIMER --> END_LUNCH["5. Employee Concludes Lunch (Return QR Scan)"]:::cBlue
+    END_LUNCH --> CALC_DIFF{"6. Evaluate Actual vs Allowed Duration"}:::cOrange
+
+    CALC_DIFF -- "Within Policy (<= 0s excess)" --> ON_TIME["Status: COMPLETED (0 Overrun)"]:::cGreen
+    CALC_DIFF -- "Exceeded Policy (> 0s excess)" --> OVERRUN["Status: EXCEEDED<br/>Log Overrun Seconds & Penalty"]:::cRed
+
+    ON_TIME --> UPDATE_ATT["7. Update Attendance State in MySQL"]:::cDb
+    OVERRUN --> UPDATE_ATT
+    UPDATE_ATT --> AUDIT_LOG["8. Write Immutable Audit Log Transaction"]:::cDark
+
+    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
+    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
+    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
+    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
+    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
+    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
+    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
 ```
 
 ---
@@ -728,22 +742,28 @@ Approved leave must affect attendance calculations.
 
 Workflow:
 
-```text
-Employee
- ↓
-Camera/Image
- ↓
-Face Verification Provider
- ↓
-Match Score
- ↓
-Threshold Comparison
- ↓
-VERIFIED / FAILED
- ↓
-Attendance Event
- ↓
-Audit
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+flowchart TD
+    STAFF["1. Employee Check-in Request"]:::cBlue --> CAM["2. WebCam Live Frame Capture"]:::cTeal
+    CAM --> ENROLL["3. Compare vs Enrolled Biometric Baseline"]:::cTeal
+    ENROLL --> SCORE["4. Compute Cosine Match Score (e.g. 94.2%)"]:::cTeal
+    SCORE --> THRESHOLD{"5. Match Score >= 85.0% Threshold?"}:::cOrange
+
+    THRESHOLD -- "YES (>= 85%)" --> PASS["Status: VERIFIED<br/>Allow Punch In"]:::cGreen
+    THRESHOLD -- "NO (< 85%)" --> FAIL["Status: FAILED<br/>Reject Punch & Alert"]:::cRed
+
+    PASS --> ATT_EV["6. Record Attendance Event in MySQL"]:::cDb
+    FAIL --> ATT_EV
+    ATT_EV --> AUDIT_FACE["7. Append to FaceVerificationLog & Audit Trail"]:::cDark
+
+    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
+    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
+    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
+    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
+    classDef cTeal fill:#009688,stroke:#00675B,stroke-width:2px,color:#FFFFFF;
+    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
+    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
 ```
 
 Store actual provider score.
@@ -791,26 +811,35 @@ Previous-day token must no longer be valid.
 
 Scanner workflow:
 
-```text
-Open Scanner
- ↓
-Camera Permission
- ↓
-Scan
- ↓
-Token Validation
- ↓
-Date Validation
- ↓
-Expiration Validation
- ↓
-Role Validation
- ↓
-Location Validation
- ↓
-Duplicate Validation
- ↓
-Transaction
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+flowchart TD
+    SCAN_DEV["1. Scanner Terminal Reads Token"]:::cTeal --> VAL_SIG{"2. Token Format (>= 24 chars)?"}:::cDark
+    VAL_SIG -- "Malformed" --> ERR_FORMAT["Reject: INVALID_TOKEN"]:::cRed
+    VAL_SIG -- "Valid" --> VAL_DATE{"3. Token Date == CURDATE()?"}:::cOrange
+
+    VAL_DATE -- "Previous Day" --> ERR_DATE["Reject: EXPIRED_TOKEN"]:::cRed
+    VAL_DATE -- "Today" --> VAL_ROLE{"4. Scanner Role Authorized (T-Shop/Admin)?"}:::cDark
+
+    VAL_ROLE -- "Unauthorized" --> ERR_ROLE["Reject: UNAUTHORIZED_ROLE"]:::cRed
+    VAL_ROLE -- "Authorized" --> VAL_LOC{"5. Scanner Location == Staff Location?"}:::cOrange
+
+    VAL_LOC -- "Cross-Location" --> ERR_LOC["Reject: WRONG_LOCATION"]:::cRed
+    VAL_LOC -- "Same Location" --> VAL_DUP{"6. Already Used for Same Action Today?"}:::cOrange
+
+    VAL_DUP -- "Duplicate" --> ERR_DUP["Reject: ALREADY_USED"]:::cRed
+    VAL_DUP -- "Fresh" --> COMMIT_SCAN["7. Commit Break/Attendance Transaction in MySQL"]:::cDb
+
+    COMMIT_SCAN --> WS_DISPATCH["8. Socket.IO Broadcast: 'qr.scanned' & 'break.started'"]:::cPurple
+
+    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
+    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
+    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
+    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
+    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
+    classDef cTeal fill:#009688,stroke:#00675B,stroke-width:2px,color:#FFFFFF;
+    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
+    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
 ```
 
 ---
@@ -877,22 +906,23 @@ Display a simple user-facing message while storing the detailed technical reason
 
 The engine must evaluate active incentive rules.
 
-Example:
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+flowchart TD
+    TRIG["1. Operational Trigger (Punch Early / Target Met)"]:::cBlue --> RULE_MATCH["2. Match Active IncentiveRule from MySQL"]:::cOrange
+    RULE_MATCH --> SCOPE_VAL["3. Validate Employee Scope (Role, Location, Dept)"]:::cDark
+    SCOPE_VAL --> CALC_ENG["4. Calculate Formula with Explainability Breakdown"]:::cOrange
+    CALC_ENG --> GRANT_REC["5. Create IncentiveGrant Transaction (status: PENDING/APPROVED)"]:::cDb
+    GRANT_REC --> APPROVAL{"6. Automatic Policy or Manager Approval?"}:::cOrange
+    APPROVAL -- "Approved" --> ACCRUE["7. Accrue into Active Monthly Payroll Run"]:::cGreen
+    APPROVAL -- "Rejected" --> VOID["8. Mark Rejected & Audit"]:::cRed
 
-```text
-Trigger
- ↓
-Find Applicable Rule
- ↓
-Validate Employee Scope
- ↓
-Calculate
- ↓
-Create Incentive Transaction
- ↓
-Approval
- ↓
-Payroll
+    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
+    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
+    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
+    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
+    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
+    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
 ```
 
 ---
@@ -937,26 +967,31 @@ Every penalty must have:
 
 # 40. PAYROLL FUNCTIONAL FLOW
 
-```text
-Attendance
-+
-Leave
-+
-Overtime
-+
-Approved Incentives
-+
-Approved Deductions
-↓
-Payroll Calculation
-↓
-Review
-↓
-Approval
-↓
-Payroll Lock
-↓
-Payslip
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+flowchart TD
+    ATT["1. Validated Attendance Records"]:::cGreen --> AGG["6. Aggregate Month Earnings & Deductions"]:::cOrange
+    LEAVE["2. Approved Paid / Unpaid Leaves"]:::cGreen --> AGG
+    OT["3. Shift Overtime Hours"]:::cGreen --> AGG
+    INC["4. Approved Incentives (Early Login, Sales)"]:::cGreen --> AGG
+    DED["5. Approved Deductions (Late, Overrun, PF/ESI)"]:::cRed --> AGG
+
+    AGG --> CALC["7. Calculate Gross & Net Pay per Employee"]:::cOrange
+    CALC --> DRAFT_RUN["8. Create PayrollRun (Status: DRAFT) + Items in MySQL"]:::cDb
+    DRAFT_RUN --> REVIEW["9. HR & Payroll Manager Verification Review"]:::cBlue
+
+    REVIEW --> APP_GATE{"10. Approval Granted?"}:::cOrange
+    APP_GATE -- "Adjustments Required" --> RECALC["Manual Adjustment Flow"]:::cOrange
+    RECALC --> DRAFT_RUN
+    APP_GATE -- "Approved" --> LOCK["11. Payroll Lock: Status = PUBLISHED"]:::cGreen
+
+    LOCK --> SLIPS["12. Generate Digital Payslips for My Desk Portal"]:::cGreen
+
+    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
+    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
+    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
+    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
+    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
 ```
 
 Locked payroll must not be silently changed.
@@ -967,30 +1002,25 @@ Corrections require authorized adjustment/audit flow.
 
 # 41. OBSERVATION FUNCTIONAL FLOW
 
-```text
-Create Observation
- ↓
-Select Employee
- ↓
-Select Location/Organization
- ↓
-Enter Observation
- ↓
-Set Level
- ↓
-Set Priority
- ↓
-Attach Media
- ↓
-Assign Action
- ↓
-Notify
- ↓
-Employee/Manager Response
- ↓
-Resolution
- ↓
-Close
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+flowchart TD
+    INIT["1. Floor / Dept Manager Initiates Observation"]:::cBlue --> SEL["2. Select Target Employee & Showroom Floor"]:::cBlue
+    SEL --> NOTE["3. Enter Narrative, Rating (1-5), Category & Stream Timestamp"]:::cBlue
+    NOTE --> MEDIA["4. Attach Image / Video Snapshot (Optional)"]:::cTeal
+    MEDIA --> SAVE_OBS["5. Commit Observation to MySQL Database"]:::cDb
+
+    SAVE_OBS --> PUSH_WS["6. Socket.IO Dispatch Realtime Notification to Staff"]:::cPurple
+    PUSH_WS --> RESP_STAFF["7. Staff Acknowledges & Submits Clarification on My Desk"]:::cGreen
+    RESP_STAFF --> RESOLVE["8. Manager Evaluates Outcome & Resolves Action Item"]:::cGreen
+    RESOLVE --> CLOSE["9. Status = RESOLVED / CLOSED (Immutable Audit)"]:::cDark
+
+    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
+    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
+    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
+    classDef cTeal fill:#009688,stroke:#00675B,stroke-width:2px,color:#FFFFFF;
+    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
+    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
 ```
 
 ---
@@ -1049,22 +1079,19 @@ Video must have controlled access.
 
 # 45. LIVE STREAM FUNCTIONAL DESIGN
 
-Stream lifecycle:
+Stream lifecycle state machine:
 
-```text
-DRAFT
- ↓
-READY
- ↓
-LIVE
- ↓
-PAUSED
- ↓
-LIVE
- ↓
-ENDED
- ↓
-ARCHIVED
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#7B61FF', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+stateDiagram-v2
+    [*] --> DRAFT: Manager Creates Showroom Stream Channel
+    DRAFT --> READY: Camera Feed Bound & Signal Verified
+    READY --> LIVE: Manager Starts Broadcast (Status: LIVE)
+    LIVE --> PAUSED: Network / Intermission Pause
+    PAUSED --> LIVE: Resume Broadcast
+    LIVE --> ENDED: Manager Concludes Broadcast Session
+    ENDED --> ARCHIVED: Stream Recording Indexed for Audits
+    ARCHIVED --> [*]
 ```
 
 Only authorized roles can start or stop streams.
@@ -1107,16 +1134,19 @@ Chat must persist.
 
 During live streaming:
 
-```text
-Current Stream Time
- ↓
-Create Observation
- ↓
-Save Timestamp
- ↓
-Select Employee
- ↓
-Save Observation
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+flowchart TD
+    TIME["1. Capture Current Stream Video Timecode (e.g. 00:14:32)"]:::cTeal --> MODAL["2. Manager Triggers Live Observation Modal"]:::cBlue
+    MODAL --> EMP["3. Select Target Floor Sales Employee"]:::cBlue
+    EMP --> FORM["4. Enter Coaching Note, Rating & Behavioral Tags"]:::cBlue
+    FORM --> COMMIT_OBS["5. INSERT INTO StreamObservation & Observation in MySQL"]:::cDb
+    COMMIT_OBS --> PIN["6. Pin Timecoded Marker to Live Video Progress Scrubber"]:::cPurple
+
+    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
+    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
+    classDef cTeal fill:#009688,stroke:#00675B,stroke-width:2px,color:#FFFFFF;
+    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
 ```
 
 The observation must retain the relevant stream timestamp.
@@ -1153,18 +1183,21 @@ Each notification contains:
 
 # 50. REALTIME EVENT ENGINE
 
-Backend publishes events after successful database transactions.
+Backend publishes events after successful database transactions:
 
-Example:
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+flowchart TD
+    TX_OK["1. MySQL Database Transaction Successfully Committed"]:::cDb --> PUB["2. Socket.IO Gateway Publishes Event (e.g. 'break.started')"]:::cPurple
+    PUB --> ROOM["3. Filter by Authorized Room (e.g. 'location:BEL')"]:::cDark
+    ROOM --> SUBSCRIBERS["4. Connected Browser Clients Receive Event Payload"]:::cBlue
+    SUBSCRIBERS --> OPT_UI["5. Optimistic UI Re-render & State Synchronization"]:::cGreen
 
-```text
-DB Transaction Success
- ↓
-Publish Event
- ↓
-Authorized Subscribers
- ↓
-Frontend Update
+    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
+    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
+    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
+    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
+    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
 ```
 
 Do not publish false events before database commit.
