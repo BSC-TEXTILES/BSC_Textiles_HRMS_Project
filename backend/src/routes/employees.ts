@@ -1,0 +1,341 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { prisma } from '../index.js';
+import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
+import { validate } from '../middleware/validation.js';
+
+const router = Router();
+
+router.use(authenticate);
+
+const employeeSchema = z.object({
+  body: z.object({
+    employeeCode: z.string().min(2).max(30),
+    firstName: z.string().min(1).max(50),
+    lastName: z.string().min(1).max(50),
+    email: z.string().email().optional().or(z.literal('')),
+    phone: z.string().optional(),
+    gender: z.enum(['male', 'female', 'other']).optional(),
+    locationId: z.string().min(1),
+    floorId: z.string().optional(),
+    departmentId: z.string().optional(),
+    sectionId: z.string().optional(),
+    shiftId: z.string().optional(),
+    designation: z.string().optional(),
+    role: z.enum(['SUPER_ADMIN', 'ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE', 'PAYROLL_MANAGER', 'LOCATION_MANAGER', 'FLOOR_MANAGER', 'DEPARTMENT_MANAGER', 'TEAM_LEAD', 'SALES_EMPLOYEE', 'TEA_BREAK_MANAGER', 'T_SHOP_OWNER', 'HR_AUDITOR', 'EMPLOYEE']).optional(),
+    joiningDate: z.string().optional(),
+  }),
+});
+
+router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
+  try {
+    const { locationId, floorId, departmentId, sectionId, shiftId, status, page = 1, limit = 20, search } = req.query;
+    const skip = (Number(page) - 1) * Number(limit);
+    
+    const where: any = { locationId: req.user!.role === 'SUPER_ADMIN' ? locationId : req.user!.locationId };
+    if (floorId) where.floorId = floorId;
+    if (departmentId) where.departmentId = departmentId;
+    if (sectionId) where.sectionId = sectionId;
+    if (shiftId) where.shiftId = shiftId;
+    if (status) where.status = status;
+    if (search) where.OR = [
+      { employeeCode: { contains: String(search), mode: 'insensitive' } },
+      { firstName: { contains: String(search), mode: 'insensitive' } },
+      { lastName: { contains: String(search), mode: 'insensitive' } },
+    ];
+    
+    const [employees, total] = await Promise.all([
+      prisma.employee.findMany({
+        where,
+        skip,
+        take: Number(limit),
+        orderBy: { employeeCode: 'asc' },
+        include: {
+          location: { select: { id: true, name: true, code: true } },
+          floor: { select: { id: true, name: true } },
+          department: { select: { id: true, name: true } },
+          section: { select: { id: true, name: true } },
+          shift: { select: { id: true, name: true, startTime: true, endTime: true } },
+          sellingPoints: { include: { sellingPoint: { select: { id: true, name: true, code: true } } } },
+        },
+      }),
+      prisma.employee.count({ where }),
+    ]);
+    
+    res.json({ employees, total, page: Number(page), limit: Number(limit) });
+  } catch (error) {
+    console.error('Get employees error:', error);
+    res.status(500).json({ error: 'Failed to get employees' });
+  }
+});
+
+router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res) => {
+  try {
+    const employee = await prisma.employee.findUnique({
+      where: { id: req.params.id },
+      include: {
+        location: { select: { id: true, name: true, code: true } },
+        floor: { select: { id: true, name: true } },
+        department: { select: { id: true, name: true } },
+        section: { select: { id: true, name: true } },
+        shift: { select: { id: true, name: true, startTime: true, endTime: true, gracePeriod: true } },
+        sellingPoints: { include: { sellingPoint: { select: { id: true, name: true, code: true } } } },
+        faceProfile: { select: { id: true, enrolledAt: true, isActive: true } },
+        qrCode: { select: { id: true, token: true, validFrom: true, validTo: true, isConsumed: true } },
+        dailyQRCode: { select: { id: true, token: true, validFrom: true, validTo: true, isConsumed: true } },
+        attendances: { take: 5, orderBy: { attendanceDate: 'desc' } },
+        breaks: { take: 5, orderBy: { breakDate: 'desc' } },
+        faceVerifications: { take: 5, orderBy: { verifiedAt: 'desc' } },
+        qrScanRecords: { take: 5, orderBy: { scannedAt: 'desc' } },
+        observations: { take: 5, orderBy: { createdAt: 'desc' } },
+      },
+    });
+    
+    if (!employee) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    
+    if (req.user!.role !== 'SUPER_ADMIN' && employee.locationId !== req.user!.locationId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    res.json(employee);
+  } catch (error) {
+    console.error('Get employee error:', error);
+    res.status(500).json({ error: 'Failed to get employee' });
+  }
+});
+
+router.post('/', authorize('ADD'), validate(employeeSchema), async (req: AuthRequest, res) => {
+  try {
+    const { employeeCode, firstName, lastName, email, phone, gender, locationId, floorId, departmentId, sectionId, shiftId, designation, role, joiningDate } = req.body;
+    
+    if (req.user!.role !== 'SUPER_ADMIN' && locationId !== req.user!.locationId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const existing = await prisma.employee.findUnique({ where: { employeeCode } });
+    if (existing) {
+      return res.status(400).json({ error: 'Employee code already exists' });
+    }
+    
+    const fullName = `${firstName} ${lastName}`;
+    
+    const employee = await prisma.employee.create({
+      data: {
+        employeeCode,
+        firstName,
+        lastName,
+        fullName,
+        email,
+        phone,
+        gender,
+        locationId,
+        floorId,
+        departmentId,
+        sectionId,
+        shiftId,
+        designation,
+        role: role || 'EMPLOYEE',
+        joiningDate: joiningDate ? new Date(joiningDate) : new Date(),
+        status: 'ACTIVE',
+      },
+    });
+    
+    // Generate QR codes
+    const empQR = await prisma.qRCode.create({
+      data: {
+        token: `EMP-${employeeCode}-${Date.now()}`,
+        type: 'EMPLOYEE',
+        employeeId: employee.id,
+        locationId,
+        validFrom: new Date(),
+        validTo: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      },
+    });
+    
+    const dailyQR = await prisma.qRCode.create({
+      data: {
+        token: `DAILY-${employeeCode}-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`,
+        type: 'DAILY',
+        employeeId: employee.id,
+        locationId,
+        validFrom: new Date(new Date().setHours(0, 0, 0, 0)),
+        validTo: new Date(new Date().setHours(23, 59, 59, 999)),
+      },
+    });
+    
+    await prisma.employee.update({
+      where: { id: employee.id },
+      data: { qrCodeId: empQR.id, dailyQRCodeId: dailyQR.id },
+    });
+    
+    // Create user account if email provided
+    if (email) {
+      const bcrypt = await import('bcryptjs');
+      const passwordHash = await bcrypt.hash('password123', 12);
+      
+      await prisma.user.create({
+        data: {
+          email,
+          passwordHash,
+          fullName,
+          role: role || 'EMPLOYEE',
+          permissions: ['VIEW'],
+          employeeId: employee.id,
+          locationId,
+        },
+      });
+    }
+    
+    res.status(201).json(employee);
+  } catch (error) {
+    console.error('Create employee error:', error);
+    res.status(500).json({ error: 'Failed to create employee' });
+  }
+});
+
+router.put('/:id', authorize('EDIT'), validate(employeeSchema), async (req: AuthRequest, res) => {
+  try {
+    const { firstName, lastName, email, phone, gender, floorId, departmentId, sectionId, shiftId, designation, role, status, exitDate } = req.body;
+    
+    const existing = await prisma.employee.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    
+    if (req.user!.role !== 'SUPER_ADMIN' && existing.locationId !== req.user!.locationId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const fullName = `${firstName} ${lastName}`;
+    
+    const employee = await prisma.employee.update({
+      where: { id: req.params.id },
+      data: {
+        firstName,
+        lastName,
+        fullName,
+        email,
+        phone,
+        gender,
+        floorId,
+        departmentId,
+        sectionId,
+        shiftId,
+        designation,
+        role,
+        status,
+        exitDate: exitDate ? new Date(exitDate) : null,
+      },
+    });
+    
+    res.json(employee);
+  } catch (error) {
+    console.error('Update employee error:', error);
+    res.status(500).json({ error: 'Failed to update employee' });
+  }
+});
+
+router.patch('/:id/status', authorize('EDIT'), async (req: AuthRequest, res) => {
+  try {
+    const { status } = req.body;
+    
+    const existing = await prisma.employee.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    
+    if (req.user!.role !== 'SUPER_ADMIN' && existing.locationId !== req.user!.locationId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const employee = await prisma.employee.update({
+      where: { id: req.params.id },
+      data: { status, exitDate: status === 'TERMINATED' ? new Date() : null },
+    });
+    
+    res.json(employee);
+  } catch (error) {
+    console.error('Update employee status error:', error);
+    res.status(500).json({ error: 'Failed to update employee status' });
+  }
+});
+
+router.post('/:id/regenerate-qr', authorize('CONFIGURE'), async (req: AuthRequest, res) => {
+  try {
+    const existing = await prisma.employee.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    
+    if (req.user!.role !== 'SUPER_ADMIN' && existing.locationId !== req.user!.locationId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    // Regenerate permanent QR
+    const empQR = await prisma.qRCode.create({
+      data: {
+        token: `EMP-${existing.employeeCode}-${Date.now()}`,
+        type: 'EMPLOYEE',
+        employeeId: existing.id,
+        locationId: existing.locationId,
+        validFrom: new Date(),
+        validTo: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+      },
+    });
+    
+    // Regenerate daily QR
+    const dailyQR = await prisma.qRCode.create({
+      data: {
+        token: `DAILY-${existing.employeeCode}-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`,
+        type: 'DAILY',
+        employeeId: existing.id,
+        locationId: existing.locationId,
+        validFrom: new Date(new Date().setHours(0, 0, 0, 0)),
+        validTo: new Date(new Date().setHours(23, 59, 59, 999)),
+      },
+    });
+    
+    await prisma.employee.update({
+      where: { id: existing.id },
+      data: { qrCodeId: empQR.id, dailyQRCodeId: dailyQR.id },
+    });
+    
+    res.json({ empQR, dailyQR });
+  } catch (error) {
+    console.error('Regenerate QR error:', error);
+    res.status(500).json({ error: 'Failed to regenerate QR codes' });
+  }
+});
+
+router.delete('/:id', authorize('DELETE'), async (req: AuthRequest, res) => {
+  try {
+    const existing = await prisma.employee.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    
+    if (req.user!.role !== 'SUPER_ADMIN' && existing.locationId !== req.user!.locationId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
+    const [attCount, breakCount, fvCount] = await Promise.all([
+      prisma.attendance.count({ where: { employeeId: req.params.id } }),
+      prisma.employeeBreak.count({ where: { employeeId: req.params.id } }),
+      prisma.faceVerification.count({ where: { employeeId: req.params.id } }),
+    ]);
+    
+    if (attCount > 0 || breakCount > 0 || fvCount > 0) {
+      return res.status(400).json({ error: 'Cannot delete employee with existing records. Set status to TERMINATED instead.' });
+    }
+    
+    await prisma.employee.delete({ where: { id: req.params.id } });
+    res.json({ message: 'Employee deleted successfully' });
+  } catch (error) {
+    console.error('Delete employee error:', error);
+    res.status(500).json({ error: 'Failed to delete employee' });
+  }
+});
+
+export default router;

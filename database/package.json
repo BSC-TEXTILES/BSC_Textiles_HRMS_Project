@@ -1,0 +1,25 @@
+{
+  "name": "bsc-textiles-hrms-database",
+  "version": "1.0.0",
+  "description": "BSC Textiles HRMS Database Schema",
+  "main": "index.js",
+  "scripts": {
+    "build": "cd .. && prisma generate --schema=database/prisma/schema.prisma",
+    "prisma:generate": "cd .. && prisma generate --schema=database/prisma/schema.prisma",
+    "prisma:migrate": "cd .. && prisma migrate dev --schema=database/prisma/schema.prisma",
+    "prisma:seed": "cd .. && tsx database/prisma/seed.ts",
+    "prisma:studio": "cd .. && prisma studio --schema=database/prisma/schema.prisma",
+    "db:push": "cd .. && prisma db push --schema=database/prisma/schema.prisma",
+    "db:reset": "cd .. && prisma db push --force-reset --schema=database/prisma/schema.prisma"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.7.0",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "prisma": "^5.7.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

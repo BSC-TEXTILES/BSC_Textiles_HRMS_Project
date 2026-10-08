@@ -1,0 +1,37 @@
+{
+  "name": "bsc-textiles-hrms",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend",
+    "database"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "build": "npm run build --workspaces",
+    "build:backend": "npm run build --workspace=backend",
+    "build:frontend": "npm run build --workspace=frontend",
+    "db:generate": "prisma generate --schema=database/prisma/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema=database/prisma/schema.prisma",
+    "db:push": "prisma db push --schema=database/prisma/schema.prisma",
+    "db:reset": "prisma db push --force-reset --schema=database/prisma/schema.prisma",
+    "db:seed": "tsx database/prisma/seed.ts",
+    "db:studio": "prisma studio --schema=database/prisma/schema.prisma",
+    "db:setup": "npm run db:push && npm run db:seed",
+    "install:all": "npm install",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "prisma": "^5.7.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
