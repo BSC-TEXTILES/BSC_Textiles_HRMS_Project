@@ -48,7 +48,7 @@ router.post('/ingest', async (req: AuthRequest, res) => {
       data: {
         userId: req.user!.id,
         locationId: employee.locationId,
-        action: 'RECORD',
+        action: 'CREATE',
         entityType: 'DevicePunch',
         entityId: deviceId,
         newValue: { deviceId, employeeCode, punchType, timestamp: timestamp || new Date() },

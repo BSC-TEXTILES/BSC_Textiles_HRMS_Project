@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../index.js';
+import { prisma } from '../db.js';
 import { JWT_SECRET, JWT_ISSUER, TOKEN_TTL } from '../config/env.js';
 
 export interface AuthRequest extends Request {
@@ -15,7 +15,7 @@ export interface AuthRequest extends Request {
   };
 }
 
-export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
+export async function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
     
@@ -58,7 +58,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
   }
 };
 
-export const authorize = (...permissions: string[]) => {
+export function authorize(...permissions: string[]) {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -75,9 +75,9 @@ export const authorize = (...permissions: string[]) => {
 
     next();
   };
-};
+}
 
-export const authorizeLocation = (req: AuthRequest, res: Response, next: NextFunction) => {
+export function authorizeLocation(req: AuthRequest, res: Response, next: NextFunction) {
   if (!req.user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
@@ -93,9 +93,9 @@ export const authorizeLocation = (req: AuthRequest, res: Response, next: NextFun
   }
 
   next();
-};
+}
 
-export const generateToken = (user: { id: string; email: string; role: string; permissions: unknown; locationId?: string | null; employeeId?: string | null }) => {
+export function generateToken(user: { id: string; email: string; role: string; permissions: unknown; locationId?: string | null; employeeId?: string | null }) {
   // Only the subject is carried. Permissions and location scope are re-read from
   // MySQL on every request by `authenticate`, so revoking access takes effect
   // immediately rather than when a 7-day token happens to expire.
@@ -104,8 +104,8 @@ export const generateToken = (user: { id: string; email: string; role: string; p
     JWT_SECRET,
     { expiresIn: TOKEN_TTL }
   );
-};
+}
 
-export const verifyToken = (token: string) => {
+export function verifyToken(token: string) {
   return jwt.verify(token, JWT_SECRET);
-};
+}

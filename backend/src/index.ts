@@ -10,7 +10,7 @@ import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './db.js';
 
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
@@ -48,7 +48,7 @@ const io = new Server(httpServer, {
   },
 });
 
-export const prisma = new PrismaClient();
+export { prisma };
 export const socketIO = io;
 
 app.use(helmet({
