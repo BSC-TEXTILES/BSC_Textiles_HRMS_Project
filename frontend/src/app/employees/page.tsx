@@ -64,6 +64,8 @@ export default function EmployeesPage() {
       if (selectedLocation) params.append('locationId', selectedLocation);
       if (selectedDept) params.append('departmentId', selectedDept);
       if (selectedStatus) params.append('status', selectedStatus);
+      // The backend paginates at 20 by default — the directory must list every employee.
+      params.append('limit', '1000');
 
       const res = await api.get(`/employees?${params.toString()}`);
       setEmployees(res.data.employees || []);

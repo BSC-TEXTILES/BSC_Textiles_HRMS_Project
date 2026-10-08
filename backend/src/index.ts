@@ -38,6 +38,7 @@ import notificationRoutes from './routes/notifications.js';
 import roleRoutes from './routes/roles.js';
 import settingRoutes from './routes/settings.js';
 import deviceRoutes from './routes/devices.js';
+import staffOpsRoutes from './routes/staffOps.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -115,6 +116,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/settings', settingRoutes);
 app.use('/api/devices', deviceRoutes);
+app.use('/api/staff-ops', staffOpsRoutes);
 
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Error:', err);

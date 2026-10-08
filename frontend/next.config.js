@@ -21,6 +21,7 @@ const backendRoutes = [
   'holidays',
   'reports',
   'audit',
+  'staff-ops',
 ];
 
 /** @type {import('next').NextConfig} */

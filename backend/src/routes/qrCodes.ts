@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { z } from 'zod';
 import QRCode from 'qrcode';
 import { prisma } from '../index.js';
+import { dbDate } from '../utils/dates.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
 
@@ -295,7 +296,7 @@ router.post('/scan', authorize('SCAN'), validate(qrScanSchema), async (req: Auth
         data: {
           employeeId: qrCode.employeeId,
           breakType: 'LUNCH',
-          breakDate: new Date(),
+          breakDate: dbDate(),
           startTime: new Date(),
           allowedDuration: qrCode.employee.gender === 'female' ? 40 : 100,
           status: 'ACTIVE',
@@ -321,7 +322,7 @@ router.post('/scan', authorize('SCAN'), validate(qrScanSchema), async (req: Auth
         data: {
           employeeId: qrCode.employeeId,
           breakType: 'TEA',
-          breakDate: new Date(),
+          breakDate: dbDate(),
           startTime: new Date(),
           allowedDuration: qrCode.employee.gender === 'female' ? 15 : 20,
           status: 'ACTIVE',
@@ -344,8 +345,7 @@ router.post('/scan', authorize('SCAN'), validate(qrScanSchema), async (req: Auth
       }
     } else if (purpose === 'ATTENDANCE_CHECK_IN') {
       // Create or update attendance
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const today = dbDate();
       
       const existing = await prisma.attendance.findUnique({
         where: { employeeId_attendanceDate: { employeeId: qrCode.employeeId, attendanceDate: today } },
@@ -378,8 +378,7 @@ router.post('/scan', authorize('SCAN'), validate(qrScanSchema), async (req: Auth
         });
       }
     } else if (purpose === 'ATTENDANCE_CHECK_OUT') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const today = dbDate();
       
       const existing = await prisma.attendance.findUnique({
         where: { employeeId_attendanceDate: { employeeId: qrCode.employeeId, attendanceDate: today } },

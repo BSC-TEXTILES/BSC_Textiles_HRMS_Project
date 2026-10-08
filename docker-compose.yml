@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: bsc-textiles-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: bsc_textiles_hrms
+      MYSQL_USER: bsc_user
+      MYSQL_PASSWORD: bsc_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+      - ./database/seeds:/docker-entrypoint-initdb.d/seeds
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --max-connections=200
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ppassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - bsc-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bsc-textiles-backend
+    environment:
+      DATABASE_URL: mysql://root:password@mysql:3306/bsc_textiles_hrms
+      JWT_SECRET: bsc-textiles-hrms-super-secret-jwt-key-2024-production-ready-min-32-chars
+      NODE_ENV: development
+      PORT: 4000
+      FRONTEND_URL: http://localhost:3000
+    ports:
+      - "4000:4000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    networks:
+      - bsc-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bsc-textiles-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api
+      NEXTAUTH_SECRET: bsc-textiles-nextauth-secret-2024-production-ready-min-32-chars
+      NEXTAUTH_URL: http://localhost:3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - bsc-network
+
+volumes:
+  mysql_data:
+
+networks:
+  bsc-network:
+    driver: bridge
