@@ -7,6 +7,7 @@ export interface AuthRequest extends Request {
   user?: {
     id: string;
     email: string;
+    fullName: string;
     role: string;
     permissions: string[];
     locationId?: string;
@@ -29,6 +30,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
       select: {
         id: true,
         email: true,
+        fullName: true,
         role: true,
         permissions: true,
         locationId: true,
@@ -44,6 +46,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     req.user = {
       id: user.id,
       email: user.email,
+      fullName: user.fullName,
       role: user.role,
       permissions: Array.isArray(user.permissions) ? (user.permissions as string[]) : [],
       locationId: user.locationId ?? undefined,
