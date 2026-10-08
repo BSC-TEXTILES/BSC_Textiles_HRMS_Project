@@ -5,6 +5,7 @@
   "main": "src/pool.ts",
   "type": "module",
   "scripts": {
+    "build": "echo 'Database workspace uses native SQL - no build step required'",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
     "db:setup": "tsx scripts/migrate.ts && tsx scripts/seed.ts",
