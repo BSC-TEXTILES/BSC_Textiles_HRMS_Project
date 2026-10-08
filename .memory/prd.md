@@ -69,6 +69,41 @@ Create a centralized HRMS and workforce operations platform for BSC Textiles tha
 
 The architecture must allow future BSC Textiles systems such as Wedding CRM, Telecaller, customer management, store operations, feedback, VM, Live TV, and other modules to integrate without breaking the HRMS.
 
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+graph TB
+    subgraph STORES["Regional BSC Textiles Showrooms"]
+        B_BEL["Belagavi Head Store (BEL)"]:::cBlue
+        B_DAV["Davanagere Mega Store (DAV)"]:::cBlue
+        B_SHI["Shivamogga Flagship (SHI)"]:::cBlue
+        B_HUB["Hubballi Hub (HUB-TEST)"]:::cBlue
+    end
+
+    subgraph CORE_HRMS["BSC Textiles HRMS Central Core"]
+        WF["Workforce & Attendance Engine"]:::cGreen
+        BIO["Biometrics (Face Match + Daily QR)"]:::cTeal
+        COMP["Compensation & Punctuality Engine"]:::cOrange
+        LIVE["Showroom Live Stream & Observations"]:::cPurple
+        PAY["Multi-Branch Payroll Processing"]:::cOrange
+    end
+
+    subgraph FUTURE_ECOSYSTEM["Future BSC Textiles Enterprise Extensions"]
+        WED_CRM["Wedding & Bridal CRM"]:::cTeal
+        TELE["Telecaller Operations"]:::cTeal
+        VM["Visual Merchandising Audits"]:::cTeal
+        LIVE_TV["Showroom Live TV Signage"]:::cTeal
+    end
+
+    STORES --> CORE_HRMS
+    CORE_HRMS <--> FUTURE_ECOSYSTEM
+
+    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
+    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
+    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
+    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
+    classDef cTeal fill:#009688,stroke:#00675B,stroke-width:2px,color:#FFFFFF;
+```
+
 ---
 
 # 3. TECHNOLOGY REQUIREMENTS
