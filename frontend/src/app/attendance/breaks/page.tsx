@@ -14,6 +14,15 @@ export default function AttendanceBreaksPage() {
   const [filterType, setFilterType] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
 
+  // Deep-link support: /attendance/breaks?breakType=LUNCH&status=ACTIVE
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    const t = q.get('breakType');
+    const s = q.get('status');
+    if (t) setFilterType(t);
+    if (s) setFilterStatus(s);
+  }, []);
+
   useEffect(() => {
     fetchBreaks();
   }, [filterType, filterStatus]);

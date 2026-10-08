@@ -80,6 +80,12 @@ export default function LiveAttendancePage() {
     }
   };
 
+  // Deep-link support: /operations/live-attendance?status=present
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get('status');
+    if (s) setStatusFilter(s);
+  }, []);
+
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 30000);
@@ -127,7 +133,7 @@ export default function LiveAttendancePage() {
 
   const stats = {
     total: employees.length,
-    present: employees.filter(e => e.attendance.status === 'present' && !e.attendance.isWeekOff).length,
+    present: employees.filter(e => ['present', 'late'].includes(e.attendance.status) && !e.attendance.isWeekOff).length,
     late: employees.filter(e => e.attendance.lateMinutes > 0).length,
     onBreak: employees.filter(e => e.break?.status === 'active').length,
     weekOff: employees.filter(e => e.attendance.isWeekOff).length,
@@ -304,6 +310,7 @@ export default function LiveAttendancePage() {
                 { value: 'leave', label: 'On Leave' },
                 { value: 'weekly_off', label: 'Weekly Off' },
                 { value: 'on_break', label: 'On Break' },
+                { value: 'overtime', label: 'Overtime' },
               ]}
             />
             <Select

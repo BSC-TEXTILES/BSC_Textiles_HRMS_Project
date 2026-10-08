@@ -292,7 +292,8 @@ router.get('/live-status', async (req: AuthRequest, res) => {
       output = rows.filter((r) => {
         switch (statusFilter) {
           case 'present':
-            return r.item.attendance.status === 'present';
+            // "Present" on the dashboard includes late arrivals (they are checked in).
+            return r.item.attendance.status === 'present' || r.item.attendance.status === 'late';
           case 'late':
             return r.item.attendance.lateMinutes > 0;
           case 'absent':
@@ -303,6 +304,8 @@ router.get('/live-status', async (req: AuthRequest, res) => {
             return r.item.attendance.isWeekOff;
           case 'on_break':
             return r.active;
+          case 'overtime':
+            return r.item.attendance.status === 'overtime';
           default:
             return true;
         }

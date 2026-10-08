@@ -21,6 +21,14 @@ export default function ReportsPage() {
     fetchLocations();
   }, []);
 
+  // Deep-link support: /reports?tab=qr
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab');
+    if (t && ['attendance', 'face', 'qr', 'incentives', 'payroll'].includes(t)) {
+      setActiveTab(t as any);
+    }
+  }, []);
+
   useEffect(() => {
     fetchReportData();
   }, [activeTab, selectedLocation]);
@@ -149,7 +157,7 @@ export default function ReportsPage() {
               <table className="w-full text-left text-xs text-gray-600">
                 <thead className="bg-gray-50 text-[11px] uppercase font-semibold text-gray-700 border-b border-gray-200">
                   <tr>
-                    {Object.keys(data[0]).slice(0, 7).map((key) => (
+                    {Object.keys(data[0]).map((key) => (
                       <th key={key} className="py-3 px-4 capitalize">{key.replace(/([A-Z])/g, ' $1')}</th>
                     ))}
                   </tr>
@@ -157,7 +165,7 @@ export default function ReportsPage() {
                 <tbody className="divide-y divide-gray-100">
                   {data.map((row, idx) => (
                     <tr key={idx} className="hover:bg-gray-50/80">
-                      {Object.values(row).slice(0, 7).map((val: any, vIdx) => (
+                      {Object.values(row).map((val: any, vIdx) => (
                         <td key={vIdx} className="py-3 px-4 font-mono">
                           {typeof val === 'object' ? JSON.stringify(val).slice(0, 25) : String(val)}
                         </td>
