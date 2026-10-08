@@ -228,6 +228,39 @@ router.put('/:id', authorize('EDIT'), async (req: AuthRequest, res) => {
   }
 });
 
+router.post('/start', authorize('RECORD'), async (req: AuthRequest, res) => {
+  try {
+    const { employeeId, breakType = 'TEA' } = req.body;
+    const employee = await prisma.employee.findUnique({ where: { id: employeeId } });
+    if (!employee) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const allowedDuration = breakType === 'LUNCH' ? 45 : 20;
+
+    const breakRecord = await prisma.employeeBreak.create({
+      data: {
+        employeeId,
+        breakType,
+        breakDate: today,
+        startTime: new Date(),
+        allowedDuration,
+        status: 'ACTIVE',
+      },
+      include: {
+        employee: { select: { id: true, employeeCode: true, fullName: true, locationId: true } },
+      },
+    });
+
+    res.status(201).json({ employeeBreak: breakRecord, ...breakRecord });
+  } catch (error) {
+    console.error('Start new break error:', error);
+    res.status(500).json({ error: 'Failed to start break' });
+  }
+});
+
 router.post('/:id/start', authorize('RECORD'), async (req: AuthRequest, res) => {
   try {
     const existing = await prisma.employeeBreak.findUnique({

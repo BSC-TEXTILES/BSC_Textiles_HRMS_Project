@@ -216,7 +216,14 @@ export function Sidebar({ isOpen, onToggle }: { isOpen: boolean; onToggle: () =>
             </div>
           </div>
           <button
-            onClick={() => signOut({ callbackUrl: '/login' })}
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                localStorage.removeItem('bsc_token');
+                localStorage.removeItem('token');
+                localStorage.removeItem('bsc_user');
+              }
+              signOut({ callbackUrl: '/login' });
+            }}
             className="w-full mt-3 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
           >
             <LogOut className="w-4 h-4" />

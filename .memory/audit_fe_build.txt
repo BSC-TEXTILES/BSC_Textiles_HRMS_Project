@@ -1,0 +1,118 @@
+﻿
+> bsc-textiles-hrms-frontend@1.0.0 build
+> next build
+
+  Ôû▓ Next.js 14.2.35
+  - Environments: .env.local
+
+   Creating an optimized production build ...
+ Ô£ô Compiled successfully
+   Linting and checking validity of types ...
+
+./src/app/admin/audit-logs/page.tsx
+19:6  Warning: React Hook useEffect has a missing dependency: 'fetchLogs'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/attendance/breaks/page.tsx
+19:6  Warning: React Hook useEffect has a missing dependency: 'fetchBreaks'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/attendance/register/page.tsx
+26:6  Warning: React Hook useEffect has a missing dependency: 'fetchRegister'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/attendance/shifts/page.tsx
+24:6  Warning: React Hook useEffect has a missing dependency: 'fetchShifts'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/employees/page.tsx
+44:6  Warning: React Hook useEffect has a missing dependency: 'fetchEmployees'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/employees/profile/[id]/page.tsx
+80:6  Warning: React Hook useEffect has a missing dependency: 'fetchEmployee'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/my-desk/page.tsx
+34:6  Warning: React Hook useEffect has a missing dependency: 'fetchDeskData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/operations/breaks/page.tsx
+27:6  Warning: React Hook useEffect has a missing dependency: 'fetchData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/operations/face-verification/page.tsx
+71:6  Warning: React Hook useEffect has missing dependencies: 'today' and 'weekAgo'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+103:6  Warning: React Hook useEffect has missing dependencies: 'fetchRecords' and 'fetchStats'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/operations/live-attendance/page.tsx
+87:6  Warning: React Hook useEffect has a missing dependency: 'fetchData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/operations/observations/page.tsx
+137:6  Warning: React Hook useEffect has a missing dependency: 'fetchData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/operations/qr-scanner/page.tsx
+214:6  Warning: React Hook useEffect has a missing dependency: 'startCamera'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/operations/selling-points/page.tsx
+32:6  Warning: React Hook useEffect has a missing dependency: 'fetchLocations'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+36:6  Warning: React Hook useEffect has a missing dependency: 'fetchSellingPoints'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/organization/departments/page.tsx
+30:6  Warning: React Hook useEffect has a missing dependency: 'fetchDepartments'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/payroll/page.tsx
+23:6  Warning: React Hook useEffect has a missing dependency: 'fetchPayrollRuns'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+./src/app/reports/page.tsx
+26:6  Warning: React Hook useEffect has a missing dependency: 'fetchReportData'. Either include it or remove the dependency array.  react-hooks/exhaustive-deps
+
+info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/basic-features/eslint#disabling-rules
+   Collecting page data ...
+   Generating static pages (0/37) ...
+   Generating static pages (9/37) 
+   Generating static pages (18/37) 
+   Generating static pages (27/37) 
+ Ô£ô Generating static pages (37/37)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+Ôöî Ôùï /                                    563 B          97.5 kB
+Ôö£ Ôùï /_not-found                          877 B          88.2 kB
+Ôö£ Ôùï /admin/audit-logs                    2.1 kB          140 kB
+Ôö£ Ôùï /admin/backup                        2.16 kB         126 kB
+Ôö£ Ôùï /admin/roles                         2.15 kB         145 kB
+Ôö£ Ôùï /admin/settings                      3.1 kB          146 kB
+Ôö£ Ôùï /admin/users                         2.7 kB          145 kB
+Ôö£ ãÆ /api/auth/[...nextauth]              0 B                0 B
+Ôö£ Ôùï /attendance/breaks                   2.16 kB         140 kB
+Ôö£ Ôùï /attendance/calculation              7.22 kB         145 kB
+Ôö£ Ôùï /attendance/corrections              1.7 kB          126 kB
+Ôö£ Ôùï /attendance/punches                  2.77 kB         145 kB
+Ôö£ Ôùï /attendance/register                 2.01 kB         139 kB
+Ôö£ Ôùï /attendance/shifts                   1.6 kB          139 kB
+Ôö£ Ôùï /dashboard                           5.55 kB         143 kB
+Ôö£ Ôùï /employees                           3.6 kB          146 kB
+Ôö£ Ôùï /employees/profile                   988 B           116 kB
+Ôö£ ãÆ /employees/profile/[id]              5.96 kB         143 kB
+Ôö£ Ôùï /incentives/calculation              2.16 kB         140 kB
+Ôö£ Ôùï /leaves                              1.77 kB         126 kB
+Ôö£ Ôùï /login                               30.6 kB         140 kB
+Ôö£ Ôùï /my-desk                             5.09 kB         148 kB
+Ôö£ Ôùï /operations/breaks                   3.58 kB         146 kB
+Ôö£ Ôùï /operations/face-verification        6.17 kB         144 kB
+Ôö£ Ôùï /operations/live-attendance          6.67 kB         129 kB
+Ôö£ Ôùï /operations/live-streams             3.33 kB         146 kB
+Ôö£ Ôùï /operations/observations             7.39 kB         145 kB
+Ôö£ Ôùï /operations/qr-scanner               7.25 kB         130 kB
+Ôö£ Ôùï /operations/selling-points           2.76 kB         145 kB
+Ôö£ Ôùï /operations/time-shifts              3.04 kB         145 kB
+Ôö£ Ôùï /organization/departments            2.4 kB          145 kB
+Ôö£ Ôùï /organization/designations           1.37 kB         120 kB
+Ôö£ Ôùï /organization/floor-managers         1.64 kB         139 kB
+Ôö£ Ôùï /organization/holidays               2.12 kB         145 kB
+Ôö£ Ôùï /organization/locations              5.29 kB         143 kB
+Ôö£ Ôùï /payroll                             3.32 kB         146 kB
+Ôöö Ôùï /reports                             2.34 kB         145 kB
++ First Load JS shared by all            87.3 kB
+  Ôö£ chunks/2364-5c767db94c41c8f4.js      31.7 kB
+  Ôö£ chunks/618f8807-622581104bc2d466.js  53.6 kB
+  Ôöö other shared chunks (total)          1.96 kB
+
+
+Ôùï  (Static)   prerendered as static content
+ãÆ  (Dynamic)  server-rendered on demand
+

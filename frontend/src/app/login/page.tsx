@@ -93,22 +93,41 @@ export default function LoginPage() {
     setErrorMessage(null);
     
     try {
-      const result = await signIn('credentials', {
+      // 1. Direct call to backend to obtain token and persist to localStorage
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+      const loginRes = await fetch(`${apiBase}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: data.email, password: data.password }),
+      });
+      const loginData = await loginRes.json().catch(() => null);
+
+      if (!loginRes.ok || !loginData?.token) {
+        const errorMsg = loginData?.error || 'Invalid email or password';
+        setErrorMessage(errorMsg);
+        toast.error(errorMsg);
+        setIsLoading(false);
+        return;
+      }
+
+      // Persist auth tokens immediately
+      localStorage.setItem('bsc_token', loginData.token);
+      localStorage.setItem('token', loginData.token);
+      localStorage.setItem('bsc_user', JSON.stringify(loginData.user));
+      document.cookie = `token=${loginData.token}; path=/; max-age=604800; SameSite=Lax`;
+
+      // 2. Also establish NextAuth session
+      await signIn('credentials', {
         email: data.email,
         password: data.password,
         redirect: false,
-      });
+      }).catch(() => null);
 
-      if (result?.error) {
-        setErrorMessage(result.error);
-        toast.error(result.error);
-      } else {
-        toast.success('Welcome back to BSC Textiles HRMS!');
-        router.push('/dashboard');
-        router.refresh();
-      }
+      toast.success('Welcome back to BSC Textiles HRMS!');
+      router.push('/dashboard');
+      router.refresh();
     } catch (error) {
-      const message = 'An error occurred. Please try again.';
+      const message = 'An error occurred during authentication. Please try again.';
       setErrorMessage(message);
       toast.error(message);
     } finally {
