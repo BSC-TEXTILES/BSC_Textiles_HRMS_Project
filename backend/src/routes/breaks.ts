@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../index.js';
+import { dbDate } from '../utils/dates.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
 
@@ -159,8 +160,7 @@ router.post('/', authorize('RECORD'), validate(breakSchema), async (req: AuthReq
       return res.status(403).json({ error: 'Access denied' });
     }
     
-    const date = new Date(breakDate);
-    date.setHours(0, 0, 0, 0);
+    const date = dbDate(new Date(breakDate));
     
     const breakRecord = await prisma.employeeBreak.create({
       data: {
@@ -236,8 +236,7 @@ router.post('/start', authorize('RECORD'), async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Employee not found' });
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = dbDate();
     const allowedDuration = breakType === 'LUNCH' ? 45 : 20;
 
     const breakRecord = await prisma.employeeBreak.create({

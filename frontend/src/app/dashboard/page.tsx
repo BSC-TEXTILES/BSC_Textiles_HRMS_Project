@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Users, Clock, CheckCircle, AlertCircle, Coffee, Utensils,
@@ -47,9 +48,12 @@ interface QuickStat {
   color: string;
   trend?: { value: string; positive: boolean };
   badge?: string;
+  /** When set, the card navigates to this route on click. */
+  href?: string;
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +97,7 @@ export default function DashboardPage() {
   }
 
   const quickStats: QuickStat[] = [
-    { title: 'Total Employees', value: stats?.totalEmployees || 0, icon: Users, color: 'bg-blue-500', badge: 'Active workforce' },
+    { title: 'Total Employees', value: stats?.totalEmployees || 0, icon: Users, color: 'bg-blue-500', badge: 'Active workforce', href: '/employees' },
     { title: 'Present Today', value: stats?.present || 0, icon: CheckCircle, color: 'bg-emerald-500', badge: 'On floor' },
     { title: 'Late Arrivals', value: stats?.late || 0, icon: Clock, color: 'bg-amber-500', badge: 'Need attention' },
     { title: 'On Lunch', value: stats?.onLunch || 0, icon: Utensils, color: 'bg-blue-400', badge: 'Break active' },
@@ -141,6 +145,7 @@ export default function DashboardPage() {
               icon={stat.icon}
               color={stat.color}
               badge={stat.badge}
+              onClick={stat.href ? () => router.push(stat.href!) : undefined}
             />
           ))}
         </div>

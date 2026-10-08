@@ -2,7 +2,7 @@
 -- BSC TEXTILES HRMS — NATIVE MYSQL 8.0 SEED DATASET (ZERO PRISMA)
 -- Company: BSC Textiles Pvt Ltd
 -- Pre-configured Test Accounts Password: password123
--- Pre-hashed Bcrypt Hash: $2a$12$4m26eL1d.VnQ6oW1kM9sXeU3gV2vY1nZ2bX3mP4wR5tY6uI7oP8qa
+-- Pre-hashed Bcrypt Hash (of "password123"): $2a$12$FM2IEz.uvN10roK2KrJiqOsn3cudHt3J21Gqa/IkZ6VTQnmyLznuq
 -- ==============================================================================
 
 SET FOREIGN_KEY_CHECKS = 0;
@@ -67,13 +67,13 @@ INSERT INTO employees (id, employee_code, full_name, gender, phone, email, locat
 -- 10. SYSTEM USERS (Password: password123 hashed via bcrypt)
 -- Using universal hash for password123: $2a$12$hTf9Vq4M77mPzU6mJg.8o.cE3wQzS2D0qW4LwG7y1l5v6b5y3z1e2
 INSERT INTO users (id, email, password_hash, full_name, role, permissions, location_id, employee_id, is_active) VALUES
-('usr_admin', 'admin@bsctextiles.com', '$2a$12$r3y7R6uN8Q7z9vQ8O0yQ1e5LzX9gL2kP3mQ4wR5tY6uI7oP8qa123', 'Rajesh Sharma', 'SUPER_ADMIN', '["VIEW", "ADD", "EDIT", "DELETE", "APPROVE", "REJECT", "ASSIGN", "EXPORT", "IMPORT", "CONFIGURE", "MANAGE", "RECORD", "UPLOAD", "PUBLISH", "SCAN", "VIEW_SENSITIVE_DATA"]', 'loc_bel', 'emp_admin', TRUE),
-('usr_kavita', 'kavita.bhat@bsctextiles.com', '$2a$12$r3y7R6uN8Q7z9vQ8O0yQ1e5LzX9gL2kP3mQ4wR5tY6uI7oP8qa123', 'Kavita Bhat', 'HR_MANAGER', '["VIEW", "ADD", "EDIT", "APPROVE", "REJECT", "ASSIGN", "EXPORT", "MANAGE", "RECORD", "VIEW_SENSITIVE_DATA"]', 'loc_bel', 'emp_kavita', TRUE),
-('usr_vikram', 'vikram.singh@bsctextiles.com', '$2a$12$r3y7R6uN8Q7z9vQ8O0yQ1e5LzX9gL2kP3mQ4wR5tY6uI7oP8qa123', 'Vikram Singh', 'HR_MANAGER', '["VIEW", "ADD", "EDIT", "APPROVE", "REJECT", "ASSIGN", "EXPORT", "MANAGE", "RECORD"]', 'loc_shi', 'emp_vikram', TRUE),
-('usr_amit', 'amit.patel@bsctextiles.com', '$2a$12$r3y7R6uN8Q7z9vQ8O0yQ1e5LzX9gL2kP3mQ4wR5tY6uI7oP8qa123', 'Amit Patel', 'FLOOR_MANAGER', '["VIEW", "EDIT", "ASSIGN", "RECORD", "UPLOAD"]', 'loc_bel', 'emp_amit', TRUE),
-('usr_ramesh', 'ramesh.gowda@bsctextiles.com', '$2a$12$r3y7R6uN8Q7z9vQ8O0yQ1e5LzX9gL2kP3mQ4wR5tY6uI7oP8qa123', 'Ramesh Gowda', 'T_SHOP_OWNER', '["VIEW", "SCAN", "RECORD"]', 'loc_bel', 'emp_ramesh', TRUE),
-('usr_rajesh', 'rajesh.kumar@bsctextiles.com', '$2a$12$r3y7R6uN8Q7z9vQ8O0yQ1e5LzX9gL2kP3mQ4wR5tY6uI7oP8qa123', 'Rajesh Kumar', 'SALES_EMPLOYEE', '["VIEW", "RECORD"]', 'loc_bel', 'emp_rajesh', TRUE),
-('usr_priya', 'priya.d@bsctextiles.com', '$2a$12$r3y7R6uN8Q7z9vQ8O0yQ1e5LzX9gL2kP3mQ4wR5tY6uI7oP8qa123', 'Priya Deshmukh', 'EMPLOYEE', '["VIEW", "RECORD"]', 'loc_bel', 'emp_priya', TRUE);
+('usr_admin', 'admin@bsctextiles.com', '$2a$12$FM2IEz.uvN10roK2KrJiqOsn3cudHt3J21Gqa/IkZ6VTQnmyLznuq', 'Rajesh Sharma', 'SUPER_ADMIN', '["VIEW", "ADD", "EDIT", "DELETE", "APPROVE", "REJECT", "ASSIGN", "EXPORT", "IMPORT", "CONFIGURE", "MANAGE", "RECORD", "UPLOAD", "PUBLISH", "SCAN", "VIEW_SENSITIVE_DATA"]', 'loc_bel', 'emp_admin', TRUE),
+('usr_kavita', 'kavita.bhat@bsctextiles.com', '$2a$12$FM2IEz.uvN10roK2KrJiqOsn3cudHt3J21Gqa/IkZ6VTQnmyLznuq', 'Kavita Bhat', 'HR_MANAGER', '["VIEW", "ADD", "EDIT", "APPROVE", "REJECT", "ASSIGN", "EXPORT", "MANAGE", "RECORD", "VIEW_SENSITIVE_DATA"]', 'loc_bel', 'emp_kavita', TRUE),
+('usr_vikram', 'vikram.singh@bsctextiles.com', '$2a$12$FM2IEz.uvN10roK2KrJiqOsn3cudHt3J21Gqa/IkZ6VTQnmyLznuq', 'Vikram Singh', 'HR_MANAGER', '["VIEW", "ADD", "EDIT", "APPROVE", "REJECT", "ASSIGN", "EXPORT", "MANAGE", "RECORD"]', 'loc_shi', 'emp_vikram', TRUE),
+('usr_amit', 'amit.patel@bsctextiles.com', '$2a$12$FM2IEz.uvN10roK2KrJiqOsn3cudHt3J21Gqa/IkZ6VTQnmyLznuq', 'Amit Patel', 'FLOOR_MANAGER', '["VIEW", "EDIT", "ASSIGN", "RECORD", "UPLOAD"]', 'loc_bel', 'emp_amit', TRUE),
+('usr_ramesh', 'ramesh.gowda@bsctextiles.com', '$2a$12$FM2IEz.uvN10roK2KrJiqOsn3cudHt3J21Gqa/IkZ6VTQnmyLznuq', 'Ramesh Gowda', 'T_SHOP_OWNER', '["VIEW", "SCAN", "RECORD"]', 'loc_bel', 'emp_ramesh', TRUE),
+('usr_rajesh', 'rajesh.kumar@bsctextiles.com', '$2a$12$FM2IEz.uvN10roK2KrJiqOsn3cudHt3J21Gqa/IkZ6VTQnmyLznuq', 'Rajesh Kumar', 'SALES_EMPLOYEE', '["VIEW", "RECORD"]', 'loc_bel', 'emp_rajesh', TRUE),
+('usr_priya', 'priya.d@bsctextiles.com', '$2a$12$FM2IEz.uvN10roK2KrJiqOsn3cudHt3J21Gqa/IkZ6VTQnmyLznuq', 'Priya Deshmukh', 'EMPLOYEE', '["VIEW", "RECORD"]', 'loc_bel', 'emp_priya', TRUE);
 
 -- Update floor manager reference
 UPDATE floors SET floor_manager_id = 'usr_amit' WHERE id = 'floor_bel_g';

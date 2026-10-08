@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../index.js';
+import { dbDate } from '../utils/dates.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
 
@@ -125,8 +126,7 @@ router.post('/', authorize('RECORD'), validate(fvSchema), async (req: AuthReques
     });
     
     // Update attendance if exists
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = dbDate();
     await prisma.attendance.updateMany({
       where: { employeeId, attendanceDate: today },
       data: { faceVerified: result === 'VERIFIED', faceMatchPercentage: matchPercentage },

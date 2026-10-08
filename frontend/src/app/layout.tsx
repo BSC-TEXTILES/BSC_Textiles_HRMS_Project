@@ -52,7 +52,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
-      <body className={`${inter.variable} font-sans antialiased h-full bg-gray-50`}>
+      <body className={`${inter.variable} font-sans antialiased h-full bg-gray-50`} suppressHydrationWarning>
         <Providers>{children}</Providers>
       </body>
     </html>

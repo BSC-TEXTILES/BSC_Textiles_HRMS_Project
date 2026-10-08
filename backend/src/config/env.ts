@@ -8,9 +8,18 @@
 
 import crypto from 'node:crypto';
 import type { SignOptions } from 'jsonwebtoken';
+import dotenv from 'dotenv';
+
+// Load .env HERE, before any secret is read. index.ts also calls dotenv.config(),
+// but ESM/CJS module evaluation may run this file first (via route imports), which
+// previously left JWT_SECRET unset and forced a random per-process key — breaking
+// every session on each tsx-watch restart.
+dotenv.config();
+dotenv.config({ path: '../.env' });
 
 const PLACEHOLDER_SECRETS = new Set([
   'your-super-secret-jwt-key-change-in-production',
+  'your-super-secret-jwt-key-change-in-production-min-32-chars',
   'bsc-textiles-hrms-super-secret-jwt-key-2024-production-ready',
   'change-me',
   'secret',

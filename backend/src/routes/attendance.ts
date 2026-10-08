@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../index.js';
+import { dbDate } from '../utils/dates.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { socketIO } from '../index.js';
 import { validate } from '../middleware/validation.js';
@@ -91,8 +92,7 @@ router.post('/punch', authorize('RECORD'), async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Employee not found' });
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = dbDate();
     const now = new Date();
 
     let existing = await prisma.attendance.findFirst({
@@ -151,8 +151,7 @@ router.post('/punch', authorize('RECORD'), async (req: AuthRequest, res) => {
 router.get('/calculate/:employeeId/:date', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
     const { employeeId, date } = req.params;
-    const targetDate = new Date(date);
-    targetDate.setHours(0, 0, 0, 0);
+    const targetDate = dbDate(new Date(date));
 
     const employee = await prisma.employee.findUnique({
       where: { id: employeeId },
@@ -268,8 +267,7 @@ router.get('/calculate/:employeeId/:date', authorize('VIEW'), async (req: AuthRe
 router.get('/summary/:employeeId/:date', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
     const { employeeId, date } = req.params;
-    const targetDate = new Date(date);
-    targetDate.setHours(0, 0, 0, 0);
+    const targetDate = dbDate(new Date(date));
 
     const attendance = await prisma.attendance.findFirst({
       where: { employeeId, attendanceDate: targetDate },
@@ -448,8 +446,7 @@ router.post('/', authorize('RECORD'), validate(attendanceSchema), async (req: Au
         : null;
     const rules = await prisma.attendanceRules.findUnique({ where: { locationId } });
     
-    const date = new Date(attendanceDate);
-    date.setHours(0, 0, 0, 0);
+    const date = dbDate(new Date(attendanceDate));
     
     // Check if attendance already exists
     const existing = await prisma.attendance.findUnique({
