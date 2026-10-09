@@ -161,6 +161,44 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const userName = session?.user?.name || 'S. B. Angadi';
   const userRole = session?.user?.role?.replace(/_/g, ' ') || 'Super Admin';
   const userEmail = session?.user?.email || 'admin@bsctextiles.com';
+  const rawRole = session?.user?.role || 'SUPER_ADMIN';
+
+  const visibleNavigation = stitchNavigation
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        // Admin-only system management
+        if (item.href.startsWith('/admin')) {
+          return rawRole === 'SUPER_ADMIN' || rawRole === 'ADMIN';
+        }
+        // Store floor & observation operations
+        if (item.href.startsWith('/operations')) {
+          return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole);
+        }
+        // Payroll runs & incentive formula calculations
+        if (item.href.startsWith('/payroll') || item.href.startsWith('/incentives')) {
+          return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'PAYROLL_MANAGER'].includes(rawRole);
+        }
+        // Department structure & organizational units
+        if (item.href.startsWith('/organization')) {
+          return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole);
+        }
+        // Corporate governance reports
+        if (item.href.startsWith('/reports')) {
+          return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole);
+        }
+        // Attendance calculations & manual corrections
+        if (item.href === '/attendance/calculation' || item.href === '/attendance/corrections') {
+          return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole);
+        }
+        // Directory access
+        if (item.href === '/employees' && !['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole)) {
+          return false;
+        }
+        return true;
+      }),
+    }))
+    .filter((section) => section.items.length > 0);
 
   return (
     <div className="min-h-screen bg-[#f8f9ff] text-[#0b1c30] font-sans antialiased">
@@ -202,7 +240,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
           {/* Navigation Links */}
           <nav className={`flex flex-col gap-1 ${isCollapsed ? 'px-2 py-3' : 'px-3 py-3'}`}>
-            {stitchNavigation.map((section) => (
+            {visibleNavigation.map((section) => (
               <div key={section.title} className="mb-2">
                 {!isCollapsed ? (
                   <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">
@@ -298,7 +336,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               </div>
 
               <nav className="p-3 space-y-2">
-                {stitchNavigation.map((sec) => (
+                {visibleNavigation.map((sec) => (
                   <div key={sec.title}>
                     <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       {sec.title}

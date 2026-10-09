@@ -77,6 +77,25 @@ export function authorize(...permissions: string[]) {
   };
 }
 
+export const requireAuth = authenticate;
+
+export function requireRole(...roles: string[]) {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const isSuperAdmin = req.user.role === 'SUPER_ADMIN';
+    const hasRole = roles.includes(req.user.role);
+
+    if (!hasRole && !isSuperAdmin) {
+      return res.status(403).json({ error: 'Forbidden: insufficient role privileges' });
+    }
+
+    next();
+  };
+}
+
 export function authorizeLocation(req: AuthRequest, res: Response, next: NextFunction) {
   if (!req.user) {
     return res.status(401).json({ error: 'Authentication required' });
