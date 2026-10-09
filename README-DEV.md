@@ -22,17 +22,15 @@ Then open **http://localhost:3000/login**.
 > calls it) before `npm run dev` - MySQL runs as a background process, not as
 > a Windows service.
 
-## How the database layers work
+## How the database layer works
 
-The repo contains two database layers:
+The project is built on **Pure Native MySQL 8.0** (`mysql2/promise` connection pool) with zero Prisma dependencies:
 
-| Layer | Tables | Used by | How to apply |
-|-------|--------|---------|--------------|
-| **Prisma** (authoritative today) | `user`, `employee`, `location`, `attendance`, ... (camelCase) | **backend API** (all routes incl. login) | `npx prisma db push --schema=backend/prisma/schema.prisma` + `npx tsx backend/prisma/seed.ts` - both automated by `.\setup-database.ps1` |
-| **Native MySQL** (migration in progress) | `users`, `employees`, `locations`, `attendance`, ... (snake_case) | `database/` workspace repositories only (not wired into the backend yet) | `npm run db:setup --workspace=database` |
+| Layer | Architecture | Used by | How to apply |
+|-------|--------------|---------|--------------|
+| **Native MySQL 8.0** | Native connection pool (`mysql2/promise`) + indexed SQL | **Backend API & All Services** | `npm run db:setup` (or `npm run db:migrate && npm run db:seed`) |
 
-**Login only depends on the Prisma layer.** The backend authenticates against
-the `user` table (camelCase columns, real bcrypt hashes of `password123`).
+The backend authenticates against the native MySQL database using pure SQL queries and secure bcrypt hashes of `password123`.
 
 ## Test Credentials
 
@@ -125,10 +123,6 @@ npm run test --workspace=backend
 npm run typecheck
 npm run lint
 
-# Re-apply Prisma schema / reseed (equivalent to setup-database.ps1 steps 3-4)
-npx prisma db push --schema=backend/prisma/schema.prisma
-npx tsx backend/prisma/seed.ts
-
-# Native MySQL layer (database workspace - future migration)
-npm run db:setup --workspace=database
+# Apply Native MySQL schema migrations and seed
+npm run db:setup
 ```
