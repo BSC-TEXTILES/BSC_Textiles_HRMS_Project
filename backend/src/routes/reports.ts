@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../index.js';
 import { dbDate } from '../utils/dates.js';
-import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
+import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -9,9 +9,7 @@ router.use(authenticate);
 
 router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
-    const locationId = req.user!.role === 'SUPER_ADMIN'
-      ? (typeof req.query.locationId === 'string' ? req.query.locationId : undefined)
-      : req.user!.locationId;
+    const locationId = getScopedLocationId(req.user, req.query.locationId);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -136,7 +134,7 @@ router.get('/attendance-summary', authorize('VIEW'), async (req: AuthRequest, re
   try {
     const { locationId, startDate, endDate, shiftId, departmentId } = req.query;
     
-    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? (locationId as string | undefined) : req.user!.locationId;
+    const targetLocationId = getScopedLocationId(req.user, locationId);
     const where: any = targetLocationId ? { locationId: targetLocationId } : {};
     if (startDate || endDate) {
       where.attendanceDate = {};
@@ -198,9 +196,9 @@ router.get('/employee-performance', authorize('VIEW'), async (req: AuthRequest, 
   try {
     const { locationId, employeeId, startDate, endDate } = req.query;
     
-    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? locationId : req.user!.locationId;
+    const targetLocationId = getScopedLocationId(req.user, locationId);
     
-    const where: any = { locationId: targetLocationId };
+    const where: any = targetLocationId ? { locationId: targetLocationId } : {};
     if (employeeId) where.employeeId = employeeId;
     if (startDate || endDate) {
       where.attendanceDate = {};
@@ -238,7 +236,7 @@ router.get(['/incentive-summary', '/incentives-summary'], authorize('VIEW'), asy
   try {
     const { locationId, startDate, endDate, incentiveRuleId } = req.query;
     
-    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? (locationId as string | undefined) : req.user!.locationId;
+    const targetLocationId = getScopedLocationId(req.user, locationId);
     
     const where: any = targetLocationId ? { employee: { locationId: targetLocationId } } : {};
     if (incentiveRuleId) where.incentiveRuleId = incentiveRuleId;
@@ -277,7 +275,7 @@ router.get('/break-analysis', authorize('VIEW'), async (req: AuthRequest, res) =
   try {
     const { locationId, startDate, endDate, breakType } = req.query;
     
-    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? (locationId as string | undefined) : req.user!.locationId;
+    const targetLocationId = getScopedLocationId(req.user, locationId);
     
     const where: any = targetLocationId ? { employee: { locationId: targetLocationId } } : {};
     if (breakType) where.breakType = breakType;
@@ -316,7 +314,7 @@ router.get(['/face-verification-stats', '/face-verification-accuracy'], authoriz
   try {
     const { locationId, startDate, endDate } = req.query;
     
-    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? (locationId as string | undefined) : req.user!.locationId;
+    const targetLocationId = getScopedLocationId(req.user, locationId);
     
     const where: any = targetLocationId ? { locationId: targetLocationId } : {};
     if (startDate || endDate) {
@@ -369,7 +367,7 @@ router.get(['/qr-scan-analytics', '/qr-scans-summary'], authorize('VIEW'), async
   try {
     const { locationId, startDate, endDate, purpose } = req.query;
     
-    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? (locationId as string | undefined) : req.user!.locationId;
+    const targetLocationId = getScopedLocationId(req.user, locationId);
     
     const where: any = targetLocationId ? { locationId: targetLocationId } : {};
     if (purpose) where.purpose = purpose;
@@ -422,12 +420,10 @@ router.get('/selling-point-performance', authorize('VIEW'), async (req: AuthRequ
   try {
     const { locationId, startDate, endDate } = req.query;
     
-    const targetLocationId = req.user!.role === 'SUPER_ADMIN'
-      ? (typeof locationId === 'string' ? locationId : undefined)
-      : req.user!.locationId;
+    const targetLocationId = getScopedLocationId(req.user, locationId);
     
     const sellingPoints = await prisma.sellingPoint.findMany({
-      where: { locationId: targetLocationId, status: true },
+      where: targetLocationId ? { locationId: targetLocationId, status: true } : { status: true },
       include: {
         _count: { select: { employees: true, qrScanRecords: true } },
         incentiveRule: true,

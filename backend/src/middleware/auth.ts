@@ -96,12 +96,27 @@ export function requireRole(...roles: string[]) {
   };
 }
 
+export function isElevatedRole(role?: string): boolean {
+  return role === 'SUPER_ADMIN' || role === 'ADMIN';
+}
+
+export function getScopedLocationId(user?: AuthRequest['user'], requestedLocationId?: any): string | undefined {
+  if (!user) return undefined;
+  if (requestedLocationId) {
+    if (isElevatedRole(user.role)) return String(requestedLocationId);
+    if (user.locationId && user.locationId === String(requestedLocationId)) return user.locationId;
+    return user.locationId ?? undefined;
+  }
+  if (isElevatedRole(user.role)) return undefined;
+  return user.locationId ?? undefined;
+}
+
 export function authorizeLocation(req: AuthRequest, res: Response, next: NextFunction) {
   if (!req.user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
 
-  if (req.user.role === 'SUPER_ADMIN') {
+  if (isElevatedRole(req.user.role)) {
     return next();
   }
 

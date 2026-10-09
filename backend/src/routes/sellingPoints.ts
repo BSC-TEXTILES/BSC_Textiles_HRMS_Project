@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../index.js';
-import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
+import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
 
 const router = Router();
@@ -27,7 +27,9 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
     const { locationId, floorId, sectionId, page = 1, limit = 20, search } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
     
-    const where: any = { locationId: req.user!.role === 'SUPER_ADMIN' ? locationId : req.user!.locationId };
+    const scopedLocId = getScopedLocationId(req.user, locationId);
+    const where: any = {};
+    if (scopedLocId) where.locationId = scopedLocId;
     if (floorId) where.floorId = floorId;
     if (sectionId) where.sectionId = sectionId;
     if (search) where.OR = [{ name: { contains: String(search), mode: 'insensitive' } }, { code: { contains: String(search), mode: 'insensitive' } }];
