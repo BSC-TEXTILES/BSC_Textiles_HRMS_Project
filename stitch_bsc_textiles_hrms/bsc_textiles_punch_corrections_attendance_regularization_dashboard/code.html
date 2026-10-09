@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,600;0,700;1,400&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "secondary-container": "#2170e4", "surface-container-high": "#dce9ff", "on-tertiary-fixed-variant": "#6e3900", "on-tertiary-fixed": "#2f1500", "primary-container": "#131b2e", "surface-variant": "#d3e4fe", "on-secondary-container": "#fefcff", "primary-fixed-dim": "#bec6e0", "on-secondary-fixed-variant": "#004395", "on-primary": "#ffffff", "secondary-fixed": "#d8e2ff", "surface-container-low": "#eff4ff", "on-error": "#ffffff", "on-tertiary-container": "#c76c00", "surface-tint": "#565e74", "on-primary-fixed": "#131b2e", "on-secondary-fixed": "#001a42", "tertiary-fixed-dim": "#ffb77d", "inverse-surface": "#213145", "surface-container-lowest": "#ffffff", "background": "#f8f9ff", "surface-container-highest": "#d3e4fe", "secondary": "#0058be", "surface": "#f8f9ff", "on-secondary": "#ffffff", "on-error-container": "#93000a", "surface-container": "#e5eeff", "surface-dim": "#cbdbf5", "error": "#ba1a1a", "error-container": "#ffdad6", "tertiary-container": "#2f1500", "tertiary": "#000000", "on-primary-fixed-variant": "#3f465c", "primary": "#000000", "on-surface-variant": "#45464d", "inverse-primary": "#bec6e0", "inverse-on-surface": "#eaf1ff", "on-tertiary": "#ffffff", "primary-fixed": "#dae2fd", "secondary-fixed-dim": "#adc6ff", "on-surface": "#0b1c30", "on-primary-container": "#7c839b", "surface-bright": "#f8f9ff", "tertiary-fixed": "#ffdcc3", "outline": "#76777d", "on-background": "#0b1c30", "outline-variant": "#c6c6cd" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "space-xl": "1.5rem", "gutter": "1rem", "margin": "1.5rem", "space-2xl": "2rem", "space-lg": "1rem", "space-sm": "0.5rem", "margin-lg": "2rem", "gutter-lg": "1.5rem", "space-xs": "0.25rem", "space-md": "0.75rem" }, "fontFamily": { "headline-md": ["Plus Jakarta Sans"], "label-md": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"], "label-lg": ["Plus Jakarta Sans"], "label-sm": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "display-lg": ["Plus Jakarta Sans"], "body-sm": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"] }, "fontSize": { "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "label-md": ["11px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "600" }], "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.015em", "fontWeight": "600" }], "headline-sm": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "600" }], "label-lg": ["13px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600" }], "label-sm": ["10px", { "lineHeight": "12px", "letterSpacing": "0.06em", "fontWeight": "700" }], "body-md": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }], "body-lg": ["15px", { "lineHeight": "22px", "fontWeight": "400" }] } } } };</script></head><body class="bg-background font-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between overflow-y-auto"><div class="flex flex-col"><div class="h-14 flex items-center gap-space-sm px-margin bg-surface-container-lowest"><img alt="BSC Textiles HRMS Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVH-y2iZ7yaWx6Q6YdmCHl5vkuKf05I_tvVHXVmfcUPbGtp_kwuvSAA6xrLyvKJHBNWbsKAe9w2IVjozxX7H1lJp-QjrcIHW9eZzcLHERrm1drSgbM7tnMjOxun2eDUY0Z7MD95iXYT3uCEmzqt88rmLfdZES7ZnfHodPxWD1vFb9iZAjw75H43SyIc1YyF2g7zpDhy4idpDfo40BeesriCLNRd9xeLnJTvyUFLuRMJMuXeerzo-5b"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm text-on-surface leading-none tracking-tight">BSC Textiles</span><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">HRMS Portal</span></div></div><nav class="flex flex-col gap-space-xs px-space-sm py-space-md" data-active-classes="bg-surface-container text-secondary font-label-lg font-bold"><div class="px-space-md pt-space-xs pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Core Operations</div><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="executive-dashboard" href="#">Executive Dashboard</a><div class="px-space-md pt-space-md pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Workforce Directory</div><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="all-employees" href="#">All Employees</a><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="profile-360-dossier" href="#">Profile 360 &amp; Dossier</a><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="departments-units" href="#">Departments &amp; Units</a><div class="px-space-md pt-space-md pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Time &amp; Attendance</div><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="biometric-punches" href="#">Biometric Punches</a><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="floor-shifts-rosters" href="#">Floor Shifts &amp; Rosters</a><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="lunch-break-tracker" href="#">Lunch &amp; Break Tracker</a><a aria-current="page" class="flex items-center px-space-md py-space-sm rounded-lg transition-colors bg-surface-container text-secondary font-label-lg font-bold" data-path="punch-corrections" href="#">Punch Corrections</a><div class="px-space-md pt-space-md pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Leave &amp; Payroll</div><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="leave-approvals" href="#">Leave Approvals</a><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="payroll-payslips" href="#">Payroll &amp; Payslips</a><div class="px-space-md pt-space-md pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Governance</div><a class="flex items-center px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="audit-logs-security" href="#">Audit Logs &amp; Security</a></nav></div><div class="p-space-md bg-surface-container-low m-space-sm rounded-xl"><div class="flex items-center justify-between mb-space-xs"><span class="font-label-sm text-label-sm uppercase text-on-surface-variant">Biometric Server</span><span class="flex h-2 w-2 relative"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span></span></div><div class="font-label-md text-label-md text-on-surface font-bold">Synced Live</div><div class="font-body-sm text-body-sm text-on-surface-variant">99.8% Terminal Uptime</div></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-14 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-margin-lg"><div class="flex items-center gap-space-lg flex-1 max-w-2xl"><div class="relative flex items-center bg-surface-container-low rounded-lg px-space-md py-space-xs"><span class="material-symbols-outlined text-secondary text-[18px] mr-space-xs">pin_drop</span><select class="bg-transparent font-label-lg text-label-lg text-on-surface focus:outline-none cursor-pointer pr-space-sm"><option value="all">All Hubs (Karnataka)</option><option value="bel">Belagavi Spinning Mill (BEL)</option><option value="dav">Davanagere Weaving Hub (DAV)</option><option value="shi">Shivamogga Retail Apex (SHI)</option></select></div><div class="relative flex-1 flex items-center bg-surface-container-lowest rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.02)] px-space-md py-space-xs"><span class="material-symbols-outlined text-on-surface-variant text-[20px] mr-space-xs">search</span><input class="w-full bg-transparent font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none" placeholder="Search by ID (e.g. BSC-4029), Name, Dept, or Phone..." type="text"/></div></div><div class="flex items-center gap-space-md"><div class="flex flex-col text-right pr-space-sm hidden md:flex"><div class="flex items-center gap-space-xs justify-end"><span class="material-symbols-outlined text-[14px] text-secondary">schedule</span><span class="font-label-lg text-label-lg text-on-surface font-bold">14:22:08 IST</span></div><span class="font-body-sm text-body-sm text-on-surface-variant">24 Oct 2024 • Shift A</span></div><div class="relative flex items-center justify-center p-space-xs rounded-lg hover:bg-surface-container-high transition-colors cursor-pointer"><span class="material-symbols-outlined text-on-surface-variant text-[22px]">notifications</span><span class="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-error text-on-error font-label-sm text-[9px] font-bold">3</span></div><div class="flex items-center gap-space-sm pl-space-sm"><div class="flex flex-col text-right hidden sm:flex"><span class="font-label-lg text-label-lg text-on-surface font-bold">S. B. Angadi</span><span class="font-label-sm text-label-sm uppercase tracking-wide text-on-surface-variant">HR Director • Super Admin</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="w-full pt-14 px-margin-lg py-space-xl bg-background"><div class="flex flex-col w-full">
+<!-- Top Operational Breadcrumb & Context Header -->
+<div class="flex flex-col md:flex-row md:items-center justify-between pb-space-lg mb-space-lg">
+<div class="flex flex-col gap-space-xs">
+<div class="flex items-center gap-space-xs font-label-sm text-label-sm text-on-surface-variant tracking-wider uppercase">
+<span>Time &amp; Attendance</span>
+<span class="material-symbols-outlined text-[12px] text-outline">chevron_right</span>
+<span class="text-secondary font-bold">Punch Corrections &amp; Regularization Ledger</span>
+</div>
+<div class="flex flex-wrap items-center gap-space-md mt-space-xs">
+<h1 class="font-headline-lg text-headline-lg text-on-surface font-bold tracking-tight">Punch Corrections &amp; Attendance Regularization</h1>
+<div class="inline-flex items-center gap-space-xs px-space-sm py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant font-label-md text-label-md font-semibold">
+<span class="flex h-2 w-2 relative">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
+</span>
+          Active Pay Cycle: 21 Oct – 27 Oct 2024
+        </div>
+<div class="inline-flex items-center gap-1 text-on-surface-variant font-label-sm text-label-sm bg-surface-container-low px-space-xs py-0.5 rounded-lg">
+<span class="material-symbols-outlined text-[14px] text-secondary">verified_user</span>
+          Karnataka Factories Act Form T
+        </div>
+</div>
+</div>
+<!-- Screen Action Suite -->
+<div class="flex items-center gap-space-sm mt-space-md md:mt-0 flex-wrap">
+<button class="inline-flex items-center gap-space-xs px-space-md py-space-xs bg-surface-container-lowest text-on-surface hover:bg-surface-container-low transition-colors rounded-lg font-label-lg text-label-lg shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">file_download</span>
+        Export Audit (XLSX)
+      </button>
+<button class="inline-flex items-center gap-space-xs px-space-md py-space-xs bg-surface-container-lowest text-on-surface hover:bg-surface-container-low transition-colors rounded-lg font-label-lg text-label-lg shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px] text-secondary">checklist_rtl</span>
+        Batch Approve Selected (4)
+      </button>
+<button class="inline-flex items-center gap-space-xs px-space-md py-space-xs bg-primary text-on-primary hover:bg-primary-container transition-colors rounded-lg font-label-lg text-label-lg shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px]">add_circle</span>
+        Request Manual Correction
+      </button>
+</div>
+</div>
+<!-- Strategic KPI Metric Horizon -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-space-md mb-space-xl">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between mb-space-sm">
+<div class="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">pending_actions</span>
+</div>
+<span class="px-space-xs py-0.5 rounded bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">Action Required</span>
+</div>
+<div>
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant block mb-1">Pending Regularizations</span>
+<div class="flex items-baseline gap-space-xs">
+<span class="font-headline-lg text-headline-lg text-on-surface font-bold">18</span>
+<span class="font-label-lg text-label-lg text-on-surface-variant">Requests</span>
+</div>
+</div>
+<div class="mt-space-sm pt-space-xs font-body-sm text-body-sm text-on-surface-variant flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px] text-secondary">subdirectory_arrow_right</span>
+        12 Floor Approved • 6 with HR
+      </div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between mb-space-sm">
+<div class="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">warning</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-bold">Today</span>
+</div>
+<div>
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant block mb-1">Auto-Detected Anomalies</span>
+<div class="flex items-baseline gap-space-xs">
+<span class="font-headline-lg text-headline-lg text-on-surface font-bold">24</span>
+<span class="font-label-lg text-label-lg text-on-surface-variant">Flagged</span>
+</div>
+</div>
+<div class="mt-space-sm pt-space-xs font-body-sm text-body-sm text-on-surface-variant truncate">
+        14 Single Punches • 6 Grace Breaches
+      </div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between mb-space-sm">
+<div class="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">speed</span>
+</div>
+<span class="px-space-xs py-0.5 rounded bg-surface-container text-secondary font-label-sm text-label-sm font-bold">94.2% SLA</span>
+</div>
+<div>
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant block mb-1">Avg Resolution Time</span>
+<div class="flex items-baseline gap-space-xs">
+<span class="font-headline-lg text-headline-lg text-on-surface font-bold">2.4</span>
+<span class="font-label-lg text-label-lg text-on-surface-variant">Hours</span>
+</div>
+</div>
+<div class="mt-space-sm pt-space-xs font-body-sm text-body-sm text-on-surface-variant">
+        Target &lt; 4.0 hrs before 20:00 lock
+      </div>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between mb-space-sm">
+<div class="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">fingerprint</span>
+</div>
+<span class="text-secondary font-label-sm text-label-sm font-bold">-0.4% MoM</span>
+</div>
+<div>
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant block mb-1">Biometric Discrepancy</span>
+<div class="flex items-baseline gap-space-xs">
+<span class="font-headline-lg text-headline-lg text-on-surface font-bold">1.8%</span>
+<span class="font-label-lg text-label-lg text-on-surface-variant">Error Rate</span>
+</div>
+</div>
+<div class="mt-space-sm pt-space-xs font-body-sm text-body-sm text-on-surface-variant truncate">
+        Across 792 daily terminal punches
+      </div>
+</div>
+<!-- Card 5 -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between mb-space-sm">
+<div class="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">account_balance_wallet</span>
+</div>
+<span class="px-space-xs py-0.5 rounded bg-surface-container-highest text-secondary font-label-sm text-label-sm font-bold">Live Safeguard</span>
+</div>
+<div>
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant block mb-1">Payroll Impact Saved</span>
+<div class="flex items-baseline gap-space-xs">
+<span class="font-headline-lg text-headline-lg text-on-surface font-bold">&amp;inr18,420</span>
+</div>
+</div>
+<div class="mt-space-sm pt-space-xs font-body-sm text-body-sm text-on-surface-variant">
+        Protected from wrongful LOP deductions
+      </div>
+</div>
+</div>
+<!-- Multi-Level Filter, Tab Navigation & Fast Query Tools -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm mb-space-lg flex flex-col gap-space-md">
+<!-- Tab Strip -->
+<div class="flex items-center gap-space-xs overflow-x-auto pb-space-xs">
+<button class="inline-flex items-center gap-space-xs px-space-md py-space-xs rounded-lg bg-surface-container text-secondary font-label-lg text-label-lg font-bold whitespace-nowrap" type="button">
+<span>All Requests</span>
+<span class="px-1.5 py-0.2 bg-secondary text-on-secondary rounded-full font-label-sm text-label-sm">18</span>
+</button>
+<button class="inline-flex items-center gap-space-xs px-space-md py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container-low transition-colors font-label-lg text-label-lg whitespace-nowrap" type="button">
+<span>Missed Out-Punches</span>
+<span class="px-1.5 py-0.2 bg-surface-container-high text-on-surface-variant rounded-full font-label-sm text-label-sm">8</span>
+</button>
+<button class="inline-flex items-center gap-space-xs px-space-md py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container-low transition-colors font-label-lg text-label-lg whitespace-nowrap" type="button">
+<span>Late In-Punch Grace Breach</span>
+<span class="px-1.5 py-0.2 bg-surface-container-high text-on-surface-variant rounded-full font-label-sm text-label-sm">5</span>
+</button>
+<button class="inline-flex items-center gap-space-xs px-space-md py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container-low transition-colors font-label-lg text-label-lg whitespace-nowrap" type="button">
+<span>On-Duty &amp; Mill Out-Slip</span>
+<span class="px-1.5 py-0.2 bg-surface-container-high text-on-surface-variant rounded-full font-label-sm text-label-sm">3</span>
+</button>
+<button class="inline-flex items-center gap-space-xs px-space-md py-space-xs rounded-lg text-on-surface-variant hover:bg-surface-container-low transition-colors font-label-lg text-label-lg whitespace-nowrap" type="button">
+<span>Biometric Optical Failure</span>
+<span class="px-1.5 py-0.2 bg-surface-container-high text-on-surface-variant rounded-full font-label-sm text-label-sm">2</span>
+</button>
+</div>
+<!-- Filter Fields Bar -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-space-sm items-center">
+<!-- Search Input -->
+<div class="md:col-span-4 relative flex items-center bg-surface-container-low rounded-lg px-space-sm py-1.5">
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant mr-space-xs">search</span>
+<input class="w-full bg-transparent font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none" placeholder="Search by Employee, ID (e.g. BSC-EMP-0042), or Supervisor..." type="text"/>
+</div>
+<!-- Hub Selector -->
+<div class="md:col-span-2 relative flex items-center bg-surface-container-low rounded-lg px-space-sm py-1.5">
+<span class="material-symbols-outlined text-[16px] text-secondary mr-space-xs">store</span>
+<select class="w-full bg-transparent font-label-sm text-label-sm text-on-surface focus:outline-none cursor-pointer">
+<option>All Hubs (Karnataka)</option>
+<option>BEL-01 Flagship Belagavi</option>
+<option>DAV-02 Weaving Davanagere</option>
+<option>SHI-03 Retail Apex Shivamogga</option>
+</select>
+</div>
+<!-- Department Selector -->
+<div class="md:col-span-2 relative flex items-center bg-surface-container-low rounded-lg px-space-sm py-1.5">
+<select class="w-full bg-transparent font-label-sm text-label-sm text-on-surface focus:outline-none cursor-pointer">
+<option>All Departments</option>
+<option>Bridal Silk &amp; Atelier</option>
+<option>Jacquard Loom Yard</option>
+<option>Cashiering &amp; POS</option>
+<option>Finished Goods Depot</option>
+<option>Tailoring &amp; Alterations</option>
+</select>
+</div>
+<!-- Status Selector -->
+<div class="md:col-span-2 relative flex items-center bg-surface-container-low rounded-lg px-space-sm py-1.5">
+<select class="w-full bg-transparent font-label-sm text-label-sm text-on-surface focus:outline-none cursor-pointer">
+<option>Status: Pending HR</option>
+<option>Supervisor Verified</option>
+<option>Under Escalation</option>
+<option>Approved &amp; Synced</option>
+</select>
+</div>
+<!-- Quick Action Badges -->
+<div class="md:col-span-2 flex items-center gap-space-xs justify-end">
+<button class="px-space-sm py-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-label-sm text-label-sm flex items-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-[14px] text-secondary">tune</span>
+          Form T Flags
+        </button>
+<button class="px-space-sm py-1.5 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-label-sm text-label-sm flex items-center gap-1 transition-colors" type="button">
+<span class="material-symbols-outlined text-[14px] text-on-tertiary-container">local_fire_department</span>
+          Diwali Shift
+        </button>
+</div>
+</div>
+</div>
+<!-- Main Work Surface: 12-Column Ledger & Inspector Splitting -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
+<!-- LEFT 70% (8 Cols): High-Density Tabular Corrections Ledger -->
+<div class="lg:col-span-8 flex flex-col gap-space-md">
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden flex flex-col">
+<!-- Table Control Top Banner -->
+<div class="px-space-md py-space-sm bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="font-label-lg text-label-lg text-on-surface font-bold">Discrepancy Investigation Matrix</span>
+<span class="px-space-xs py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm font-semibold">18 Pending Signoffs</span>
+</div>
+<div class="flex items-center gap-space-sm text-on-surface-variant font-label-sm text-label-sm">
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-secondary"></span> Auto-Verified Punch Sync</span>
+<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-error"></span> Missing Biometric Token</span>
+</div>
+</div>
+<!-- Tabular Ledger Content -->
+<div class="overflow-x-auto">
+<table class="w-full text-left font-body-sm text-body-sm">
+<thead class="bg-surface-container-low/60 font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
+<tr>
+<th class="py-space-sm px-space-md w-10" scope="col">
+<input class="rounded text-secondary focus:ring-0 cursor-pointer" type="checkbox"/>
+</th>
+<th class="py-space-sm px-space-md font-semibold" scope="col">Staff &amp; Unit</th>
+<th class="py-space-sm px-space-md font-semibold" scope="col">Shift &amp; Raw Punches</th>
+<th class="py-space-sm px-space-md font-semibold" scope="col">Proposed Ledger</th>
+<th class="py-space-sm px-space-md font-semibold" scope="col">Attestation &amp; Evidence</th>
+<th class="py-space-sm px-space-md font-semibold text-center" scope="col">Pipeline</th>
+<th class="py-space-sm px-space-md font-semibold text-right" scope="col">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-transparent">
+<!-- ROW 1: Active Focus (Rajeshwari V. Patil) -->
+<tr class="bg-surface-container-low/40 hover:bg-surface-container-low transition-colors">
+<td class="py-space-sm px-space-md align-top">
+<input checked="" class="rounded text-secondary focus:ring-0 cursor-pointer mt-1" type="checkbox"/>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex items-start gap-space-sm">
+<img class="w-8 h-8 rounded-full object-cover shrink-0 shadow-sm" data-alt="Close up professional portrait of a senior Indian female textile retail specialist wearing a crisp traditional saree inside a well-lit luxury bridal boutique setting with soft ambient warm lights" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQroTcKVL76z9xcyN3nTIiiynglde7fRFpJN8aT8Zz2KSBQTDWKbyqBrYguTNFjcHD6E7IyzusCUj1LQ9SrAA4KpULhexM5PL6h6jnkLQnWz8SRq0AD2xk4LDYvP1t6x_dxxns-hLFkHfZaT5b_VCX8FIuCpD_mxS9zoOcx7HsUne4KfForClLT1DhHClBSel-J15QMZG_fGs1Q4gn6F-krWuBJSUlzADug3T0LsCqLxGmfee04Bfn"/>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg text-on-surface font-bold truncate">Rajeshwari V. Patil</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono">BSC-EMP-0042</span>
+<span class="inline-flex mt-1 items-center gap-1 font-label-sm text-label-sm text-secondary bg-surface-container px-1.5 py-0.5 rounded w-max">
+                        BEL-01 • Bridal Silk
+                      </span>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface">Shift A (09:30 – 18:30)</span>
+<div class="flex items-center gap-1 text-on-surface-variant mt-0.5">
+<span class="font-mono text-on-surface">09:28 IN</span>
+<span class="text-on-surface-variant">•</span>
+<span class="px-1 py-0.2 rounded bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">Missed OUT</span>
+</div>
+<span class="text-[11px] text-on-surface-variant mt-0.5">Terminal: BEL-IN-02</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex flex-col">
+<div class="flex items-center gap-1">
+<span class="font-mono font-bold text-secondary">19:15 OUT</span>
+<span class="text-[11px] text-on-surface-variant">(Override)</span>
+</div>
+<span class="font-label-sm text-label-sm font-semibold text-on-surface mt-0.5">9h 47m Total</span>
+<span class="text-[11px] text-on-tertiary-container font-semibold">+1h 15m Overtime</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top max-w-[200px]">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface font-medium truncate" title="VIP Bridal Kanjeevaram Showcase extended handover">VIP Bridal Showcase extended</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-0.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-secondary">verified</span>
+                      Sup: Anand Kulkarni
+                    </span>
+<span class="font-label-sm text-label-sm text-secondary underline cursor-pointer mt-0.5">Bill #SLK-8819 attached</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top text-center">
+<div class="inline-flex flex-col items-center">
+<span class="px-space-xs py-0.5 rounded bg-surface-container-highest text-secondary font-label-sm text-label-sm font-bold">HR Signoff</span>
+<span class="text-[10px] text-on-surface-variant mt-0.5">Step 2 of 3</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1 rounded bg-primary text-on-primary hover:bg-primary-container transition-colors shadow-sm" title="Quick Approve" type="button">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</button>
+<button class="p-1 rounded bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors" title="Flag or Reject" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+<button class="p-1 rounded bg-secondary-fixed text-on-secondary-fixed-variant hover:bg-secondary-fixed-dim transition-colors" title="Inspect Full Record" type="button">
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 2: Amit Deshpande -->
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="py-space-sm px-space-md align-top">
+<input checked="" class="rounded text-secondary focus:ring-0 cursor-pointer mt-1" type="checkbox"/>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex items-start gap-space-sm">
+<img class="w-8 h-8 rounded-full object-cover shrink-0 shadow-sm" data-alt="Headshot of middle-aged Indian master tailor with measuring tape around neck in garment fabrication workshop with subtle textile reels background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDjLcjh3VX0jhD4TwPoOO9XlnfGsDIK3pNwJAhZHydxWT1ZSGfXRPvZYJNCHxTUWQOBAZx6Kx96eTAzJtCtII2MU4Kau9r1_vDHRk5LjJyxWrchXrweFZh0UCHrlAhFkACQdg11-odDBAL3LPNMVdyzMVB5-pi4_ENBkQ0f0cGBxDcFAsMvejawmKlq94Bk1JDrk9ig1ah-2WZQoNz9OHFoF-jgfDd-qnuH7laYIdxiQFIgCSGzvLZE"/>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg text-on-surface font-bold truncate">Amit Deshpande</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono">BSC-EMP-0089</span>
+<span class="inline-flex mt-1 items-center gap-1 font-label-sm text-label-sm text-on-surface-variant bg-surface-container-low px-1.5 py-0.5 rounded w-max">
+                        SHI-03 • Master Tailor
+                      </span>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface">Shift B (11:30 – 20:30)</span>
+<div class="flex items-center gap-1 text-on-surface-variant mt-0.5">
+<span class="font-mono text-error font-bold">14:02 IN</span>
+<span class="text-on-surface-variant">•</span>
+<span class="font-mono text-on-surface">20:38 OUT</span>
+</div>
+<span class="text-[11px] text-error mt-0.5 font-medium">Late by 2h 32m</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex flex-col">
+<div class="flex items-center gap-1">
+<span class="font-mono font-bold text-on-surface">Half-Day Waiver</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Credit 6.5h payable</span>
+<span class="text-[11px] text-on-surface-variant">0.5 Casual Leave applied</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top max-w-[200px]">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface truncate" title="KSRTC Shivamogga bus depot strike stranded rural transit">KSRTC District Bus Strike</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-0.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-secondary">verified</span>
+                      Sup: V. Hiremath
+                    </span>
+<span class="text-[11px] text-on-surface-variant">News Bulletin Ref attached</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top text-center">
+<div class="inline-flex flex-col items-center">
+<span class="px-space-xs py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm font-bold">Under HR Review</span>
+<span class="text-[10px] text-on-surface-variant mt-0.5">Step 2 of 3</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1 rounded bg-primary text-on-primary hover:bg-primary-container transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</button>
+<button class="p-1 rounded bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+<button class="p-1 rounded bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">visibility</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 3: Veeranna Pattar -->
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="py-space-sm px-space-md align-top">
+<input checked="" class="rounded text-secondary focus:ring-0 cursor-pointer mt-1" type="checkbox"/>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex items-start gap-space-sm">
+<div class="w-8 h-8 rounded-full bg-surface-container-high text-secondary flex items-center justify-center font-bold text-label-sm shrink-0">
+                      VP
+                    </div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg text-on-surface font-bold truncate">Veeranna Pattar</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono">BSC-MGR-0021</span>
+<span class="inline-flex mt-1 items-center gap-1 font-label-sm text-label-sm text-secondary bg-surface-container px-1.5 py-0.5 rounded w-max">
+                        DAV-02 • Loom Yard
+                      </span>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface">Shift C Night (20:30 – 05:30)</span>
+<div class="flex items-center gap-1 text-on-surface-variant mt-0.5">
+<span class="px-1 py-0.2 rounded bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">Sensor Glitch IN</span>
+<span class="text-on-surface-variant">•</span>
+<span class="font-mono text-on-surface">05:32 OUT</span>
+</div>
+<span class="text-[11px] text-on-surface-variant mt-0.5">Turnstile DAV-GATE-01</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex flex-col">
+<div class="flex items-center gap-1">
+<span class="font-mono font-bold text-secondary">20:25 IN Logged</span>
+</div>
+<span class="font-label-sm text-label-sm font-semibold text-on-surface mt-0.5">9h 07m Full Shift</span>
+<span class="text-[11px] text-secondary font-medium">100% Shift Paid</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top max-w-[200px]">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface truncate" title="Security Gate Physical Logbook Entry #318 signed by Sub-Inspector">Guard Register Entry #318</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Terminal rebooted at 20:28</span>
+<span class="font-label-sm text-label-sm text-secondary underline cursor-pointer mt-0.5">Guard Signature Verified</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top text-center">
+<div class="inline-flex flex-col items-center">
+<span class="px-space-xs py-0.5 rounded bg-surface-container text-secondary font-label-sm text-label-sm font-bold">Ready to Sync</span>
+<span class="text-[10px] text-on-surface-variant mt-0.5">Step 3 of 3</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1 rounded bg-primary text-on-primary hover:bg-primary-container transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</button>
+<button class="p-1 rounded bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+<button class="p-1 rounded bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">visibility</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 4: Kavita M. -->
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="py-space-sm px-space-md align-top">
+<input checked="" class="rounded text-secondary focus:ring-0 cursor-pointer mt-1" type="checkbox"/>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex items-start gap-space-sm">
+<img class="w-8 h-8 rounded-full object-cover shrink-0 shadow-sm" data-alt="South Indian female corporate retail accountant cashier at desk checking ledger printout with natural soft lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDmf4FyUFyhanLzZlNp4xYqigCO4q_eiGL9kRyXxQraMeT2E-geqwiFc85HCIQcsCNFkmkWGyZaC40AqlB-N3UaQja5f8Swrs2yMQWDRUS-zTchCGA_Na0nPX8IZM8JnExT-x0U5fpmwRlbFKeoGtw_UWIDTt7XwWu3yNGWzTzhXKWL4KFgN60CbSc_Fc6IoVFgWZvlvbe90jzTzg9IjKMz8NPqanixRyckYp5RgBO1FhWUsZCDsrQG"/>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg text-on-surface font-bold truncate">Kavita M.</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono">BSC-EMP-0144</span>
+<span class="inline-flex mt-1 items-center gap-1 font-label-sm text-label-sm text-on-surface-variant bg-surface-container-low px-1.5 py-0.5 rounded w-max">
+                        BEL-01 • Cashiering POS
+                      </span>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface">Shift A (09:30 – 18:30)</span>
+<div class="flex items-center gap-1 text-on-surface-variant mt-0.5">
+<span class="font-mono text-on-surface">09:34 IN</span>
+<span class="text-on-surface-variant">•</span>
+<span class="font-mono text-error font-bold">13:45 OUT</span>
+</div>
+<span class="text-[11px] text-error mt-0.5">Premature Exit Tag</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex flex-col">
+<div class="flex items-center gap-1">
+<span class="font-mono font-bold text-secondary">18:32 OUT</span>
+</div>
+<span class="font-label-sm text-label-sm font-semibold text-on-surface mt-0.5">8h 58m Total Shift</span>
+<span class="text-[11px] text-on-surface-variant">Break swipe confusion</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top max-w-[200px]">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface truncate" title="Swiped turnstile instead of cafeteria punch reader. Vault cash handover signed at 18:30">Dual Cashier EOD Sheet</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-0.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-secondary">verified</span>
+                      Sup: R. Deshmukh
+                    </span>
+<span class="font-label-sm text-label-sm text-secondary underline cursor-pointer mt-0.5">Vault Handover #V-102</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top text-center">
+<div class="inline-flex flex-col items-center">
+<span class="px-space-xs py-0.5 rounded bg-surface-container-highest text-secondary font-label-sm text-label-sm font-bold">Supervisor OK</span>
+<span class="text-[10px] text-on-surface-variant mt-0.5">Pending HR Final</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1 rounded bg-primary text-on-primary hover:bg-primary-container transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</button>
+<button class="p-1 rounded bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+<button class="p-1 rounded bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">visibility</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 5: Rekha Naik -->
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="py-space-sm px-space-md align-top">
+<input class="rounded text-secondary focus:ring-0 cursor-pointer mt-1" type="checkbox"/>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex items-start gap-space-sm">
+<div class="w-8 h-8 rounded-full bg-surface-container text-on-surface flex items-center justify-center font-bold text-label-sm shrink-0">
+                      RN
+                    </div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg text-on-surface font-bold truncate">Rekha Naik</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono">BSC-EMP-0094</span>
+<span class="inline-flex mt-1 items-center gap-1 font-label-sm text-label-sm text-on-surface-variant bg-surface-container-low px-1.5 py-0.5 rounded w-max">
+                        BEL-01 • Saree Depot
+                      </span>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface">General (09:00 – 18:00)</span>
+<div class="flex items-center gap-1 text-on-surface-variant mt-0.5">
+<span class="font-mono text-on-surface">08:58 IN</span>
+<span class="text-on-surface-variant">•</span>
+<span class="px-1 py-0.2 rounded bg-surface-container text-secondary font-label-sm text-label-sm font-bold">On-Duty Slip</span>
+</div>
+<span class="text-[11px] text-on-surface-variant mt-0.5">15:00 to 19:30 Off-site</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex flex-col">
+<div class="flex items-center gap-1">
+<span class="font-mono font-bold text-secondary">19:35 OUT DAV</span>
+</div>
+<span class="font-label-sm text-label-sm font-semibold text-on-surface mt-0.5">10h 37m Net Shift</span>
+<span class="text-[11px] text-on-tertiary-container font-semibold">OD Allowance + OT</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top max-w-[200px]">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface truncate" title="Inter-mill convoy dispatch escort to Davanagere processing center">Inter-Mill Transit Convoy</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-0.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px] text-secondary">verified</span>
+                      Gate Pass #GP-882
+                    </span>
+<span class="text-[11px] text-on-surface-variant">Logistics Mgr Signed</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top text-center">
+<div class="inline-flex flex-col items-center">
+<span class="px-space-xs py-0.5 rounded bg-surface-container text-secondary font-label-sm text-label-sm font-bold">OD Verified</span>
+<span class="text-[10px] text-on-surface-variant mt-0.5">Step 2 of 3</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1 rounded bg-primary text-on-primary hover:bg-primary-container transition-colors shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</button>
+<button class="p-1 rounded bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+<button class="p-1 rounded bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">visibility</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- ROW 6: Darshan R. -->
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="py-space-sm px-space-md align-top">
+<input class="rounded text-secondary focus:ring-0 cursor-pointer mt-1" type="checkbox"/>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex items-start gap-space-sm">
+<div class="w-8 h-8 rounded-full bg-surface-container-high text-on-surface flex items-center justify-center font-bold text-label-sm shrink-0">
+                      DR
+                    </div>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg text-on-surface font-bold truncate">Darshan R.</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono">BSC-EMP-0182</span>
+<span class="inline-flex mt-1 items-center gap-1 font-label-sm text-label-sm text-on-surface-variant bg-surface-container-low px-1.5 py-0.5 rounded w-max">
+                        DAV-02 • Weaver Trainee
+                      </span>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-semibold text-on-surface">Shift A (06:00 – 14:30)</span>
+<div class="flex items-center gap-1 text-on-surface-variant mt-0.5">
+<span class="font-mono text-error font-bold">06:48 IN</span>
+<span class="text-on-surface-variant">•</span>
+<span class="font-mono text-on-surface">14:35 OUT</span>
+</div>
+<span class="text-[11px] text-error mt-0.5 font-medium">Late by 48 mins</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top">
+<div class="flex flex-col">
+<div class="flex items-center gap-1">
+<span class="font-mono font-bold text-on-surface">Grace LOP Appeal</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant mt-0.5">Requesting late waiver</span>
+<span class="text-[11px] text-error">Unverified Delay</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top max-w-[200px]">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm text-on-surface truncate" title="Power line tripping halted municipal pump and bus feeder">Feeder Bus Delay Claim</span>
+<span class="font-label-sm text-label-sm text-error mt-0.5 flex items-center gap-1">
+<span class="material-symbols-outlined text-[13px]">hourglass_empty</span>
+                      Pending Lead Endorsement
+                    </span>
+<span class="text-[11px] text-on-surface-variant">No supporting slip yet</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top text-center">
+<div class="inline-flex flex-col items-center">
+<span class="px-space-xs py-0.5 rounded bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">Floor Pending</span>
+<span class="text-[10px] text-on-surface-variant mt-0.5">Step 1 of 3</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md align-top text-right">
+<div class="flex items-center justify-end gap-1">
+<button class="p-1 rounded bg-surface-container text-on-surface-variant hover:bg-primary hover:text-on-primary transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">check</span>
+</button>
+<button class="p-1 rounded bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">close</span>
+</button>
+<button class="p-1 rounded bg-surface-container text-on-surface-variant hover:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[16px]">visibility</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer Pagination & Ledger Health -->
+<div class="p-space-md bg-surface-container-low/50 flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm font-body-sm text-body-sm text-on-surface-variant">
+<div class="flex items-center gap-space-md">
+<span>Showing <strong>1 to 6</strong> of <strong>18</strong> regularization requests</span>
+<span class="hidden sm:inline">•</span>
+<span class="hidden sm:inline">428 Active Floor Staff Registered</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<button class="px-space-sm py-1 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm hover:bg-surface-container transition-colors disabled:opacity-50" disabled="" type="button">
+              Previous
+            </button>
+<span class="px-2 py-1 rounded bg-secondary text-on-secondary font-label-sm text-label-sm font-bold">1</span>
+<button class="px-2 py-1 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm hover:bg-surface-container transition-colors" type="button">2</button>
+<button class="px-2 py-1 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm hover:bg-surface-container transition-colors" type="button">3</button>
+<button class="px-space-sm py-1 rounded bg-surface-container-lowest text-on-surface font-label-sm text-label-sm hover:bg-surface-container transition-colors" type="button">
+              Next
+            </button>
+</div>
+</div>
+</div>
+<!-- Real-Time Anomaly Audit Log Stream -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-sm">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px]">find_replace</span>
+<span class="font-label-lg text-label-lg text-on-surface font-bold">Live Biometric Ingestion &amp; Optical Sensor Diagnostics</span>
+</div>
+<span class="font-mono text-label-sm text-label-sm text-on-surface-variant">SHA-256 HASH VERIFIED</span>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-space-sm font-body-sm text-body-sm">
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col">
+<div class="flex items-center justify-between text-label-sm font-bold mb-1">
+<span class="text-on-surface">Terminal BEL-GATE-04</span>
+<span class="text-secondary">OK 99.8%</span>
+</div>
+<span class="text-on-surface-variant font-mono text-[11px]">Synced: 14:22:01 IST</span>
+<span class="text-on-surface-variant text-[11px] mt-1">Optical scan match: 0.18s latency</span>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col">
+<div class="flex items-center justify-between text-label-sm font-bold mb-1">
+<span class="text-on-surface">Terminal DAV-GATE-01</span>
+<span class="text-error">SENSOR RECALIBRATED</span>
+</div>
+<span class="text-on-surface-variant font-mono text-[11px]">Last event: 20:28:11 IST</span>
+<span class="text-on-surface-variant text-[11px] mt-1">Optical glass cleaned &amp; rebooted</span>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col">
+<div class="flex items-center justify-between text-label-sm font-bold mb-1">
+<span class="text-on-surface">Terminal SHI-RETAIL-01</span>
+<span class="text-secondary">OK 100%</span>
+</div>
+<span class="text-on-surface-variant font-mono text-[11px]">Synced: 14:21:49 IST</span>
+<span class="text-on-surface-variant text-[11px] mt-1">Direct LAN sync to HQ Master Cloud</span>
+</div>
+</div>
+</div>
+</div>
+<!-- RIGHT 30% (4 Cols): High-Fidelity Inspection & Approval Drawer Panel -->
+<div class="lg:col-span-4 flex flex-col gap-space-md">
+<!-- Detailed Inspection Card (Pinned for Rajeshwari V. Patil) -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-md flex flex-col gap-space-md">
+<!-- Card Header with Avatar & Active Status -->
+<div class="flex items-start justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="relative">
+<img class="w-12 h-12 rounded-full object-cover shadow-sm" data-alt="Senior Indian female sales specialist in traditional saree wearing company identity lanyard with warm ambient lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2C58dkoxpYQSHjqHS5pM8NRWQsx0N0RAM4cfqn58j4rp1doKcRxFIMNu4KAXhUIBkv57DmLsORq2nt-zx7r039y4D9XmrHxK-ImVVb9ONbO7vgv4zRTFa-RRR4LGxxgKhsX2Qw7FWaYg2KvoURDjg_Q58Fby5yVQdOKjCzbHCA8gGQ31jMkNDcRVMzrt5SAoT9YCLi8_gpjykbEJMYfWKx6Di9u_HrAtE5IDebw8AeQph1hJ75G5d"/>
+<span class="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-secondary border-2 border-surface-container-lowest"></span>
+</div>
+<div class="flex flex-col">
+<div class="flex items-center gap-1">
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold">Rajeshwari V. Patil</span>
+<span class="material-symbols-outlined text-secondary text-[16px]">verified</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono">BSC-EMP-0042 • Tier 1 Senior Floor Specialist</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Belagavi Flagship (BEL-01) • Bridal Silk</span>
+</div>
+</div>
+<span class="px-space-xs py-0.5 rounded bg-surface-container-high text-secondary font-label-sm text-label-sm font-bold">
+            Inspecting
+          </span>
+</div>
+<!-- Punch Visual Comparison Box -->
+<div class="p-space-md rounded-xl bg-surface-container-low flex flex-col gap-space-sm">
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-bold">Punch Override Comparison</span>
+<!-- Raw Log Line -->
+<div class="p-space-xs rounded-lg bg-surface-container-lowest flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase">Raw Biometric Ingestion</span>
+<span class="font-mono text-label-lg text-label-lg text-on-surface font-bold">09:28:14 IST → <span class="text-error font-bold">[MISSING OUT]</span></span>
+</div>
+<span class="px-1.5 py-0.5 rounded bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">Timeout</span>
+</div>
+<!-- Proposed Corrected Line -->
+<div class="p-space-xs rounded-lg bg-surface-container-highest flex items-center justify-between">
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-secondary uppercase font-bold">Proposed Approved Ledger</span>
+<span class="font-mono text-label-lg text-label-lg text-on-surface font-bold">09:28:14 IST → <span class="text-secondary font-bold">19:15:00 IST</span></span>
+</div>
+<span class="px-1.5 py-0.5 rounded bg-secondary text-on-secondary font-label-sm text-label-sm font-bold">Verified</span>
+</div>
+<!-- Calculation Summary Details -->
+<div class="grid grid-cols-2 gap-space-xs pt-space-xs text-body-sm">
+<div class="flex flex-col p-space-xs bg-surface-container-lowest rounded-lg">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Payable Net Hours</span>
+<span class="font-headline-sm text-headline-sm text-on-surface font-bold">9h 47m</span>
+</div>
+<div class="flex flex-col p-space-xs bg-surface-container-lowest rounded-lg">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Overtime Entitlement</span>
+<span class="font-headline-sm text-headline-sm text-secondary font-bold">1h 15m (1.25x)</span>
+</div>
+</div>
+</div>
+<!-- Supervisor Attestation Evidence -->
+<div class="flex flex-col gap-space-xs">
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-bold">Supervisor Endorsement &amp; Evidence</span>
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1">
+<p class="font-body-sm text-body-sm text-on-surface italic">
+              “Rajeshwari was actively presenting heritage Kanjeevaram sarees to the royal wedding family party until 19:10 IST. CCTV camera CAM-04 Bridal Vault confirms floor presence. Card tap missed due to vault register lockdown protocol.”
+            </p>
+<div class="flex items-center justify-between pt-space-xs text-on-surface-variant font-label-sm text-label-sm">
+<span class="font-bold text-on-surface">— Anand Kulkarni (Store Lead BEL-01)</span>
+<span>24 Oct 19:40 IST</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs mt-1">
+<a class="flex-1 p-space-xs rounded-lg bg-surface-container hover:bg-surface-container-high transition-colors flex items-center justify-center gap-1 font-label-sm text-label-sm text-on-surface" href="#">
+<span class="material-symbols-outlined text-[16px] text-secondary">receipt_long</span>
+              Invoice #SLK-8819 (&amp;inr3.4L)
+            </a>
+<a class="flex-1 p-space-xs rounded-lg bg-surface-container hover:bg-surface-container-high transition-colors flex items-center justify-center gap-1 font-label-sm text-label-sm text-on-surface" href="#">
+<span class="material-symbols-outlined text-[16px] text-secondary">videocam</span>
+              CCTV Vault Clip
+            </a>
+</div>
+</div>
+<!-- Action Execution Strip -->
+<div class="flex flex-col gap-space-xs pt-space-xs">
+<button class="w-full py-space-sm px-space-md rounded-lg bg-primary text-on-primary hover:bg-primary-container transition-colors font-label-lg text-label-lg font-bold flex items-center justify-center gap-space-xs shadow-sm" type="button">
+<span class="material-symbols-outlined text-[18px]">verified</span>
+            Approve &amp; Commit to Payroll Ledger
+          </button>
+<div class="grid grid-cols-2 gap-space-xs">
+<button class="py-space-xs px-space-sm rounded-lg bg-surface-container-lowest text-on-surface hover:bg-surface-container-low transition-colors font-label-sm text-label-sm font-semibold flex items-center justify-center gap-1 shadow-sm" type="button">
+<span class="material-symbols-outlined text-[16px] text-on-surface-variant">contact_support</span>
+              Request Clarification
+            </button>
+<button class="py-space-xs px-space-sm rounded-lg bg-error-container text-on-error-container hover:bg-error hover:text-on-error transition-colors font-label-sm text-label-sm font-semibold flex items-center justify-center gap-1" type="button">
+<span class="material-symbols-outlined text-[16px]">cancel</span>
+              Reject &amp; Deduct LOP
+            </button>
+</div>
+</div>
+</div>
+<!-- Root-Cause Anomaly Breakdown Widget -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-md flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<span class="font-label-lg text-label-lg text-on-surface font-bold">Root-Cause Breakdown</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Pay Cycle W43</span>
+</div>
+<div class="flex flex-col gap-space-sm">
+<!-- Item 1 -->
+<div class="flex flex-col gap-1">
+<div class="flex items-center justify-between font-label-sm text-label-sm">
+<span class="text-on-surface font-semibold">Festive Floor Customer Surge</span>
+<span class="font-mono text-secondary font-bold">32% (8 reqs)</span>
+</div>
+<div class="w-full bg-surface-container-low h-2 rounded-full overflow-hidden">
+<div class="bg-secondary h-full rounded-full" style="width: 32%"></div>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="flex flex-col gap-1">
+<div class="flex items-center justify-between font-label-sm text-label-sm">
+<span class="text-on-surface font-semibold">Terminal Optical Sensor Glitch</span>
+<span class="font-mono text-on-surface font-bold">28% (7 reqs)</span>
+</div>
+<div class="w-full bg-surface-container-low h-2 rounded-full overflow-hidden">
+<div class="bg-primary h-full rounded-full" style="width: 28%"></div>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="flex flex-col gap-1">
+<div class="flex items-center justify-between font-label-sm text-label-sm">
+<span class="text-on-surface font-semibold">Official Convoy &amp; Depot Movement</span>
+<span class="font-mono text-on-surface font-bold">24% (6 reqs)</span>
+</div>
+<div class="w-full bg-surface-container-low h-2 rounded-full overflow-hidden">
+<div class="bg-surface-tint h-full rounded-full" style="width: 24%"></div>
+</div>
+</div>
+<!-- Item 4 -->
+<div class="flex flex-col gap-1">
+<div class="flex items-center justify-between font-label-sm text-label-sm">
+<span class="text-on-surface font-semibold">Misplaced Badge / Forgotten Swipe</span>
+<span class="font-mono text-on-surface-variant font-bold">16% (4 reqs)</span>
+</div>
+<div class="w-full bg-surface-container-low h-2 rounded-full overflow-hidden">
+<div class="bg-outline-variant h-full rounded-full" style="width: 16%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Karnataka Statutory Form T & Factories Act Compliance Notice -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-md flex flex-col gap-space-sm">
+<div class="flex items-center gap-space-xs">
+<div class="w-7 h-7 rounded bg-surface-container flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[18px]">gavel</span>
+</div>
+<span class="font-label-lg text-label-lg text-on-surface font-bold">Karnataka Statutory Compliance</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
+<strong class="text-on-surface">Section 62 - Register of Adult Workers:</strong> Every manual attendance adjustment requires dual attestation (Floor Manager + HR Director) before monthly muster roll seal.
+        </p>
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1">
+<div class="flex items-center justify-between font-label-sm text-label-sm">
+<span class="text-on-surface font-bold">Muster Roll Lockdown</span>
+<span class="text-secondary font-bold font-mono">410 / 428 Staff (95.8%)</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
+<div class="bg-secondary h-full rounded-full" style="width: 95.8%"></div>
+</div>
+<span class="text-[11px] text-on-surface-variant mt-1">18 remaining cases must be cleared prior to 20:00 IST</span>
+</div>
+<button class="w-full py-space-xs px-space-sm rounded-lg bg-surface-container text-on-surface hover:bg-surface-container-high transition-colors font-label-sm text-label-sm font-semibold flex items-center justify-center gap-1" type="button">
+<span class="material-symbols-outlined text-[16px] text-secondary">download_for_offline</span>
+          Download Form T Muster Register (PDF)
+        </button>
+</div>
+</div>
+</div>
+<!-- Executive Audit Trail & Ledger Cryptographic Verification Notice -->
+<div class="mt-space-xl p-space-md bg-surface-container-low rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm text-on-surface-variant font-label-sm text-label-sm">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-secondary text-[20px]">encrypted</span>
+<span>
+        All punch overrides are cryptographically committed to the BSC Immutable HRMS AuditLog with dual supervisor keys &amp; SHA-256 fingerprint.
+      </span>
+</div>
+<div class="flex items-center gap-space-md">
+<span>Terminal Server: <strong>Synced 14:22:08 IST</strong></span>
+<span>Ledger Version: <strong>4.8.2-PROD</strong></span>
+</div>
+</div>
+</div></main></div></body></html>

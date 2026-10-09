@@ -14,7 +14,7 @@ Transform the database and persistence layer of **BSC Textiles HRMS** into a hig
 2. **Native Driver:** Use `mysql2` with the `mysql2/promise` interface for all database interactions.
 3. **Pure DDL Schema:** Create full, production-ready `.sql` schema definitions with exact constraints, composite indexes, and strict referential integrity.
 4. **Native Migration System:** Implement a lightweight, transactional SQL migration runner executing sequentially versioned `.sql` files (`001_initial_schema.sql`, `002_views_and_procedures.sql`, etc.).
-5. **Native Seeding:** Provide pure SQL seed scripts (`seed.sql`) populating the database with all 4 locations (`BEL`, `DAV`, `SHI`, `HUB-TEST`), all organizational tiers, shifts, test accounts (with pre-hashed bcrypt passwords), and baseline attendance.
+5. **Native Seeding:** Provide pure SQL seed scripts (`seed.sql`) populating the database with all 3 locations (`BEL`, `DAV`, `SHI`), all organizational tiers, shifts, test accounts (with pre-hashed bcrypt passwords), and baseline attendance.
 6. **Data Access Layer (Repository Pattern):** Build type-safe repositories using parameterized SQL queries (`?` placeholders) preventing SQL injection.
 7. **Maintain API Contracts:** Ensure all 26 backend route files and 43 automated integration tests continue to operate with 100% pass rate.
 

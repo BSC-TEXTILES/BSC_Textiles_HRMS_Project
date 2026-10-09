@@ -9,6 +9,8 @@ const api = axios.create({
   },
 });
 
+let sessionToken: string | null = null;
+
 api.interceptors.request.use(async (config) => {
   let token: string | null = null;
   
@@ -17,13 +19,20 @@ api.interceptors.request.use(async (config) => {
   }
 
   if (!token) {
-    const session = await getSession().catch(() => null);
-    if (session?.token) {
-      token = session.token;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('bsc_token', session.token);
+    if (sessionToken) {
+      token = sessionToken;
+    } else {
+      const session = await getSession().catch(() => null);
+      if (session?.token) {
+        token = session.token;
+        sessionToken = session.token;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('bsc_token', session.token);
+        }
       }
     }
+  } else if (!sessionToken) {
+    sessionToken = token;
   }
 
   if (token) {
@@ -36,11 +45,17 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && typeof window !== 'undefined') {
-      if (!window.location.pathname.startsWith('/login')) {
-        localStorage.removeItem('bsc_token');
-        localStorage.removeItem('token');
-        localStorage.removeItem('bsc_user');
-        window.location.href = '/login';
+      const pathname = window.location.pathname;
+      if (!pathname.startsWith('/login')) {
+        // Only redirect if both localStorage and NextAuth session have no token
+        const storedToken = localStorage.getItem('bsc_token') || localStorage.getItem('token');
+        if (!storedToken) {
+          sessionToken = null;
+          localStorage.removeItem('bsc_token');
+          localStorage.removeItem('token');
+          localStorage.removeItem('bsc_user');
+          window.location.href = '/login';
+        }
       }
     }
     return Promise.reject(error);

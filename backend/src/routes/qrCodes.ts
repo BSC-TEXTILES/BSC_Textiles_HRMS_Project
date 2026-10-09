@@ -154,7 +154,7 @@ router.post('/generate-daily', authorize('CONFIGURE'), async (req: AuthRequest, 
     const tomorrow = new Date(today);
     tomorrow.setHours(23, 59, 59, 999);
     
-    const results = [];
+    const results: any[] = [];
     for (const emp of employees) {
       // Invalidate old daily QR
       if (emp.dailyQRCodeId) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { 
   MessageSquare, Plus, Search, Filter, Eye, Edit, Trash2,
   CheckCircle, AlertCircle, Star, Flag, BookOpen, Video,
@@ -114,7 +114,7 @@ export default function ObservationsPage() {
     photoUrl: '',
   });
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ locationId });
@@ -133,20 +133,22 @@ export default function ObservationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [locationId, statusFilter, typeFilter, levelFilter]);
 
   // Deep-link support: /operations/observations?status=OPEN&level=CRITICAL
   useEffect(() => {
-    const q = new URLSearchParams(window.location.search);
-    const s = q.get('status');
-    const l = q.get('level');
-    if (s) setStatusFilter(s);
-    if (l) setLevelFilter(l);
+    if (typeof window !== 'undefined') {
+      const q = new URLSearchParams(window.location.search);
+      const s = q.get('status');
+      const l = q.get('level');
+      if (s) setStatusFilter(s);
+      if (l) setLevelFilter(l);
+    }
   }, []);
 
   useEffect(() => {
     fetchData();
-  }, [locationId, statusFilter, typeFilter, levelFilter]);
+  }, [fetchData]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -27,6 +27,19 @@
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   },
+  "overrides": {
+    "next": {
+      "postcss": "^8.5.29"
+    },
+    "@next/eslint-plugin-next": {
+      "glob": "^10.4.5"
+    },
+    "dompurify": "^3.4.16",
+    "postcss": "^8.5.29",
+    "postcss-selector-parser": "^7.1.6",
+    "braces": "^3.0.3",
+    "micromatch": "^4.0.8"
+  },
   "engines": {
     "node": ">=20.0.0"
   }

@@ -11,8 +11,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 INSERT INTO locations (id, name, code, city, address, phone, email, status, manager_name) VALUES
 ('loc_bel', 'Belagavi Head Store', 'BEL', 'Belagavi', 'Khade Bazar, Belagavi, Karnataka 590001', '+91 831 2420001', 'belagavi@bsctextiles.com', 'ACTIVE', 'Kavita Bhat'),
 ('loc_dav', 'Davanagere Mega Store', 'DAV', 'Davanagere', 'P.B. Road, Davanagere, Karnataka 577002', '+91 819 2230002', 'davanagere@bsctextiles.com', 'ACTIVE', 'Suresh Patil'),
-('loc_shi', 'Shivamogga Flagship', 'SHI', 'Shivamogga', 'Nehru Road, Shivamogga, Karnataka 577201', '+91 818 2270003', 'shivamogga@bsctextiles.com', 'ACTIVE', 'Vikram Singh'),
-('loc_hub', 'Hubballi Test Hub', 'HUB-TEST', 'Hubballi', 'Station Road, Hubballi, Karnataka 580020', '+91 836 2350004', 'hubballi@bsctextiles.com', 'ACTIVE', 'Anand Kulkarni');
+('loc_shi', 'Shivamogga Flagship', 'SHI', 'Shivamogga', 'Nehru Road, Shivamogga, Karnataka 577201', '+91 818 2270003', 'shivamogga@bsctextiles.com', 'ACTIVE', 'Vikram Singh');
 
 -- 2. FLOORS (Belagavi)
 INSERT INTO floors (id, location_id, name, floor_number, status) VALUES

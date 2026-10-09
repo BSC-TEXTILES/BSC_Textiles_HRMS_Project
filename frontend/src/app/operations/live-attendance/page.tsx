@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { 
   Search, Filter, RefreshCw, Download, Eye, AlertCircle,
   CheckCircle, Clock, Coffee, Utensils, Activity, Shield,
@@ -61,7 +61,7 @@ export default function LiveAttendancePage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<EmployeeLiveStatus | null>(null);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -78,7 +78,7 @@ export default function LiveAttendancePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [locationId, floorId, departmentId, genderFilter, statusFilter]);
 
   // Deep-link support: /operations/live-attendance?status=present
   useEffect(() => {
@@ -90,7 +90,7 @@ export default function LiveAttendancePage() {
     fetchData();
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
-  }, [locationId, floorId, departmentId, statusFilter, genderFilter]);
+  }, [fetchData]);
 
   const filteredEmployees = employees.filter(emp => {
     if (search) {

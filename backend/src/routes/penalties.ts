@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../index.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
-import { Decimal } from '@prisma/client/runtime/library';
+import { Decimal } from '../db.js';
 
 const router = Router();
 

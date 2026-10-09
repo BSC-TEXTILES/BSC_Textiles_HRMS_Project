@@ -174,6 +174,94 @@ router.get(['/stats', '/stats/:locationId'], authorize('VIEW'), async (req: Auth
     const allFailed = totalCount - allVerified;
     const avgScore = Math.round(Number(avgMatch._avg?.matchPercentage ?? 94));
     const passRate = totalCount > 0 ? Math.round((allVerified / totalCount) * 100) : 100;
+
+    // 7-day trend computed from actual verification timestamps
+    const trendStart = new Date(today);
+    trendStart.setDate(trendStart.getDate() - 6);
+
+    const trend: Array<{ date: string; total: number; passed: number; failed: number; avgScore: number }> = [];
+    for (let d = 0; d < 7; d++) {
+      const day = new Date(trendStart);
+      day.setDate(day.getDate() + d);
+      const next = new Date(day);
+      next.setDate(next.getDate() + 1);
+      const [dayTotal, dayPassed] = await Promise.all([
+        prisma.faceVerification.count({ where: { ...whereBase, verifiedAt: { gte: day, lt: next } } }),
+        prisma.faceVerification.aggregate({
+          where: { ...whereBase, result: 'VERIFIED', verifiedAt: { gte: day, lt: next } },
+          _count: { _all: true },
+          _avg: { matchPercentage: true },
+        }),
+      ]);
+      const passed = Number(dayPassed._count?._all ?? 0);
+      trend.push({
+        date: day.toISOString().slice(0, 10),
+        total: dayTotal,
+        passed,
+        failed: dayTotal - passed,
+        avgScore: Math.round(Number(dayPassed._avg?.matchPercentage ?? 0) * 10) / 10,
+      });
+    }
+
+    // Per-location breakdown from the real location registry
+    const scopeLocations = locationId
+      ? await prisma.location.findMany({ where: { id: locationId }, select: { id: true, code: true, name: true } })
+      : await prisma.location.findMany({ select: { id: true, code: true, name: true } });
+    const locationBreakdown = await Promise.all(
+      scopeLocations.map(async (loc) => {
+        const [locTotal, locAgg] = await Promise.all([
+          prisma.faceVerification.count({ where: { locationId: loc.id } }),
+          prisma.faceVerification.aggregate({
+            where: { locationId: loc.id, result: 'VERIFIED' },
+            _count: { _all: true },
+            _avg: { matchPercentage: true },
+          }),
+        ]);
+        const passed = Number(locAgg._count?._all ?? 0);
+        return {
+          code: loc.code,
+          name: loc.name,
+          total: locTotal,
+          passed,
+          failed: locTotal - passed,
+          avgScore: Math.round(Number(locAgg._avg?.matchPercentage ?? 0) * 10) / 10,
+        };
+      })
+    );
+
+    // Per-device breakdown from recorded device ids (null -> 'Unregistered')
+    const deviceGroups = await prisma.faceVerification.groupBy({
+      by: ['deviceId'],
+      where: whereBase,
+      _count: { _all: true },
+    });
+    const deviceBreakdown = await Promise.all(
+      deviceGroups.map(async (g) => {
+        const whereDevice: any = { ...whereBase, deviceId: g.deviceId };
+        const [devTotal, devAgg] = await Promise.all([
+          prisma.faceVerification.count({ where: whereDevice }),
+          prisma.faceVerification.aggregate({
+            where: { ...whereDevice, result: 'VERIFIED' },
+            _count: { _all: true },
+            _avg: { matchPercentage: true },
+          }),
+        ]);
+        const passed = Number(devAgg._count?._all ?? 0);
+        return {
+          device: g.deviceId || 'Unregistered',
+          total: devTotal,
+          passed,
+          failed: devTotal - passed,
+          avgScore: Math.round(Number(devAgg._avg?.matchPercentage ?? 0) * 10) / 10,
+        };
+      })
+    );
+
+    const stats = await prisma.faceVerification.aggregate({
+      where: { ...whereBase, result: 'VERIFIED' },
+      _max: { matchPercentage: true },
+      _min: { matchPercentage: true },
+    });
     
     res.json({
       // Flat properties for automated tests
@@ -186,12 +274,12 @@ router.get(['/stats', '/stats/:locationId'], authorize('VIEW'), async (req: Auth
       totalVerified: allVerified,
       // Nested structures for frontend FaceDashboardStats
       summary: {
-        verifiedToday: todayVerified || 12,
-        failedToday: todayFailed || 0,
-        averageMatchPercent: avgScore || 95,
-        highestMatchPercent: 99.4,
-        lowestMatchPercent: 86.2,
-        belowThreshold: todayFailed || 0,
+        verifiedToday: todayVerified,
+        failedToday: todayFailed,
+        averageMatchPercent: Number(avgMatch._avg?.matchPercentage ?? 0),
+        highestMatchPercent: Number(stats?._max?.matchPercentage ?? 0),
+        lowestMatchPercent: Number(stats?._min?.matchPercentage ?? 0),
+        belowThreshold: todayFailed,
         manualVerification: 0,
       },
       successRate: {
@@ -200,24 +288,9 @@ router.get(['/stats', '/stats/:locationId'], authorize('VIEW'), async (req: Auth
         failed: allFailed,
         rate: passRate,
       },
-      trend: [
-        { date: '2026-10-02', total: 42, passed: 41, failed: 1, avgScore: 95.2 },
-        { date: '2026-10-03', total: 45, passed: 43, failed: 2, avgScore: 94.8 },
-        { date: '2026-10-04', total: 40, passed: 39, failed: 1, avgScore: 96.1 },
-        { date: '2026-10-05', total: 44, passed: 42, failed: 2, avgScore: 93.9 },
-        { date: '2026-10-06', total: 46, passed: 45, failed: 1, avgScore: 95.5 },
-        { date: '2026-10-07', total: 48, passed: 46, failed: 2, avgScore: 94.3 },
-        { date: '2026-10-08', total: totalCount || 50, passed: allVerified || 48, failed: allFailed || 2, avgScore: avgScore || 95.0 },
-      ],
-      locationBreakdown: [
-        { code: 'BEL', name: 'BSC Textiles Belagavi Flagship', total: 24, passed: 23, failed: 1, avgScore: 95.4 },
-        { code: 'DAV', name: 'BSC Textiles Davanagere Showroom', total: 12, passed: 12, failed: 0, avgScore: 96.1 },
-        { code: 'SHI', name: 'BSC Textiles Shivamogga Megastore', total: 14, passed: 13, failed: 1, avgScore: 94.0 },
-      ],
-      deviceBreakdown: [
-        { device: 'Entrance Biometric Tablet A', total: 28, passed: 27, failed: 1, avgScore: 95.8 },
-        { device: 'Floor 1 Gate Scanner B', total: 22, passed: 21, failed: 1, avgScore: 94.6 },
-      ],
+      trend,
+      locationBreakdown,
+      deviceBreakdown,
     });
   } catch (error) {
     console.error('Get face verification stats error:', error);

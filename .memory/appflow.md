@@ -9,7 +9,7 @@ Version: 1.0.0 (Production Architecture)
 
 ---
 
-## 1. Executive Summary & Flow Topology
+## 1. Executive Summary & Flow Topology 
 
 The **BSC Textiles HRMS** application orchestrates complex, real-time retail workforce interactions across 4 store locations (`Belagavi`, `Davanagere`, `Shivamogga`, `Hubballi`), 14 functional user roles, and 32+ responsive application views.
 

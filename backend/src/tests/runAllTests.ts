@@ -39,7 +39,7 @@ async function main() {
   try {
     adminToken = await loginUser('admin@bsctextiles.com');
     console.log('  ✔ Super Admin Authenticated');
-    
+
     // Belagavi HR
     belagaviHrToken = await loginUser('kavita.bhat@bsctextiles.com');
     console.log('  ✔ Belagavi HR Authenticated');

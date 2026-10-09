@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,600;0,700;1,400&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "secondary-container": "#2170e4", "surface-container-high": "#dce9ff", "on-tertiary-fixed-variant": "#6e3900", "on-tertiary-fixed": "#2f1500", "primary-container": "#131b2e", "surface-variant": "#d3e4fe", "on-secondary-container": "#fefcff", "primary-fixed-dim": "#bec6e0", "on-secondary-fixed-variant": "#004395", "on-primary": "#ffffff", "secondary-fixed": "#d8e2ff", "surface-container-low": "#eff4ff", "on-error": "#ffffff", "on-tertiary-container": "#c76c00", "surface-tint": "#565e74", "on-primary-fixed": "#131b2e", "on-secondary-fixed": "#001a42", "tertiary-fixed-dim": "#ffb77d", "inverse-surface": "#213145", "surface-container-lowest": "#ffffff", "background": "#f8f9ff", "surface-container-highest": "#d3e4fe", "secondary": "#0058be", "surface": "#f8f9ff", "on-secondary": "#ffffff", "on-error-container": "#93000a", "surface-container": "#e5eeff", "surface-dim": "#cbdbf5", "error": "#ba1a1a", "error-container": "#ffdad6", "tertiary-container": "#2f1500", "tertiary": "#000000", "on-primary-fixed-variant": "#3f465c", "primary": "#000000", "on-surface-variant": "#45464d", "inverse-primary": "#bec6e0", "inverse-on-surface": "#eaf1ff", "on-tertiary": "#ffffff", "primary-fixed": "dae2fd", "secondary-fixed-dim": "#adc6ff", "on-surface": "#0b1c30", "on-primary-container": "#7c839b", "surface-bright": "#f8f9ff", "tertiary-fixed": "#ffdcc3", "outline": "#76777d", "on-background": "#0b1c30", "outline-variant": "#c6c6cd" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "space-xl": "1.5rem", "gutter": "1rem", "margin": "1.5rem", "space-2xl": "2rem", "space-lg": "1rem", "space-sm": "0.5rem", "margin-lg": "2rem", "gutter-lg": "1.5rem", "space-xs": "0.25rem", "space-md": "0.75rem" }, "fontFamily": { "headline-md": ["Plus Jakarta Sans"], "label-md": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"], "label-lg": ["Plus Jakarta Sans"], "label-sm": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "display-lg": ["Plus Jakarta Sans"], "body-sm": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"] }, "fontSize": { "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "label-md": ["11px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "600" }], "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.015em", "fontWeight": "600" }], "headline-sm": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "600" }], "label-lg": ["13px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600" }], "label-sm": ["10px", { "lineHeight": "12px", "letterSpacing": "0.06em", "fontWeight": "700" }], "body-md": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }], "body-lg": ["15px", { "lineHeight": "22px", "fontWeight": "400" }] } } } };</script></head><body class="bg-background font-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between overflow-y-auto"><div class="flex flex-col"><div class="h-14 flex items-center gap-space-sm px-margin bg-surface-container-lowest"><img alt="BSC Textiles HRMS Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVH-y2iZ7yaWx6Q6YdmCHl5vkuKf05I_tvVHXVmfcUPbGtp_kwuvSAA6xrLyvKJHBNWbsKAe9w2IVjozxX7H1lJp-QjrcIHW9eZzcLHERrm1drSgbM7tnMjOxun2eDUY0Z7MD95iXYT3uCEmzqt88rmLfdZES7ZnfHodPxWD1vFb9iZAjw75H43SyIc1YyF2g7zpDhy4idpDfo40BeesriCLNRd9xeLnJTvyUFLuRMJMuXeerzo-5b"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm text-on-surface leading-none tracking-tight">BSC Textiles</span><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">HRMS Portal</span></div></div><nav class="flex flex-col gap-space-xs px-space-sm py-space-md" data-active-classes="bg-surface-container text-secondary font-label-lg font-bold"><div class="px-space-md pt-space-xs pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Core Operations</div><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[20px]">grid_view</span><span>Executive Dashboard</span></a><div class="px-space-md pt-space-md pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Workforce Directory</div><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="employee-roster" href="#"><span class="material-symbols-outlined text-[20px]">badge</span><span>All Employees</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="employee-profile" href="#"><span class="material-symbols-outlined text-[20px]">person_search</span><span>Profile 360 &amp; Dossier</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="organization-units" href="#"><span class="material-symbols-outlined text-[20px]">corporate_fare</span><span>Departments &amp; Units</span></a><div class="px-space-md pt-space-md pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Time &amp; Attendance</div><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="daily-punches" href="#"><span class="material-symbols-outlined text-[20px]">fingerprint</span><span>Biometric Punches</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="shifts-rosters" href="#"><span class="material-symbols-outlined text-[20px]">calendar_view_week</span><span>Floor Shifts &amp; Rosters</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="break-tracker" href="#"><span class="material-symbols-outlined text-[20px]">coffee</span><span>Lunch &amp; Break Tracker</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="attendance-corrections" href="#"><span class="material-symbols-outlined text-[20px]">edit_calendar</span><span>Punch Corrections</span></a><div class="px-space-md pt-space-md pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Leave &amp; Payroll</div><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="leave-management" href="#"><span class="material-symbols-outlined text-[20px]">event_busy</span><span>Leave Approvals</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="payroll-processing" href="#"><span class="material-symbols-outlined text-[20px]">payments</span><span>Payroll &amp; Payslips</span></a><div class="px-space-md pt-space-md pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Governance</div><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="audit-logs" href="#"><span class="material-symbols-outlined text-[20px]">rule</span><span>Audit Logs &amp; Security</span></a></nav></div><div class="p-space-md bg-surface-container-low m-space-sm rounded-xl"><div class="flex items-center justify-between mb-space-xs"><span class="font-label-sm text-label-sm uppercase text-on-surface-variant">Biometric Server</span><span class="flex h-2 w-2 relative"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span></span></div><div class="font-label-md text-label-md text-on-surface font-bold">Synced Live</div><div class="font-body-sm text-body-sm text-on-surface-variant">99.8% Terminal Uptime</div></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-14 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-margin-lg"><div class="flex items-center gap-space-lg flex-1 max-w-2xl"><div class="relative flex items-center bg-surface-container-low rounded-lg px-space-md py-space-xs"><span class="material-symbols-outlined text-secondary text-[18px] mr-space-xs">pin_drop</span><select class="bg-transparent font-label-lg text-label-lg text-on-surface focus:outline-none cursor-pointer pr-space-sm"><option value="all">All Hubs (Karnataka)</option><option value="bel">Belagavi Spinning Mill (BEL)</option><option value="dav">Davanagere Weaving Hub (DAV)</option><option value="shi">Shivamogga Retail Apex (SHI)</option></select></div><div class="relative flex-1 flex items-center bg-surface-container-lowest rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.02)] px-space-md py-space-xs"><span class="material-symbols-outlined text-on-surface-variant text-[20px] mr-space-xs">search</span><input class="w-full bg-transparent font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none" placeholder="Search by ID (e.g. BSC-4029), Name, Dept, or Phone..." type="text"/></div></div><div class="flex items-center gap-space-md"><div class="flex flex-col text-right pr-space-sm hidden md:flex"><div class="flex items-center gap-space-xs justify-end"><span class="material-symbols-outlined text-[14px] text-secondary">schedule</span><span class="font-label-lg text-label-lg text-on-surface font-bold">14:22:08 IST</span></div><span class="font-body-sm text-body-sm text-on-surface-variant">24 Oct 2024 • Shift A</span></div><div class="relative flex items-center justify-center p-space-xs rounded-lg hover:bg-surface-container-high transition-colors cursor-pointer"><span class="material-symbols-outlined text-on-surface-variant text-[22px]">notifications</span><span class="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-error text-on-error font-label-sm text-[9px] font-bold">3</span></div><div class="flex items-center gap-space-sm pl-space-sm"><div class="flex flex-col text-right hidden sm:flex"><span class="font-label-lg text-label-lg text-on-surface font-bold">S. B. Angadi</span><span class="font-label-sm text-label-sm uppercase tracking-wide text-on-surface-variant">HR Director • Super Admin</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="w-full pt-14 px-margin-lg py-space-xl bg-background"><div class="flex flex-col w-full">
+<!-- Executive Context & Scoped Floor Header -->
+<div class="bg-surface-container-lowest rounded-xl p-space-lg shadow-sm mb-space-lg">
+<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-space-md">
+<div class="flex flex-col gap-space-xs">
+<div class="flex flex-wrap items-center gap-space-sm">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-surface-container font-label-sm text-label-sm uppercase tracking-wider text-secondary">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+            Scoped Role: Floor Manager / Lead
+          </span>
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-container-low font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]">groups</span>
+            28 Direct Followers
+          </span>
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-container-high font-label-sm text-label-sm uppercase tracking-wider text-on-surface">
+<span class="material-symbols-outlined text-[14px] text-secondary">storefront</span>
+            Belagavi Flagship (BEL-01) • Level 1 &amp; Silk Atelier
+          </span>
+</div>
+<div class="flex items-baseline gap-space-md mt-1">
+<h1 class="font-headline-lg text-headline-lg text-on-surface">
+            Anand Kulkarni
+          </h1>
+<span class="font-body-md text-body-md text-on-surface-variant">
+            Store Ops &amp; Retail Floor Lead • Terminal Station BEL-MGR-01
+          </span>
+</div>
+<div class="flex items-center gap-space-md text-on-surface-variant font-body-sm text-body-sm">
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-secondary">timelapse</span>
+<span>Shift A (09:30 AM – 18:30 PM)</span>
+</div>
+<span class="text-outline-variant">•</span>
+<div class="flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px] text-secondary">verified</span>
+<span class="font-label-md text-label-md text-secondary">Live Floor Adherence: 96.4%</span>
+</div>
+<span class="text-outline-variant">•</span>
+<div class="flex items-center gap-1 text-on-surface-variant">
+<span class="material-symbols-outlined text-[16px]">devices</span>
+<span>Terminal BEL-IN-02 Synced</span>
+</div>
+</div>
+</div>
+<!-- Quick Floor Actions -->
+<div class="flex flex-wrap items-center gap-space-sm">
+<button class="inline-flex items-center gap-1.5 px-space-md py-space-sm rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-label-lg text-label-lg transition-colors">
+<span class="material-symbols-outlined text-[18px]">rule</span>
+<span>+ Regularize Punch</span>
+</button>
+<button class="inline-flex items-center gap-1.5 px-space-md py-space-sm rounded-lg bg-surface-container-high hover:bg-surface-variant text-secondary font-label-lg text-label-lg transition-colors">
+<span class="material-symbols-outlined text-[18px]">fact_check</span>
+<span>Verify Batch (4)</span>
+</button>
+<button class="inline-flex items-center gap-1.5 px-space-md py-space-sm rounded-lg bg-primary hover:bg-primary-container text-on-primary font-label-lg text-label-lg shadow-sm transition-colors">
+<span class="material-symbols-outlined text-[18px]">ios_share</span>
+<span>Export Daily Floor Report</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Row of 4 Scoped KPI Metric Cards -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md mb-space-lg">
+<!-- Card 1: Direct Followers -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">Assigned Team</span>
+<div class="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">badge</span>
+</div>
+</div>
+<div>
+<div class="flex items-baseline gap-2">
+<span class="font-display-lg text-display-lg text-on-surface font-bold">28</span>
+<span class="font-headline-sm text-headline-sm text-on-surface-variant">/ 28</span>
+</div>
+<div class="flex items-center gap-1.5 mt-1 font-body-sm text-body-sm text-on-surface">
+<span class="inline-block w-2 h-2 rounded-full bg-secondary"></span>
+<span>27 Active on Floor</span>
+<span class="text-outline-variant">•</span>
+<span class="text-on-surface-variant">1 Approved CL</span>
+</div>
+</div>
+<div class="mt-space-md pt-space-xs bg-surface-container-lowest flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span>+2 Trainees Under Mentorship</span>
+<span class="font-semibold text-secondary">0 Absent</span>
+</div>
+</div>
+<!-- Card 2: Live Floor Presence -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">Live Floor Presence</span>
+<div class="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">how_to_reg</span>
+</div>
+</div>
+<div>
+<div class="flex items-baseline gap-2">
+<span class="font-display-lg text-display-lg text-secondary font-bold">96.4%</span>
+<span class="px-2 py-0.5 rounded-full bg-surface-container font-label-sm text-label-sm text-secondary font-bold">+1.8% vs Wk Avg</span>
+</div>
+<div class="flex items-center gap-1.5 mt-1 font-body-sm text-body-sm text-on-surface-variant">
+<span>2 Early Check-ins (09:12 AM)</span>
+</div>
+</div>
+<div class="mt-space-md pt-space-xs flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span>Gate Terminal BEL-IN-02</span>
+<span class="text-on-surface font-semibold">100% In-Sync</span>
+</div>
+</div>
+<!-- Card 3: Pending Directives / Verification -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">Pending Verifications</span>
+<div class="w-9 h-9 rounded-lg bg-error-container/40 flex items-center justify-center text-error">
+<span class="material-symbols-outlined text-[20px]">pending_actions</span>
+</div>
+</div>
+<div>
+<div class="flex items-baseline gap-2">
+<span class="font-display-lg text-display-lg text-on-surface font-bold">6</span>
+<span class="font-headline-sm text-headline-sm text-error font-semibold">Directives</span>
+</div>
+<div class="flex items-center gap-1 mt-1 font-body-sm text-body-sm text-on-surface-variant">
+<span>2 Identity/KYC</span>
+<span class="text-outline-variant">•</span>
+<span>2 Corrections</span>
+<span class="text-outline-variant">•</span>
+<span>2 Asset</span>
+</div>
+</div>
+<div class="mt-space-md pt-space-xs flex items-center justify-between font-label-sm text-label-sm">
+<span class="text-error font-bold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-error animate-pulse"></span>
+          Action Required Today
+        </span>
+<span class="text-secondary font-semibold cursor-pointer">Review All</span>
+</div>
+</div>
+<!-- Card 4: Lunch & Break Tracker -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between mb-space-sm">
+<span class="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant">Lunch &amp; Break Compliance</span>
+<div class="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">coffee</span>
+</div>
+</div>
+<div>
+<div class="flex items-baseline gap-2">
+<span class="font-display-lg text-display-lg text-on-surface font-bold">18</span>
+<span class="font-headline-sm text-headline-sm text-on-surface-variant">/ 28 Done</span>
+</div>
+<div class="flex items-center gap-1.5 mt-1 font-body-sm text-body-sm text-on-surface">
+<span class="font-semibold text-secondary">3 Currently at Lunch</span>
+<span class="text-outline-variant">•</span>
+<span class="text-on-surface-variant">0 Breaches</span>
+</div>
+</div>
+<div class="mt-space-md pt-space-xs flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span>Floor Avg: 38 min / 45m cap</span>
+<span class="text-secondary font-semibold">In Legal Band</span>
+</div>
+</div>
+</div>
+<!-- Primary Layout: Central Queue & Side Support Rails -->
+<div class="grid grid-cols-1 xl:grid-cols-12 gap-space-lg items-start">
+<!-- Central Queue: Scoped Follower Roster & Verification (Span 8) -->
+<div class="xl:col-span-8 flex flex-col gap-space-md">
+<div class="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden">
+<!-- Tab Bar & Table Actions -->
+<div class="p-space-md bg-surface-container-lowest flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
+<div>
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">BEL-01 Silk Atelier &amp; Floor 1</span>
+<h2 class="font-headline-sm text-headline-sm text-on-surface">Team Verification Queue &amp; Followers Roster</h2>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="font-label-md text-label-md px-2.5 py-1 rounded bg-surface-container font-semibold text-on-surface">Auto-Refresh: 30s</span>
+<button class="p-1.5 rounded-lg hover:bg-surface-container-low text-on-surface-variant transition-colors" title="Sync Roster">
+<span class="material-symbols-outlined text-[18px]">sync</span>
+</button>
+</div>
+</div>
+<!-- Filter Segmented Tabs -->
+<div class="px-space-md flex flex-wrap items-center gap-space-xs bg-surface-container-low/50 py-space-xs">
+<button class="px-space-md py-1.5 rounded font-label-lg text-label-lg bg-surface-container-lowest text-secondary shadow-sm font-bold flex items-center gap-1.5">
+<span>All Followers</span>
+<span class="px-1.5 py-0.2 rounded-full bg-secondary-fixed text-on-secondary-fixed font-label-sm text-label-sm">28</span>
+</button>
+<button class="px-space-md py-1.5 rounded font-label-lg text-label-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-lowest transition-colors flex items-center gap-1.5">
+<span>Pending Verification</span>
+<span class="px-1.5 py-0.2 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">6</span>
+</button>
+<button class="px-space-md py-1.5 rounded font-label-lg text-label-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-lowest transition-colors flex items-center gap-1.5">
+<span>Active on Floor</span>
+<span class="px-1.5 py-0.2 rounded-full bg-surface-container text-on-surface font-label-sm text-label-sm">27</span>
+</button>
+<button class="px-space-md py-1.5 rounded font-label-lg text-label-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-lowest transition-colors flex items-center gap-1.5">
+<span>On Lunch / Break</span>
+<span class="px-1.5 py-0.2 rounded-full bg-surface-container-high text-secondary font-label-sm text-label-sm">3</span>
+</button>
+<button class="px-space-md py-1.5 rounded font-label-lg text-label-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-lowest transition-colors flex items-center gap-1.5">
+<span>Exceptions &amp; Regularizations</span>
+<span class="px-1.5 py-0.2 rounded-full bg-surface-container text-on-surface-variant font-label-sm text-label-sm">2</span>
+</button>
+</div>
+<!-- Filter Search & Micro Controls -->
+<div class="p-space-md bg-surface-container-lowest flex flex-col md:flex-row items-center justify-between gap-space-sm">
+<div class="relative w-full md:w-96 flex items-center bg-surface-container-low rounded-lg px-space-md py-space-xs">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px] mr-2">search</span>
+<input class="w-full bg-transparent font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none" placeholder="Filter followers by ID, Name, Station, or Asset..." type="text"/>
+</div>
+<div class="flex items-center gap-space-xs w-full md:w-auto justify-end">
+<select class="bg-surface-container-low rounded-lg px-space-md py-space-xs font-label-md text-label-md text-on-surface focus:outline-none cursor-pointer">
+<option>All Floor Stations</option>
+<option>Bridal &amp; Pure Silk (Counter A)</option>
+<option>POS Checkout Desk 01–04</option>
+<option>Visual Merchandising North</option>
+<option>Fitting Atelier &amp; Alterations</option>
+</select>
+<button class="px-space-md py-space-xs rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-label-md text-label-md flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">filter_list</span>
+<span>Filter</span>
+</button>
+</div>
+</div>
+<!-- High Density Data Table -->
+<div class="overflow-x-auto">
+<table class="w-full text-left font-body-md text-body-md">
+<thead>
+<tr class="bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">
+<th class="py-space-sm px-space-md sticky left-0 bg-surface-container-low z-10">Follower Employee</th>
+<th class="py-space-sm px-space-md">Station / Counter</th>
+<th class="py-space-sm px-space-md">Live Floor Status</th>
+<th class="py-space-sm px-space-md">Punch &amp; Terminal</th>
+<th class="py-space-sm px-space-md">Directives / Verification</th>
+<th class="py-space-sm px-space-md text-right">Floor Manager Action</th>
+</tr>
+</thead>
+<tbody class="divide-y-0">
+<!-- Row 1: Rajeshwari V. Patil -->
+<tr class="hover:bg-surface-container-low/60 transition-colors group">
+<td class="py-space-sm px-space-md sticky left-0 bg-surface-container-lowest group-hover:bg-surface-container-low/60 transition-colors z-10">
+<div class="flex items-center gap-space-sm">
+<img class="w-9 h-9 rounded-full object-cover" data-alt="Professional Indian woman retail executive Rajeshwari Patil in crisp formal uniform on Belagavi luxury textile showroom floor, soft ambient lighting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDtvLGReu25YPFuBu0QrR4_V0IarZ6PYjxk-on3USRDW6BRCZwb0xHOIiPTzJ7P2RKbNmh0qyBn1iWSiugRoGPfuPAOm_3c5zsSQVS3fjzwnHSSoD0uuQRgoc8vex9j43hMtclF5ox0_ZKikiZfP0pXpC69gbOZ-cspQAnWYHe6kL7PcjsYKmqSTkBdx2JxU6JY-wTeIsyEEszKIy4M4ZbRqKId51xLDcQpEuo2Gt8MVVys60r6GplR"/>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface font-bold">Rajeshwari V. Patil</span>
+<div class="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant">
+<span class="font-mono text-secondary">BSC-EMP-0042</span>
+<span>• Sr. Silk Merchandiser</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Bridal &amp; Silk Counter A</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Main Pavilion (Station 01)</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-container-high text-secondary font-label-sm text-label-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                    Active on Floor
+                  </span>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex flex-col font-mono text-body-sm">
+<span class="text-on-surface font-semibold">09:28 AM</span>
+<span class="text-on-surface-variant text-[11px]">BEL-IN-02 (Biometric)</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface">
+<span class="material-symbols-outlined text-[14px] text-secondary">verified_user</span>
+<span>KYC &amp; Aadhaar Mask Verified</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md text-right">
+<div class="flex items-center justify-end gap-1.5">
+<button class="px-2.5 py-1 rounded bg-secondary hover:bg-secondary/90 text-on-secondary font-label-sm text-label-sm font-bold transition-colors">
+                      Confirm
+                    </button>
+<button class="p-1 rounded hover:bg-surface-container-high text-on-surface-variant transition-colors" title="Inspect Dossier">
+<span class="material-symbols-outlined text-[18px]">person_search</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container-high text-on-surface-variant transition-colors" title="More">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 2: Manoj K. -->
+<tr class="hover:bg-surface-container-low/60 transition-colors group">
+<td class="py-space-sm px-space-md sticky left-0 bg-surface-container-lowest group-hover:bg-surface-container-low/60 transition-colors z-10">
+<div class="flex items-center gap-space-sm">
+<img class="w-9 h-9 rounded-full object-cover" data-alt="Portrait of young Indian male cashier Manoj K. in neat corporate black waistcoat and tie in modern Belagavi department store setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC2kVXGkhFd3kK7FNUdZlNxwlnM2G9tkRy-yu_YWFETOodc-hB5sPy3qAXx93HMPmSmZqfwDBwSTSqJ1l2vjuN6XJyRD1VVqG6c9BrxEIHpiejQ1xkv-enWDZL-d4k9HL-04Yz0Ez1PyFvIiD48htBruY76dehwwJuFS0zUlKiHSJqxMksITUQP4X9KNhHry-iRVo640YjYUyR0Kz1TKZuzm9Vae1UpRQeJzdc6zMsLlSoM06i8VQwl"/>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface font-bold">Manoj K.</span>
+<div class="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant">
+<span class="font-mono text-secondary">BSC-EMP-0056</span>
+<span>• Senior Cashier &amp; POS</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">POS Checkout Desk 03</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Cash Desk A • Till #4</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-container-high text-secondary font-label-sm text-label-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                    Active on Floor
+                  </span>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex flex-col font-mono text-body-sm">
+<span class="text-on-surface font-semibold">09:14 AM</span>
+<span class="text-on-surface-variant text-[11px]">BEL-IN-02 (Early Punch)</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-error-container/40 font-label-sm text-label-sm text-error font-bold">
+<span class="material-symbols-outlined text-[14px]">lock_reset</span>
+<span>Drawer Key Handover Pending</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md text-right">
+<div class="flex items-center justify-end gap-1.5">
+<button class="px-2.5 py-1 rounded bg-primary hover:bg-primary-container text-on-primary font-label-sm text-label-sm font-bold transition-colors">
+                      Verify Key
+                    </button>
+<button class="p-1 rounded hover:bg-surface-container-high text-on-surface-variant transition-colors" title="Inspect Dossier">
+<span class="material-symbols-outlined text-[18px]">person_search</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container-high text-on-surface-variant transition-colors" title="More">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 3: Priyanka Shinde -->
+<tr class="hover:bg-surface-container-low/60 transition-colors group">
+<td class="py-space-sm px-space-md sticky left-0 bg-surface-container-lowest group-hover:bg-surface-container-low/60 transition-colors z-10">
+<div class="flex items-center gap-space-sm">
+<img class="w-9 h-9 rounded-full object-cover" data-alt="Professional Indian woman fashion visual merchandiser Priyanka Shinde holding fabric swatches in modern architectural retail store setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBg44_REt12Zv7KxO-ZoslajcNmjfzVcVRWm_jduIY2RA31str5q20LwIfTGcP3H38Pkyg21HRxjM_t3dFJER9Y0DlXRHvBif0_fBFq5Npm6e2MkUZk82iUElOTa4PTOwBhRsJUr1uaMd2_5qCodNhqBMM3E8LnDSrkIULpyQlsqE6g0mibZSxogzTm6Niz9b1FJX9lFdP5Kx4oxM8mlVwODjyKIuGMaMIpWGwfwzJavAh0zZDWRsza"/>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface font-bold">Priyanka Shinde</span>
+<div class="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant">
+<span class="font-mono text-secondary">BSC-EMP-0071</span>
+<span>• VM Specialist</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Display Floor North</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Festive Silk Showcase</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-container-high text-secondary font-label-sm text-label-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
+                    In Lunch Break (24m/45m)
+                  </span>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex flex-col font-mono text-body-sm">
+<span class="text-on-surface font-semibold">09:30 AM</span>
+<span class="text-on-surface-variant text-[11px]">BEL-IN-01 (Biometric)</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-on-surface-variant">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+<span>No Pending Directives</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md text-right">
+<div class="flex items-center justify-end gap-1.5">
+<button class="px-2.5 py-1 rounded bg-surface-container-low hover:bg-surface-container text-on-surface font-label-sm text-label-sm font-semibold transition-colors">
+                      Paging
+                    </button>
+<button class="p-1 rounded hover:bg-surface-container-high text-on-surface-variant transition-colors" title="Inspect Dossier">
+<span class="material-symbols-outlined text-[18px]">person_search</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container-high text-on-surface-variant transition-colors" title="More">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 4: Amit Deshpande -->
+<tr class="hover:bg-surface-container-low/60 transition-colors group">
+<td class="py-space-sm px-space-md sticky left-0 bg-surface-container-lowest group-hover:bg-surface-container-low/60 transition-colors z-10">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-full bg-surface-container-high flex items-center justify-center font-bold text-secondary font-label-lg">
+                      AD
+                    </div>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface font-bold">Amit Deshpande</span>
+<div class="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant">
+<span class="font-mono text-secondary">BSC-EMP-0089</span>
+<span>• Senior Tailor &amp; Draper</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Fitting Atelier &amp; Custom Hub</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Alteration Station B</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-error-container/40 text-error font-label-sm text-label-sm font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-error"></span>
+                    Punch Pending Review
+                  </span>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex flex-col font-mono text-body-sm">
+<span class="text-error font-semibold">09:48 AM</span>
+<span class="text-error text-[11px]">Manual Entry Flagged</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-high font-label-sm text-label-sm text-on-surface font-medium">
+<span class="material-symbols-outlined text-[14px] text-secondary">edit_calendar</span>
+<span>Forgot Out-Punch (Y'day Shift)</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md text-right">
+<div class="flex items-center justify-end gap-1.5">
+<button class="px-2.5 py-1 rounded bg-secondary hover:bg-secondary/90 text-on-secondary font-label-sm text-label-sm font-bold transition-colors">
+                      Regularize
+                    </button>
+<button class="p-1 rounded hover:bg-surface-container-high text-on-surface-variant transition-colors" title="Inspect Dossier">
+<span class="material-symbols-outlined text-[18px]">person_search</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container-high text-on-surface-variant transition-colors" title="More">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+<!-- Row 5: Rekha Naik -->
+<tr class="hover:bg-surface-container-low/60 transition-colors group">
+<td class="py-space-sm px-space-md sticky left-0 bg-surface-container-lowest group-hover:bg-surface-container-low/60 transition-colors z-10">
+<div class="flex items-center gap-space-sm">
+<img class="w-9 h-9 rounded-full object-cover" data-alt="Portrait of South Indian woman inventory associate Rekha Naik holding barcode terminal scanner in a pristine organized textile store aisle" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCs-JvhxNQHq1pr3tsLe__xxISRHdnfcMkUG7soFgWbJ20cqA6MZuda8DQzY1kKKKtOe-ml9dQ_ueeVkwiLmk8AqaMPTxYPZvP-AC1Wvx-5OIyLM0p5RWKymIxUfO5ACa1Q1uMVuamImpAXvLx4WZcoNo20ICWfk_jcmtGZjmARie_ZfTpyBR9Khd5YtnRp7ODzgOPXFq5wCDYkGJ5N3i_sSQ4zNnUQW_dJunWCIAbn_8DJtZZrqG6V"/>
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg text-on-surface font-bold">Rekha Naik</span>
+<div class="flex items-center gap-1 font-label-sm text-label-sm text-on-surface-variant">
+<span class="font-mono text-secondary">BSC-EMP-0094</span>
+<span>• Inventory Associate</span>
+</div>
+</div>
+</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Stockroom &amp; Floor Intake</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Section 4A (Saree Rolls)</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-container-high text-secondary font-label-sm text-label-sm font-semibold">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+                    Active on Floor
+                  </span>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex flex-col font-mono text-body-sm">
+<span class="text-on-surface font-semibold">09:22 AM</span>
+<span class="text-on-surface-variant text-[11px]">BEL-IN-02 (Biometric)</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface">
+<span class="material-symbols-outlined text-[14px] text-secondary">qr_code_scanner</span>
+<span>RFID Scanner #12 Assigned</span>
+</div>
+</td>
+<td class="py-space-sm px-space-md text-right">
+<div class="flex items-center justify-end gap-1.5">
+<button class="px-2.5 py-1 rounded bg-surface-container-low hover:bg-surface-container text-on-surface font-label-sm text-label-sm font-semibold transition-colors">
+                      Audit
+                    </button>
+<button class="p-1 rounded hover:bg-surface-container-high text-on-surface-variant transition-colors" title="Inspect Dossier">
+<span class="material-symbols-outlined text-[18px]">person_search</span>
+</button>
+<button class="p-1 rounded hover:bg-surface-container-high text-on-surface-variant transition-colors" title="More">
+<span class="material-symbols-outlined text-[18px]">more_vert</span>
+</button>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer / Pagination -->
+<div class="p-space-md bg-surface-container-low/30 flex flex-col sm:flex-row items-center justify-between gap-space-sm font-body-sm text-body-sm text-on-surface-variant">
+<div class="flex items-center gap-space-sm">
+<span>Showing 5 of 28 Scoped Team Members</span>
+<span class="text-outline-variant">•</span>
+<span>Floor Supervisor: Anand Kulkarni (ID: BSC-MGR-0012)</span>
+</div>
+<div class="flex items-center gap-space-xs">
+<button class="px-2.5 py-1 rounded bg-surface-container-lowest text-on-surface font-semibold hover:bg-surface-container transition-colors disabled:opacity-50" disabled="">Previous</button>
+<span class="px-2 py-1 rounded bg-secondary text-on-secondary font-label-sm text-label-sm font-bold">1</span>
+<button class="px-2 py-1 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-sm text-label-sm transition-colors">2</button>
+<button class="px-2 py-1 rounded bg-surface-container-lowest text-on-surface hover:bg-surface-container font-label-sm text-label-sm transition-colors">3</button>
+<button class="px-2.5 py-1 rounded bg-surface-container-lowest text-on-surface font-semibold hover:bg-surface-container transition-colors">Next</button>
+</div>
+</div>
+</div>
+<!-- Quick Operational Dispatch Note -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex items-start gap-space-md">
+<div class="w-10 h-10 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary shrink-0">
+<span class="material-symbols-outlined text-[22px]">campaign</span>
+</div>
+<div class="flex flex-col gap-0.5">
+<div class="flex items-center gap-2">
+<span class="font-label-lg text-label-lg text-on-surface font-bold">Floor Lead Announcement &amp; Huddle Directive</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-secondary font-label-sm text-label-sm font-bold">Today 09:30 AM Shift Note</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant">
+            Diwali Pre-Festive rush anticipated at Counter A &amp; B (Bridal silks). All staff must adhere strictly to 45-minute staggered lunch slots to preserve floor coverage minimums of 85% at all times.
+          </p>
+</div>
+</div>
+</div>
+<!-- Side Support Columns (Span 4) -->
+<div class="xl:col-span-4 flex flex-col gap-space-md">
+<!-- Panel A: Live Floor Break Monitor -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px]">timer</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Live Break Monitor</h3>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-high text-secondary font-label-sm text-label-sm font-bold">
+            3 Active
+          </span>
+</div>
+<div class="flex flex-col gap-space-sm">
+<!-- Break Progress 1 -->
+<div class="bg-surface-container-low/50 rounded-lg p-space-sm flex flex-col gap-1">
+<div class="flex items-center justify-between text-on-surface">
+<span class="font-label-md text-label-md font-bold">Priyanka Shinde (VM)</span>
+<span class="font-label-sm text-label-sm font-mono text-secondary">24m / 45m</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-1.5 overflow-hidden">
+<div class="bg-secondary h-1.5 rounded-full transition-all" style="width: 53%;"></div>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span>Slot: 13:30 - 14:15</span>
+<span class="text-secondary font-semibold">21m remaining</span>
+</div>
+</div>
+<!-- Break Progress 2 -->
+<div class="bg-surface-container-low/50 rounded-lg p-space-sm flex flex-col gap-1">
+<div class="flex items-center justify-between text-on-surface">
+<span class="font-label-md text-label-md font-bold">Gopal Hegde (Silk Draping)</span>
+<span class="font-label-sm text-label-sm font-mono text-secondary">38m / 45m</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-1.5 overflow-hidden">
+<div class="bg-secondary h-1.5 rounded-full transition-all" style="width: 84%;"></div>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span>Slot: 13:15 - 14:00</span>
+<span class="text-error font-bold">7m remaining</span>
+</div>
+</div>
+<!-- Break Progress 3 -->
+<div class="bg-surface-container-low/50 rounded-lg p-space-sm flex flex-col gap-1">
+<div class="flex items-center justify-between text-on-surface">
+<span class="font-label-md text-label-md font-bold">Sneha Kulkarni (Counter B)</span>
+<span class="font-label-sm text-label-sm font-mono text-secondary">12m / 45m</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-1.5 overflow-hidden">
+<div class="bg-secondary h-1.5 rounded-full transition-all" style="width: 26%;"></div>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm">
+<span>Slot: 13:45 - 14:30</span>
+<span class="text-secondary font-semibold">33m remaining</span>
+</div>
+</div>
+</div>
+<!-- Next Scheduled Batch -->
+<div class="bg-surface-container-low rounded-lg p-space-sm flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[18px]">local_cafe</span>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm font-bold text-on-surface">Next Stagger: Tea Break</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">04:30 PM – 04:45 PM</span>
+</div>
+</div>
+<span class="font-label-md text-label-md px-2 py-0.5 rounded bg-surface-container-lowest text-on-surface font-semibold">7 Staff</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant bg-surface-container-lowest p-1 flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-secondary">policy</span>
+<span>Karnataka Retail Shops &amp; Est. Act — 45m quota tracked.</span>
+</div>
+</div>
+<!-- Panel B: Assigned Floor Assets & Custody Tracking -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px]">inventory</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Floor Asset Custody</h3>
+</div>
+<button class="font-label-sm text-label-sm text-secondary font-bold hover:underline">
+            Audit Log
+          </button>
+</div>
+<div class="grid grid-cols-1 gap-space-xs">
+<!-- Item 1: Handheld RFID -->
+<div class="flex items-center justify-between p-space-sm rounded-lg bg-surface-container-low/40">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined text-[16px]">qr_code_scanner</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-bold">14 Handheld Scanners</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Zebra TC52 (All Assigned)</span>
+</div>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-high text-secondary font-label-sm text-label-sm font-semibold">1 Due H/O</span>
+</div>
+<!-- Item 2: POS Drawers -->
+<div class="flex items-center justify-between p-space-sm rounded-lg bg-surface-container-low/40">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined text-[16px]">key</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-bold">6 POS Drawer Keys</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Till 01 to 06 Registered</span>
+</div>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-high text-secondary font-label-sm text-label-sm font-semibold">6 In Safe</span>
+</div>
+<!-- Item 3: Access Badges -->
+<div class="flex items-center justify-between p-space-sm rounded-lg bg-surface-container-low/40">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined text-[16px]">badge</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-bold">28 Silk Vault Badges</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Active RFID Tokens</span>
+</div>
+</div>
+<span class="px-2 py-0.5 rounded-full bg-surface-container-high text-secondary font-label-sm text-label-sm font-semibold">100% Active</span>
+</div>
+</div>
+<button class="w-full py-2 rounded-lg bg-surface-container-low hover:bg-surface-container text-on-surface font-label-md text-label-md font-semibold transition-colors flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-[16px]">checklist</span>
+<span>Conduct Mid-Shift Floor Audit</span>
+</button>
+</div>
+<!-- Panel C: Manager Audit & Compliance Log -->
+<div class="bg-surface-container-lowest rounded-xl p-space-md shadow-sm flex flex-col gap-space-md">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px]">history_edu</span>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Recent Manager Directives</h3>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant font-mono">BEL-MGR-01</span>
+</div>
+<div class="flex flex-col gap-space-sm">
+<!-- Log 1 -->
+<div class="flex gap-space-sm items-start">
+<div class="w-2 h-2 rounded-full bg-secondary mt-1.5 shrink-0"></div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Shift Regularization Approved</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">BSC-EMP-0042 (Rajeshwari Patil) • 10:14 AM</span>
+</div>
+</div>
+<!-- Log 2 -->
+<div class="flex gap-space-sm items-start">
+<div class="w-2 h-2 rounded-full bg-secondary mt-1.5 shrink-0"></div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">KYC Verification Confirmed</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">BSC-EMP-0056 (Manoj K.) • 09:45 AM</span>
+</div>
+</div>
+<!-- Log 3 -->
+<div class="flex gap-space-sm items-start">
+<div class="w-2 h-2 rounded-full bg-error mt-1.5 shrink-0"></div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Biometric Glitch Escalated</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Forwarded to S. B. Angadi (HR Dir.) • Yesterday</span>
+</div>
+</div>
+</div>
+<div class="p-2.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant flex items-center justify-between">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[14px] text-secondary">security</span>
+<span>Auth IP: 192.168.1.104</span>
+</div>
+<span class="font-bold text-on-surface">Belagavi Intranet</span>
+</div>
+</div>
+</div>
+</div>
+</div></main></div></body></html>

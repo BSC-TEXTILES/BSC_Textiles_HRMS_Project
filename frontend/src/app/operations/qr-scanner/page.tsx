@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Camera, QrCode, CheckCircle, AlertCircle, AlertTriangle,
   User, MapPin, Building2, Clock, Coffee, Utensils,
@@ -114,22 +114,55 @@ export default function QRScannerPage() {
     }
   };
 
-  const stopCamera = () => {
-    if (scanIntervalRef.current) {
-      clearInterval(scanIntervalRef.current);
-      scanIntervalRef.current = null;
+  const fetchEmployeeInfo = useCallback(async (employeeId: number) => {
+    try {
+      const res = await api.get<EmployeeInfo>(`/staff-ops/live-status?employee_id=${employeeId}`);
+      if (res.data.employee) {
+        setEmployeeInfo(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch employee info:', err);
     }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-    setScanning(false);
-  };
+  }, []);
 
-  const startScanLoop = () => {
+  const handleScan = useCallback(async (token: string) => {
+    try {
+      const res = await api.post<QRScanResult>('/qr-codes/scan', {
+        token,
+        purpose,
+        locationId: locationId !== 'all' ? locationId : undefined,
+        floorId: floorId || undefined,
+        deviceInfo: {
+          userAgent: navigator.userAgent,
+          platform: navigator.platform,
+        },
+      });
+      
+      const result = res.data;
+      setScanResult(result);
+      setLastScans(prev => [result, ...prev.slice(0, 9)]);
+
+      if (result.success && result.employee) {
+        await fetchEmployeeInfo(result.employee.id);
+      }
+    } catch (err: any) {
+      const errorResult: QRScanResult = {
+        success: false,
+        result: 'error',
+        reason: err.response?.data?.error || err.message || 'Scan failed',
+      };
+      setScanResult(errorResult);
+      setLastScans(prev => [errorResult, ...prev.slice(0, 9)]);
+    }
+  }, [locationId, floorId, purpose, fetchEmployeeInfo]);
+
+  const processScan = useCallback(async (token: string) => {
+    stopCamera();
+    setManualToken(token);
+    await handleScan(token);
+  }, [handleScan]);
+
+  const startScanLoop = useCallback(() => {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
     if (!context) return;
@@ -164,54 +197,41 @@ export default function QRScannerPage() {
     };
 
     scanFrame();
-  };
+  }, [scanning, processScan]);
 
-  const processScan = async (token: string) => {
-    stopCamera();
-    setManualToken(token);
-    await handleScan(token);
-  };
-
-  const handleScan = async (token: string) => {
+  const startCamera = useCallback(async () => {
     try {
-      const res = await api.post<QRScanResult>('/qr-codes/scan', {
-        token,
-        purpose,
-        locationId: locationId !== 'all' ? locationId : undefined,
-        floorId: floorId || undefined,
-        deviceInfo: {
-          userAgent: navigator.userAgent,
-          platform: navigator.platform,
-        },
+      setCameraError(null);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
       });
-      
-      const result = res.data;
-      setScanResult(result);
-      setLastScans(prev => [result, ...prev.slice(0, 9)]);
-
-      if (result.success && result.employee) {
-        await fetchEmployeeInfo(result.employee.id);
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
       }
-    } catch (err: any) {
-      const errorResult: QRScanResult = {
-        success: false,
-        result: 'error',
-        reason: err.response?.data?.error || err.message || 'Scan failed',
-      };
-      setScanResult(errorResult);
-      setLastScans(prev => [errorResult, ...prev.slice(0, 9)]);
-    }
-  };
-
-  const fetchEmployeeInfo = async (employeeId: number) => {
-    try {
-      const res = await api.get<EmployeeInfo>(`/staff-ops/live-status?employee_id=${employeeId}`);
-      if (res.data.employee) {
-        setEmployeeInfo(res.data);
-      }
+      setScanning(true);
+      startScanLoop();
     } catch (err) {
-      console.error('Failed to fetch employee info:', err);
+      console.error('Camera access denied:', err);
+      setCameraError('Camera access is required for QR scanning. Please allow camera permissions or use manual entry.');
+      setScanning(false);
     }
+  }, [startScanLoop]);
+
+  const stopCamera = () => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setScanning(false);
   };
 
   const handleManualScan = async () => {

@@ -12,6 +12,27 @@ async function seed() {
   console.log('🌱 BSC TEXTILES HRMS — NATIVE MYSQL SEED RUNNER');
   console.log('================================================================');
 
+  // Baseline guard: the seed dataset is only for empty (freshly migrated)
+  // databases. Re-running it against an existing database would duplicate
+  // synthetic rows and could dangle foreign keys, so we refuse instead.
+  const [schemaRows]: any = await pool.query(
+    `SELECT COUNT(*) AS n FROM information_schema.tables
+     WHERE table_schema = DATABASE() AND LOWER(table_name) = 'user'`
+  );
+  if (schemaRows[0].n === 0) {
+    console.error('❌ No schema found (User table missing). Run `npm run db:migrate` first.');
+    await pool.end();
+    process.exit(1);
+  }
+  const [userRows]: any = await pool.query('SELECT COUNT(*) AS n FROM `User`');
+  if (Number(userRows[0].n) > 0) {
+    console.log(`⏩ Baseline data already present (${userRows[0].n} users). Skipping seed.`);
+    console.log('   (Seeds only run against empty databases; existing business data is preserved.)');
+    console.log('================================================================\n');
+    await pool.end();
+    process.exit(0);
+  }
+
   const seedsDir = path.resolve(process.cwd(), 'seeds');
   if (!fs.existsSync(seedsDir)) {
     throw new Error(`Seeds directory not found at: ${seedsDir}`);

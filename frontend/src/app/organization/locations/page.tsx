@@ -298,8 +298,8 @@ export default function LocationsPage() {
             <form onSubmit={editingLocation ? handleUpdateLocation : handleCreateLocation} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <Input
-                  label="Location Code (e.g. HUB)"
-                  placeholder="HUB"
+                  label="Location Code (e.g. BEL)"
+                  placeholder="BEL"
                   required
                   value={code}
                   onChange={(e) => setCode(e.target.value.toUpperCase())}
@@ -307,7 +307,7 @@ export default function LocationsPage() {
                 />
                 <Input
                   label="Location Name"
-                  placeholder="e.g. Hubballi Flagship Store"
+                  placeholder="e.g. Belagavi Flagship Store"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -329,7 +329,7 @@ export default function LocationsPage() {
                 />
                 <Input
                   label="City"
-                  placeholder="e.g. Hubballi"
+                  placeholder="e.g. Belagavi"
                   required
                   value={city}
                   onChange={(e) => setCity(e.target.value)}

@@ -2,20 +2,21 @@ import { query } from '../pool.js';
 
 export interface IncentiveRuleRow {
   id: string;
-  location_id: string;
+  locationId: string | null;
   name: string;
-  type: string;
-  rate_type: string;
-  rate_value: number;
-  threshold: number | null;
-  cap_amount: number | null;
-  is_active: boolean;
+  incentiveType: string;
+  calculationType: string;
+  amount: number | null;
+  percentage: number | null;
+  targetAmount: number | null;
+  status: string;
 }
 
 export class IncentiveRepository {
   static async listActiveRules(locationId: string): Promise<IncentiveRuleRow[]> {
     return query<IncentiveRuleRow>(
-      `SELECT * FROM incentive_rules WHERE location_id = ? AND is_active = TRUE`,
+      `SELECT id, locationId, name, incentiveType, calculationType, amount, percentage, targetAmount, status
+       FROM IncentiveRule WHERE locationId = ? AND status = 'ACTIVE'`,
       [locationId]
     );
   }
@@ -26,12 +27,12 @@ export class IncentiveRepository {
     ruleId: string,
     amount: number,
     date: string,
-    breakdown: any
+    breakdown: unknown
   ): Promise<void> {
     await query(
-      `INSERT INTO incentive_grants (id, employee_id, rule_id, amount, granted_date, breakdown)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, employeeId, ruleId, amount, date, JSON.stringify(breakdown)]
+      `INSERT INTO IncentiveTransaction (id, employeeId, incentiveRuleId, transactionDate, calculationBasis, calculatedAmount, calculationDetails, status)
+       VALUES (?, ?, ?, ?, 'MANUAL_GRANT', ?, ?, 'APPROVED')`,
+      [id, employeeId, ruleId, date, amount, JSON.stringify(breakdown ?? {})]
     );
   }
 }

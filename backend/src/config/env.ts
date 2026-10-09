@@ -1,11 +1,5 @@
-/**
- * Server configuration.
- *
- * Secrets are resolved here and nowhere else, so a missing or placeholder value
- * fails at boot instead of silently signing tokens with a key that is committed
- * to source and therefore known to anyone reading the repository.
- */
-
+import dotenv from 'dotenv';
+import path from 'node:path';
 import crypto from 'node:crypto';
 import type { SignOptions } from 'jsonwebtoken';
 import dotenv from 'dotenv';
@@ -16,6 +10,10 @@ import dotenv from 'dotenv';
 // every session on each tsx-watch restart.
 dotenv.config();
 dotenv.config({ path: '../.env' });
+
+dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+dotenv.config();
 
 const PLACEHOLDER_SECRETS = new Set([
   'your-super-secret-jwt-key-change-in-production',
@@ -35,10 +33,8 @@ function readSecret(name: string): string {
     if (isProduction) {
       throw new Error(`${name} ${reason}. Refusing to start in production without a real secret.`);
     }
-    // Development only: a random per-process key. Sessions stop validating on
-    // restart, which is honest behaviour and cannot be guessed by an attacker.
-    console.warn(`[config] ${name} ${reason} — generating a temporary development key. Sign-ins will not survive a restart.`);
-    return crypto.randomBytes(48).toString('base64url');
+    // Development fallback: use stable dev key so sessions survive hot-reloads and restarts
+    return 'bsc-textiles-hrms-super-secret-jwt-key-2024-production-ready-32chars';
   }
 
   if (value.length < 32) {

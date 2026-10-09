@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { 
   Shield, CheckCircle, AlertCircle, Target, TrendingUp, TrendingDown,
   BarChart2, Users, Eye, AlertTriangle, RefreshCw, Download,
@@ -62,34 +62,29 @@ export default function FaceVerificationDashboardPage() {
   const [search, setSearch] = useState('');
   const [selectedRecord, setSelectedRecord] = useState<FaceVerificationRecord | null>(null);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-
   useEffect(() => {
-    setFromDate(weekAgo);
-    setToDate(today);
+    if (typeof window !== 'undefined') {
+      const q = new URLSearchParams(window.location.search);
+      const result = q.get('result');
+      const loc = q.get('location');
+      if (result) setResultFilter(result);
+      if (loc) setLocationId(loc);
+    }
   }, []);
 
-  // Deep-link support: /operations/face-verification?result=failed&location=all
-  useEffect(() => {
-    const q = new URLSearchParams(window.location.search);
-    const result = q.get('result');
-    const loc = q.get('location');
-    if (result) setResultFilter(result);
-    if (loc) setLocationId(loc);
-  }, []);
-
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     try {
+      const today = new Date().toISOString().slice(0, 10);
+      const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
       const statsPath = locationId === 'all' ? '/face-verification/stats' : `/face-verification/stats/${locationId}`;
-      const res = await api.get<FaceDashboardStats>(`${statsPath}?from=${fromDate}&to=${toDate}`);
+      const res = await api.get<FaceDashboardStats>(`${statsPath}?from=${fromDate || weekAgo}&to=${toDate || today}`);
       setStats(res.data);
     } catch (err) {
       console.error('Failed to fetch face verification stats:', err);
     }
-  };
+  }, [locationId, fromDate, toDate]);
 
-  const fetchRecords = async () => {
+  const fetchRecords = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -106,12 +101,19 @@ export default function FaceVerificationDashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [locationId, fromDate, toDate, resultFilter, search]);
+
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    setFromDate(weekAgo);
+    setToDate(today);
+  }, []);
 
   useEffect(() => {
     fetchStats();
     fetchRecords();
-  }, [locationId, fromDate, toDate, resultFilter, search]);
+  }, [fetchStats, fetchRecords]);
 
   const statCards = stats ? [
     { label: 'Verified Today', value: stats.summary.verifiedToday, icon: CheckCircle, color: 'bg-emerald-500' },

@@ -2,35 +2,45 @@ import { query, queryOne } from '../pool.js';
 
 export interface AttendanceRow {
   id: string;
-  employee_id: string;
-  location_id: string;
-  shift_id: string | null;
-  attendance_date: string;
-  punch_in: Date | null;
-  punch_out: Date | null;
+  employeeId: string;
+  locationId: string;
+  shiftId: string | null;
+  attendanceDate: string;
+  scheduledLogin: Date | null;
+  actualLogin: Date | null;
+  scheduledLogout: Date | null;
+  actualLogout: Date | null;
+  earlyLoginSeconds: number;
+  lateLoginSeconds: number;
+  earlyLogoutSeconds: number;
+  overtimeSeconds: number;
+  totalWorkingSeconds: number;
+  breakSeconds: number;
+  effectiveWorkingSeconds: number;
+  earlyLoginIncentive: number;
+  lateLoginPenalty: number;
+  overtimeIncentive: number;
+  earlyLogoutPenalty: number;
   status: string;
-  early_login_incentive: number;
-  late_login_penalty: number;
-  overtime_seconds: number;
-  early_seconds: number;
-  late_seconds: number;
-  is_face_verified: boolean;
-  created_at: Date;
-  updated_at: Date;
+  faceVerified: boolean;
+  faceMatchPercentage: number | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export class AttendanceRepository {
   static async findByEmployeeAndDate(employeeId: string, date: string): Promise<AttendanceRow | null> {
     return queryOne<AttendanceRow>(
-      `SELECT * FROM attendance WHERE (employee_id = ? OR employeeId = ?) AND (attendance_date = ? OR attendanceDate = ?) LIMIT 1`,
-      [employeeId, employeeId, date, date]
+      `SELECT * FROM Attendance WHERE employeeId = ? AND attendanceDate = ? LIMIT 1`,
+      [employeeId, date]
     );
   }
 
   static async listByLocationAndDate(locationId: string, date: string): Promise<AttendanceRow[]> {
     return query<AttendanceRow>(
-      `SELECT * FROM attendance WHERE (location_id = ? OR locationId = ?) AND (attendance_date = ? OR attendanceDate = ?) ORDER BY punch_in DESC`,
-      [locationId, locationId, date, date]
+      `SELECT * FROM Attendance WHERE locationId = ? AND attendanceDate = ? ORDER BY actualLogin DESC`,
+      [locationId, date]
     );
   }
 
@@ -44,8 +54,8 @@ export class AttendanceRepository {
     earlyIncentive: number = 0
   ): Promise<void> {
     await query(
-      `INSERT INTO attendance (id, employeeId, locationId, shiftId, attendanceDate, actualLogin, status, earlyLoginIncentive, faceVerified)
-       VALUES (?, ?, ?, ?, ?, ?, 'PRESENT', ?, TRUE)
+      `INSERT INTO Attendance (id, employeeId, locationId, shiftId, attendanceDate, actualLogin, status, earlyLoginIncentive, faceVerified)
+       VALUES (?, ?, ?, ?, ?, ?, 'PRESENT', ?, FALSE)
        ON DUPLICATE KEY UPDATE actualLogin = VALUES(actualLogin), earlyLoginIncentive = VALUES(earlyLoginIncentive)`,
       [id, employeeId, locationId, shiftId, date, punchIn, earlyIncentive]
     );
@@ -58,10 +68,10 @@ export class AttendanceRepository {
     overtimeSeconds: number = 0
   ): Promise<void> {
     await query(
-      `UPDATE attendance 
+      `UPDATE Attendance
        SET actualLogout = ?, overtimeSeconds = ?, updatedAt = NOW(3)
-       WHERE (employee_id = ? OR employeeId = ?) AND (attendance_date = ? OR attendanceDate = ?)`,
-      [punchOut, overtimeSeconds, employeeId, employeeId, date, date]
+       WHERE employeeId = ? AND attendanceDate = ?`,
+      [punchOut, overtimeSeconds, employeeId, date]
     );
   }
 }

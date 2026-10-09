@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   MapPin, Plus, Search, Building2, Users, 
   Target, TrendingUp, CheckCircle, X, Edit, Shield 
@@ -27,15 +27,16 @@ export default function SellingPointsPage() {
     targetAmount: 1000000,
   });
 
-  useEffect(() => {
-    fetchLocations();
+  const fetchFloors = useCallback(async (locId: string) => {
+    try {
+      const res = await api.get(`/floors?locationId=${locId}`);
+      setFloors(res.data?.floors || []);
+    } catch (e) {
+      console.error('Fetch floors error:', e);
+    }
   }, []);
 
-  useEffect(() => {
-    fetchSellingPoints();
-  }, [selectedLocation]);
-
-  const fetchLocations = async () => {
+  const fetchLocations = useCallback(async () => {
     try {
       const res = await api.get('/locations/all');
       const locs = res.data || [];
@@ -47,18 +48,9 @@ export default function SellingPointsPage() {
     } catch (e) {
       console.error('Fetch locations error:', e);
     }
-  };
+  }, [fetchFloors]);
 
-  const fetchFloors = async (locId: string) => {
-    try {
-      const res = await api.get(`/floors?locationId=${locId}`);
-      setFloors(res.data?.floors || []);
-    } catch (e) {
-      console.error('Fetch floors error:', e);
-    }
-  };
-
-  const fetchSellingPoints = async () => {
+  const fetchSellingPoints = useCallback(async () => {
     try {
       setLoading(true);
       const url = selectedLocation ? `/selling-points?locationId=${selectedLocation}` : '/selling-points';
@@ -69,7 +61,15 @@ export default function SellingPointsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedLocation]);
+
+  useEffect(() => {
+    fetchLocations();
+  }, [fetchLocations]);
+
+  useEffect(() => {
+    fetchSellingPoints();
+  }, [fetchSellingPoints]);
 
   const handleCreateSP = async (e: React.FormEvent) => {
     e.preventDefault();

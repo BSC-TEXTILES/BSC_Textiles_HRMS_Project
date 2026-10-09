@@ -1,12 +1,27 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { signIn } from 'next-auth/react';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { signIn, useSession, getSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Loader2, Shield, Building2, Sparkles, MapPin, CheckCircle2 } from 'lucide-react';
+import { 
+  Eye, 
+  EyeOff, 
+  Shield, 
+  Building2, 
+  Sparkles, 
+  MapPin, 
+  CheckCircle2, 
+  Lock, 
+  ArrowRight,
+  Store,
+  Clock,
+  Award,
+  Users,
+  Fingerprint
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Logo } from '@/components/ui/Logo';
 import { Button } from '@/components/ui/Button';
@@ -25,60 +40,89 @@ const PERSONAS = [
   { 
     email: 'admin@bsctextiles.com', 
     label: 'Super Admin', 
-    description: 'Global unrestricted access',
+    roleTag: 'ALL HUBS',
+    description: 'Executive & Global unrestricted access',
     icon: Shield,
-    color: 'bg-primary-100 text-primary-700 border-primary-200',
-    iconColor: 'text-primary-600',
+    accent: 'from-amber-500/20 to-amber-600/10 border-amber-500/40 text-amber-300 hover:border-amber-400',
+    iconColor: 'text-amber-400',
+    badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
   },
   { 
     email: 'kavita.bhat@bsctextiles.com', 
     label: 'Belagavi HR', 
-    description: 'BEL Branch only',
+    roleTag: 'BELAGAVI',
+    description: 'BEL Flagship workforce & payroll',
     icon: Building2,
-    color: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-    iconColor: 'text-emerald-600',
-  },
-  { 
-    email: 'vikram.singh@bsctextiles.com', 
-    label: 'Shivamogga HR', 
-    description: 'SHI Branch only',
-    icon: Building2,
-    color: 'bg-amber-100 text-amber-700 border-amber-200',
-    iconColor: 'text-amber-600',
+    accent: 'from-emerald-500/20 to-emerald-600/10 border-emerald-500/40 text-emerald-300 hover:border-emerald-400',
+    iconColor: 'text-emerald-400',
+    badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
   },
   { 
     email: 'amit.patel@bsctextiles.com', 
     label: 'Floor Manager', 
-    description: 'Belagavi Floor 0',
+    roleTag: 'FLOOR 0',
+    description: 'Shift rosters & floor discipline',
     icon: MapPin,
-    color: 'bg-blue-100 text-blue-700 border-blue-200',
-    iconColor: 'text-blue-600',
+    accent: 'from-blue-500/20 to-blue-600/10 border-blue-500/40 text-blue-300 hover:border-blue-400',
+    iconColor: 'text-blue-400',
+    badge: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
   },
   { 
     email: 'ramesh.gowda@bsctextiles.com', 
     label: 'T-Shop Scanner', 
-    description: 'QR Tea Scanner Role',
+    roleTag: 'REFRESHMENT',
+    description: 'QR tea & break audit console',
     icon: Sparkles,
-    color: 'bg-purple-100 text-purple-700 border-purple-200',
-    iconColor: 'text-purple-600',
+    accent: 'from-purple-500/20 to-purple-600/10 border-purple-500/40 text-purple-300 hover:border-purple-400',
+    iconColor: 'text-purple-400',
+    badge: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
   },
   { 
     email: 'rajesh.kumar@bsctextiles.com', 
     label: 'Sales Employee', 
-    description: 'My Desk Self-Service',
+    roleTag: 'MY DESK',
+    description: 'Self-service dossier & payslips',
     icon: CheckCircle2,
-    color: 'bg-gray-100 text-gray-700 border-gray-200',
-    iconColor: 'text-gray-600',
+    accent: 'from-cyan-500/20 to-cyan-600/10 border-cyan-500/40 text-cyan-300 hover:border-cyan-400',
+    iconColor: 'text-cyan-400',
+    badge: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+  },
+  { 
+    email: 'vikram.singh@bsctextiles.com', 
+    label: 'Shivamogga HR', 
+    roleTag: 'SHIVAMOGGA',
+    description: 'SHI Hub regional administration',
+    icon: Building2,
+    accent: 'from-rose-500/20 to-rose-600/10 border-rose-500/40 text-rose-300 hover:border-rose-400',
+    iconColor: 'text-rose-400',
+    badge: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
   },
 ];
 
-export default function LoginPage() {
+const STORE_HUBS = [
+  { name: 'Belagavi Flagship', code: 'BEL-01', status: 'Optimal', count: '4 Terminals' },
+  { name: 'Davanagere Weaving Showroom', code: 'DAV-02', status: 'Optimal', count: '2 Terminals' },
+  { name: 'Shivamogga Retail Apex', code: 'SHI-03', status: 'Optimal', count: '2 Terminals' },
+];
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+  const { data: session, status } = useSession();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [activePersonaEmail, setActivePersonaEmail] = useState<string | null>(null);
 
-  const { register, handleSubmit, setValue, formState: { errors }, watch } = useForm<LoginForm>({
+  // Auto-redirect if already authenticated
+  useEffect(() => {
+    if (status === 'authenticated') {
+      window.location.href = callbackUrl;
+    }
+  }, [status, callbackUrl]);
+
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       email: '',
@@ -86,46 +130,45 @@ export default function LoginPage() {
     },
   });
 
-  const emailValue = watch('email');
-
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
     setErrorMessage(null);
     
     try {
-      // 1. Direct call to backend to obtain token and persist to localStorage
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-      const loginRes = await fetch(`${apiBase}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: data.email, password: data.password }),
+      const result = await signIn('credentials', {
+        email: data.email,
+        password: data.password,
+        redirect: false,
       });
-      const loginData = await loginRes.json().catch(() => null);
 
-      if (!loginRes.ok || !loginData?.token) {
-        const errorMsg = loginData?.error || 'Invalid email or password';
+      if (result?.error) {
+        const errorMsg = result.error;
         setErrorMessage(errorMsg);
         toast.error(errorMsg);
         setIsLoading(false);
         return;
       }
 
-      // Persist auth tokens immediately
-      localStorage.setItem('bsc_token', loginData.token);
-      localStorage.setItem('token', loginData.token);
-      localStorage.setItem('bsc_user', JSON.stringify(loginData.user));
-      document.cookie = `token=${loginData.token}; path=/; max-age=604800; SameSite=Lax`;
+      if (result?.ok) {
+        toast.success('Welcome back to BSC Textiles HRMS!');
+        
+        try {
+          const freshSession = await getSession();
+          if (freshSession?.token) {
+            localStorage.setItem('bsc_token', freshSession.token);
+            localStorage.setItem('token', freshSession.token);
+            if (freshSession.user) {
+              localStorage.setItem('bsc_user', JSON.stringify(freshSession.user));
+            }
+          }
+        } catch {
+          // ignore session fetch error, proceed to navigate
+        }
 
-      // 2. Also establish NextAuth session
-      await signIn('credentials', {
-        email: data.email,
-        password: data.password,
-        redirect: false,
-      }).catch(() => null);
-
-      toast.success('Welcome back to BSC Textiles HRMS!');
-      router.push('/dashboard');
-      router.refresh();
+        // Full page redirect ensures complete session and cookie sync
+        window.location.href = callbackUrl;
+        return;
+      }
     } catch (error) {
       const message = 'An error occurred during authentication. Please try again.';
       setErrorMessage(message);
@@ -136,123 +179,174 @@ export default function LoginPage() {
   };
 
   const setPersona = (email: string) => {
-    setValue('email', email);
-    setValue('password', 'password123');
+    setActivePersonaEmail(email);
+    setValue('email', email, { shouldValidate: true });
+    setValue('password', 'password123', { shouldValidate: true });
     setErrorMessage(null);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-950 via-primary-900 to-indigo-950 px-4 py-12 relative overflow-hidden">
-      {/* Background decorative elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute w-[600px] h-[600px] bg-primary-500/10 rounded-full blur-3xl -top-40 -left-40 animate-pulse-slow" />
-        <div className="absolute w-[500px] h-[500px] bg-burgundy-500/10 rounded-full blur-3xl -bottom-40 -right-40 animate-pulse-slow" style={{ animationDelay: '1s' }} />
-        <div className="absolute w-[400px] h-[400px] bg-primary-400/5 rounded-full blur-3xl top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+    <div className="relative min-h-screen w-full flex items-center justify-center p-4 sm:p-6 lg:p-10 overflow-x-hidden">
+      {/* Background Layer with Ultra-HD Luxury Atelier Image */}
+      <div 
+        className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat transition-transform duration-1000 scale-105"
+        style={{
+          backgroundImage: "url('/images/textile_luxury_bg.jpg')",
+        }}
+      >
+        {/* Layered Rich Gradient Overlays for High Legibility & Cinematic Atmosphere */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-slate-950 via-slate-950/85 to-[#0b1c30]/80" />
+        <div className="absolute inset-0 bg-radial-gradient from-transparent via-slate-950/50 to-slate-950/90" />
         
-        {/* Subtle fabric texture overlay */}
-        <div 
-          className="absolute inset-0 opacity-[0.02] h-full w-full"
-          style={{
-            backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%239C92AC\' fill-opacity=\'0.4\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 36v-4H0v4H0v2h4v4h2v-4h4v-2H6zM6 4a4 4 0 00-4 4v2h4V4H6zm64 4a4 4 0 014-4h2v4h-4V4h-4zM4 30h4v4H4v-4zm2 26h4v4H6v-4zm38 4h4v4h-4v-4z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
-            backgroundRepeat: 'repeat',
-          }}
-        />
+        {/* Subtle Gold / Indigo Ambient Glows */}
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-amber-500/10 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-indigo-500/15 rounded-full blur-[120px] pointer-events-none" />
       </div>
 
-      <div className="relative z-10 w-full max-w-5xl">
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
-          
-          {/* Brand Visual Area */}
-          <div className="hidden lg:block relative">
-            <div className="relative h-[520px] rounded-3xl overflow-hidden bg-gradient-to-br from-primary-950 via-primary-900 to-primary-800 border border-primary-700/50 shadow-2xl">
-              {/* Fabric texture background */}
-              <div 
-                className="absolute inset-0 opacity-10"
-                style={{
-                  backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'100\' height=\'100\' viewBox=\'0 0 100 100\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.05\'%3E%3Cpath d=\'M50 50m-50 0a50 50 0 1 1 100 0a50 50 0 1 1 -100 0\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
-                  backgroundRepeat: 'repeat',
-                }}
-              />
-              
-              {/* Decorative elements */}
-              <div className="absolute inset-0 flex items-center justify-center p-12">
-                <div className="relative z-10 text-center">
-                  <Logo variant="full" size="xl" className="mx-auto mb-8" />
-                  
-                  <div className="space-y-6 max-w-md mx-auto">
-                    <div className="inline-flex items-center gap-3 px-5 py-3 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center">
-                        <Building2 className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-white font-semibold text-sm">4 Locations</p>
-                        <p className="text-primary-200 text-xs">Belagavi • Davanagere • Shivamogga • Hubballi</p>
-                      </div>
-                    </div>
-                    
-                    <div className="inline-flex items-center gap-3 px-5 py-3 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center">
-                        <Shield className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-white font-semibold text-sm">35+ Employees</p>
-                        <p className="text-primary-200 text-xs">Active workforce across all stores</p>
-                      </div>
-                    </div>
-                    
-                    <div className="inline-flex items-center gap-3 px-5 py-3 bg-white/10 backdrop-blur-sm rounded-full border border-white/20">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-burgundy-500 to-burgundy-600 flex items-center justify-center">
-                        <Sparkles className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-white font-semibold text-sm">8 Roles</p>
-                        <p className="text-primary-200 text-xs">Granular permission-based access control</p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Heritage badge */}
-                  <div className="mt-10 inline-flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-sm rounded-full border border-white/10">
-                    <span className="text-white/70 text-xs font-medium uppercase tracking-wider">Est.</span>
-                    <span className="text-white font-bold text-lg">1938</span>
-                    <span className="text-white/70 text-xs font-medium uppercase tracking-wider">Heritage</span>
-                  </div>
-                </div>
+      {/* Main Container */}
+      <div className="relative z-10 w-full max-w-7xl mx-auto">
+        
+        {/* Top Floating Header Banner */}
+        <header className="mb-6 lg:mb-10 flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/40 backdrop-blur-md border border-white/10 shadow-2xl">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-700 flex items-center justify-center shadow-lg shadow-amber-500/20">
+              <span className="font-extrabold text-slate-950 text-base tracking-tighter">BSC</span>
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-white font-bold text-base tracking-tight">BSC Textiles Pvt Ltd</span>
+                <span className="text-[10px] uppercase font-extrabold tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  Est. 1938
+                </span>
               </div>
-              
-              {/* Bottom accent */}
-              <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-primary-950 to-transparent" />
+              <p className="text-xs text-slate-400">Master Retail Workforce & Enterprise HRMS Platform</p>
             </div>
           </div>
 
-          {/* Login Form Area */}
-          <div className="relative z-10 w-full max-w-md mx-auto lg:mx-0">
-            <div className="text-center lg:text-left mb-10">
-              <Logo variant="full" size="lg" className="mx-auto lg:mx-0 mb-4" />
-              <p className="text-primary-200 text-sm font-medium uppercase tracking-widest">Next Generation Workforce Management System</p>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>Biometric Cloud: Live 99.8%</span>
+            </div>
+            <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-slate-300 text-xs">
+              <Shield className="w-3.5 h-3.5 text-amber-400" />
+              <span>Karnataka Regional Network</span>
+            </div>
+          </div>
+        </header>
+
+        {/* Two-Column Grid: Heritage Brand Story + Glass Login Card */}
+        <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+          
+          {/* LEFT COLUMN: BRAND STORY & ENTERPRISE TELEMETRY (7 Cols) */}
+          <div className="lg:col-span-7 flex flex-col space-y-6 text-white">
+            
+            {/* Main Headline Cluster */}
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-gradient-to-r from-amber-500/15 via-indigo-500/15 to-transparent border border-amber-500/30 text-amber-300 text-xs font-bold uppercase tracking-wider">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Weaving Dreams, Building Futures</span>
+              </div>
+              
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-[1.15]">
+                Intelligent Retail Workforce & Biometric Operations
+              </h1>
+              
+              <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-2xl font-light">
+                Seamlessly orchestrating Karnataka retail store operations across 3 flagship hubs, 350+ artisans, IoT face verification, and instant ₹1/sec early login incentive calculation.
+              </p>
             </div>
 
-            <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 p-6 sm:p-8">
-              <div className="text-center lg:text-left mb-8">
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Welcome Back</h1>
-                <p className="text-gray-500 mt-2 text-sm">Sign in to access your BSC Textiles workspace</p>
+            {/* 3 Flagship Hubs Matrix */}
+            <div className="p-5 rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-white/10 shadow-2xl space-y-3">
+              <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
+                <span className="flex items-center gap-1.5 text-amber-300">
+                  <Store className="w-4 h-4 text-amber-400" />
+                  Karnataka Enterprise Hub Network
+                </span>
+                <span className="text-emerald-400">3 Active Outlets</span>
               </div>
 
-              {errorMessage && (
-                <div className="mb-6 p-4 bg-burgundy-50 border border-burgundy-200 rounded-lg flex items-start gap-3 animate-slide-down" role="alert">
-                  <div className="w-5 h-5 flex-shrink-0 mt-0.5 text-burgundy-600">
-                    <svg fill="currentColor" viewBox="0 0 20 20" className="w-5 h-5"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/></svg>
+              <div className="grid sm:grid-cols-3 gap-2.5">
+                {STORE_HUBS.map((hub) => (
+                  <div 
+                    key={hub.code}
+                    className="p-3 rounded-xl bg-white/[0.03] border border-white/5 hover:border-amber-500/30 transition-all flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-[11px] font-bold text-amber-400">{hub.code}</span>
+                        <span className="text-xs font-semibold text-slate-200">{hub.name}</span>
+                      </div>
+                      <span className="text-[10px] text-slate-400">{hub.count}</span>
+                    </div>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" title={hub.status} />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-burgundy-800 text-sm font-medium">Authentication Failed</p>
-                    <p className="text-burgundy-700 text-sm mt-0.5">{errorMessage}</p>
+                ))}
+              </div>
+            </div>
+
+            {/* Feature Metric Strip */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-4 rounded-xl bg-slate-900/50 backdrop-blur-md border border-white/10 text-center">
+                <Fingerprint className="w-5 h-5 text-amber-400 mx-auto mb-1.5" />
+                <div className="text-xl font-extrabold text-white">96.4%</div>
+                <div className="text-[11px] text-slate-400 font-medium">Face Match Rate</div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-900/50 backdrop-blur-md border border-white/10 text-center">
+                <Clock className="w-5 h-5 text-emerald-400 mx-auto mb-1.5" />
+                <div className="text-xl font-extrabold text-white">3 Shifts</div>
+                <div className="text-[11px] text-slate-400 font-medium">Automated Rosters</div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-900/50 backdrop-blur-md border border-white/10 text-center">
+                <Award className="w-5 h-5 text-cyan-400 mx-auto mb-1.5" />
+                <div className="text-xl font-extrabold text-white">₹1 / sec</div>
+                <div className="text-[11px] text-slate-400 font-medium">Early Login Bonus</div>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: FROSTED GLASS LOGIN CARD (5 Cols) */}
+          <div className="lg:col-span-5 w-full">
+            <div className="relative rounded-3xl bg-slate-900/80 backdrop-blur-2xl border border-white/15 p-6 sm:p-8 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)]">
+              
+              {/* Card Header */}
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
+                    <Lock className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <h2 className="text-2xl font-black text-white tracking-tight">Sign In</h2>
+                </div>
+                <p className="text-xs text-slate-400">
+                  Authenticate to your BSC Textiles enterprise workspace
+                </p>
+              </div>
+
+              {/* Error Alert Banner */}
+              {errorMessage && (
+                <div 
+                  className="mb-5 p-3.5 bg-rose-500/15 border border-rose-500/30 rounded-xl flex items-start gap-3 animate-slide-down text-rose-200 text-xs" 
+                  role="alert"
+                >
+                  <div className="w-4 h-4 rounded-full bg-rose-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 text-rose-400">
+                    !
+                  </div>
+                  <div>
+                    <p className="font-bold text-rose-300">Authentication Failed</p>
+                    <p className="mt-0.5 text-rose-200/90">{errorMessage}</p>
                   </div>
                 </div>
               )}
 
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+              {/* Form Element */}
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
                 <div>
-                  <Label htmlFor="email">Email or Username</Label>
+                  <Label htmlFor="email" className="text-xs font-semibold text-slate-200 mb-1.5 block">
+                    Enterprise Email or Username
+                  </Label>
                   <Input
                     id="email"
                     type="email"
@@ -260,121 +354,149 @@ export default function LoginPage() {
                     placeholder="name@bsctextiles.com"
                     {...register('email')}
                     disabled={isLoading}
-                    error={errors.email?.message}
-                    className="input"
+                    className="w-full bg-slate-950/60 border-slate-700/80 text-white placeholder:text-slate-500 rounded-xl focus:border-amber-400 focus:ring-amber-400/20 text-xs h-11"
                   />
                   {errors.email && (
-                    <p className="mt-1.5 text-xs text-burgundy-600 flex items-center gap-1">
-                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/></svg>
+                    <p className="mt-1 text-[11px] text-rose-400 font-medium">
                       {errors.email.message}
                     </p>
                   )}
                 </div>
 
                 <div>
-                  <Label htmlFor="password">Password</Label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Label htmlFor="password" className="text-xs font-semibold text-slate-200 block">
+                      Security Password
+                    </Label>
+                    <span className="text-[10px] text-amber-400/80 font-mono">Default: password123</span>
+                  </div>
                   <div className="relative">
                     <Input
                       id="password"
                       type={showPassword ? 'text' : 'password'}
                       autoComplete="current-password"
-                      placeholder="••••••••"
+                      placeholder="••••••••••••"
                       {...register('password')}
                       disabled={isLoading}
-                      error={errors.password?.message}
-                      className="input pr-12"
+                      className="w-full bg-slate-950/60 border-slate-700/80 text-white placeholder:text-slate-500 rounded-xl focus:border-amber-400 focus:ring-amber-400/20 text-xs h-11 pr-11 font-mono"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1 rounded transition-colors"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 rounded transition-colors"
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                   {errors.password && (
-                    <p className="mt-1.5 text-xs text-burgundy-600 flex items-center gap-1">
-                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/></svg>
+                    <p className="mt-1 text-[11px] text-rose-400 font-medium">
                       {errors.password.message}
                     </p>
                   )}
                 </div>
 
-                <Button
+                {/* Primary CTA Submit Button */}
+                <button
                   type="submit"
-                  variant="primary"
-                  size="lg"
-                  loading={isLoading}
-                  className="w-full mt-2"
+                  disabled={isLoading}
+                  className="w-full h-11 mt-2 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 text-slate-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-lg shadow-amber-500/25 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isLoading ? 'Signing in...' : 'Sign In to Workspace'}
-                </Button>
+                  {isLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin" />
+                      <span>Authenticating Session...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Sign In to Workspace</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
               </form>
 
-              {/* Quick-test Persona Pickers */}
-              <div className="mt-8 pt-6 border-t border-gray-100">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-gray-500 mb-4">
-                  <Sparkles className="w-4 h-4 text-amber-500" />
-                  <span>Quick Test Personas</span>
+              {/* QUICK TEST PERSONAS SECTION */}
+              <div className="mt-6 pt-5 border-t border-white/10">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Quick-Select Test Personas</span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium">Click to auto-fill</span>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-2" role="list" aria-label="Test personas">
-                  {PERSONAS.map((persona, index) => (
-                    <button
-                      key={persona.email}
-                      type="button"
-                      onClick={() => setPersona(persona.email)}
-                      disabled={isLoading}
-                      className={cn(
-                        'p-3 rounded-xl border transition-all duration-200 text-left',
-                        'hover:bg-gray-50 hover:border-primary-200',
-                        'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500',
-                        'disabled:opacity-50 disabled:cursor-not-allowed',
-                        persona.color
-                      )}
-                      role="listitem"
-                    >
-                      <div className="flex items-start gap-2.5">
-                        <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0', persona.iconColor)}>
-                          <persona.icon className="w-4 h-4" aria-hidden="true" />
+
+                <div className="grid grid-cols-2 gap-2" role="list" aria-label="Quick test personas">
+                  {PERSONAS.map((persona) => {
+                    const isSelected = activePersonaEmail === persona.email;
+                    return (
+                      <button
+                        key={persona.email}
+                        type="button"
+                        onClick={() => setPersona(persona.email)}
+                        disabled={isLoading}
+                        className={cn(
+                          'p-2.5 rounded-xl border text-left transition-all duration-200 relative group',
+                          'bg-gradient-to-br backdrop-blur-sm',
+                          isSelected 
+                            ? 'ring-2 ring-amber-400 border-amber-400 bg-amber-500/20' 
+                            : persona.accent
+                        )}
+                        role="listitem"
+                      >
+                        <div className="flex items-start gap-2">
+                          <div className={cn('p-1.5 rounded-lg bg-black/30 flex-shrink-0', persona.iconColor)}>
+                            <persona.icon className="w-3.5 h-3.5" aria-hidden="true" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-bold text-white text-xs truncate">
+                                {persona.label}
+                              </span>
+                            </div>
+                            <span className={cn('text-[9px] font-extrabold uppercase px-1 py-0.2 rounded border inline-block mt-0.5', persona.badge)}>
+                              {persona.roleTag}
+                            </span>
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="font-semibold text-gray-900 text-xs truncate">{persona.label}</div>
-                          <div className="text-[10px] text-gray-500 truncate">{persona.description}</div>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    );
+                  })}
                 </div>
-                
-                <p className="mt-4 text-center text-xs text-gray-400">
-                  All test accounts use password: {' '}
-                  <span className="font-mono text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded">password123</span>
-                </p>
               </div>
 
-              {/* Security notice */}
-              <div className="mt-6 p-4 bg-primary-50 border border-primary-100 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <div className="w-6 h-6 flex-shrink-0 mt-0.5 text-primary-600">
-                    <Shield className="w-5 h-5" />
-                  </div>
-                  <div className="text-xs text-primary-800">
-                    <p className="font-semibold mb-1">Secure Authentication</p>
-                    <p>Your credentials are encrypted and validated against BSC Textiles enterprise directory. Session tokens are HTTP-only cookies with 7-day expiry.</p>
-                  </div>
-                </div>
+              {/* Security Footnote */}
+              <div className="mt-5 pt-4 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
+                <span className="flex items-center gap-1 text-slate-400">
+                  <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                  AES-256 Encrypted Session
+                </span>
+                <span>BSC HRMS v2.4</span>
               </div>
-            </div>
-
-            <div className="mt-6 text-center lg:text-left text-xs text-gray-400">
-              <p>BSC Textiles HRMS v2.0</p>
-              <p className="mt-1">© 2024 BSC Textiles Pvt Ltd. All rights reserved.</p>
             </div>
           </div>
         </div>
+
+        {/* Global Footer */}
+        <footer className="mt-8 text-center text-xs text-slate-400 font-light">
+          © 2024 BSC Textiles Pvt Ltd • Karnataka Retail Operations Network • All Rights Reserved.
+        </footer>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-amber-400 border-t-transparent rounded-full animate-spin" />
+          <p className="text-amber-200 text-xs font-semibold uppercase tracking-wider">Loading BSC Textiles HRMS...</p>
+        </div>
+      </div>
+    }>
+      <LoginForm />
+    </Suspense>
   );
 }
