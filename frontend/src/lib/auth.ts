@@ -12,7 +12,6 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
-        console.log('[NextAuth] authorize called with:', credentials?.email);
         if (!credentials?.email || !credentials?.password) {
           throw new Error('Email and password are required');
         }
@@ -52,8 +51,6 @@ export const authOptions: NextAuthOptions = {
 
         const data = await response.json().catch(() => ({}));
 
-        console.log('[NextAuth] Backend response:', { ok: response.ok, hasUser: !!data?.user, hasToken: !!data?.token });
-
         if (!response.ok || !data?.user) {
           throw new Error(data?.error || 'Invalid email or password');
         }
@@ -80,7 +77,6 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, user }) {
-      console.log('[NextAuth] jwt callback:', { hasToken: !!token, hasUser: !!user });
       if (user) {
         token.id = user.id;
         token.role = user.role;
@@ -92,7 +88,6 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      console.log('[NextAuth] session callback:', { hasSession: !!session, hasToken: !!token });
       if (token && token.id) {
         session.user = {
           ...session.user,

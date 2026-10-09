@@ -111,12 +111,33 @@ export default function PayrollPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            <a
+              href="/payroll/payslips"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 transition-all text-xs font-semibold"
+            >
+              <span className="material-symbols-outlined text-[18px] text-[#0058be]">receipt_long</span>
+              <span>Manage Payslips</span>
+            </a>
+            <a
+              href="/payroll/salary-structure"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 transition-all text-xs font-semibold"
+            >
+              <span className="material-symbols-outlined text-[18px] text-[#0058be]">account_balance_wallet</span>
+              <span>Salary Structure</span>
+            </a>
+            <a
+              href="/payroll/reports"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 transition-all text-xs font-semibold"
+            >
+              <span className="material-symbols-outlined text-[18px] text-[#0058be]">analytics</span>
+              <span>Reports</span>
+            </a>
             <button
               onClick={handleExportBankCSV}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 transition-all text-xs font-semibold"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 transition-all text-xs font-semibold"
             >
               <span className="material-symbols-outlined text-[18px] text-slate-400">account_balance</span>
-              <span>Export Bank NEFT Batch</span>
+              <span>Export CSV</span>
             </button>
             <button
               onClick={handleGeneratePayroll}
@@ -391,9 +412,24 @@ export default function PayrollPage() {
                     <span>Print</span>
                   </button>
                   <button
-                    onClick={() => {
-                      toast.success('Payslip PDF downloaded');
-                      setSelectedPayslip(null);
+                    onClick={async () => {
+                      try {
+                        const res = await api.get(`/payroll/payslip/${selectedPayslip.id}/pdf`, {
+                          responseType: 'blob',
+                        });
+                        const blob = new Blob([res.data], { type: 'application/pdf' });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `BSC_Textiles_Payslip_${selectedPayslip.employee?.employeeCode || selectedPayslip.id}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
+                        window.URL.revokeObjectURL(url);
+                        toast.success('Payslip PDF downloaded');
+                      } catch {
+                        toast.error('Failed to download PDF');
+                      }
                     }}
                     className="px-4 py-1.5 rounded-lg bg-[#0058be] text-white font-bold hover:bg-[#2170e4] text-xs flex items-center gap-1.5 shadow-sm"
                   >

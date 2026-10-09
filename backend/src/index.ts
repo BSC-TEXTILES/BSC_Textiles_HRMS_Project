@@ -38,6 +38,7 @@ import notificationRoutes from './routes/notifications.js';
 import roleRoutes from './routes/roles.js';
 import settingRoutes from './routes/settings.js';
 import deviceRoutes from './routes/devices.js';
+import kycRoutes from './routes/kyc.js';
 import { staffOpsRouter, observationLevelsRouter } from './routes/workerOps.js';
 
 const app = express();
@@ -118,6 +119,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/roles', roleRoutes);
 app.use('/api/settings', settingRoutes);
 app.use('/api/devices', deviceRoutes);
+app.use('/api/kyc', kycRoutes);
 
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Error:', err);

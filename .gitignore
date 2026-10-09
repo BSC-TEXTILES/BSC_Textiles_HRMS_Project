@@ -50,3 +50,6 @@ uploads/
 # Misc
 *.pem
 .cache/
+.memory/
+*.tmp
+*.bak

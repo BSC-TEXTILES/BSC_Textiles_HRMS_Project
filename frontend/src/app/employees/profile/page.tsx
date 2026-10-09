@@ -13,15 +13,16 @@ export default function ProfileRedirectPage() {
     if (status === 'loading') return;
 
     async function redirect() {
+      const query = typeof window !== 'undefined' ? window.location.search : '';
       if (session?.user?.employeeId) {
-        router.replace(`/employees/profile/${session.user.employeeId}`);
+        router.replace(`/employees/profile/${session.user.employeeId}${query}`);
         return;
       }
       try {
         const res = await api.get('/employees?limit=1');
         const first = res.data.employees?.[0];
         if (first?.id) {
-          router.replace(`/employees/profile/${first.id}`);
+          router.replace(`/employees/profile/${first.id}${query}`);
         } else {
           router.replace('/employees');
         }

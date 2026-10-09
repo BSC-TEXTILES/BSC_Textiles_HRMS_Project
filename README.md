@@ -1000,36 +1000,73 @@ flowchart TD
 
 ---
 
-## 22. Payroll Flow
+## 22. Payroll Flow & Digital Payslip Generation
+
+The BSC Textiles HRMS Payroll module provides a complete end-to-end statutory wage ledger adhering to the **Karnataka Shops & Commercial Establishments Act (Form T)**:
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
 sequenceDiagram
     autonumber
-    actor HR as Payroll Manager
-    participant UI as Payroll Portal
+    actor HR as HR / Payroll Manager
+    participant UI as Payroll Portal (/payroll/payslips)
     participant API as /api/payroll
+    participant PDF as PDFKit Form T Engine
+    participant SMTP as Nodemailer SMTP Service
     participant DB as MySQL Database
+    actor Emp as Employee
 
-    HR->>UI: Select Month & Location (e.g., Oct 2026, BEL)
-    UI->>API: POST /api/payroll/generate {periodStart, periodEnd, locationId}
-    API->>DB: Fetch Active Employees for Location
-    API->>DB: Aggregate Month Attendance (Punches, Early Incentives, Overtime)
-    API->>DB: Aggregate Penalties (Late Arrivals, Break Overages)
-    API->>DB: Aggregate Sales & Milestone Incentive Grants
-    API->>API: Compute Individual Payroll Items (Net Pay Formula)
-    API->>DB: INSERT PayrollRun (Status: DRAFT) + Items
-    API-->>UI: Display Interactive Draft Payroll Table
-    HR->>UI: Review & Click "Approve and Publish Payroll"
-    UI->>API: POST /api/payroll/publish {runId}
-    API->>DB: UPDATE PayrollRun SET status = 'PUBLISHED'
-    API-->>UI: Payroll Published & Payslips Available on My Desk
+    HR->>UI: Select Month & Location (e.g., Oct 2024, Belagavi Flagship)
+    UI->>API: POST /api/payroll/runs (Generate Cycle Run)
+    API->>DB: Compute base wages, incentives (₹1/sec), OT, and statutory deductions
+    API->>DB: INSERT INTO payrollitem (Status: PENDING, EmailStatus: NOT_SENT)
+    API-->>UI: Interactive Ledger Table Rendered
+
+    alt HR Custom Adjustments & Dynamic Sections
+        HR->>UI: Click "Edit" on Employee Payslip
+        HR->>UI: Adjust Basic, HRA, Allowances, Deductions, or Add Custom Dynamic Blocks
+        UI->>API: PUT /api/payroll/payslip/:id (Persist adjusted amounts & custom sections)
+        API->>DB: UPDATE payrollitem SET basicSalary, hra, customSections, netPay, remarks
+        API-->>UI: 200 OK (Recalculated Net Pay)
+    end
+
+    HR->>UI: Click "Finalize & Auto-Email"
+    UI->>API: POST /api/payroll/payslip/:id/finalize
+    API->>DB: UPDATE payrollitem SET status = 'APPROVED', finalizedBy, finalizedAt = NOW()
+    API->>PDF: generatePayslipPdf(payslipData, companySettings)
+    PDF-->>API: Stream Form T Binary Buffer (%PDF)
+    API->>SMTP: sendPayslipEmail(pdfBuffer, employeeEmail)
+    SMTP-->>API: Delivery Receipt (MessageId / Simulated)
+    API->>DB: INSERT INTO payroll_email_log & UPDATE payrollitem.emailStatus = 'SENT'
+    API-->>UI: 200 OK: Payslip Finalized & Email Dispatched
+
+    Emp->>UI: Opens /payroll/payslips (Self-Service View)
+    Emp->>UI: Clicks "Download PDF"
+    UI->>API: GET /api/payroll/payslip/:id/pdf
+    API-->>Emp: Downloads Certified Form T Payslip PDF
 ```
 
-### Net Pay Derivation Formula
-$$\text{Gross Earnings} = \text{Base Salary} + \text{Allowances} + \text{Early Login Incentives} + \text{Sales Incentives} + \text{Overtime}$$
-$$\text{Total Deductions} = \text{Late Penalties} + \text{Break Overrun Deductions} + \text{Statutory Deductions (PF/ESI)}$$
+### 22.1 RBAC Enforcement in Payroll
+- **Admin (`SUPER_ADMIN`, `ADMIN`)**: Full global access to all branches, master wage runs, salary cadre configurations, and statutory reports.
+- **HR (`HR_MANAGER`, `HR_EXECUTIVE`, `PAYROLL_MANAGER`)**: Can generate wage cycles for assigned stores, edit payslip line items, add reusable custom sections, finalize payslips, download PDFs, and manually resend emails.
+- **Employee (`EMPLOYEE`, `SALES_EMPLOYEE`)**: Strictly self-service access to view and download their own Form T payslips. Cross-employee payslip access is blocked via IDOR middleware.
+
+### 22.2 Net Pay Derivation Formula
+$$\text{Gross Earnings} = \text{Base Salary} + \text{HRA} + \text{Allowances} + \text{Performance Bonus} + \text{Early Login Incentives} + \text{Sales Incentives} + \text{Overtime} + \sum \text{Custom Section Earnings}$$
+$$\text{Total Deductions} = \text{PF (12\%)} + \text{TDS / Income Tax} + \text{Loss of Pay (LOP)} + \text{Late Penalties} + \sum \text{Custom Section Deductions}$$
 $$\mathbf{\text{Net Salary}} = \mathbf{\text{Gross Earnings}} - \mathbf{\text{Total Deductions}}$$
+
+### 22.3 SMTP & Email Configuration
+Configure standard SMTP credentials in `.env` for production email dispatch:
+```env
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT=587
+SMTP_SECURE="false"
+SMTP_USER="payroll@bsctextiles.com"
+SMTP_PASS="your-app-specific-password"
+SMTP_FROM="BSC Textiles Payroll <payroll@bsctextiles.com>"
+```
+*Note: In local development, if SMTP credentials are unconfigured, the system safely operates a simulated delivery transporter that verifies PDF compilation and records audit logs in `payroll_email_log` without crashing.*
 
 ---
 
@@ -1501,6 +1538,43 @@ The system's modular architecture is designed to integrate seamlessly with futur
 - **Technical Inquiries:** `tech@bsctextiles.com`  
 - **HR Operations:** `hr@bsctextiles.com`  
 - **Internal Portal:** `https://hrms.bsctextiles.com`
+
+---
+
+## 49. Employee Aadhaar e-KYC & DigiLocker Document Management
+
+### 49.1 Architecture & Regulatory Compliance
+BSC Textiles HRMS integrates an enterprise-grade **Employee KYC and DigiLocker Document Management module** fully compliant with:
+- **UIDAI Section 29 & Aadhaar Act (2016):** Strict 12-digit Aadhaar number masking (`XXXX-XXXX-1234`). Only the last 4 digits are stored or displayed in user interfaces. Biometric templates and Aadhaar OTPs are **never stored** on application servers.
+- **Digital Personal Data Protection (DPDP) Act 2023:** Explicit employee consent tracking with granular scopes (`doc_fetch:ADHAR`, `doc_fetch:PANCR`, `doc_fetch:DRVLC`), 365-day validity, purpose explanation, and revocation support.
+- **National DigiLocker Requester API (OAuth 2.0 PKCE):** Standardized RFC 7636 Authorization Code Flow using `code_challenge_method=S256` (cryptographically random 32-byte verifier) preventing authorization code interception.
+
+### 49.2 Key Capabilities
+1. **Employee Profile — KYC Digital Vault (`/employees/profile/:id`):**
+   - Live synchronization with `/api/kyc/employee/:id`.
+   - **"Connect DigiLocker"** action modal with explicit legal notice and consent checkbox.
+   - 1-click retrieval of verified Aadhaar and PAN documents with government digital seals.
+   - **"Upload Physical Scan Fallback"** modal for employees without DigiLocker.
+   - Document inspection drawer and authorized download token generator (`/api/kyc/download/:id`).
+2. **HR & Admin KYC Dashboard (`/operations/kyc`):**
+   - KPI metrics: Total Documents, Verified & Sealed, Pending Attestation, Rejected.
+   - Filters: Store Hub, Document Type, Attestation Status, Channel Source.
+   - Document Decision Review Drawer: Approve & Seal or Reject with statutory reason.
+   - Super Admin DigiLocker Requester Settings modal.
+   - Location-based scoping: Store HR managers can only review documents for employees in their assigned hub.
+
+### 49.3 MySQL Database Tables
+- `kyc_documents`: Encrypted document metadata, masked identifier, issuing authority, cryptographic URI, verification audit trail.
+- `kyc_consents`: Explicit consent ledger, purpose, requested scopes, IP address, user-agent, expiry timestamp.
+- `kyc_settings`: Organization Requester ID, Client ID, API URLs, Sandbox toggle, and masking rules.
+
+### 49.4 External Onboarding & Production Clearance Notice
+> [!IMPORTANT]
+> To activate live DigiLocker production synchronization:
+> 1. Complete Organization Onboarding on the official [DigiLocker Requester Portal](https://partners.digitallocker.gov.in).
+> 2. Submit enterprise KYC and authorized signatory details to MeitY (Ministry of Electronics & Information Technology).
+> 3. Register production redirect URIs and configure `DIGILOCKER_CLIENT_ID` and `DIGILOCKER_CLIENT_SECRET` in protected server environment variables.
+> 4. In development and staging environments, the system operates in sandbox simulation mode to prevent real data exposure.
 
 ---
 
