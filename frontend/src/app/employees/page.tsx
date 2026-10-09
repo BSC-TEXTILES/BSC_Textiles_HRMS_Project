@@ -395,7 +395,7 @@ export default function EmployeesPage() {
                       </td>
                       <td className="py-3 px-4 text-right">
                         <Link
-                          href={`/employees/profile`}
+                          href={`/employees/profile/${emp.id}`}
                           className="px-2.5 py-1 text-xs font-semibold text-[#0058be] hover:bg-[#eff4ff] rounded border border-[#dce9ff] transition-colors"
                         >
                           View 360° Dossier

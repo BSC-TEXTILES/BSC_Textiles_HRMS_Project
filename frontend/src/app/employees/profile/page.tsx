@@ -7,9 +7,11 @@ import api from '@/lib/api';
 
 export default function ProfileRedirectPage() {
   const router = useRouter();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
 
   useEffect(() => {
+    if (status === 'loading') return;
+
     async function redirect() {
       if (session?.user?.employeeId) {
         router.replace(`/employees/profile/${session.user.employeeId}`);
@@ -28,7 +30,7 @@ export default function ProfileRedirectPage() {
       }
     }
     redirect();
-  }, [session, router]);
+  }, [session, status, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
