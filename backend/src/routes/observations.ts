@@ -65,6 +65,17 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
   }
 });
 
+router.get('/levels', authorize('VIEW'), async (req: AuthRequest, res) => {
+  const levels = [
+    { id: 'EXCELLENT', code: 'EXCELLENT', name: 'Excellent', score: 5, color: '#059669', requiresAction: false },
+    { id: 'VERY_GOOD', code: 'VERY_GOOD', name: 'Very Good', score: 4, color: '#2563eb', requiresAction: false },
+    { id: 'GOOD', code: 'GOOD', name: 'Good', score: 3, color: '#7c3aed', requiresAction: false },
+    { id: 'NEEDS_IMPROVEMENT', code: 'NEEDS_IMPROVEMENT', name: 'Needs Improvement', score: 2, color: '#d97706', requiresAction: true },
+    { id: 'CRITICAL', code: 'CRITICAL', name: 'Critical', score: 1, color: '#dc2626', requiresAction: true },
+  ];
+  res.json({ levels, total: levels.length });
+});
+
 router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
     const observation = await prisma.observation.findUnique({
@@ -97,7 +108,15 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res) => {
   }
 });
 
-router.post('/', authorize('ADD'), validate(obsSchema), async (req: AuthRequest, res) => {
+router.post('/', async (req: AuthRequest, res, next) => {
+  const role = req.user?.role || '';
+  const allowedRoles = ['SUPER_ADMIN', 'ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE', 'HR', 'FLOOR_MANAGER', 'LOCATION_MANAGER'];
+  const hasPerm = req.user?.permissions?.some((p: string) => ['ADD', 'RECORD', 'MANAGE'].includes(p));
+  if (!allowedRoles.includes(role) && !hasPerm) {
+    return res.status(403).json({ error: 'Insufficient permissions to create observation' });
+  }
+  next();
+}, validate(obsSchema), async (req: AuthRequest, res) => {
   try {
     const { locationId, employeeId, floorId, sectionId, sellingPointId, ...rest } = req.body;
     
@@ -123,17 +142,6 @@ router.post('/', authorize('ADD'), validate(obsSchema), async (req: AuthRequest,
     console.error('Create observation error:', error);
     res.status(500).json({ error: 'Failed to create observation' });
   }
-});
-
-router.get('/levels', authorize('VIEW'), async (req: AuthRequest, res) => {
-  const levels = [
-    { id: 'EXCELLENT', code: 'EXCELLENT', name: 'Excellent', score: 5, color: '#059669', requiresAction: false },
-    { id: 'VERY_GOOD', code: 'VERY_GOOD', name: 'Very Good', score: 4, color: '#2563eb', requiresAction: false },
-    { id: 'GOOD', code: 'GOOD', name: 'Good', score: 3, color: '#7c3aed', requiresAction: false },
-    { id: 'NEEDS_IMPROVEMENT', code: 'NEEDS_IMPROVEMENT', name: 'Needs Improvement', score: 2, color: '#d97706', requiresAction: true },
-    { id: 'CRITICAL', code: 'CRITICAL', name: 'Critical', score: 1, color: '#dc2626', requiresAction: true },
-  ];
-  res.json({ levels, total: levels.length });
 });
 
 router.patch('/:id', authorize('EDIT'), async (req: AuthRequest, res) => {

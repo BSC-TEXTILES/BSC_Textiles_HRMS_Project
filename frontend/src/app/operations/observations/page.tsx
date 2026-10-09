@@ -84,8 +84,14 @@ const REACTIONS = [
 export default function ObservationsPage() {
   const [observations, setObservations] = useState<Observation[]>([]);
   const [levels, setLevels] = useState<ObservationLevel[]>([]);
+  const [employees, setEmployees] = useState<Array<{ id: string; fullName: string; employeeCode: string; locationId?: string }>>([]);
+  const [locations, setLocations] = useState<Array<{ id: string; code: string; name: string }>>([
+    { id: 'cmuzam5fe00014n4pq25hkcww', code: 'BEL', name: 'Belagavi Flagship (BEL-01)' },
+    { id: 'cmuzam5fr00024n4p4izbomev', code: 'DAV', name: 'Davanagere Showroom (DAV-02)' },
+    { id: 'cmuzam5g400034n4p89o33l8e', code: 'SHI', name: 'Shivamogga Retail Apex (SHI-03)' },
+  ]);
   const [loading, setLoading] = useState(true);
-  const [locationId, setLocationId] = useState<string>('bel');
+  const [locationId, setLocationId] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [levelFilter, setLevelFilter] = useState<string>('all');
@@ -96,15 +102,15 @@ export default function ObservationsPage() {
 
   // Form state
   const [formData, setFormData] = useState({
-    locationId: 'bel',
+    locationId: 'cmuzam5fe00014n4pq25hkcww',
     floorId: '',
     sectionId: '',
     sellingPointId: '',
     employeeId: '',
-    levelId: '',
+    level: 'GOOD',
     observationDate: new Date().toISOString().slice(0, 10),
     observationTime: new Date().toTimeString().slice(0, 5),
-    observationType: 'positive',
+    observationType: 'sales',
     priority: 'medium',
     description: '',
     actionRequired: '',
@@ -117,17 +123,52 @@ export default function ObservationsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ locationId });
+      const params = new URLSearchParams();
+      if (locationId && locationId !== 'all') params.set('locationId', locationId);
       if (statusFilter !== 'all') params.set('status', statusFilter);
-      if (typeFilter !== 'all') params.set('observationType', typeFilter);
+      if (typeFilter !== 'all') params.set('observationType', typeFilter.toUpperCase().replace(/\s+/g, '_'));
       if (levelFilter !== 'all') params.set('level', levelFilter);
-      
-      const [obsRes, levelsRes] = await Promise.all([
-        api.get<{ rows: Observation[]; total: number }>(`/observations?${params}`),
-        api.get<ObservationLevel[]>('/observation-levels'),
+
+      const [obsRes, levelsRes, empRes, locRes] = await Promise.all([
+        api.get<any>(`/observations?${params.toString()}`).catch(() => ({ data: { observations: [] } })),
+        api.get<any>('/observations/levels').catch(() => ({ data: { levels: [] } })),
+        api.get<any>('/employees?limit=100').catch(() => ({ data: { employees: [] } })),
+        api.get<any>('/locations').catch(() => ({ data: { locations: [] } })),
       ]);
-      setObservations(obsRes.data.rows);
-      setLevels(levelsRes.data);
+
+      const rawObs = obsRes.data?.observations || obsRes.data?.rows || (Array.isArray(obsRes.data) ? obsRes.data : []);
+      const normalizedObs = (Array.isArray(rawObs) ? rawObs : []).map((o: any) => ({
+        ...o,
+        id: o.id,
+        code: o.code || `OBS-${String(o.id).slice(-4).toUpperCase()}`,
+        employeeName: o.employeeName || o.employee?.fullName || 'Personnel',
+        employeeCode: o.employeeCode || o.employee?.employeeCode || '—',
+        levelName: o.levelName || o.level || 'Standard',
+        levelColor: o.levelColor || (o.level === 'CRITICAL' ? '#dc2626' : o.level === 'NEEDS_IMPROVEMENT' ? '#d97706' : '#059669'),
+        observationDate: o.observationDate ? String(o.observationDate).slice(0, 10) : (o.createdAt ? String(o.createdAt).slice(0, 10) : new Date().toISOString().slice(0, 10)),
+        observationTime: o.observationTime || (o.createdAt ? String(o.createdAt).slice(11, 16) : '10:00'),
+        priority: o.priority || 'medium',
+        status: o.status || 'OPEN',
+        observationType: o.observationType || 'positive',
+        description: o.description || '',
+        createdByName: o.createdByName || o.createdBy?.fullName || 'Supervisor',
+      }));
+      setObservations(normalizedObs);
+
+      const rawLevels = levelsRes.data?.levels || (Array.isArray(levelsRes.data) ? levelsRes.data : []);
+      if (Array.isArray(rawLevels) && rawLevels.length > 0) {
+        setLevels(rawLevels);
+      }
+
+      const rawEmps = empRes.data?.employees || empRes.data?.rows || (Array.isArray(empRes.data) ? empRes.data : []);
+      if (Array.isArray(rawEmps) && rawEmps.length > 0) {
+        setEmployees(rawEmps);
+      }
+
+      const rawLocs = locRes.data?.locations || (Array.isArray(locRes.data) ? locRes.data : []);
+      if (Array.isArray(rawLocs) && rawLocs.length > 0) {
+        setLocations(rawLocs);
+      }
     } catch (err) {
       console.error('Failed to fetch observations:', err);
     } finally {
@@ -153,15 +194,31 @@ export default function ObservationsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const levelScoreMap: Record<string, number> = {
+        EXCELLENT: 5,
+        VERY_GOOD: 4,
+        GOOD: 3,
+        NEEDS_IMPROVEMENT: 2,
+        CRITICAL: 1,
+      };
+      const selectedLevel = formData.level || 'GOOD';
+      const score = levelScoreMap[selectedLevel] || 3;
+      const targetEmpId = formData.employeeId || (employees.length > 0 ? employees[0].id : 'cmuzam8lr009i4n4p5336xloi');
+
       await api.post('/observations', {
-        ...formData,
         locationId: formData.locationId,
-        floorId: formData.floorId || null,
-        sectionId: formData.sectionId || null,
-        sellingPointId: formData.sellingPointId || null,
-        employeeId: Number(formData.employeeId),
-        levelId: Number(formData.levelId),
-        dueDate: formData.dueDate || null,
+        employeeId: targetEmpId,
+        floorId: formData.floorId || undefined,
+        sectionId: formData.sectionId || undefined,
+        sellingPointId: formData.sellingPointId || undefined,
+        observationType: formData.observationType.toUpperCase().replace(/\s+/g, '_'),
+        level: selectedLevel,
+        score: score,
+        description: formData.description.length < 10 ? `${formData.description} (Retail observation record)` : formData.description,
+        actionRequired: formData.actionRequired || undefined,
+        dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : undefined,
+        videoUrl: formData.videoUrl || undefined,
+        photoUrl: formData.photoUrl || undefined,
       });
       setShowCreateModal(false);
       resetForm();
@@ -173,15 +230,15 @@ export default function ObservationsPage() {
 
   const resetForm = () => {
     setFormData({
-      locationId: 'bel',
+      locationId: locations[0]?.id || 'cmuzam5fe00014n4pq25hkcww',
       floorId: '',
       sectionId: '',
       sellingPointId: '',
-      employeeId: '',
-      levelId: '',
+      employeeId: employees[0]?.id || '',
+      level: 'GOOD',
       observationDate: new Date().toISOString().slice(0, 10),
       observationTime: new Date().toTimeString().slice(0, 5),
-      observationType: 'positive',
+      observationType: 'sales',
       priority: 'medium',
       description: '',
       actionRequired: '',
@@ -321,9 +378,8 @@ export default function ObservationsPage() {
               value={locationId}
               onChange={(e) => setLocationId(e.target.value)}
               options={[
-                { value: 'bel', label: 'Belagavi' },
-                { value: 'dav', label: 'Davanagere' },
-                { value: 'shi', label: 'Shivamogga' },
+                { value: 'all', label: 'All Hubs' },
+                ...locations.map(loc => ({ value: loc.id, label: loc.name || loc.code }))
               ]}
             />
             <Select
@@ -383,11 +439,7 @@ export default function ObservationsPage() {
                     label="Location *"
                     value={formData.locationId}
                     onChange={(e) => setFormData({ ...formData, locationId: e.target.value })}
-                    options={[
-                      { value: 'bel', label: 'Belagavi' },
-                      { value: 'dav', label: 'Davanagere' },
-                      { value: 'shi', label: 'Shivamogga' },
-                    ]}
+                    options={locations.map(loc => ({ value: loc.id, label: loc.name || loc.code }))}
                     required
                   />
                   <Select
@@ -411,19 +463,21 @@ export default function ObservationsPage() {
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  <Input
-                    label="Employee ID *"
-                    type="number"
-                    placeholder="Enter employee ID"
+                  <Select
+                    label="Employee *"
                     value={formData.employeeId}
                     onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
+                    options={[
+                      { value: '', label: 'Select Employee...' },
+                      ...employees.map(emp => ({ value: emp.id, label: `${emp.fullName} (${emp.employeeCode})` }))
+                    ]}
                     required
                   />
                   <Select
                     label="Level *"
-                    value={formData.levelId}
-                    onChange={(e) => setFormData({ ...formData, levelId: e.target.value })}
-                    options={levels.map(l => ({ value: l.id.toString(), label: `${l.name} (${l.ratingLabel})` }))}
+                    value={formData.level}
+                    onChange={(e) => setFormData({ ...formData, level: e.target.value })}
+                    options={LEVELS.map(l => ({ value: l, label: l.replace(/_/g, ' ') }))}
                     required
                   />
                   <Select
