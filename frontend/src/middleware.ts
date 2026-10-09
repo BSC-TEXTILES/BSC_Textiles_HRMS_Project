@@ -2,8 +2,8 @@ import { withAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
 
 export default withAuth(
-  function middleware(req) {
-    const token = req.nextauth.token;
+  function middleware(req: any) {
+    const token = req.nextauth?.token;
     const pathname = req.nextUrl.pathname;
 
     if (pathname.startsWith('/admin') && token?.role !== 'SUPER_ADMIN' && token?.role !== 'ADMIN') {
@@ -18,7 +18,7 @@ export default withAuth(
   },
   {
     callbacks: {
-      authorized: ({ token, req }) => {
+      authorized: ({ token, req }: { token: any; req: any }) => {
         const pathname = req.nextUrl.pathname;
         
         if (pathname === '/login') {
