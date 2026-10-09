@@ -18,6 +18,26 @@ export default function EmployeeProfileDossierPage() {
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+  // KYC & DigiLocker State
+  const [kycDocuments, setKycDocuments] = useState<any[]>([]);
+  const [kycConsent, setKycConsent] = useState<any>(null);
+  const [isDigiLockerConnected, setIsDigiLockerConnected] = useState(false);
+  const [kycLoading, setKycLoading] = useState(false);
+  const [isConnectModalOpen, setIsConnectModalOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+  const [selectedDocPreview, setSelectedDocPreview] = useState<any>(null);
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [consentSubmitting, setConsentSubmitting] = useState(false);
+  const [fetchingDocType, setFetchingDocType] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadForm, setUploadForm] = useState({
+    documentType: 'AADHAAR',
+    documentNumber: '',
+    issuer: 'UIDAI (Govt of India)',
+    expiryDate: '',
+  });
+
   // Edit form state
   const [editForm, setEditForm] = useState({
     phone: '',
@@ -121,9 +141,129 @@ export default function EmployeeProfileDossierPage() {
     }
   }, [id]);
 
+  const fetchKycData = useCallback(async () => {
+    if (!id) return;
+    try {
+      setKycLoading(true);
+      const res = await api.get(`/kyc/employee/${id}`);
+      if (res.data) {
+        setKycDocuments(res.data.documents || []);
+        setKycConsent(res.data.consent || null);
+        setIsDigiLockerConnected(Boolean(res.data.isDigiLockerConnected));
+      }
+    } catch (err) {
+      console.error('Failed to load KYC dossier:', err);
+    } finally {
+      setKycLoading(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     fetchProfile();
-  }, [fetchProfile]);
+    fetchKycData();
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get('tab') === 'documents') {
+        setActiveTab('documents');
+      }
+    }
+  }, [fetchProfile, fetchKycData]);
+
+  const handleConnectDigiLocker = async () => {
+    if (!consentAccepted) {
+      toast.error('Please accept the explicit consent declaration to continue');
+      return;
+    }
+    try {
+      setConsentSubmitting(true);
+      // 1. Record explicit employee consent
+      await api.post('/kyc/consent', {
+        employeeId: id,
+        purpose: 'Statutory employment KYC verification, PF/ESIC linkage, and tamper-evident identity verification',
+        scopes: 'doc_fetch:ADHAR,doc_fetch:PANCR,doc_fetch:DRVLC',
+      });
+
+      // 2. Obtain DigiLocker OAuth PKCE Authorization URL
+      await api.post('/kyc/digilocker/authorize', { employeeId: id });
+
+      // 3. Complete the retrieval of certified documents (Aadhaar & PAN)
+      await api.post('/kyc/digilocker/fetch', {
+        employeeId: id,
+        docType: 'AADHAAR',
+      });
+      await api.post('/kyc/digilocker/fetch', {
+        employeeId: id,
+        docType: 'PAN',
+      });
+
+      toast.success('DigiLocker linked! Certified Aadhaar & PAN verified with UIDAI seal.');
+      setIsConnectModalOpen(false);
+      fetchKycData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'DigiLocker connection failed');
+    } finally {
+      setConsentSubmitting(false);
+    }
+  };
+
+  const handlePullDigiLockerDoc = async (docType: string) => {
+    try {
+      setFetchingDocType(docType);
+      await api.post('/kyc/digilocker/fetch', {
+        employeeId: id,
+        docType,
+      });
+      toast.success(`Certified ${docType.replace('_', ' ')} pulled and sealed from DigiLocker!`);
+      fetchKycData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || `Failed to fetch ${docType}`);
+    } finally {
+      setFetchingDocType(null);
+    }
+  };
+
+  const handleManualUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadForm.documentNumber.trim()) {
+      toast.error('Please enter the document number');
+      return;
+    }
+    try {
+      setUploading(true);
+      await api.post('/kyc/upload', {
+        employeeId: id,
+        documentType: uploadForm.documentType,
+        documentNumber: uploadForm.documentNumber.trim(),
+        issuer: uploadForm.issuer.trim() || 'Verified Official Authority',
+        expiryDate: uploadForm.expiryDate || undefined,
+      });
+      toast.success('Physical document scan submitted! Awaiting HR attestation.');
+      setIsUploadModalOpen(false);
+      setUploadForm({
+        documentType: 'AADHAAR',
+        documentNumber: '',
+        issuer: 'UIDAI (Govt of India)',
+        expiryDate: '',
+      });
+      fetchKycData();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to upload document');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDownloadDoc = async (doc: any) => {
+    try {
+      const res = await api.get(`/kyc/download/${doc.id}`);
+      if (res.data?.downloadUrl) {
+        toast.success(`Secure token generated for ${doc.fileName || doc.documentType}`);
+        window.open(res.data.downloadUrl, '_blank');
+      }
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Download failed');
+    }
+  };
 
   const emp = {
     id: employee?.id || id || 'BSC-EMP-0042',
@@ -315,7 +455,7 @@ export default function EmployeeProfileDossierPage() {
               { key: 'breaks', label: '3. Work Hours & Breaks' },
               { key: 'leaves', label: '4. Leave Balances & Quota' },
               { key: 'payroll', label: '5. Salary & Payslip History' },
-              { key: 'documents', label: '6. Verified Documents (5)' },
+              { key: 'documents', label: `6. KYC & Digital Documents (${kycDocuments.length})` },
               { key: 'audit', label: '7. Audit Trail' },
               { key: 'notes', label: '8. HR Confidential Notes' },
             ].map((tab) => (
@@ -951,52 +1091,308 @@ export default function EmployeeProfileDossierPage() {
           </div>
         )}
 
-        {/* TAB 6: VERIFIED DOCUMENTS */}
+        {/* TAB 6: KYC & DIGITAL DOCUMENTS */}
         {activeTab === 'documents' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { title: 'Aadhaar Card (UIDAI)', desc: 'Official Identity proof verified via e-KYC', type: 'PDF Document (Signed)', size: '1.4 MB', date: 'Enrolled 12 Jan 2021', icon: 'badge' },
-              { title: 'Income Tax PAN Card', desc: 'Permanent Account Number verified via NSDL API', type: 'PDF / Image (Certified)', size: '840 KB', date: 'Enrolled 12 Jan 2021', icon: 'credit_card' },
-              { title: 'Appointment Letter', desc: 'Permanent employment contract with BSC Textiles Pvt Ltd', type: 'PDF (Certified Contract)', size: '2.1 MB', date: 'Issued 12 Jan 2021', icon: 'description' },
-              { title: 'Educational Certificate', desc: 'B.Sc Textile & Merchandising Design, Karnataka University', type: 'PDF (Attested)', size: '3.2 MB', date: 'Verified 14 Jan 2021', icon: 'school' },
-              { title: 'Karnataka Form B Extract', desc: 'Statutory workforce register extract for Belagavi Hub', type: 'Form B Govt Register', size: '650 KB', date: 'Updated Oct 2026', icon: 'account_balance' },
-            ].map((doc, idx) => (
-              <div key={idx} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-blue-50 text-[#0058be] flex items-center justify-center shrink-0">
-                    <span className="material-symbols-outlined text-[22px]">{doc.icon}</span>
+          <div className="space-y-6">
+            {/* Executive KYC Hub Banner */}
+            <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white rounded-2xl p-6 shadow-md border border-slate-800">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[#3b82f6] text-[24px]">verified_user</span>
+                    <h3 className="font-bold text-lg text-white">KYC &amp; DigiLocker Digital Vault</h3>
+                    <span className="bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-bold px-2 py-0.5 rounded uppercase">
+                      UIDAI Sec. 29 Compliant
+                    </span>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900">{doc.title}</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">{doc.desc}</p>
-                    <div className="flex items-center gap-2 mt-2 text-[11px] text-slate-400 font-mono">
-                      <span>{doc.type}</span>
-                      <span>&bull;</span>
-                      <span>{doc.size}</span>
+                  <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
+                    Official employee identity and statutory credential registry. Supports instant document retrieval via National DigiLocker API (OAuth 2.0 PKCE) and verified manual upload fallback with 12-digit Aadhaar masking.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3 pt-2">
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+                      <span className="text-slate-300">DigiLocker Status:</span>
+                      <span className="font-semibold text-white">
+                        {isDigiLockerConnected ? 'Connected & Verified' : 'Awaiting Employee Link'}
+                      </span>
                     </div>
+                    <span className="text-slate-600">•</span>
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="material-symbols-outlined text-slate-400 text-[14px]">lock</span>
+                      <span className="text-slate-300">Aadhaar Masking:</span>
+                      <span className="font-semibold text-emerald-400">Enforced (Last 4 digits visible)</span>
+                    </div>
+                    {kycConsent && (
+                      <>
+                        <span className="text-slate-600">•</span>
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <span className="material-symbols-outlined text-blue-400 text-[14px]">history_edu</span>
+                          <span className="text-slate-300">Active Consent:</span>
+                          <span className="font-semibold text-blue-300">Valid until {new Date(kycConsent.expiresAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-bold uppercase border border-emerald-200">
-                    Verified by HR
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => toast.success(`Viewing certified copy of ${doc.title}`)}
-                      className="px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 rounded font-medium"
-                    >
-                      View
-                    </button>
-                    <button
-                      onClick={() => toast.success(`Downloading ${doc.title}`)}
-                      className="px-2 py-1 text-xs bg-[#0058be] text-white hover:bg-blue-700 rounded font-bold"
-                    >
-                      Download
-                    </button>
-                  </div>
+
+                {/* Primary Actions */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+                  <button
+                    onClick={() => {
+                      setConsentAccepted(Boolean(kycConsent));
+                      setIsConnectModalOpen(true);
+                    }}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-md shadow-blue-900/30 transition-all cursor-pointer"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">cloud_sync</span>
+                    <span>{isDigiLockerConnected ? 'Manage DigiLocker' : 'Connect DigiLocker'}</span>
+                  </button>
+                  <button
+                    onClick={() => setIsUploadModalOpen(true)}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-semibold text-xs border border-white/20 transition-all cursor-pointer"
+                    type="button"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">upload_file</span>
+                    <span>Upload Physical Scan</span>
+                  </button>
                 </div>
               </div>
-            ))}
+            </div>
+
+            {/* Statutory Compliance Checklist Strip */}
+            <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+                <span className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+                  Mandatory Statutory Identification Checklist
+                </span>
+                <span className="text-xs text-slate-500">
+                  {kycDocuments.filter(d => d.status === 'VERIFIED').length} of 4 Documents Verified
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {[
+                  {
+                    type: 'AADHAAR',
+                    label: 'Aadhaar Card (UIDAI)',
+                    desc: 'Required for EPFO & ESIC compliance',
+                    icon: 'badge',
+                  },
+                  {
+                    type: 'PAN',
+                    label: 'PAN Card (Income Tax)',
+                    desc: 'Mandatory for TDS wage filing',
+                    icon: 'credit_card',
+                  },
+                  {
+                    type: 'DRIVING_LICENSE',
+                    label: 'Driving License / Address',
+                    desc: 'Karnataka Form B address proof',
+                    icon: 'directions_car',
+                  },
+                  {
+                    type: 'DEGREE_CERTIFICATE',
+                    label: 'Educational Certificate',
+                    desc: 'Merchandising technical cadre',
+                    icon: 'school',
+                  },
+                ].map((item) => {
+                  const doc = kycDocuments.find((d) => d.documentType === item.type);
+                  const isVerified = doc?.status === 'VERIFIED';
+                  const isSubmitted = doc?.status === 'SUBMITTED' || doc?.status === 'PENDING';
+                  return (
+                    <div
+                      key={item.type}
+                      className={`p-3 rounded-lg border flex flex-col justify-between gap-2 ${
+                        isVerified
+                          ? 'bg-emerald-50/50 border-emerald-200'
+                          : isSubmitted
+                          ? 'bg-amber-50/50 border-amber-200'
+                          : 'bg-slate-50/70 border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className={`material-symbols-outlined text-[20px] ${isVerified ? 'text-emerald-600' : 'text-slate-500'}`}>
+                            {item.icon}
+                          </span>
+                          <div>
+                            <div className="font-bold text-xs text-slate-900">{item.label}</div>
+                            <div className="text-[10px] text-slate-500">{item.desc}</div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between pt-1 border-t border-slate-200/40">
+                        {isVerified ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700">
+                            <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                            Verified ({doc.documentNumberMasked})
+                          </span>
+                        ) : isSubmitted ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700">
+                            <span className="material-symbols-outlined text-[13px]">hourglass_top</span>
+                            Awaiting HR Attestation
+                          </span>
+                        ) : (
+                          <button
+                            disabled={fetchingDocType === item.type}
+                            onClick={() => {
+                              if (!kycConsent) {
+                                setIsConnectModalOpen(true);
+                              } else {
+                                handlePullDigiLockerDoc(item.type);
+                              }
+                            }}
+                            className="text-[11px] font-semibold text-[#0058be] hover:underline flex items-center gap-1"
+                          >
+                            {fetchingDocType === item.type ? (
+                              <span>Fetching...</span>
+                            ) : (
+                              <>
+                                <span className="material-symbols-outlined text-[13px]">download</span>
+                                <span>Pull via DigiLocker</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Document Ledger Cards Grid */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-bold text-sm text-slate-900">
+                  Registered Documents ({kycDocuments.length})
+                </h4>
+                <span className="text-xs text-slate-500">
+                  Certified audit copies stored in encrypted tenant storage
+                </span>
+              </div>
+
+              {kycDocuments.length === 0 ? (
+                <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
+                  <span className="material-symbols-outlined text-slate-400 text-[40px] mb-2">folder_off</span>
+                  <h4 className="font-bold text-sm text-slate-800">No Documents Uploaded Yet</h4>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto mt-1 mb-4">
+                    Connect DigiLocker to seamlessly fetch verified Aadhaar and PAN documents, or upload a scanned copy manually.
+                  </p>
+                  <button
+                    onClick={() => setIsConnectModalOpen(true)}
+                    className="px-4 py-2 bg-[#0058be] text-white rounded-lg text-xs font-bold hover:bg-blue-700"
+                  >
+                    Connect DigiLocker Now
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {kycDocuments.map((doc: any) => {
+                    const isVerified = doc.status === 'VERIFIED';
+                    const isPending = doc.status === 'PENDING' || doc.status === 'SUBMITTED';
+                    const isRejected = doc.status === 'REJECTED';
+                    const isDigi = doc.source === 'DIGILOCKER';
+
+                    let iconName = 'badge';
+                    if (doc.documentType === 'PAN') iconName = 'credit_card';
+                    if (doc.documentType === 'DRIVING_LICENSE') iconName = 'directions_car';
+                    if (doc.documentType === 'DEGREE_CERTIFICATE') iconName = 'school';
+                    if (doc.documentType === 'VOTER_ID') iconName = 'how_to_vote';
+
+                    return (
+                      <div
+                        key={doc.id}
+                        className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between gap-4 hover:border-slate-300 transition-colors"
+                      >
+                        <div className="space-y-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-blue-50 text-[#0058be] flex items-center justify-center shrink-0">
+                                <span className="material-symbols-outlined text-[22px]">{iconName}</span>
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-bold text-slate-900">
+                                  {doc.documentType.replace('_', ' ')}
+                                </h4>
+                                <p className="text-xs text-slate-500 mt-0.5">{doc.issuer}</p>
+                              </div>
+                            </div>
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase border ${
+                                isVerified
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : isPending
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                  : isRejected
+                                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                  : 'bg-slate-100 text-slate-700 border-slate-200'
+                              }`}
+                            >
+                              {doc.status}
+                            </span>
+                          </div>
+
+                          <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-slate-400">Masked ID:</span>
+                              <span className="font-mono font-bold text-slate-800">{doc.documentNumberMasked}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-slate-400">Source:</span>
+                              <span className={`inline-flex items-center gap-1 font-semibold text-[11px] ${isDigi ? 'text-indigo-600' : 'text-slate-600'}`}>
+                                {isDigi && <span className="material-symbols-outlined text-[13px]">cloud_done</span>}
+                                {isDigi ? 'DigiLocker PKCE' : 'Physical Scan'}
+                              </span>
+                            </div>
+                            {doc.expiryDate && (
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-slate-400">Expires:</span>
+                                <span className="font-mono text-slate-700">{new Date(doc.expiryDate).toLocaleDateString('en-IN')}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {isRejected && doc.rejectionReason && (
+                            <div className="p-2 bg-rose-50 rounded border border-rose-200 text-xs text-rose-700">
+                              <span className="font-bold">Rejection Note: </span>
+                              {doc.rejectionReason}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs">
+                          <span className="text-[11px] text-slate-400">
+                            {doc.createdAt ? new Date(doc.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Verified'}
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => {
+                                setSelectedDocPreview(doc);
+                                setIsPreviewModalOpen(true);
+                              }}
+                              className="px-2.5 py-1 text-slate-700 hover:bg-slate-100 rounded font-medium"
+                              type="button"
+                            >
+                              Inspect
+                            </button>
+                            <button
+                              onClick={() => handleDownloadDoc(doc)}
+                              className="px-2.5 py-1 bg-[#0058be] text-white hover:bg-blue-700 rounded font-bold flex items-center gap-1"
+                              type="button"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">download</span>
+                              Download
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1173,6 +1569,337 @@ export default function EmployeeProfileDossierPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+
+        {/* Connect DigiLocker Modal */}
+        {isConnectModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-xl p-6 flex flex-col gap-5">
+              <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0058be] flex items-center justify-center font-bold">
+                    <span className="material-symbols-outlined text-[24px]">cloud_sync</span>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-slate-900">
+                      Connect National DigiLocker
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Approved OAuth 2.0 PKCE Authorization &amp; KYC Verification
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsConnectModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-700"
+                >
+                  <span className="material-symbols-outlined text-[20px]">close</span>
+                </button>
+              </div>
+
+              <div className="space-y-4 text-xs">
+                {/* Purpose Explanation */}
+                <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3.5 space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold text-blue-900">
+                    <span className="material-symbols-outlined text-[16px]">info</span>
+                    <span>Why are we requesting your documents?</span>
+                  </div>
+                  <p className="text-blue-800 leading-relaxed">
+                    BSC Textiles requires verified documents for statutory employment registration, provident fund (EPFO) linkage, employee state insurance (ESIC) enrollment, and income tax TDS filing under Karnataka and Indian labor laws.
+                  </p>
+                </div>
+
+                {/* Requested Documents & Scopes */}
+                <div>
+                  <h4 className="font-bold text-slate-800 mb-2">Requested Certified Scopes:</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-start gap-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200/60">
+                      <span className="material-symbols-outlined text-emerald-600 text-[18px] shrink-0 mt-0.5">badge</span>
+                      <div>
+                        <span className="font-semibold text-slate-900">Aadhaar Card (UIDAI)</span>
+                        <p className="text-slate-500 text-[11px]">Identity &amp; age verification. Stored strictly in masked format (XXXX-XXXX-1234).</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200/60">
+                      <span className="material-symbols-outlined text-blue-600 text-[18px] shrink-0 mt-0.5">credit_card</span>
+                      <div>
+                        <span className="font-semibold text-slate-900">PAN Card (Income Tax Dept)</span>
+                        <p className="text-slate-500 text-[11px]">Salary disbursement and TDS compliance certificate.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-2.5 bg-slate-50 rounded-lg border border-slate-200/60">
+                      <span className="material-symbols-outlined text-indigo-600 text-[18px] shrink-0 mt-0.5">directions_car</span>
+                      <div>
+                        <span className="font-semibold text-slate-900">Driving License / Address Proof</span>
+                        <p className="text-slate-500 text-[11px]">Karnataka Shops &amp; Establishments Register Form B address proof.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Privacy & UIDAI Compliance Notice */}
+                <div className="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                    <span className="material-symbols-outlined text-[16px]">security</span>
+                    <span>Statutory Privacy &amp; Data Security Safeguards</span>
+                  </div>
+                  <p className="text-emerald-800 text-[11px] leading-relaxed">
+                    Under UIDAI Section 29 and DPDP Act 2023: Raw 12-digit Aadhaar numbers, biometric templates, and Aadhaar OTPs are NEVER stored on our servers. All documents are retrieved through an encrypted, authorized government tunnel with digital signatures verified.
+                  </p>
+                </div>
+
+                {/* Explicit Consent Checkbox */}
+                <div className="pt-2 border-t border-slate-100">
+                  <label className="flex items-start gap-3 cursor-pointer p-2.5 rounded-lg hover:bg-slate-50">
+                    <input
+                      type="checkbox"
+                      checked={consentAccepted}
+                      onChange={(e) => setConsentAccepted(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 text-[#0058be] rounded border-slate-300 focus:ring-[#0058be]"
+                    />
+                    <span className="text-slate-700 leading-snug">
+                      I voluntarily grant explicit consent to BSC Textiles Pvt Ltd to initiate DigiLocker OAuth 2.0 PKCE authorization and retrieve my certified documents for official employment KYC. I understand this consent is valid for 365 days and can be revoked upon request.
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsConnectModalOpen(false)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!consentAccepted || consentSubmitting}
+                  onClick={handleConnectDigiLocker}
+                  className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-bold text-xs shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {consentSubmitting ? (
+                    <>
+                      <span className="animate-spin material-symbols-outlined text-[16px]">progress_activity</span>
+                      <span>Authorizing &amp; Fetching...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[16px]">lock_open</span>
+                      <span>Authorize with DigiLocker</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Manual Scanned Upload Modal */}
+        {isUploadModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 flex flex-col gap-4">
+              <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0058be] flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[24px]">upload_file</span>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-slate-900">
+                      Manual Document Upload Fallback
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      For physical scan submissions awaiting HR attestation
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsUploadModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-700"
+                >
+                  <span className="material-symbols-outlined text-[20px]">close</span>
+                </button>
+              </div>
+
+              <form onSubmit={handleManualUpload} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Document Type *</label>
+                  <select
+                    value={uploadForm.documentType}
+                    onChange={(e) => {
+                      const dt = e.target.value;
+                      let defaultIssuer = 'UIDAI (Govt of India)';
+                      if (dt === 'PAN') defaultIssuer = 'Income Tax Department';
+                      if (dt === 'DRIVING_LICENSE') defaultIssuer = 'MoRTH Karnataka Transport';
+                      if (dt === 'VOTER_ID') defaultIssuer = 'Election Commission of India';
+                      if (dt === 'DEGREE_CERTIFICATE') defaultIssuer = 'Karnataka State University';
+                      setUploadForm({ ...uploadForm, documentType: dt, issuer: defaultIssuer });
+                    }}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0058be]"
+                  >
+                    <option value="AADHAAR">Aadhaar Card (UIDAI)</option>
+                    <option value="PAN">PAN Card (Income Tax)</option>
+                    <option value="DRIVING_LICENSE">Driving License (Transport Dept)</option>
+                    <option value="VOTER_ID">Voter ID (Election Commission)</option>
+                    <option value="DEGREE_CERTIFICATE">Educational Degree Certificate</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">
+                    Document Number / Identifier *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder={uploadForm.documentType === 'AADHAAR' ? 'e.g. 12-digit number (will be masked)' : 'e.g. ABCDE1234F'}
+                    value={uploadForm.documentNumber}
+                    onChange={(e) => setUploadForm({ ...uploadForm, documentNumber: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-[#0058be]"
+                  />
+                  {uploadForm.documentType === 'AADHAAR' && (
+                    <p className="text-[11px] text-emerald-600 mt-1 flex items-center gap-1 font-semibold">
+                      <span className="material-symbols-outlined text-[13px]">shield</span>
+                      Only masked number (XXXX-XXXX-1234) will be stored in database.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Issuing Authority</label>
+                  <input
+                    type="text"
+                    value={uploadForm.issuer}
+                    onChange={(e) => setUploadForm({ ...uploadForm, issuer: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0058be]"
+                  />
+                </div>
+
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Expiry Date (Optional)</label>
+                  <input
+                    type="date"
+                    value={uploadForm.expiryDate}
+                    onChange={(e) => setUploadForm({ ...uploadForm, expiryDate: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0058be]"
+                  />
+                </div>
+
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-[11px]">
+                  <span className="font-bold">Note: </span>
+                  Manually submitted documents enter the <strong>PENDING</strong> review queue. An authorized HR Officer assigned to your store location will verify the scan before marking it <strong>VERIFIED</strong>.
+                </div>
+
+                <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsUploadModalOpen(false)}
+                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={uploading}
+                    className="px-5 py-2 bg-[#0058be] text-white hover:bg-blue-700 rounded-lg font-bold shadow-sm disabled:opacity-50"
+                  >
+                    {uploading ? 'Submitting...' : 'Submit for HR Attestation'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Certified Document Inspection Modal */}
+        {isPreviewModalOpen && selectedDocPreview && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 flex flex-col gap-4">
+              <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#0058be] text-[24px]">verified</span>
+                  <div>
+                    <h3 className="font-bold text-base text-slate-900">
+                      Certified Document Dossier
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      {selectedDocPreview.documentType.replace('_', ' ')}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsPreviewModalOpen(false);
+                    setSelectedDocPreview(null);
+                  }}
+                  className="text-slate-400 hover:text-slate-700"
+                >
+                  <span className="material-symbols-outlined text-[20px]">close</span>
+                </button>
+              </div>
+
+              <div className="space-y-3 text-xs">
+                <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Document Type</span>
+                    <span className="font-bold text-slate-800">{selectedDocPreview.documentType}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Masked Identifier</span>
+                    <span className="font-mono font-bold text-slate-800">{selectedDocPreview.documentNumberMasked}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Issuing Authority</span>
+                    <span className="font-semibold text-slate-800">{selectedDocPreview.issuer}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Acquisition Channel</span>
+                    <span className="font-semibold text-slate-800">{selectedDocPreview.source}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Status</span>
+                    <span className="font-bold text-emerald-700">{selectedDocPreview.status}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-bold">Attested By</span>
+                    <span className="font-semibold text-slate-800">{selectedDocPreview.verifiedBy || 'System / Pending'}</span>
+                  </div>
+                </div>
+
+                {selectedDocPreview.digilockerDocUri && (
+                  <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200/80 space-y-1">
+                    <span className="text-blue-900 font-bold block text-[11px]">DigiLocker Cryptographic URI</span>
+                    <span className="font-mono text-blue-800 text-[11px] break-all">{selectedDocPreview.digilockerDocUri}</span>
+                  </div>
+                )}
+
+                {selectedDocPreview.rejectionReason && (
+                  <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-rose-700">
+                    <span className="font-bold block">HR Rejection Reason:</span>
+                    <span>{selectedDocPreview.rejectionReason}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewModalOpen(false)}
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium text-xs"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDownloadDoc(selectedDocPreview)}
+                  className="px-4 py-2 bg-[#0058be] text-white hover:bg-blue-700 rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-sm"
+                >
+                  <span className="material-symbols-outlined text-[16px]">download</span>
+                  <span>Download Secure Copy</span>
+                </button>
+              </div>
             </div>
           </div>
         )}

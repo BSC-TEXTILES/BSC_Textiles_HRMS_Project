@@ -5,6 +5,8 @@ import { runFaceVerificationTests } from './faceVerification.test.js';
 import { runPermissionsAndLocationTests } from './permissionsAndLocation.test.js';
 import { runIncentivesTests } from './incentives.test.js';
 import { runSecurityTests } from './security.test.js';
+import { runKycTests } from './kyc.test.js';
+import { runPayrollTestSuite } from './payroll.test.js';
 
 const BASE_URL = process.env.API_URL || 'http://localhost:4000';
 
@@ -104,6 +106,20 @@ async function main() {
   console.log('▶ Executing Suite 7: Authentication, JWT & Security Middleware...');
   const secResults = await runSecurityTests(BASE_URL);
   allResults.push(...secResults);
+
+  // 8. KYC & DigiLocker Suite
+  console.log('▶ Executing Suite 8: Employee Aadhaar KYC & DigiLocker Integration...');
+  const kycResults = await runKycTests(
+    BASE_URL,
+    adminToken,
+    belagaviHrToken,
+    shivamoggaHrToken,
+    salesToken
+  );
+  allResults.push(...kycResults);
+
+  // 9. Complete Payroll, PDF & Auto-Email Suite
+  await runPayrollTestSuite();
 
   // Print Summary Table
   console.log('\n================================================================');

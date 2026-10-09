@@ -3,7 +3,7 @@
     Sets up the BSC Textiles HRMS Native MySQL 8.0 database.
 .DESCRIPTION
     1. Starts MySQL 8.0 if it is not running (start-mysql.ps1).
-    2. Creates the database and sets the root password.
+    2. Creates the database (root credentials are detected, never modified).
     3. Applies native MySQL 8.0 migrations (npm run db:migrate).
     4. Seeds native MySQL baseline dataset (npm run db:seed).
 #>
@@ -30,20 +30,37 @@ if (-not (Test-Path $MySqlPath)) {
     exit 1
 }
 
-# --- 2. Root password + database -------------------------------------------
+# --- 2. Detect how root authenticates, then create the database ------------
+# Never mutate the root account here: start-mysql.ps1 initialises MySQL
+# insecurely (root, empty password) and the backend/.env mirrors that.
+# If you secured root yourself, pass -MySqlRootPassword <pw>.
 $createDb = "CREATE DATABASE IF NOT EXISTS $DatabaseName CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
-& $MySqlPath -u root "-p$MySqlRootPassword" -e $createDb 2>$null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Connecting without password (fresh install) and setting root password..." -ForegroundColor Yellow
-    $init = "ALTER USER 'root'@'localhost' IDENTIFIED BY '$MySqlRootPassword'; FLUSH PRIVILEGES; $createDb"
-    & $MySqlPath -u root --skip-password -e $init 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Cannot connect to MySQL as root. Is another root password set?"
-        exit 1
+function Invoke-MySql([string]$Sql, [switch]$WithPassword) {
+    if ($WithPassword) {
+        & $script:MySqlPath -u root "-p$script:MySqlRootPassword" -e $Sql 2>$null
+    } else {
+        & $script:MySqlPath -u root --skip-password -e $Sql 2>$null
     }
+    return $LASTEXITCODE -eq 0
 }
-Write-Host "Database '$DatabaseName' is ready (root password: $MySqlRootPassword)." -ForegroundColor Green
+
+if (Invoke-MySql "SELECT 1;") {
+    Write-Host "Connected to MySQL as root (no password required)." -ForegroundColor Green
+    $dbReady = Invoke-MySql $createDb
+} elseif ($MySqlRootPassword -and (Invoke-MySql "SELECT 1;" -WithPassword)) {
+    Write-Host "Connected to MySQL as root with the supplied password." -ForegroundColor Green
+    $dbReady = Invoke-MySql $createDb -WithPassword
+} else {
+    Write-Error "Cannot connect to MySQL as root. Re-run with -MySqlRootPassword <password> if root is secured."
+    exit 1
+}
+
+if (-not $dbReady) {
+    Write-Error "Could not create database '$DatabaseName'."
+    exit 1
+}
+Write-Host "Database '$DatabaseName' is ready." -ForegroundColor Green
 
 # --- 3. Apply Native MySQL 8.0 schema + seed -------------------------------
 Push-Location $PSScriptRoot

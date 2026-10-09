@@ -754,6 +754,8 @@ export class ModelDelegate {
         values.push(JSON.stringify(v));
       } else if (typeof v === 'boolean') {
         values.push(v ? 1 : 0);
+      } else if (typeof v === 'object' && v !== null && !(v instanceof Date) && typeof (v as any).toFixed !== 'function') {
+        values.push(JSON.stringify(v));
       } else {
         values.push(v);
       }
@@ -816,6 +818,8 @@ export class ModelDelegate {
         values.push(JSON.stringify(v));
       } else if (typeof v === 'boolean') {
         values.push(v ? 1 : 0);
+      } else if (typeof v === 'object' && v !== null && !(v instanceof Date) && typeof (v as any).toFixed !== 'function') {
+        values.push(JSON.stringify(v));
       } else {
         values.push(v);
       }

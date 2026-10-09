@@ -45,6 +45,13 @@ const stitchNavigation: NavSectionConfig[] = [
     ],
   },
   {
+    title: 'KYC & DigiLocker',
+    items: [
+      { title: 'KYC Verification Hub', href: '/operations/kyc', icon: 'verified_user', badge: 'DigiLocker' },
+      { title: 'Digital Document Vault', href: '/employees/profile?tab=documents', icon: 'shield_person', badge: 'UIDAI' },
+    ],
+  },
+  {
     title: 'Time & Attendance',
     items: [
       { title: 'Biometric Punches', href: '/attendance/punches', icon: 'fingerprint' },
@@ -56,10 +63,18 @@ const stitchNavigation: NavSectionConfig[] = [
     ],
   },
   {
-    title: 'Leave & Payroll',
+    title: 'Payroll Management',
+    items: [
+      { title: 'Payroll Dashboard', href: '/payroll', icon: 'payments' },
+      { title: 'Employee Payslips', href: '/payroll/payslips', icon: 'receipt_long' },
+      { title: 'Salary Structure', href: '/payroll/salary-structure', icon: 'account_balance_wallet' },
+      { title: 'Payroll Reports', href: '/payroll/reports', icon: 'analytics' },
+    ],
+  },
+  {
+    title: 'Leave & Incentives',
     items: [
       { title: 'Leave Approvals', href: '/leaves', icon: 'event_busy' },
-      { title: 'Payroll & Payslips', href: '/payroll', icon: 'payments' },
       { title: 'Incentive Calculation', href: '/incentives/calculation', icon: 'price_change' },
     ],
   },
@@ -187,6 +202,14 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
+        // Employee KYC & DigiLocker Management Hub (Admin, HR, Location Manager)
+        if (item.href === '/operations/kyc') {
+          return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'LOCATION_MANAGER'].includes(rawRole);
+        }
+        // Digital Document Vault is available to ALL authenticated personnel
+        if (item.href.includes('tab=documents')) {
+          return true;
+        }
         // Admin-only system management
         if (item.href.startsWith('/admin')) {
           return rawRole === 'SUPER_ADMIN' || rawRole === 'ADMIN';
@@ -195,7 +218,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         if (item.href.startsWith('/operations')) {
           return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole);
         }
-        // Payroll runs & incentive formula calculations
+        // Employee Payslips self-service view is accessible to all authenticated staff
+        if (item.href === '/payroll/payslips') {
+          return true;
+        }
+        // Payroll master dashboard, salary structure, and statutory reports
         if (item.href.startsWith('/payroll') || item.href.startsWith('/incentives')) {
           return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'PAYROLL_MANAGER'].includes(rawRole);
         }
@@ -257,7 +284,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 )}
                 <div className="space-y-0.5">
                   {section.items.map((item) => {
-                    const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                    const itemPath = item.href.split('?')[0];
+                    const isActive = pathname === item.href || (item.href !== '/dashboard' && !item.href.includes('?') && pathname.startsWith(itemPath));
                     return (
                       <Link
                         key={item.href}
@@ -347,19 +375,23 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                     <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                       {sec.title}
                     </div>
-                    {sec.items.map((i) => (
-                      <Link
-                        key={i.href}
-                        href={i.href}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs ${
-                          pathname === i.href ? 'bg-[#e5eeff] text-[#0058be] font-bold' : 'text-slate-600'
-                        }`}
-                      >
-                        <span className="material-symbols-outlined text-[18px]">{i.icon}</span>
-                        <span>{i.title}</span>
-                      </Link>
-                    ))}
+                    {sec.items.map((i) => {
+                      const itemPath = i.href.split('?')[0];
+                      const isItemActive = pathname === i.href || (i.href !== '/dashboard' && !i.href.includes('?') && pathname.startsWith(itemPath));
+                      return (
+                        <Link
+                          key={i.href}
+                          href={i.href}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs ${
+                            isItemActive ? 'bg-[#e5eeff] text-[#0058be] font-bold' : 'text-slate-600'
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[18px]">{i.icon}</span>
+                          <span>{i.title}</span>
+                        </Link>
+                      );
+                    })}
                   </div>
                 ))}
               </nav>
