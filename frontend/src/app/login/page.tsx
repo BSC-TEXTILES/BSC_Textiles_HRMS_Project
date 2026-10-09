@@ -152,6 +152,7 @@ function LoginForm() {
             localStorage.setItem('bsc_user', JSON.stringify(directData.user));
           }
           document.cookie = `token=${encodeURIComponent(directData.token)}; path=/; max-age=604800; SameSite=Lax`;
+          document.cookie = `bsc_token=${encodeURIComponent(directData.token)}; path=/; max-age=604800; SameSite=Lax`;
         }
       } catch (e) {
         console.warn('[Login] Direct token pre-fetch warning:', e);
@@ -530,7 +531,7 @@ function LoginForm() {
 
         {/* Global Footer */}
         <footer className="mt-6 text-center text-xs text-slate-300 font-normal">
-          © 2024 BSC Textiles Pvt Ltd • Karnataka Retail Operations Network • Version 2.4 Active
+          © 2026 BSC Textiles Pvt Ltd • Karnataka Retail Operations Network • Version 2.4 Active
         </footer>
       </div>
     </div>
