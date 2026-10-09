@@ -52,6 +52,11 @@ export default function DashboardPage() {
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
+      const token = typeof window !== 'undefined' ? (localStorage.getItem('bsc_token') || localStorage.getItem('token')) : null;
+      if (!token && typeof window !== 'undefined') {
+        setLoading(false);
+        return;
+      }
       const url = selectedHub !== 'all' ? `/reports/dashboard-summary?locationId=${selectedHub}` : '/reports/dashboard-summary';
       const [summaryRes, attendanceRes, fvRes] = await Promise.all([
         api.get(url).catch(() => ({ data: null })),

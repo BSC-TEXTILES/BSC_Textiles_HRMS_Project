@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { Logo } from '@/components/ui/Logo';
+import api from '@/lib/api';
 
 interface NavSectionConfig {
   title: string;
@@ -97,12 +98,23 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (status === 'unauthenticated') {
-      const hasLocalToken = typeof window !== 'undefined' && !!(localStorage.getItem('bsc_token') || localStorage.getItem('token'));
-      if (!hasLocalToken) {
-        window.location.href = '/login';
+      const token = typeof window !== 'undefined' ? (localStorage.getItem('bsc_token') || localStorage.getItem('token')) : null;
+      if (!token) {
+        window.location.href = `/login?callbackUrl=${encodeURIComponent(pathname)}`;
+      } else {
+        // Verify token with backend /auth/me
+        api.get('/auth/me').catch(() => {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('bsc_token');
+            localStorage.removeItem('token');
+            localStorage.removeItem('bsc_user');
+            document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+            window.location.href = `/login?callbackUrl=${encodeURIComponent(pathname)}`;
+          }
+        });
       }
     }
-  }, [status]);
+  }, [status, pathname]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -121,9 +133,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  const hasLocalToken = typeof window !== 'undefined' && !!(localStorage.getItem('bsc_token') || localStorage.getItem('token'));
-
-  if (status === 'loading' || (status === 'unauthenticated' && hasLocalToken)) {
+  if (status === 'loading') {
     return (
       <div className="min-h-screen bg-[#f8f9ff] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
@@ -134,7 +144,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (status === 'unauthenticated') {
+  if (status === 'unauthenticated' && typeof window !== 'undefined' && !localStorage.getItem('bsc_token') && !localStorage.getItem('token')) {
     return null;
   }
 
