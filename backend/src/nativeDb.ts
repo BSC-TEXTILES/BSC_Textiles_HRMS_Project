@@ -1020,4 +1020,8 @@ function createProxyClient(nativeClient: NativeMySQLClient): any {
 
 const rootClient = new NativeMySQLClient();
 export const prisma: any = createProxyClient(rootClient);
+export const nativeDb: any = prisma;
+export const mysqlDb: any = prisma;
+export const db: any = prisma;
 export default prisma;
+

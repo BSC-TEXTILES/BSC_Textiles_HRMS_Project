@@ -1,18 +1,11 @@
 <#
 .SYNOPSIS
-    Sets up the BSC Textiles HRMS database (backend = Prisma).
+    Sets up the BSC Textiles HRMS Native MySQL 8.0 database.
 .DESCRIPTION
-    1. Starts MySQL if it is not running (start-mysql.ps1).
+    1. Starts MySQL 8.0 if it is not running (start-mysql.ps1).
     2. Creates the database and sets the root password.
-    3. Applies the Prisma schema (npx prisma db push) - this is what the
-       backend actually queries (camelCase tables: user, employee, location, ...).
-    4. Seeds 36 users with real bcrypt hashes of "password123".
-
-    NOTE: database/schema.sql + database/seed.sql belong to the future
-    "native MySQL (zero Prisma)" workspace layer. The running backend does not
-    use those tables, and prisma db push replaces them if present. Only run
-    them via `npm run db:setup --workspace=database` if you are working on
-    that migration.
+    3. Applies native MySQL 8.0 migrations (npm run db:migrate).
+    4. Seeds native MySQL baseline dataset (npm run db:seed).
 #>
 
 param(
@@ -24,7 +17,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 Write-Host "============================================================" -ForegroundColor Cyan
-Write-Host "  BSC Textiles HRMS - Database Setup (Prisma)" -ForegroundColor Cyan
+Write-Host "  BSC Textiles HRMS - Native MySQL 8.0 Setup" -ForegroundColor Cyan
 Write-Host "============================================================" -ForegroundColor Cyan
 Write-Host ""
 
