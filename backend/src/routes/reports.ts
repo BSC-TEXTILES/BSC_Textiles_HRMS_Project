@@ -9,9 +9,21 @@ router.use(authenticate);
 
 router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
-    const locationId = getScopedLocationId(req.user, req.query.locationId);
+    let locationId = getScopedLocationId(req.user, req.query.locationId);
+    if (locationId === 'all') locationId = undefined;
+    if (locationId) {
+      const cleanCode = locationId.replace(/^loc_/, '').toUpperCase();
+      const locMatch = await prisma.location.findFirst({
+        where: { OR: [{ id: locationId }, { code: cleanCode }] },
+      });
+      if (locMatch) locationId = locMatch.id;
+    }
 
-    const today = new Date();
+    const departmentId = req.query.departmentId && req.query.departmentId !== 'all' ? String(req.query.departmentId) : undefined;
+    const shiftId = req.query.shiftId && req.query.shiftId !== 'all' ? String(req.query.shiftId) : undefined;
+    const dateParam = req.query.date ? String(req.query.date) : undefined;
+
+    const today = dateParam ? new Date(dateParam) : new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -20,7 +32,7 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
       orderBy: { attendanceDate: 'desc' },
       select: { attendanceDate: true },
     });
-    const targetDate = latestAttendance?.attendanceDate;
+    const targetDate = dateParam ? new Date(dateParam) : latestAttendance?.attendanceDate;
 
     const employeeWhere: any = { status: 'ACTIVE' };
     const attendanceWhere: any = targetDate ? { attendanceDate: targetDate } : {};
@@ -37,11 +49,22 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
       attendanceWhere.locationId = locationId;
       faceWhere.locationId = locationId;
       qrWhere.locationId = locationId;
-      incentiveWhere.employee = { locationId };
-      penaltyWhere.employee = { locationId };
+      incentiveWhere.employee = { ...incentiveWhere.employee, locationId };
+      penaltyWhere.employee = { ...penaltyWhere.employee, locationId };
       observationWhere.locationId = locationId;
       streamWhere.locationId = locationId;
       sellingPointWhere.locationId = locationId;
+    }
+
+    if (departmentId) {
+      employeeWhere.departmentId = departmentId;
+      attendanceWhere.employee = { ...(attendanceWhere.employee || {}), departmentId };
+      incentiveWhere.employee = { ...(incentiveWhere.employee || {}), departmentId };
+      penaltyWhere.employee = { ...(penaltyWhere.employee || {}), departmentId };
+    }
+
+    if (shiftId) {
+      attendanceWhere.shiftId = shiftId;
     }
 
     const [

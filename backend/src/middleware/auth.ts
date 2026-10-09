@@ -100,11 +100,26 @@ export function isElevatedRole(role?: string): boolean {
   return role === 'SUPER_ADMIN' || role === 'ADMIN';
 }
 
+export function resolveLocationCodeToId(val?: any): string | undefined {
+  if (!val || val === 'all' || val === 'ALL') return undefined;
+  const s = String(val).toLowerCase();
+  const map: Record<string, string> = {
+    bel: 'loc_bel',
+    belagavi: 'loc_bel',
+    dav: 'loc_dav',
+    davanagere: 'loc_dav',
+    shi: 'loc_shi',
+    shivamogga: 'loc_shi',
+  };
+  return map[s] || String(val);
+}
+
 export function getScopedLocationId(user?: AuthRequest['user'], requestedLocationId?: any): string | undefined {
   if (!user) return undefined;
-  if (requestedLocationId) {
-    if (isElevatedRole(user.role)) return String(requestedLocationId);
-    if (user.locationId && user.locationId === String(requestedLocationId)) return user.locationId;
+  const resolvedRequested = resolveLocationCodeToId(requestedLocationId);
+  if (resolvedRequested) {
+    if (isElevatedRole(user.role)) return resolvedRequested;
+    if (user.locationId && user.locationId === resolvedRequested) return user.locationId;
     return user.locationId ?? undefined;
   }
   if (isElevatedRole(user.role)) return undefined;

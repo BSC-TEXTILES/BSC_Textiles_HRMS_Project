@@ -271,7 +271,7 @@ export default function AttendanceCorrectionsPage() {
         {/* MULTI-LEVEL FILTER, TAB STRIP & QUERY TOOLS */}
         <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-200/90 flex flex-col gap-4">
           {/* Tab Strip */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
             <button
               onClick={() => setActiveTab('ALL')}
               className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${

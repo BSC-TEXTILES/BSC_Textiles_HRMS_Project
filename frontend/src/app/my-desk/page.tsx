@@ -376,7 +376,7 @@ export default function MyDeskPage() {
                   <span className="font-medium">Daily Attendance Log (Oct 1 – Oct 24)</span>
                   <span className="text-[11px] text-slate-400">Scroll horizontally for past days →</span>
                 </div>
-                <div className="overflow-x-auto pb-2 pt-1 scrollbar-thin">
+                <div className="overflow-x-auto pb-2 pt-1 no-scrollbar">
                   <div className="flex items-center gap-2 min-w-max">
                     {[
                       { d: '01 Oct', h: '8.8h', type: 'P' },
