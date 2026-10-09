@@ -126,28 +126,26 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
-  
+
   socket.on('join-location', (locationId: string) => {
     socket.join(`location:${locationId}`);
   });
-  
+
   socket.on('join-stream', (streamId: string) => {
     socket.join(`stream:${streamId}`);
   });
-  
+
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
   });
 });
 
-const PORT = Number(process.env.PORT) || 4000;
-httpServer.listen(PORT, '0.0.0.0', () => {
+const PORT = process.env.PORT || 4000;
+httpServer.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 WebSocket server ready`);
-}).on('error', (err: Error) => {
-  console.error('Server listen error:', err);
-  process.exit(1);
 });
+console.log('Listen called, waiting for callback...');
 
 process.on('SIGINT', async () => {
   await prisma.$disconnect();
