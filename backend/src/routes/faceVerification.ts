@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../index.js';
 import { dbDate } from '../utils/dates.js';
-import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
+import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
 
 const router = Router();
@@ -26,7 +26,8 @@ router.get(['/', '/history', '/records'], authorize('VIEW'), async (req: AuthReq
     const skip = (Number(page) - 1) * Number(limit);
     
     // Resolve location
-    let targetLocId = req.user!.role === 'SUPER_ADMIN' ? (locationId as string) : req.user!.locationId;
+    let targetLocId = getScopedLocationId(req.user, locationId as string);
+    if (targetLocId === 'all') targetLocId = undefined;
     if (targetLocId && targetLocId.length < 10) {
       const locMatch = await prisma.location.findFirst({
         where: { OR: [{ code: targetLocId.toUpperCase() }, { id: targetLocId }] },
@@ -147,7 +148,8 @@ router.post('/', authorize('RECORD'), validate(fvSchema), async (req: AuthReques
 router.get(['/stats', '/stats/:locationId'], authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
     let locParam = req.params.locationId || (typeof req.query.locationId === 'string' ? req.query.locationId : undefined);
-    let locationId = req.user!.role === 'SUPER_ADMIN' ? locParam : req.user!.locationId;
+    let locationId = getScopedLocationId(req.user, locParam);
+    if (locationId === 'all') locationId = undefined;
 
     if (locationId && locationId.length < 10) {
       const locMatch = await prisma.location.findFirst({
