@@ -3,59 +3,48 @@ import { query, queryOne } from '../pool.js';
 export interface UserRow {
   id: string;
   email: string;
-  password_hash: string;
-  full_name: string;
+  passwordHash: string;
+  fullName: string;
   role: string;
   permissions: string[] | null;
-  location_id: string | null;
-  employee_id: string | null;
-  is_active: boolean;
-  last_login_at: Date | null;
-  created_at: Date;
-  updated_at: Date;
+  locationId: string | null;
+  employeeId: string | null;
+  isActive: boolean;
+  lastLoginAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const COLUMNS = `id, email, passwordHash, fullName, role, permissions,
+        locationId, employeeId, isActive, lastLoginAt, createdAt, updatedAt`;
+
+function mapUser(row: any): UserRow {
+  return {
+    ...row,
+    permissions: typeof row.permissions === 'string' ? JSON.parse(row.permissions) : row.permissions,
+  };
 }
 
 export class UserRepository {
   static async findByEmail(email: string): Promise<UserRow | null> {
-    const row = await queryOne<any>(
-      `SELECT id, email, password_hash, full_name, role, permissions, 
-              location_id, employee_id, is_active, last_login_at, created_at, updated_at
-       FROM users WHERE email = ? LIMIT 1`,
-      [email]
-    );
-    if (!row) return null;
-    return {
-      ...row,
-      permissions: typeof row.permissions === 'string' ? JSON.parse(row.permissions) : row.permissions,
-    };
+    const row = await queryOne<any>(`SELECT ${COLUMNS} FROM User WHERE email = ? LIMIT 1`, [email]);
+    return row ? mapUser(row) : null;
   }
 
   static async findById(id: string): Promise<UserRow | null> {
-    const row = await queryOne<any>(
-      `SELECT id, email, full_name, role, permissions, location_id, employee_id, is_active, last_login_at
-       FROM users WHERE id = ? LIMIT 1`,
-      [id]
-    );
-    if (!row) return null;
-    return {
-      ...row,
-      permissions: typeof row.permissions === 'string' ? JSON.parse(row.permissions) : row.permissions,
-    };
+    const row = await queryOne<any>(`SELECT ${COLUMNS} FROM User WHERE id = ? LIMIT 1`, [id]);
+    return row ? mapUser(row) : null;
   }
 
   static async listByLocation(locationId: string): Promise<UserRow[]> {
     const rows = await query<any>(
-      `SELECT id, email, full_name, role, permissions, location_id, employee_id, is_active, last_login_at
-       FROM users WHERE location_id = ? ORDER BY full_name ASC`,
+      `SELECT ${COLUMNS} FROM User WHERE locationId = ? ORDER BY fullName ASC`,
       [locationId]
     );
-    return rows.map((r) => ({
-      ...r,
-      permissions: typeof r.permissions === 'string' ? JSON.parse(r.permissions) : r.permissions,
-    }));
+    return rows.map(mapUser);
   }
 
   static async updateLastLogin(id: string): Promise<void> {
-    await query(`UPDATE users SET last_login_at = NOW(3) WHERE id = ?`, [id]);
+    await query(`UPDATE User SET lastLoginAt = NOW(3) WHERE id = ?`, [id]);
   }
 }

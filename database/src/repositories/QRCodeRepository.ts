@@ -2,61 +2,76 @@ import { query, queryOne } from '../pool.js';
 
 export interface QRCodeRow {
   id: string;
-  employee_id: string;
   token: string;
-  valid_date: string;
-  is_active: boolean;
-  expires_at: Date;
-  created_at: Date;
+  type: 'EMPLOYEE' | 'DAILY';
+  employeeId: string;
+  locationId: string;
+  validFrom: Date;
+  validTo: Date;
+  isConsumed: boolean;
+  consumedAt: Date | null;
+  consumedBy: string | null;
+  purpose: string | null;
 }
 
 export class QRCodeRepository {
   static async findValidToken(token: string): Promise<QRCodeRow | null> {
     return queryOne<QRCodeRow>(
-      `SELECT * FROM qr_codes 
-       WHERE token = ? AND is_active = TRUE AND valid_date = CURDATE() AND expires_at > NOW(3)
+      `SELECT * FROM QRCode
+       WHERE token = ? AND isConsumed = FALSE AND validFrom <= NOW(3) AND validTo >= NOW(3)
        LIMIT 1`,
       [token]
     );
   }
 
-  static async getActiveByEmployee(employeeId: string): Promise<QRCodeRow | null> {
+  static async getActiveByEmployee(employeeId: string, date: string = new Date().toISOString().slice(0, 10)): Promise<QRCodeRow | null> {
     return queryOne<QRCodeRow>(
-      `SELECT * FROM qr_codes 
-       WHERE employee_id = ? AND valid_date = CURDATE() AND is_active = TRUE
-       LIMIT 1`,
-      [employeeId]
+      `SELECT * FROM QRCode
+       WHERE employeeId = ? AND type = 'DAILY' AND DATE(validFrom) = ? AND isConsumed = FALSE
+       ORDER BY validFrom DESC LIMIT 1`,
+      [employeeId, date]
     );
   }
 
-  static async createToken(
+  static async createDailyToken(
     id: string,
     employeeId: string,
+    locationId: string,
     token: string,
-    validDate: string,
-    expiresAt: Date
+    validFrom: Date,
+    validTo: Date
   ): Promise<void> {
     await query(
-      `INSERT INTO qr_codes (id, employee_id, token, valid_date, is_active, expires_at)
-       VALUES (?, ?, ?, ?, TRUE, ?)`,
-      [id, employeeId, token, validDate, expiresAt]
+      `INSERT INTO QRCode (id, token, type, employeeId, locationId, validFrom, validTo, isConsumed, purpose)
+       VALUES (?, ?, 'DAILY', ?, ?, ?, ?, FALSE, 'ATTENDANCE_CHECK_IN')`,
+      [id, token, employeeId, locationId, validFrom, validTo]
     );
+  }
+
+  static async consumeToken(tokenId: string, consumedBy: string): Promise<boolean> {
+    const result: any = await query(
+      `UPDATE QRCode SET isConsumed = TRUE, consumedAt = NOW(3), consumedBy = ?, updatedAt = NOW(3)
+       WHERE id = ? AND isConsumed = FALSE`,
+      [consumedBy, tokenId]
+    );
+    return result.affectedRows > 0;
   }
 
   static async recordScan(
     id: string,
     qrCodeId: string,
     employeeId: string,
-    scannerUserId: string,
+    scannerId: string,
     locationId: string,
-    scanType: string,
-    isValid: boolean,
-    rejectionReason?: string
+    purpose: string,
+    result: string,
+    failureReason?: string,
+    ipAddress?: string
   ): Promise<void> {
     await query(
-      `INSERT INTO qr_scan_records (id, qr_code_id, employee_id, scanner_user_id, location_id, scan_type, is_valid, rejection_reason)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, qrCodeId, employeeId, scannerUserId, locationId, scanType, isValid, rejectionReason || null]
+      `INSERT INTO QRScanRecord (id, qrCodeId, employeeId, scannerId, locationId, purpose, result, failureReason, ipAddress)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, qrCodeId, employeeId, scannerId, locationId, purpose, result, failureReason || null, ipAddress || null]
     );
   }
 }

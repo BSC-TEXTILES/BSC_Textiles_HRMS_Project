@@ -38,6 +38,7 @@ import notificationRoutes from './routes/notifications.js';
 import roleRoutes from './routes/roles.js';
 import settingRoutes from './routes/settings.js';
 import deviceRoutes from './routes/devices.js';
+import { staffOpsRouter, observationLevelsRouter } from './routes/workerOps.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -99,6 +100,8 @@ app.use('/api/selling-points', sellingPointRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/shifts', shiftRoutes);
 app.use('/api/attendance', attendanceRoutes);
+app.use('/api/staff-ops', staffOpsRouter);
+app.use('/api/observation-levels', observationLevelsRouter);
 app.use('/api/breaks', breakRoutes);
 app.use('/api/face-verification', faceVerificationRoutes);
 app.use('/api/qr-codes', qrCodeRoutes);
@@ -137,10 +140,13 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 4000;
-httpServer.listen(PORT, () => {
+const PORT = Number(process.env.PORT) || 4000;
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📡 WebSocket server ready`);
+}).on('error', (err: Error) => {
+  console.error('Server listen error:', err);
+  process.exit(1);
 });
 
 process.on('SIGINT', async () => {

@@ -13,7 +13,6 @@ Weaving Dreams, Building Futures
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg?style=flat&logo=node.js)](https://nodejs.org/)
 [![Express](https://img.shields.io/badge/Express-4.18-lightgrey.svg?style=flat&logo=express)](https://expressjs.com/)
 [![MySQL](https://img.shields.io/badge/MySQL-8.0-00758F.svg?style=flat&logo=mysql)](https://www.mysql.com/)
-[![Prisma](https://img.shields.io/badge/Prisma-5.7-2D3748.svg?style=flat&logo=prisma)](https://www.prisma.io/)
 [![Socket.IO](https://img.shields.io/badge/Socket.IO-4.7-black.svg?style=flat&logo=socket.io)](https://socket.io/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.3-38B2AC.svg?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
 [![Version](https://img.shields.io/badge/Version-1.0.0-purple.svg?style=flat)](package.json)
@@ -119,7 +118,7 @@ The long-term vision of BSC Textiles HRMS is to serve as the unified operating s
 
 ## 4. System Architecture
 
-The BSC Textiles HRMS architecture follows a decoupled client-server model with a real-time WebSocket communication bus, an Express API gateway, Prisma ORM, and a normalized MySQL 8.0 relational cluster.
+The BSC Textiles HRMS architecture follows a decoupled client-server model with a real-time WebSocket communication bus, an Express API gateway, a high-performance native MySQL 8.0 connection pool (`mysql2/promise`), and a normalized relational cluster.
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280', 'secondaryColor': '#2E9D59', 'tertiaryColor': '#F3F4F6' }}}%%
@@ -202,7 +201,7 @@ graph TB
 - **Runtime:** Node.js 20.x LTS
 - **Server Framework:** Express 4.18
 - **Language:** TypeScript 5.3 (Executed natively with `tsx`)
-- **Database Client:** Prisma ORM 5.7
+- **Database Client:** Native MySQL 8.0 Driver (`mysql2/promise` connection pool)
 - **Authentication:** JSON Web Tokens (`jsonwebtoken` 9.0) + `bcryptjs` 2.4 (12 salt rounds)
 - **Security Hardening:** Helmet 7.1, CORS 2.8, Express Rate Limit 7.1, Cookie Parser 1.4
 - **Real-Time Messaging:** Socket.IO 4.7
@@ -210,8 +209,8 @@ graph TB
 
 ### Database & Persistence
 - **RDBMS:** MySQL 8.0 Enterprise Community Server
-- **Schema Management:** Prisma Migrations & Introspection
-- **Normalization:** 3NF Schema with 38 relational models & 14 functional enums
+- **Schema Management:** Native DDL Schema & Sequential Migration Engine
+- **Normalization:** 3NF Schema with 38 relational tables & strict referential integrity
 
 ---
 
@@ -421,7 +420,6 @@ flowchart TD
 1. **Belagavi (`BEL`):** Head Store / Primary Regional Hub
 2. **Davanagere (`DAV`):** Central Karnataka Showroom
 3. **Shivamogga (`SHI`):** Malnad Flagship Showroom
-4. **Hubballi (`HUB-TEST`):** Regional Sandbox & QA Hub
 
 ### Anti-Tampering Rules:
 - An HR Manager assigned to **Shivamogga (`SHI`)** attempting to fetch `/api/employees?locationId=BEL` will have the query overridden or rejected with a `403 Forbidden`.
@@ -1331,7 +1329,7 @@ npm run prisma:seed
 ```
 
 This provisions:
-- 4 Store locations (`Belagavi`, `Davanagere`, `Shivamogga`, `Hubballi`)
+- 3 Store locations (`Belagavi`, `Davanagere`, `Shivamogga`)
 - 12 Showroom floors, departments, and selling point registers
 - 14 Test user accounts across all system personas
 - 50+ Active staff records with realistic historical punches and break records

@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,600;0,700;1,400&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "secondary-container": "#2170e4", "surface-container-high": "#dce9ff", "on-tertiary-fixed-variant": "#6e3900", "on-tertiary-fixed": "#2f1500", "primary-container": "#131b2e", "surface-variant": "#d3e4fe", "on-secondary-container": "#fefcff", "primary-fixed-dim": "#bec6e0", "on-secondary-fixed-variant": "#004395", "on-primary": "#ffffff", "secondary-fixed": "#d8e2ff", "surface-container-low": "#eff4ff", "on-error": "#ffffff", "on-tertiary-container": "#c76c00", "surface-tint": "#565e74", "on-primary-fixed": "#131b2e", "on-secondary-fixed": "#001a42", "tertiary-fixed-dim": "#ffb77d", "inverse-surface": "#213145", "surface-container-lowest": "#ffffff", "background": "#f8f9ff", "surface-container-highest": "#d3e4fe", "secondary": "#0058be", "surface": "#f8f9ff", "on-secondary": "#ffffff", "on-error-container": "#93000a", "surface-container": "#e5eeff", "surface-dim": "#cbdbf5", "error": "#ba1a1a", "error-container": "#ffdad6", "tertiary-container": "#2f1500", "tertiary": "#000000", "on-primary-fixed-variant": "#3f465c", "primary": "#000000", "on-surface-variant": "#45464d", "inverse-primary": "#bec6e0", "inverse-on-surface": "#eaf1ff", "on-tertiary": "#ffffff", "primary-fixed": "dae2fd", "secondary-fixed-dim": "#adc6ff", "on-surface": "#0b1c30", "on-primary-container": "#7c839b", "surface-bright": "#f8f9ff", "tertiary-fixed": "#ffdcc3", "outline": "#76777d", "on-background": "#0b1c30", "outline-variant": "#c6c6cd" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "space-xl": "1.5rem", "gutter": "1rem", "margin": "1.5rem", "space-2xl": "2rem", "space-lg": "1rem", "space-sm": "0.5rem", "margin-lg": "2rem", "gutter-lg": "1.5rem", "space-xs": "0.25rem", "space-md": "0.75rem" }, "fontFamily": { "headline-md": ["Plus Jakarta Sans"], "label-md": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"], "label-lg": ["Plus Jakarta Sans"], "label-sm": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "display-lg": ["Plus Jakarta Sans"], "body-sm": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"] }, "fontSize": { "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "label-md": ["11px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "600" }], "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.015em", "fontWeight": "600" }], "headline-sm": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "600" }], "label-lg": ["13px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600" }], "label-sm": ["10px", { "lineHeight": "12px", "letterSpacing": "0.06em", "fontWeight": "700" }], "body-md": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }], "body-lg": ["15px", { "lineHeight": "22px", "fontWeight": "400" }] } } } };</script></head><body class="bg-background font-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between overflow-y-auto"><div class="flex flex-col"><div class="h-14 flex items-center gap-space-sm px-margin bg-surface-container-lowest"><img alt="BSC Textiles HRMS Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVH-y2iZ7yaWx6Q6YdmCHl5vkuKf05I_tvVHXVmfcUPbGtp_kwuvSAA6xrLyvKJHBNWbsKAe9w2IVjozxX7H1lJp-QjrcIHW9eZzcLHERrm1drSgbM7tnMjOxun2eDUY0Z7MD95iXYT3uCEmzqt88rmLfdZES7ZnfHodPxWD1vFb9iZAjw75H43SyIc1YyF2g7zpDhy4idpDfo40BeesriCLNRd9xeLnJTvyUFLuRMJMuXeerzo-5b"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm text-on-surface leading-none tracking-tight">BSC Textiles</span><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">HRMS Portal</span></div></div><nav class="flex flex-col gap-space-xs px-space-sm py-space-md" data-active-classes="bg-surface-container text-secondary font-label-lg font-bold"><div class="px-space-md pt-space-xs pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Core Operations</div><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[20px]">grid_view</span><span>Executive Dashboard</span></a><div class="px-space-md pt-space-md pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Workforce Directory</div><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="employee-roster" href="#"><span class="material-symbols-outlined text-[20px]">badge</span><span>All Employees</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="employee-profile" href="#"><span class="material-symbols-outlined text-[20px]">person_search</span><span>Profile 360 &amp; Dossier</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="organization-units" href="#"><span class="material-symbols-outlined text-[20px]">corporate_fare</span><span>Departments &amp; Units</span></a><div class="px-space-md pt-space-md pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Time &amp; Attendance</div><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="daily-punches" href="#"><span class="material-symbols-outlined text-[20px]">fingerprint</span><span>Biometric Punches</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="shifts-rosters" href="#"><span class="material-symbols-outlined text-[20px]">calendar_view_week</span><span>Floor Shifts &amp; Rosters</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="break-tracker" href="#"><span class="material-symbols-outlined text-[20px]">coffee</span><span>Lunch &amp; Break Tracker</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="attendance-corrections" href="#"><span class="material-symbols-outlined text-[20px]">edit_calendar</span><span>Punch Corrections</span></a><div class="px-space-md pt-space-md pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Leave &amp; Payroll</div><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="leave-management" href="#"><span class="material-symbols-outlined text-[20px]">event_busy</span><span>Leave Approvals</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="payroll-processing" href="#"><span class="material-symbols-outlined text-[20px]">payments</span><span>Payroll &amp; Payslips</span></a><div class="px-space-md pt-space-md pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Governance</div><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="audit-logs" href="#"><span class="material-symbols-outlined text-[20px]">rule</span><span>Audit Logs &amp; Security</span></a></nav></div><div class="p-space-md bg-surface-container-low m-space-sm rounded-xl"><div class="flex items-center justify-between mb-space-xs"><span class="font-label-sm text-label-sm uppercase text-on-surface-variant">Biometric Server</span><span class="flex h-2 w-2 relative"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span></span></div><div class="font-label-md text-label-md text-on-surface font-bold">Synced Live</div><div class="font-body-sm text-body-sm text-on-surface-variant">99.8% Terminal Uptime</div></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-14 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-margin-lg"><div class="flex items-center gap-space-lg flex-1 max-w-2xl"><div class="relative flex items-center bg-surface-container-low rounded-lg px-space-md py-space-xs"><span class="material-symbols-outlined text-secondary text-[18px] mr-space-xs">pin_drop</span><select class="bg-transparent font-label-lg text-label-lg text-on-surface focus:outline-none cursor-pointer pr-space-sm"><option value="all">All Hubs (Karnataka)</option><option value="bel">Belagavi Spinning Mill (BEL)</option><option value="dav">Davanagere Weaving Hub (DAV)</option><option value="shi">Shivamogga Retail Apex (SHI)</option></select></div><div class="relative flex-1 flex items-center bg-surface-container-lowest rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.02)] px-space-md py-space-xs"><span class="material-symbols-outlined text-on-surface-variant text-[20px] mr-space-xs">search</span><input class="w-full bg-transparent font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none" placeholder="Search by ID (e.g. BSC-4029), Name, Dept, or Phone..." type="text"/></div></div><div class="flex items-center gap-space-md"><div class="flex flex-col text-right pr-space-sm hidden md:flex"><div class="flex items-center gap-space-xs justify-end"><span class="material-symbols-outlined text-[14px] text-secondary">schedule</span><span class="font-label-lg text-label-lg text-on-surface font-bold">14:22:08 IST</span></div><span class="font-body-sm text-body-sm text-on-surface-variant">24 Oct 2024 • Shift A</span></div><div class="relative flex items-center justify-center p-space-xs rounded-lg hover:bg-surface-container-high transition-colors cursor-pointer"><span class="material-symbols-outlined text-on-surface-variant text-[22px]">notifications</span><span class="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-error text-on-error font-label-sm text-[9px] font-bold">3</span></div><div class="flex items-center gap-space-sm pl-space-sm"><div class="flex flex-col text-right hidden sm:flex"><span class="font-label-lg text-label-lg text-on-surface font-bold">S. B. Angadi</span><span class="font-label-sm text-label-sm uppercase tracking-wide text-on-surface-variant">HR Director • Super Admin</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="w-full pt-14 px-margin-lg py-space-xl bg-background"><div class="flex flex-col w-full">
+<!-- Top Header & Breadcrumb -->
+<div class="flex flex-col md:flex-row md:items-end justify-between pb-space-lg gap-space-md">
+<div class="flex flex-col">
+<div class="flex items-center gap-space-xs text-on-surface-variant font-label-sm text-label-sm tracking-wider uppercase mb-space-xs">
+<span>Time &amp; Attendance</span>
+<span class="material-symbols-outlined text-[12px]">chevron_right</span>
+<span class="text-secondary font-bold">Live Biometric Punches &amp; IoT Terminal Network</span>
+</div>
+<div class="flex items-center gap-space-sm">
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Biometric Attendance &amp; Terminal Punch Ledger</h1>
+<span class="px-space-xs py-[2px] rounded-lg bg-surface-container-high text-secondary font-label-sm text-label-sm flex items-center gap-1">
+<span class="h-2 w-2 rounded-full bg-secondary animate-pulse"></span> Live Socket
+        </span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mt-space-xs max-w-3xl">
+        Real-time telemetry, AI facial recognition &amp; RFID biometric punch streams across 8 edge-connected terminals in Karnataka manufacturing &amp; retail hubs (BEL-01, DAV-02, SHI-03).
+      </p>
+</div>
+<div class="flex items-center gap-space-xs flex-wrap">
+<button class="flex items-center gap-space-xs px-space-md py-space-xs rounded bg-surface-container-lowest text-on-surface shadow-sm hover:bg-surface-container transition-all font-label-lg text-label-lg">
+<span class="material-symbols-outlined text-[18px] text-on-surface-variant">download</span>
+<span>Export Raw Logs (CSV / DAT)</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-md py-space-xs rounded bg-surface-container-lowest text-secondary shadow-sm hover:bg-surface-container transition-all font-label-lg text-label-lg">
+<span class="material-symbols-outlined text-[18px]">sensors</span>
+<span>Ping All Terminals (8/8 Online)</span>
+</button>
+<button class="flex items-center gap-space-xs px-space-md py-space-xs rounded bg-primary text-on-primary shadow-sm hover:opacity-90 transition-all font-label-lg text-label-lg">
+<span class="material-symbols-outlined text-[18px]">add</span>
+<span>+ Manual Punch Override</span>
+</button>
+</div>
+</div>
+<!-- Top Metric KPI Row (5 Cards) -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-space-md mb-space-lg">
+<!-- Card 1 -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Total Today Punches</span>
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[18px]">fingerprint</span>
+</div>
+</div>
+<div class="my-space-xs">
+<div class="font-headline-lg text-headline-lg text-on-surface font-bold">792</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant truncate">396 Employees In-Punched</div>
+</div>
+<div class="flex items-center gap-space-xs pt-space-xs text-on-surface-variant font-label-sm text-label-sm">
+<span class="text-secondary font-bold">99.8%</span>
+<span>Terminal Sync (0 Missed)</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">On-Floor Live Presence</span>
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[18px]">group</span>
+</div>
+</div>
+<div class="my-space-xs">
+<div class="font-headline-lg text-headline-lg text-on-surface font-bold">396 <span class="font-body-md text-body-md text-on-surface-variant font-normal">/ 428 Staff</span></div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">92.5% Floor Occupancy</div>
+</div>
+<div class="flex items-center gap-space-xs pt-space-xs font-label-sm text-label-sm text-secondary">
+<span class="material-symbols-outlined text-[14px]">trending_up</span>
+<span class="font-bold">+1.8%</span>
+<span class="text-on-surface-variant font-normal">vs Expected Shift A</span>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Active Terminals</span>
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[18px]">router</span>
+</div>
+</div>
+<div class="my-space-xs">
+<div class="font-headline-lg text-headline-lg text-on-surface font-bold flex items-center gap-2">
+          8 / 8
+          <span class="px-space-xs py-0.5 rounded-full bg-surface-container-low text-secondary font-label-sm text-label-sm uppercase">All Up</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Zero loss • Latency: 18ms</div>
+</div>
+<div class="flex items-center gap-1 pt-space-xs text-on-surface-variant font-label-sm text-label-sm truncate">
+<span>4 BEL</span> • <span>2 DAV</span> • <span>2 SHI</span>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Punctuality Rate</span>
+<div class="w-8 h-8 rounded bg-surface-container flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[18px]">timer</span>
+</div>
+</div>
+<div class="my-space-xs">
+<div class="font-headline-lg text-headline-lg text-on-surface font-bold">96.4% <span class="font-body-md text-body-md text-on-surface-variant font-normal">On-Time</span></div>
+<div class="font-body-sm text-body-sm text-on-surface-variant truncate">14 In Grace Period (&lt;15m)</div>
+</div>
+<div class="flex items-center gap-space-xs pt-space-xs text-on-surface-variant font-label-sm text-label-sm">
+<span class="text-error font-bold">4 Flagged</span>
+<span>Late Arrivals (&gt;30m)</span>
+</div>
+</div>
+<!-- Card 5 -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-wider">Anomalies &amp; Flags</span>
+<div class="w-8 h-8 rounded bg-surface-container-high flex items-center justify-center text-error">
+<span class="material-symbols-outlined text-[18px]">warning</span>
+</div>
+</div>
+<div class="my-space-xs">
+<div class="font-headline-lg text-headline-lg text-on-surface font-bold flex items-center gap-2">
+          3
+          <span class="px-space-xs py-0.5 rounded bg-error-container text-on-error-container font-label-sm text-label-sm">Needs Review</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant truncate">1 Missing Out • 1 Passback</div>
+</div>
+<div class="flex items-center gap-space-xs pt-space-xs text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[14px] text-on-surface-variant">cached</span>
+<span>1 Device retry resolved</span>
+</div>
+</div>
+</div>
+<!-- Hub Filter & Terminal Status Bar -->
+<div class="bg-surface-container-lowest p-space-md rounded-xl shadow-sm mb-space-lg flex flex-col gap-space-md">
+<div class="flex items-center justify-between flex-wrap gap-space-sm pb-space-xs">
+<!-- Hub Selector Tabs -->
+<div class="flex items-center gap-space-xs overflow-x-auto">
+<button class="px-space-md py-space-xs rounded font-label-lg text-label-lg bg-surface-container text-secondary font-bold">
+          All Hub Terminals (8)
+        </button>
+<button class="px-space-md py-space-xs rounded font-label-lg text-label-lg text-on-surface-variant hover:bg-surface-container-low transition-colors">
+          Belagavi Flagship BEL-01 (4 Terminals)
+        </button>
+<button class="px-space-md py-space-xs rounded font-label-lg text-label-lg text-on-surface-variant hover:bg-surface-container-low transition-colors">
+          Davanagere Hub DAV-02 (2 Terminals)
+        </button>
+<button class="px-space-md py-space-xs rounded font-label-lg text-label-lg text-on-surface-variant hover:bg-surface-container-low transition-colors">
+          Shivamogga Apex SHI-03 (2 Terminals)
+        </button>
+</div>
+<div class="flex items-center gap-space-sm text-on-surface-variant font-label-sm text-label-sm">
+<span class="flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-secondary"></span> Operational
+        </span>
+<span class="flex items-center gap-1">
+<span class="w-2 h-2 rounded-full bg-surface-container-highest"></span> Maintenance Standby
+        </span>
+</div>
+</div>
+<!-- Terminal Quick Status Strip -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-space-sm">
+<div class="p-space-sm rounded bg-surface-container-low flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md font-bold text-on-surface">BEL-IN-01: Main Silk</span>
+<span class="text-secondary font-label-sm text-label-sm flex items-center gap-1">
+<span class="h-1.5 w-1.5 rounded-full bg-secondary"></span> 12ms
+          </span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-1">Facial + RFID Dual-Optic</div>
+<div class="flex items-center justify-between mt-2 pt-1 font-label-sm text-label-sm text-on-surface">
+<span class="text-on-surface-variant">Punches:</span>
+<span class="font-bold">184 today</span>
+</div>
+</div>
+<div class="p-space-sm rounded bg-surface-container-low flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md font-bold text-on-surface">BEL-IN-02: Staff Gate</span>
+<span class="text-secondary font-label-sm text-label-sm flex items-center gap-1">
+<span class="h-1.5 w-1.5 rounded-full bg-secondary"></span> 9ms
+          </span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-1">Locker Bay Entry Camera</div>
+<div class="flex items-center justify-between mt-2 pt-1 font-label-sm text-label-sm text-on-surface">
+<span class="text-on-surface-variant">Punches:</span>
+<span class="font-bold">142 today</span>
+</div>
+</div>
+<div class="p-space-sm rounded bg-surface-container-low flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md font-bold text-on-surface">BEL-OUT-03: Vault Exit</span>
+<span class="text-secondary font-label-sm text-label-sm flex items-center gap-1">
+<span class="h-1.5 w-1.5 rounded-full bg-secondary"></span> 15ms
+          </span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-1">Mezzanine High-Security</div>
+<div class="flex items-center justify-between mt-2 pt-1 font-label-sm text-label-sm text-on-surface">
+<span class="text-on-surface-variant">Punches:</span>
+<span class="font-bold">98 today</span>
+</div>
+</div>
+<div class="p-space-sm rounded bg-surface-container-low flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md font-bold text-on-surface">DAV-GATE-01: Mill Turnstile</span>
+<span class="text-secondary font-label-sm text-label-sm flex items-center gap-1">
+<span class="h-1.5 w-1.5 rounded-full bg-secondary"></span> 24ms
+          </span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-1">Weaving Plant Main Gate</div>
+<div class="flex items-center justify-between mt-2 pt-1 font-label-sm text-label-sm text-on-surface">
+<span class="text-on-surface-variant">Punches:</span>
+<span class="font-bold">124 today</span>
+</div>
+</div>
+<div class="p-space-sm rounded bg-surface-container-low flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<span class="font-label-md text-label-md font-bold text-on-surface">SHI-RETAIL-01: Saree Bay</span>
+<span class="text-secondary font-label-sm text-label-sm flex items-center gap-1">
+<span class="h-1.5 w-1.5 rounded-full bg-secondary"></span> 18ms
+          </span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-1">Apex Showroom Back-Door</div>
+<div class="flex items-center justify-between mt-2 pt-1 font-label-sm text-label-sm text-on-surface">
+<span class="text-on-surface-variant">Punches:</span>
+<span class="font-bold">94 today</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Main Content 2-Column Layout (Left 70%, Right 30%) -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
+<!-- Left Column: Live Punch Stream & Ledger Table (approx 70% / 8 cols or 8.5 cols) -->
+<div class="lg:col-span-8 flex flex-col gap-space-md">
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-md">
+<!-- Filter Toolbar -->
+<div class="flex flex-col gap-space-sm mb-space-md">
+<div class="flex items-center justify-between flex-wrap gap-space-sm">
+<div class="flex items-center gap-space-xs">
+<span class="font-headline-sm text-headline-sm text-on-surface">Live Ingested Punch Stream</span>
+<span class="h-2 w-2 rounded-full bg-secondary"></span>
+</div>
+<div class="flex items-center gap-space-xs text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">sync</span>
+<span>Updated: Just Now (14:22:08 IST)</span>
+</div>
+</div>
+<!-- Filters Row -->
+<div class="grid grid-cols-1 sm:grid-cols-4 gap-space-xs pt-space-xs">
+<div class="relative flex items-center bg-surface-container-low rounded px-space-sm py-1">
+<span class="material-symbols-outlined text-on-surface-variant text-[18px] mr-1">search</span>
+<input class="w-full bg-transparent font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none" placeholder="Search ID or Name..." type="text"/>
+</div>
+<div class="relative bg-surface-container-low rounded px-space-sm py-1">
+<select class="w-full bg-transparent font-label-lg text-label-lg text-on-surface focus:outline-none cursor-pointer">
+<option value="">All Terminals (8)</option>
+<option value="BEL-IN-01">BEL-IN-01: Main Silk Entrance</option>
+<option value="BEL-IN-02">BEL-IN-02: Staff Gate</option>
+<option value="BEL-OUT-03">BEL-OUT-03: Vault Exit</option>
+<option value="DAV-GATE-01">DAV-GATE-01: Weaving Mill</option>
+<option value="SHI-RETAIL-01">SHI-RETAIL-01: Saree Showroom</option>
+</select>
+</div>
+<div class="relative bg-surface-container-low rounded px-space-sm py-1">
+<select class="w-full bg-transparent font-label-lg text-label-lg text-on-surface focus:outline-none cursor-pointer">
+<option value="">Punch Type: All</option>
+<option value="IN">IN (Shift Start / Return)</option>
+<option value="OUT">OUT (Shift Close / Shift Transfer)</option>
+<option value="LUNCH">LUNCH-OUT / LUNCH-IN</option>
+<option value="TEA">TEA-OUT / BREAK</option>
+</select>
+</div>
+<div class="relative bg-surface-container-low rounded px-space-sm py-1">
+<select class="w-full bg-transparent font-label-lg text-label-lg text-on-surface focus:outline-none cursor-pointer">
+<option value="">Status: Verified &amp; Exceptions</option>
+<option value="verified">Verified Normal</option>
+<option value="grace">Grace Period (15m)</option>
+<option value="flagged">Flagged Anomaly / LOP</option>
+<option value="geo">Geo-Terminal Mismatch</option>
+</select>
+</div>
+</div>
+</div>
+<!-- Punch Ledger High Density Table -->
+<div class="overflow-x-auto -mx-space-md">
+<table class="w-full text-left font-body-md text-body-md">
+<thead>
+<tr class="bg-surface-container-low text-on-surface-variant font-label-sm text-label-sm uppercase tracking-wider">
+<th class="py-space-xs px-space-md font-semibold">Timestamp &amp; Terminal</th>
+<th class="py-space-xs px-space-md font-semibold">Employee</th>
+<th class="py-space-xs px-space-md font-semibold">Dept &amp; Hub</th>
+<th class="py-space-xs px-space-md font-semibold">Punch Event</th>
+<th class="py-space-xs px-space-md font-semibold">Verification Score</th>
+<th class="py-space-xs px-space-md font-semibold text-right">Ledger Status</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-transparent">
+<!-- Row 1 -->
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="py-space-sm px-space-md">
+<div class="font-headline-sm text-headline-sm text-on-surface font-semibold">14:21:40 <span class="font-body-sm text-body-sm text-on-surface-variant">IST</span></div>
+<div class="font-label-sm text-label-sm text-secondary font-bold flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[12px]">sensors</span> BEL-IN-02
+                  </div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="font-label-lg text-label-lg text-on-surface font-bold">Rajeshwari V. Patil</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant font-mono">BSC-EMP-0042</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="text-on-surface font-body-md">Sr. Merchandising, Silk</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Belagavi Flagship (BEL-01)</div>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-secondary font-bold">
+                    IN • Post-Lunch Return
+                  </span>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">RFID + Facial Camera</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex items-center gap-1 text-on-surface font-semibold">
+<span class="material-symbols-outlined text-secondary text-[16px]">verified</span>
+<span>99.4%</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">BioMatch-AI v2.4</span>
+</td>
+<td class="py-space-sm px-space-md text-right">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container-low text-secondary font-label-sm text-label-sm font-semibold">
+                    Verified On-Time
+                  </span>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="py-space-sm px-space-md">
+<div class="font-headline-sm text-headline-sm text-on-surface font-semibold">14:18:12 <span class="font-body-sm text-body-sm text-on-surface-variant">IST</span></div>
+<div class="font-label-sm text-label-sm text-secondary font-bold flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[12px]">sensors</span> BEL-OUT-03
+                  </div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="font-label-lg text-label-lg text-on-surface font-bold">Manoj K.</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant font-mono">BSC-EMP-0056</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="text-on-surface font-body-md">Head Cashier &amp; POS</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Belagavi Flagship (BEL-01)</div>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant font-bold">
+                    OUT • Vault Transfer
+                  </span>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Dual Biometric + Supervisor</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex items-center gap-1 text-on-surface font-semibold">
+<span class="material-symbols-outlined text-secondary text-[16px]">verified</span>
+<span>98.9%</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Optical Fingerprint</span>
+</td>
+<td class="py-space-sm px-space-md text-right">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container text-on-surface font-label-sm text-label-sm font-semibold">
+                    Authorized Inter-Floor
+                  </span>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="py-space-sm px-space-md">
+<div class="font-headline-sm text-headline-sm text-on-surface font-semibold">14:15:02 <span class="font-body-sm text-body-sm text-on-surface-variant">IST</span></div>
+<div class="font-label-sm text-label-sm text-secondary font-bold flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[12px]">sensors</span> DAV-GATE-01
+                  </div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="font-label-lg text-label-lg text-on-surface font-bold">Veeranna Pattar</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant font-mono">BSC-MGR-0021</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="text-on-surface font-body-md">Jacquard Looms &amp; Weaving</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Davanagere Mill (DAV-02)</div>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-secondary font-bold">
+                    IN • Floor Inspection
+                  </span>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Turnstile Optical Sensor</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex items-center gap-1 text-on-surface font-semibold">
+<span class="material-symbols-outlined text-secondary text-[16px]">verified</span>
+<span>99.1%</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Suprema BioStation</span>
+</td>
+<td class="py-space-sm px-space-md text-right">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container-low text-secondary font-label-sm text-label-sm font-semibold">
+                    Verified
+                  </span>
+</td>
+</tr>
+<!-- Row 4: Flagged -->
+<tr class="hover:bg-error-container/20 transition-colors bg-error-container/10">
+<td class="py-space-sm px-space-md">
+<div class="font-headline-sm text-headline-sm text-error font-semibold">14:02:44 <span class="font-body-sm text-body-sm text-on-surface-variant">IST</span></div>
+<div class="font-label-sm text-label-sm text-error font-bold flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[12px]">sensors</span> SHI-RETAIL-01
+                  </div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="font-label-lg text-label-lg text-on-surface font-bold">Amit Deshpande</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant font-mono">BSC-EMP-0089</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="text-on-surface font-body-md">Master Tailor, Blouse Tailoring</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Shivamogga Apex (SHI-03)</div>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-error-container font-label-sm text-label-sm text-error font-bold">
+                    IN • Mid-Entry Anomaly
+                  </span>
+<div class="font-body-sm text-body-sm text-error mt-0.5">Manual Assisted Ingest</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex items-center gap-1 text-error font-semibold">
+<span class="material-symbols-outlined text-[16px]">priority_high</span>
+<span>Late (+4h 32m)</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Missed 09:30 AM Punch</span>
+</td>
+<td class="py-space-sm px-space-md text-right">
+<button class="inline-flex items-center gap-1 px-space-xs py-0.5 rounded bg-error text-on-error font-label-sm text-label-sm font-semibold hover:opacity-90">
+                    Review LOP Waiver
+                  </button>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="py-space-sm px-space-md">
+<div class="font-headline-sm text-headline-sm text-on-surface font-semibold">13:58:19 <span class="font-body-sm text-body-sm text-on-surface-variant">IST</span></div>
+<div class="font-label-sm text-label-sm text-secondary font-bold flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[12px]">sensors</span> BEL-IN-02
+                  </div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="font-label-lg text-label-lg text-on-surface font-bold">Priyanka Shinde</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant font-mono">BSC-EMP-0071</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="text-on-surface font-body-md">Visual Merchandising</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Belagavi Flagship (BEL-01)</div>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-secondary font-bold">
+                    IN • Lunch Return (42m)
+                  </span>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Facial Recognition Scan</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex items-center gap-1 text-on-surface font-semibold">
+<span class="material-symbols-outlined text-secondary text-[16px]">verified</span>
+<span>99.8%</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">SpeedFace V5L</span>
+</td>
+<td class="py-space-sm px-space-md text-right">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container-low text-secondary font-label-sm text-label-sm font-semibold">
+                    Compliant (&lt;45m)
+                  </span>
+</td>
+</tr>
+<!-- Row 6 -->
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="py-space-sm px-space-md">
+<div class="font-headline-sm text-headline-sm text-on-surface font-semibold">13:45:10 <span class="font-body-sm text-body-sm text-on-surface-variant">IST</span></div>
+<div class="font-label-sm text-label-sm text-secondary font-bold flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[12px]">sensors</span> DAV-GATE-02
+                  </div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="font-label-lg text-label-lg text-on-surface font-bold">Vikramaditya Hegde</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant font-mono">BSC-EMP-0105</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="text-on-surface font-body-md">Handloom &amp; Zari Section</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Davanagere Mill (DAV-02)</div>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container-low font-label-sm text-label-sm text-on-surface-variant font-bold">
+                    OUT • Scheduled Permission
+                  </span>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">RFID Card Mifare Tap</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex items-center gap-1 text-on-surface font-semibold">
+<span class="material-symbols-outlined text-secondary text-[16px]">done_all</span>
+<span>Gate Verified</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Slip #PERM-9421</span>
+</td>
+<td class="py-space-sm px-space-md text-right">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container text-on-surface font-label-sm text-label-sm font-semibold">
+                    Approved Doctor Visit
+                  </span>
+</td>
+</tr>
+<!-- Row 7: Grace -->
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="py-space-sm px-space-md">
+<div class="font-headline-sm text-headline-sm text-on-surface font-semibold">09:32:15 <span class="font-body-sm text-body-sm text-on-surface-variant">IST</span></div>
+<div class="font-label-sm text-label-sm text-secondary font-bold flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[12px]">sensors</span> BEL-IN-01
+                  </div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="font-label-lg text-label-lg text-on-surface font-bold">Sneha Kulkarni</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant font-mono">BSC-EMP-0118</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="text-on-surface font-body-md">Bridal Consultant</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Belagavi Flagship (BEL-01)</div>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-secondary font-bold">
+                    IN • Morning Shift A
+                  </span>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">Facial Scan Terminal 1</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex items-center gap-1 text-on-surface font-semibold">
+<span class="material-symbols-outlined text-secondary text-[16px]">verified</span>
+<span>97.2%</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">ZKTeco ProFace X</span>
+</td>
+<td class="py-space-sm px-space-md text-right">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container-low text-secondary font-label-sm text-label-sm font-semibold">
+                    Grace Window (+2m)
+                  </span>
+</td>
+</tr>
+<!-- Row 8 -->
+<tr class="hover:bg-surface-container-low/60 transition-colors">
+<td class="py-space-sm px-space-md">
+<div class="font-headline-sm text-headline-sm text-on-surface font-semibold">09:28:14 <span class="font-body-sm text-body-sm text-on-surface-variant">IST</span></div>
+<div class="font-label-sm text-label-sm text-secondary font-bold flex items-center gap-1 mt-0.5">
+<span class="material-symbols-outlined text-[12px]">sensors</span> BEL-IN-02
+                  </div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="font-label-lg text-label-lg text-on-surface font-bold">Anand Kulkarni</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant font-mono">BSC-MGR-0012</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="text-on-surface font-body-md">Store Ops &amp; Floor Lead</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant">Belagavi Flagship (BEL-01)</div>
+</td>
+<td class="py-space-sm px-space-md">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-secondary font-bold">
+                    IN • Morning Shift A
+                  </span>
+<div class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">RFID Mifare Smart Card</div>
+</td>
+<td class="py-space-sm px-space-md">
+<div class="flex items-center gap-1 text-on-surface font-semibold">
+<span class="material-symbols-outlined text-secondary text-[16px]">verified</span>
+<span>100% Match</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Physical Chip Valid</span>
+</td>
+<td class="py-space-sm px-space-md text-right">
+<span class="inline-flex items-center px-space-xs py-0.5 rounded bg-surface-container-low text-secondary font-label-sm text-label-sm font-semibold">
+                    Early In-Punch (-2m)
+                  </span>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Table Footer with Pagination & WebSocket Status -->
+<div class="flex flex-col sm:flex-row items-center justify-between pt-space-md gap-space-sm">
+<div class="flex items-center gap-space-sm text-on-surface-variant font-body-sm text-body-sm">
+<span>Showing <strong class="text-on-surface font-semibold">8</strong> of <strong class="text-on-surface font-semibold">792</strong> Punches</span>
+<span class="hidden sm:inline">•</span>
+<div class="flex items-center gap-1 text-secondary font-label-sm text-label-sm">
+<span class="h-1.5 w-1.5 rounded-full bg-secondary"></span>
+<span>Live Streaming (WebSocket 50ms pulse)</span>
+</div>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant mr-1">Rows per page:</span>
+<select class="bg-surface-container-low font-label-sm text-label-sm text-on-surface rounded px-space-xs py-1 focus:outline-none cursor-pointer">
+<option>25</option>
+<option>50</option>
+<option>100</option>
+</select>
+<div class="flex items-center gap-1 ml-space-sm">
+<button class="p-1 rounded bg-surface-container-low text-on-surface-variant hover:text-on-surface">
+<span class="material-symbols-outlined text-[16px]">chevron_left</span>
+</button>
+<button class="px-2 py-0.5 rounded bg-surface-container font-label-sm text-label-sm font-bold text-secondary">1</button>
+<button class="px-2 py-0.5 rounded text-on-surface-variant font-label-sm text-label-sm hover:bg-surface-container-low">2</button>
+<button class="px-2 py-0.5 rounded text-on-surface-variant font-label-sm text-label-sm hover:bg-surface-container-low">3</button>
+<span class="text-on-surface-variant font-label-sm text-label-sm">...</span>
+<button class="px-2 py-0.5 rounded text-on-surface-variant font-label-sm text-label-sm hover:bg-surface-container-low">32</button>
+<button class="p-1 rounded bg-surface-container-low text-on-surface-variant hover:text-on-surface">
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: Terminal Telemetry & Live Anomaly Queue (approx 30% / 4 cols) -->
+<div class="lg:col-span-4 flex flex-col gap-space-md">
+<!-- Panel 1: Live Biometric Anomaly Resolution Queue -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-md flex flex-col gap-space-sm">
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-error text-[20px]">notification_important</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Anomaly Queue</span>
+</div>
+<span class="px-space-xs py-0.5 rounded bg-error-container text-on-error-container font-label-sm text-label-sm font-bold">
+            3 Action Items
+          </span>
+</div>
+<!-- Anomaly Item 1 -->
+<div class="p-space-sm rounded bg-surface-container-low flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-lg text-label-lg font-bold text-on-surface">Amit Deshpande</span>
+<span class="px-1.5 py-0.5 rounded bg-error-container text-error font-label-sm text-label-sm uppercase font-bold">Late In-Punch</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">
+            ID: BSC-EMP-0089 • Tailoring (SHI-03)<br/>
+            Arrived 14:02 IST (Shift standard 09:30 IST) without regularization ticket.
+          </div>
+<div class="flex items-center gap-space-xs mt-space-xs pt-space-xs">
+<button class="flex-1 py-1 px-space-xs rounded bg-surface-container font-label-sm text-label-sm text-on-surface font-semibold hover:bg-surface-container-high transition-colors">
+              Approve Half-Day
+            </button>
+<button class="flex-1 py-1 px-space-xs rounded bg-primary font-label-sm text-label-sm text-on-primary font-semibold hover:opacity-90 transition-opacity">
+              Waive Late Mark
+            </button>
+</div>
+</div>
+<!-- Anomaly Item 2 -->
+<div class="p-space-sm rounded bg-surface-container-low flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-lg text-label-lg font-bold text-on-surface">DAV-GATE-02 Turnstile</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-secondary font-label-sm text-label-sm uppercase font-bold">Passback Lock</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">
+            Duplicate tap detected within 1.2s on Card #DAV-9812.<br/>
+            Turnstile locked to prevent tailgating pass.
+          </div>
+<div class="flex items-center gap-space-xs mt-space-xs pt-space-xs">
+<button class="w-full py-1 px-space-xs rounded bg-surface-container-high font-label-sm text-label-sm text-secondary font-bold hover:bg-secondary-fixed transition-colors">
+              Clear Anti-Passback Lock
+            </button>
+</div>
+</div>
+<!-- Anomaly Item 3 -->
+<div class="p-space-sm rounded bg-surface-container-low flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-lg text-label-lg font-bold text-on-surface">Kavita M. (BSC-EMP-0144)</span>
+<span class="px-1.5 py-0.5 rounded bg-surface-container text-on-surface-variant font-label-sm text-label-sm uppercase font-bold">Low Facial Confidence</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">
+            BEL-IN-01 Match: 64% (Min req: 85%).<br/>
+            Passed with Security Guard supervisor override code.
+          </div>
+<div class="flex items-center gap-space-xs mt-space-xs pt-space-xs">
+<button class="w-full py-1 px-space-xs rounded bg-surface-container font-label-sm text-label-sm text-on-surface font-semibold hover:bg-surface-container-high transition-colors">
+              Re-enroll Biometric Face
+            </button>
+</div>
+</div>
+</div>
+<!-- Panel 2: Terminal Hardware Health & IoT Telemetry -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-md flex flex-col gap-space-sm">
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px]">memory</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">IoT Terminal Telemetry</span>
+</div>
+<span class="font-label-sm text-label-sm text-secondary font-bold">Active TCP/IP</span>
+</div>
+<div class="p-space-xs rounded bg-surface-container-low font-body-sm text-body-sm text-on-surface-variant">
+<div class="flex items-center justify-between">
+<span>Broker Host:</span>
+<span class="font-mono text-on-surface font-semibold text-label-sm">AWS ap-south-1</span>
+</div>
+<div class="flex items-center justify-between mt-1">
+<span>Local Gateway IP:</span>
+<span class="font-mono text-on-surface font-semibold text-label-sm">192.168.1.104</span>
+</div>
+</div>
+<div class="flex flex-col gap-space-xs">
+<!-- Terminal 1 -->
+<div class="flex items-center justify-between py-1 px-space-xs rounded hover:bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg font-bold text-on-surface">BEL-IN-01 (ProFace X)</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Firmware v4.2.1 • Optical 4K</span>
+</div>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-secondary font-bold">Online</span>
+<div class="font-body-sm text-body-sm text-on-surface-variant font-mono">100% Signal</div>
+</div>
+</div>
+<!-- Terminal 2 -->
+<div class="flex items-center justify-between py-1 px-space-xs rounded hover:bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg font-bold text-on-surface">BEL-IN-02 (SpeedFace V5L)</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Firmware v4.2.1 • Dual Lens</span>
+</div>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-secondary font-bold">Online</span>
+<div class="font-body-sm text-body-sm text-on-surface-variant font-mono">100% Signal</div>
+</div>
+</div>
+<!-- Terminal 3 -->
+<div class="flex items-center justify-between py-1 px-space-xs rounded hover:bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg font-bold text-on-surface">DAV-GATE-01 (BioStation 3)</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">AC Mains Powered • IP65 Seal</span>
+</div>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-secondary font-bold">Online</span>
+<div class="font-body-sm text-body-sm text-on-surface-variant font-mono">98% Signal</div>
+</div>
+</div>
+<!-- Terminal 4 -->
+<div class="flex items-center justify-between py-1 px-space-xs rounded hover:bg-surface-container-low">
+<div class="flex flex-col">
+<span class="font-label-lg text-label-lg font-bold text-on-surface">SHI-RETAIL-01 (SilkBio-101)</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Store LAN • Sync Buffer OK</span>
+</div>
+<div class="text-right">
+<span class="font-label-sm text-label-sm text-secondary font-bold">Online</span>
+<div class="font-body-sm text-body-sm text-on-surface-variant font-mono">14ms Latency</div>
+</div>
+</div>
+</div>
+<div class="pt-space-xs">
+<button class="w-full py-1.5 px-space-sm rounded bg-surface-container font-label-lg text-label-lg text-on-surface font-semibold hover:bg-surface-container-high transition-colors flex items-center justify-center gap-1">
+<span class="material-symbols-outlined text-[18px]">settings_input_component</span>
+<span>Configure Edge Gateways</span>
+</button>
+</div>
+</div>
+<!-- Panel 3: Karnataka Factories & Retail Compliance Bar -->
+<div class="bg-surface-container-lowest rounded-xl shadow-sm p-space-md flex flex-col gap-space-sm">
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-xs">
+<span class="material-symbols-outlined text-secondary text-[20px]">policy</span>
+<span class="font-headline-sm text-headline-sm text-on-surface">Karnataka Compliance</span>
+</div>
+<span class="font-label-sm text-label-sm text-secondary font-bold">Factories Act 1948</span>
+</div>
+<!-- Compliance metrics -->
+<div class="flex flex-col gap-space-sm">
+<div>
+<div class="flex items-center justify-between font-label-md text-label-md">
+<span class="text-on-surface-variant">Daily Max Working Hours (8.0h limit)</span>
+<span class="font-bold text-on-surface">99.1% Compliant</span>
+</div>
+<div class="w-full bg-surface-container-low h-1.5 rounded-full mt-1.5 overflow-hidden">
+<div class="bg-secondary h-full rounded-full" style="width: 99.1%"></div>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Max OT capped at 1.0 hr/day in Davanagere looms</span>
+</div>
+<div>
+<div class="flex items-center justify-between font-label-md text-label-md">
+<span class="text-on-surface-variant">Mandatory Rest Interval (45m tracker)</span>
+<span class="font-bold text-on-surface">98.4% On Schedule</span>
+</div>
+<div class="w-full bg-surface-container-low h-1.5 rounded-full mt-1.5 overflow-hidden">
+<div class="bg-secondary h-full rounded-full" style="width: 98.4%"></div>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Mid-day break enforcement active for Shift A</span>
+</div>
+</div>
+<div class="pt-space-xs">
+<button class="w-full py-2 px-space-sm rounded bg-surface-container-low text-secondary font-label-lg text-label-lg font-bold hover:bg-surface-container transition-colors flex items-center justify-center gap-space-xs">
+<span class="material-symbols-outlined text-[18px]">description</span>
+<span>Download Karnataka Form T Register</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</div></main></div></body></html>

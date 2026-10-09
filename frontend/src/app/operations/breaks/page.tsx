@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Coffee, Utensils, Clock, AlertTriangle, CheckCircle, 
   RefreshCw, MapPin, Search, StopCircle, UserCheck 
@@ -17,16 +17,7 @@ export default function BreaksOperationsPage() {
   const [loading, setLoading] = useState(true);
   const [nowTime, setNowTime] = useState(Date.now());
 
-  useEffect(() => {
-    const timer = setInterval(() => setNowTime(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
-    fetchData();
-  }, [selectedLocation]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       const [activeRes, rulesRes, locRes] = await Promise.all([
@@ -47,7 +38,16 @@ export default function BreaksOperationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedLocation]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleEndBreak = async (breakId: string, employeeName: string) => {
     try {

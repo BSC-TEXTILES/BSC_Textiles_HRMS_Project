@@ -1,7 +1,7 @@
 import type { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -12,20 +12,47 @@ export const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
+        console.log('[NextAuth] authorize called with:', credentials?.email);
         if (!credentials?.email || !credentials?.password) {
           throw new Error('Email and password are required');
         }
 
-        const response = await fetch(`${API_URL}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: credentials.email,
-            password: credentials.password,
-          }),
-        });
+        let response: Response;
+        try {
+          response = await fetch(`${API_URL}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: credentials.email,
+              password: credentials.password,
+            }),
+          });
+        } catch (fetchErr: any) {
+          // If localhost failed (e.g. IPv6 ::1 issue), retry with 127.0.0.1
+          if (API_URL.includes('localhost')) {
+            const fallbackUrl = API_URL.replace('localhost', '127.0.0.1');
+            try {
+              response = await fetch(`${fallbackUrl}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  email: credentials.email,
+                  password: credentials.password,
+                }),
+              });
+            } catch (err2: any) {
+              console.error('[NextAuth] Connection error:', err2.message);
+              throw new Error('Could not connect to authentication server. Please ensure backend is running on port 4000.');
+            }
+          } else {
+            console.error('[NextAuth] Connection error:', fetchErr.message);
+            throw new Error('Could not connect to authentication server. Please ensure backend is running on port 4000.');
+          }
+        }
 
         const data = await response.json().catch(() => ({}));
+
+        console.log('[NextAuth] Backend response:', { ok: response.ok, hasUser: !!data?.user, hasToken: !!data?.token });
 
         if (!response.ok || !data?.user) {
           throw new Error(data?.error || 'Invalid email or password');
@@ -53,6 +80,7 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     async jwt({ token, user }) {
+      console.log('[NextAuth] jwt callback:', { hasToken: !!token, hasUser: !!user });
       if (user) {
         token.id = user.id;
         token.role = user.role;
@@ -64,16 +92,20 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id;
-        session.user.role = token.role;
-        session.user.permissions = token.permissions;
-        session.user.locationId = token.locationId;
-        session.user.employeeId = token.employeeId;
+      console.log('[NextAuth] session callback:', { hasSession: !!session, hasToken: !!token });
+      if (token && token.id) {
+        session.user = {
+          ...session.user,
+          id: token.id,
+          role: token.role,
+          permissions: token.permissions,
+          locationId: token.locationId,
+          employeeId: token.employeeId,
+        };
       }
       session.token = token.token;
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.NEXTAUTH_SECRET || 'bsc-textiles-hrms-super-secret-jwt-key-2024-production-ready-32chars',
 };

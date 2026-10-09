@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { 
   MessageSquare, Plus, Search, Filter, Eye, Edit, Trash2,
   CheckCircle, AlertCircle, Star, Flag, BookOpen, Video,
@@ -112,7 +112,7 @@ export default function ObservationsPage() {
     photoUrl: '',
   });
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ locationId });
@@ -130,11 +130,11 @@ export default function ObservationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [locationId, statusFilter, typeFilter]);
 
   useEffect(() => {
     fetchData();
-  }, [locationId, statusFilter, typeFilter]);
+  }, [fetchData]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -57,7 +57,7 @@ export async function runPermissionsAndLocationTests(
     }
   });
 
-  await runTest('Shivamogga HR only sees Shivamogga employees; cannot view Belagavi or Hubballi', async () => {
+  await runTest('Shivamogga HR only sees Shivamogga employees; cannot view Belagavi or Davanagere', async () => {
     const res = await fetch(`${baseUrl}/api/employees?limit=50`, {
       headers: { Authorization: `Bearer ${shivamoggaHrToken}` },
     });

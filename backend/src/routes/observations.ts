@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { ReactionType } from '@prisma/client';
 import { prisma } from '../index.js';
+import { ReactionType } from '../db.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
 
@@ -124,6 +124,59 @@ router.post('/', authorize('ADD'), validate(obsSchema), async (req: AuthRequest,
   }
 });
 
+router.get('/levels', authorize('VIEW'), async (req: AuthRequest, res) => {
+  const levels = [
+    { id: 'EXCELLENT', code: 'EXCELLENT', name: 'Excellent', score: 5, color: '#059669', requiresAction: false },
+    { id: 'VERY_GOOD', code: 'VERY_GOOD', name: 'Very Good', score: 4, color: '#2563eb', requiresAction: false },
+    { id: 'GOOD', code: 'GOOD', name: 'Good', score: 3, color: '#7c3aed', requiresAction: false },
+    { id: 'NEEDS_IMPROVEMENT', code: 'NEEDS_IMPROVEMENT', name: 'Needs Improvement', score: 2, color: '#d97706', requiresAction: true },
+    { id: 'CRITICAL', code: 'CRITICAL', name: 'Critical', score: 1, color: '#dc2626', requiresAction: true },
+  ];
+  res.json({ levels, total: levels.length });
+});
+
+router.patch('/:id', authorize('EDIT'), async (req: AuthRequest, res) => {
+  try {
+    const existing = await prisma.observation.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Observation not found' });
+    }
+
+    if (req.user!.role !== 'SUPER_ADMIN' && existing.locationId !== req.user!.locationId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const allowedFields = ['status', 'actionRequired', 'assignedToId', 'dueDate', 'level', 'observationType', 'description', 'score'];
+    const updateData: any = {};
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) updateData[field] = req.body[field];
+    }
+    if (updateData.dueDate) updateData.dueDate = new Date(updateData.dueDate);
+
+    const observation = await prisma.observation.update({
+      where: { id: req.params.id },
+      data: updateData,
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.id,
+        locationId: existing.locationId,
+        action: 'UPDATE',
+        entityType: 'Observation',
+        entityId: existing.id,
+        oldValue: { status: existing.status } as any,
+        newValue: { status: updateData.status ?? existing.status } as any,
+      },
+    });
+
+    res.json(observation);
+  } catch (error) {
+    console.error('Patch observation error:', error);
+    res.status(500).json({ error: 'Failed to update observation' });
+  }
+});
+
 router.put('/:id', authorize('EDIT'), async (req: AuthRequest, res) => {
   try {
     const existing = await prisma.observation.findUnique({ where: { id: req.params.id } });
@@ -135,7 +188,7 @@ router.put('/:id', authorize('EDIT'), async (req: AuthRequest, res) => {
       return res.status(403).json({ error: 'Access denied' });
     }
     
-    const { status, actionRequired, assignedToId, dueDate, ...rest } = req.body;
+    const { status, locationId, actionRequired, assignedToId, dueDate, ...rest } = req.body;
     const updateData: any = { ...rest };
     if (status) updateData.status = status;
     if (actionRequired) updateData.actionRequired = actionRequired;

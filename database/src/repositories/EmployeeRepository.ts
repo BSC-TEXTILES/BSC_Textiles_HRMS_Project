@@ -2,50 +2,48 @@ import { query, queryOne } from '../pool.js';
 
 export interface EmployeeRow {
   id: string;
-  employee_code: string;
-  full_name: string;
-  gender: string;
-  phone: string | null;
+  employeeCode: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
   email: string | null;
-  location_id: string;
-  floor_id: string | null;
-  department_id: string | null;
-  section_id: string | null;
-  selling_point_id: string | null;
-  shift_id: string | null;
-  base_salary: number;
-  face_enrollment_url: string | null;
+  phone: string | null;
+  gender: string | null;
+  locationId: string;
+  floorId: string | null;
+  departmentId: string | null;
+  sectionId: string | null;
+  shiftId: string | null;
+  designation: string | null;
+  role: string;
   status: string;
-  date_of_joining: Date | null;
-  created_at: Date;
-  updated_at: Date;
+  joiningDate: Date;
+  exitDate: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
+
+const COLUMNS = `id, employeeCode, firstName, lastName, fullName, email, phone, gender,
+        locationId, floorId, departmentId, sectionId, shiftId, designation, role, status,
+        joiningDate, exitDate, createdAt, updatedAt`;
 
 export class EmployeeRepository {
   static async findById(id: string): Promise<EmployeeRow | null> {
-    return queryOne<EmployeeRow>(
-      `SELECT * FROM employees WHERE id = ? LIMIT 1`,
-      [id]
-    );
+    return queryOne<EmployeeRow>(`SELECT ${COLUMNS} FROM Employee WHERE id = ? LIMIT 1`, [id]);
   }
 
   static async findByCode(code: string): Promise<EmployeeRow | null> {
-    return queryOne<EmployeeRow>(
-      `SELECT * FROM employees WHERE employee_code = ? LIMIT 1`,
-      [code]
-    );
+    return queryOne<EmployeeRow>(`SELECT ${COLUMNS} FROM Employee WHERE employeeCode = ? LIMIT 1`, [code]);
   }
 
   static async listByLocation(locationId: string): Promise<EmployeeRow[]> {
     return query<EmployeeRow>(
-      `SELECT * FROM employees WHERE location_id = ? ORDER BY full_name ASC`,
+      `SELECT ${COLUMNS} FROM Employee WHERE locationId = ? ORDER BY fullName ASC`,
       [locationId]
     );
   }
 
   static async listAll(): Promise<EmployeeRow[]> {
-    return query<EmployeeRow>(
-      `SELECT * FROM employees ORDER BY employee_code ASC`
-    );
+    return query<EmployeeRow>(`SELECT ${COLUMNS} FROM Employee ORDER BY employeeCode ASC`);
   }
 }

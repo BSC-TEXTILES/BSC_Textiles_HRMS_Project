@@ -640,7 +640,7 @@ router.post('/bulk', authorize('RECORD'), async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'Records array is required' });
     }
     
-    const results = [];
+    const results: any[] = [];
     for (const record of records) {
       try {
         // Process each record similar to single create

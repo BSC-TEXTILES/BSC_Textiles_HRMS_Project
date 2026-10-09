@@ -1,14 +1,15 @@
 import { query } from '../pool.js';
 
-export interface FaceVerificationLogRow {
+export interface FaceVerificationRow {
   id: string;
-  employee_id: string;
-  location_id: string;
-  match_confidence: number;
-  threshold_used: number;
-  status: 'VERIFIED' | 'FAILED';
-  captured_image_url: string | null;
-  verified_at: Date;
+  employeeId: string;
+  locationId: string;
+  deviceId: string | null;
+  verifiedAt: Date;
+  matchPercentage: number;
+  threshold: number;
+  result: 'VERIFIED' | 'FAILED';
+  purpose: string | null;
 }
 
 export class FaceRepository {
@@ -16,24 +17,24 @@ export class FaceRepository {
     id: string,
     employeeId: string,
     locationId: string,
-    confidence: number,
+    matchPercentage: number,
     threshold: number,
-    status: 'VERIFIED' | 'FAILED',
-    imageUrl?: string
+    result: 'VERIFIED' | 'FAILED',
+    purpose: string = 'attendance',
+    deviceId?: string
   ): Promise<void> {
     await query(
-      `INSERT INTO face_verification_logs 
-       (id, employee_id, location_id, match_confidence, threshold_used, status, captured_image_url, verified_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NOW(3))`,
-      [id, employeeId, locationId, confidence, threshold, status, imageUrl || null]
+      `INSERT INTO FaceVerification (id, employeeId, locationId, deviceId, matchPercentage, threshold, result, purpose, verifiedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(3))`,
+      [id, employeeId, locationId, deviceId || null, matchPercentage, threshold, result, purpose]
     );
   }
 
-  static async getRecentLogs(employeeId: string, limit: number = 10): Promise<FaceVerificationLogRow[]> {
-    return query<FaceVerificationLogRow>(
-      `SELECT * FROM face_verification_logs 
-       WHERE employee_id = ? 
-       ORDER BY verified_at DESC 
+  static async getRecentLogs(employeeId: string, limit: number = 10): Promise<FaceVerificationRow[]> {
+    return query<FaceVerificationRow>(
+      `SELECT * FROM FaceVerification
+       WHERE employeeId = ?
+       ORDER BY verifiedAt DESC
        LIMIT ?`,
       [employeeId, limit]
     );

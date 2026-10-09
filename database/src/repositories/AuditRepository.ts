@@ -2,16 +2,16 @@ import { query } from '../pool.js';
 
 export interface AuditLogRow {
   id: string;
-  user_id: string;
-  location_id: string | null;
+  userId: string;
+  locationId: string | null;
   action: string;
-  entity_type: string;
-  entity_id: string;
-  old_value: any;
-  new_value: any;
-  ip_address: string | null;
-  user_agent: string | null;
-  created_at: Date;
+  entityType: string;
+  entityId: string;
+  oldValue: unknown;
+  newValue: unknown;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: Date;
 }
 
 export class AuditRepository {
@@ -22,14 +22,14 @@ export class AuditRepository {
     action: string,
     entityType: string,
     entityId: string,
-    oldValue: any = null,
-    newValue: any = null,
+    oldValue: unknown = null,
+    newValue: unknown = null,
     ipAddress: string | null = null,
     userAgent: string | null = null
   ): Promise<void> {
     await query(
-      `INSERT INTO audit_logs 
-       (id, user_id, location_id, action, entity_type, entity_id, old_value, new_value, ip_address, user_agent, created_at)
+      `INSERT INTO AuditLog
+       (id, userId, locationId, action, entityType, entityId, oldValue, newValue, ipAddress, userAgent, createdAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3))`,
       [
         id,
@@ -38,8 +38,8 @@ export class AuditRepository {
         action,
         entityType,
         entityId,
-        oldValue ? JSON.stringify(oldValue) : null,
-        newValue ? JSON.stringify(newValue) : null,
+        oldValue != null ? JSON.stringify(oldValue) : null,
+        newValue != null ? JSON.stringify(newValue) : null,
         ipAddress,
         userAgent,
       ]
@@ -47,9 +47,6 @@ export class AuditRepository {
   }
 
   static async listRecent(limit: number = 50): Promise<AuditLogRow[]> {
-    return query<AuditLogRow>(
-      `SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT ?`,
-      [limit]
-    );
+    return query<AuditLogRow>(`SELECT * FROM AuditLog ORDER BY createdAt DESC LIMIT ?`, [limit]);
   }
 }

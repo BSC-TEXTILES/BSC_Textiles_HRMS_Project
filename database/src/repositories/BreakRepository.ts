@@ -2,23 +2,22 @@ import { query, queryOne } from '../pool.js';
 
 export interface BreakRow {
   id: string;
-  employee_id: string;
-  attendance_id: string;
-  type: 'LUNCH' | 'TEA' | 'OTHER';
+  employeeId: string;
+  breakType: 'LUNCH' | 'TEA' | 'OTHER';
+  breakDate: string;
+  startTime: Date | null;
+  endTime: Date | null;
+  allowedDuration: number;
+  actualDuration: number | null;
+  excessDuration: number | null;
   status: 'NOT_STARTED' | 'ACTIVE' | 'COMPLETED' | 'EXCEEDED' | 'MANUALLY_ADJUSTED';
-  start_time: Date;
-  end_time: Date | null;
-  allocated_minutes: number;
-  actual_duration_seconds: number;
-  overrun_seconds: number;
-  overrun_penalty: number;
-  qr_scan_id: string | null;
+  qrScanId: string | null;
 }
 
 export class BreakRepository {
   static async getActiveBreak(employeeId: string): Promise<BreakRow | null> {
     return queryOne<BreakRow>(
-      `SELECT * FROM breaks WHERE employee_id = ? AND status = 'ACTIVE' LIMIT 1`,
+      `SELECT * FROM EmployeeBreak WHERE employeeId = ? AND status = 'ACTIVE' LIMIT 1`,
       [employeeId]
     );
   }
@@ -26,29 +25,28 @@ export class BreakRepository {
   static async startBreak(
     id: string,
     employeeId: string,
-    attendanceId: string,
-    type: 'LUNCH' | 'TEA' | 'OTHER',
-    allocatedMinutes: number,
+    breakType: 'LUNCH' | 'TEA' | 'OTHER',
+    allowedDurationMinutes: number,
     qrScanId?: string
   ): Promise<void> {
     await query(
-      `INSERT INTO breaks (id, employee_id, attendance_id, type, status, start_time, allocated_minutes, qr_scan_id)
-       VALUES (?, ?, ?, ?, 'ACTIVE', NOW(3), ?, ?)`,
-      [id, employeeId, attendanceId, type, allocatedMinutes, qrScanId || null]
+      `INSERT INTO EmployeeBreak (id, employeeId, breakType, breakDate, startTime, allowedDuration, status, qrScanId)
+       VALUES (?, ?, ?, CURDATE(), NOW(3), ?, 'ACTIVE', ?)`,
+      [id, employeeId, breakType, allowedDurationMinutes, qrScanId || null]
     );
   }
 
   static async endBreak(
     breakId: string,
     durationSeconds: number,
-    overrunSeconds: number,
-    overrunPenalty: number
+    excessSeconds: number,
+    status: 'COMPLETED' | 'EXCEEDED'
   ): Promise<void> {
     await query(
-      `UPDATE breaks 
-       SET status = 'COMPLETED', end_time = NOW(3), actual_duration_seconds = ?, overrun_seconds = ?, overrun_penalty = ?
+      `UPDATE EmployeeBreak
+       SET status = ?, endTime = NOW(3), actualDuration = ?, excessDuration = ?
        WHERE id = ?`,
-      [durationSeconds, overrunSeconds, overrunPenalty, breakId]
+      [status, durationSeconds, excessSeconds, breakId]
     );
   }
 }

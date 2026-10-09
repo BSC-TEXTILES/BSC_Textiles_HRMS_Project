@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_dashboard" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,600;0,700;1,400&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "secondary-container": "#2170e4", "surface-container-high": "#dce9ff", "on-tertiary-fixed-variant": "#6e3900", "on-tertiary-fixed": "#2f1500", "primary-container": "#131b2e", "surface-variant": "#d3e4fe", "on-secondary-container": "#fefcff", "primary-fixed-dim": "#bec6e0", "on-secondary-fixed-variant": "#004395", "on-primary": "#ffffff", "secondary-fixed": "#d8e2ff", "surface-container-low": "#eff4ff", "on-error": "#ffffff", "on-tertiary-container": "#c76c00", "surface-tint": "#565e74", "on-primary-fixed": "#131b2e", "on-secondary-fixed": "#001a42", "tertiary-fixed-dim": "#ffb77d", "inverse-surface": "#213145", "surface-container-lowest": "#ffffff", "background": "#f8f9ff", "surface-container-highest": "#d3e4fe", "secondary": "#0058be", "surface": "#f8f9ff", "on-secondary": "#ffffff", "on-error-container": "#93000a", "surface-container": "#e5eeff", "surface-dim": "#cbdbf5", "error": "#ba1a1a", "error-container": "#ffdad6", "tertiary-container": "#2f1500", "tertiary": "#000000", "on-primary-fixed-variant": "#3f465c", "primary": "#000000", "on-surface-variant": "#45464d", "inverse-primary": "#bec6e0", "inverse-on-surface": "#eaf1ff", "on-tertiary": "#ffffff", "primary-fixed": "dae2fd", "secondary-fixed-dim": "#adc6ff", "on-surface": "#0b1c30", "on-primary-container": "#7c839b", "surface-bright": "#f8f9ff", "tertiary-fixed": "#ffdcc3", "outline": "#76777d", "on-background": "#0b1c30", "outline-variant": "#c6c6cd" }, "borderRadius": { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" }, "spacing": { "space-xl": "1.5rem", "gutter": "1rem", "margin": "1.5rem", "space-2xl": "2rem", "space-lg": "1rem", "space-sm": "0.5rem", "margin-lg": "2rem", "gutter-lg": "1.5rem", "space-xs": "0.25rem", "space-md": "0.75rem" }, "fontFamily": { "headline-md": ["Plus Jakarta Sans"], "label-md": ["Plus Jakarta Sans"], "headline-lg": ["Plus Jakarta Sans"], "headline-sm": ["Plus Jakarta Sans"], "label-lg": ["Plus Jakarta Sans"], "label-sm": ["Plus Jakarta Sans"], "body-md": ["Plus Jakarta Sans"], "display-lg": ["Plus Jakarta Sans"], "body-sm": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"] }, "fontSize": { "headline-md": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }], "label-md": ["11px", { "lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "600" }], "headline-lg": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.015em", "fontWeight": "600" }], "headline-sm": ["16px", { "lineHeight": "24px", "letterSpacing": "-0.005em", "fontWeight": "600" }], "label-lg": ["13px", { "lineHeight": "16px", "letterSpacing": "0.01em", "fontWeight": "600" }], "label-sm": ["10px", { "lineHeight": "12px", "letterSpacing": "0.06em", "fontWeight": "700" }], "body-md": ["13px", { "lineHeight": "18px", "fontWeight": "400" }], "display-lg": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.02em", "fontWeight": "700" }], "body-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }], "body-lg": ["15px", { "lineHeight": "22px", "fontWeight": "400" }] } } } };</script></head><body class="bg-background font-body-md text-on-surface antialiased"><aside class="fixed left-0 top-0 h-full w-64 bg-surface-container-lowest shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-50 flex flex-col justify-between overflow-y-auto"><div class="flex flex-col"><div class="h-14 flex items-center gap-space-sm px-margin bg-surface-container-lowest"><img alt="BSC Textiles HRMS Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBVH-y2iZ7yaWx6Q6YdmCHl5vkuKf05I_tvVHXVmfcUPbGtp_kwuvSAA6xrLyvKJHBNWbsKAe9w2IVjozxX7H1lJp-QjrcIHW9eZzcLHERrm1drSgbM7tnMjOxun2eDUY0Z7MD95iXYT3uCEmzqt88rmLfdZES7ZnfHodPxWD1vFb9iZAjw75H43SyIc1YyF2g7zpDhy4idpDfo40BeesriCLNRd9xeLnJTvyUFLuRMJMuXeerzo-5b"/><div class="flex flex-col"><span class="font-headline-sm text-headline-sm text-on-surface leading-none tracking-tight">BSC Textiles</span><span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">HRMS Portal</span></div></div><nav class="flex flex-col gap-space-xs px-space-sm py-space-md" data-active-classes="bg-surface-container text-secondary font-label-lg font-bold"><div class="px-space-md pt-space-xs pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Core Operations</div><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="dashboard" href="#"><span class="material-symbols-outlined text-[20px]">grid_view</span><span>Executive Dashboard</span></a><div class="px-space-md pt-space-md pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Workforce Directory</div><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="employee-roster" href="#"><span class="material-symbols-outlined text-[20px]">badge</span><span>All Employees</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="employee-profile" href="#"><span class="material-symbols-outlined text-[20px]">person_search</span><span>Profile 360 &amp; Dossier</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="organization-units" href="#"><span class="material-symbols-outlined text-[20px]">corporate_fare</span><span>Departments &amp; Units</span></a><div class="px-space-md pt-space-md pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Time &amp; Attendance</div><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="daily-punches" href="#"><span class="material-symbols-outlined text-[20px]">fingerprint</span><span>Biometric Punches</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="shifts-rosters" href="#"><span class="material-symbols-outlined text-[20px]">calendar_view_week</span><span>Floor Shifts &amp; Rosters</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="break-tracker" href="#"><span class="material-symbols-outlined text-[20px]">coffee</span><span>Lunch &amp; Break Tracker</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="attendance-corrections" href="#"><span class="material-symbols-outlined text-[20px]">edit_calendar</span><span>Punch Corrections</span></a><div class="px-space-md pt-space-md pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Leave &amp; Payroll</div><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="leave-management" href="#"><span class="material-symbols-outlined text-[20px]">event_busy</span><span>Leave Approvals</span></a><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="payroll-processing" href="#"><span class="material-symbols-outlined text-[20px]">payments</span><span>Payroll &amp; Payslips</span></a><div class="px-space-md pt-space-md pb-space-xs font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Governance</div><a class="flex items-center gap-space-md px-space-md py-space-sm rounded-lg text-on-surface-variant hover:bg-surface-container-low hover:text-on-surface transition-colors font-label-lg text-label-lg" data-path="audit-logs" href="#"><span class="material-symbols-outlined text-[20px]">rule</span><span>Audit Logs &amp; Security</span></a></nav></div><div class="p-space-md bg-surface-container-low m-space-sm rounded-xl"><div class="flex items-center justify-between mb-space-xs"><span class="font-label-sm text-label-sm uppercase text-on-surface-variant">Biometric Server</span><span class="flex h-2 w-2 relative"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span></span></div><div class="font-label-md text-label-md text-on-surface font-bold">Synced Live</div><div class="font-body-sm text-body-sm text-on-surface-variant">99.8% Terminal Uptime</div></div></aside><div class="pl-64"><header class="fixed top-0 left-64 right-0 h-14 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)] z-40 flex items-center justify-between px-margin-lg"><div class="flex items-center gap-space-lg flex-1 max-w-2xl"><div class="relative flex items-center bg-surface-container-low rounded-lg px-space-md py-space-xs"><span class="material-symbols-outlined text-secondary text-[18px] mr-space-xs">pin_drop</span><select class="bg-transparent font-label-lg text-label-lg text-on-surface focus:outline-none cursor-pointer pr-space-sm"><option value="all">All Hubs (Karnataka)</option><option value="bel">Belagavi Spinning Mill (BEL)</option><option value="dav">Davanagere Weaving Hub (DAV)</option><option value="shi">Shivamogga Retail Apex (SHI)</option></select></div><div class="relative flex-1 flex items-center bg-surface-container-lowest rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.02)] px-space-md py-space-xs"><span class="material-symbols-outlined text-on-surface-variant text-[20px] mr-space-xs">search</span><input class="w-full bg-transparent font-body-md text-body-md text-on-surface placeholder:text-on-surface-variant focus:outline-none" placeholder="Search by ID (e.g. BSC-4029), Name, Dept, or Phone..." type="text"/></div></div><div class="flex items-center gap-space-md"><div class="flex flex-col text-right pr-space-sm hidden md:flex"><div class="flex items-center gap-space-xs justify-end"><span class="material-symbols-outlined text-[14px] text-secondary">schedule</span><span class="font-label-lg text-label-lg text-on-surface font-bold">14:22:08 IST</span></div><span class="font-body-sm text-body-sm text-on-surface-variant">24 Oct 2024 • Shift A</span></div><div class="relative flex items-center justify-center p-space-xs rounded-lg hover:bg-surface-container-high transition-colors cursor-pointer"><span class="material-symbols-outlined text-on-surface-variant text-[22px]">notifications</span><span class="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-error text-on-error font-label-sm text-[9px] font-bold">3</span></div><div class="flex items-center gap-space-sm pl-space-sm"><div class="flex flex-col text-right hidden sm:flex"><span class="font-label-lg text-label-lg text-on-surface font-bold">S. B. Angadi</span><span class="font-label-sm text-label-sm uppercase tracking-wide text-on-surface-variant">HR Director • Super Admin</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="w-full pt-14 px-margin-lg py-space-xl bg-background"><div class="flex flex-col w-full gap-space-lg">
+<!-- Executive Header Profile Banner -->
+<section class="relative w-full rounded-2xl bg-surface-container-lowest shadow-sm p-space-lg overflow-hidden">
+<div class="absolute -right-16 -top-16 w-80 h-80 rounded-full bg-secondary-fixed/30 blur-3xl pointer-events-none"></div>
+<div class="relative flex flex-col xl:flex-row xl:items-center justify-between gap-space-lg">
+<!-- Profile Identification -->
+<div class="flex items-start md:items-center gap-space-lg flex-1">
+<div class="relative flex-shrink-0">
+<img class="w-16 h-16 md:w-20 md:h-20 rounded-xl object-cover shadow-sm bg-surface-container-low" data-alt="Corporate headshot of an Indian woman merchandiser with neatly tied hair wearing formal retail attire in an elegant textile store ambiance with soft lighting and subtle blue undertones" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDd169GTGt-sXwaEQ0p1YLuEiqa9rMlRfH-zUeBVo6_CG-RtcY57x3gh7LcKsFAqwhIe-8opj7DWeBzyTL7jSMA8DCokR9I2U0XF1XObZO0O8VuIDZ4i-3yIUJR6t3tVz3jt0bEMbEUvxWjs2hcHJ1pcGPHptTA-ySIhtxXq5kpBZ-A7kRYhbdM_FxmHW18pdf__vrhmNSi8mgzA3qs82DSEihua5kZ3GkMSP9N9dmenZMWo68U6zeU"/>
+<span class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-secondary-container flex items-center justify-center ring-2 ring-surface-container-lowest">
+<span class="w-2 h-2 rounded-full bg-surface-container-lowest animate-pulse"></span>
+</span>
+</div>
+<div class="flex flex-col gap-space-xs">
+<div class="flex flex-wrap items-center gap-space-xs">
+<h1 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">Welcome back, Rajeshwari!</h1>
+<span class="inline-flex items-center px-space-sm py-0.5 rounded-lg bg-surface-container-low text-secondary font-label-sm text-label-sm uppercase tracking-wider font-bold">BSC-EMP-0042 • Permanent</span>
+<span class="inline-flex items-center px-space-sm py-0.5 rounded-lg bg-surface-container-high text-on-surface font-label-sm text-label-sm">Belagavi Flagship (BEL-01)</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant flex flex-wrap items-center gap-x-space-md gap-y-1">
+<span class="flex items-center gap-1 text-on-surface font-semibold">
+<span class="material-symbols-outlined text-[16px] text-secondary">styler</span> Bridal &amp; Silk Atelier • Level 1 Lead
+            </span>
+<span class="text-outline-variant">•</span>
+<span>Reports to: <strong class="text-on-surface font-medium">Anand Kulkarni</strong> (Floor Manager)</span>
+<span class="text-outline-variant">•</span>
+<span>Shift: <strong class="text-on-surface font-medium">Retail A (09:30 – 18:30)</strong></span>
+<span class="text-outline-variant">•</span>
+<span>Weekly Off: <strong class="text-secondary font-semibold">Tuesday</strong></span>
+</p>
+<div class="flex items-center gap-space-md pt-1">
+<div class="flex items-center gap-space-xs text-on-surface-variant font-label-md text-label-md">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span>Clocked In: <strong>09:28 AM</strong> (BEL-IN-02 RFID)</span>
+</div>
+<span class="text-outline-variant">•</span>
+<div class="flex items-center gap-space-xs text-on-surface-variant font-label-md text-label-md">
+<span class="material-symbols-outlined text-[14px] text-secondary">wifi</span>
+<span>Terminal Synced • 14:22:08 IST</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Header Primary Quick CTA Group -->
+<div class="flex flex-wrap items-center gap-space-sm self-start xl:self-center">
+<button class="px-space-md py-space-sm bg-primary text-on-primary rounded-lg font-label-lg text-label-lg flex items-center gap-space-xs hover:bg-surface-tint transition-all shadow-sm" id="clockOutBtn" onclick="toggleClockModal()">
+<span class="material-symbols-outlined text-[18px]">logout</span>
+<span>Clock Out / Shift End</span>
+</button>
+<button class="px-space-md py-space-sm bg-surface-container-lowest text-on-surface rounded-lg font-label-lg text-label-lg flex items-center gap-space-xs hover:bg-surface-container-low transition-colors shadow-sm" onclick="openPunchModal()">
+<span class="material-symbols-outlined text-[18px] text-secondary">edit_calendar</span>
+<span>Punch Regularization</span>
+</button>
+<button class="px-space-md py-space-sm bg-secondary text-on-secondary rounded-lg font-label-lg text-label-lg flex items-center gap-space-xs hover:bg-secondary-container transition-all shadow-sm" onclick="openLeaveModal()">
+<span class="material-symbols-outlined text-[18px]">add_circle</span>
+<span>Apply Leave</span>
+</button>
+</div>
+</div>
+</section>
+<!-- 3 Hero Cards Bento: Attendance Pace, Break Tracker, Self-Service Hub -->
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
+<!-- Card 1: Today's Shift Velocity (4 cols) -->
+<div class="lg:col-span-4 rounded-xl bg-surface-container-lowest shadow-sm p-space-lg flex flex-col justify-between relative overflow-hidden">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">timer</span>
+</div>
+<div>
+<div class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Daily Floor Cadence</div>
+<div class="font-headline-sm text-headline-sm text-on-surface">Shift A Progress</div>
+</div>
+</div>
+<span class="px-space-sm py-0.5 rounded-full bg-surface-container-low text-secondary font-label-sm text-label-sm font-bold flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-secondary"></span> 100% Adherence
+        </span>
+</div>
+<div class="my-space-md flex flex-col gap-space-sm">
+<div class="flex items-baseline justify-between">
+<span class="font-display-lg text-display-lg text-on-surface font-bold tracking-tight">4h 54m</span>
+<span class="font-label-lg text-label-lg text-on-surface-variant">of 8h 00m Shift Target</span>
+</div>
+<!-- Custom Graphical Shift Bar -->
+<div class="w-full bg-surface-container rounded-full h-3 overflow-hidden p-0.5 flex items-center">
+<div class="bg-secondary h-full rounded-full transition-all duration-700" style="width: 61.25%;"></div>
+</div>
+<div class="flex items-center justify-between font-label-sm text-label-sm text-on-surface-variant pt-1">
+<span>In: 09:28 AM (2m Early)</span>
+<span class="font-bold text-on-surface">61% Elapsed</span>
+<span>Target Out: 18:30 PM</span>
+</div>
+</div>
+<div class="pt-space-sm bg-surface-container-low/60 -mx-space-lg -mb-space-lg p-space-md flex items-center justify-between">
+<div class="flex items-center gap-space-xs font-body-sm text-body-sm text-on-surface">
+<span class="material-symbols-outlined text-[16px] text-secondary">verified_user</span>
+<span>Biometric Token BEL-RFID-99</span>
+</div>
+<span class="font-label-md text-label-md text-secondary font-bold">On Schedule</span>
+</div>
+</div>
+<!-- Card 2: Statutory Break Console (4 cols) -->
+<div class="lg:col-span-4 rounded-xl bg-surface-container-lowest shadow-sm p-space-lg flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-lg bg-surface-container-high flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">restaurant</span>
+</div>
+<div>
+<div class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Karnataka Shops Act 1961</div>
+<div class="font-headline-sm text-headline-sm text-on-surface">Breaks &amp; Well-being</div>
+</div>
+</div>
+<span class="font-label-sm text-label-sm uppercase px-space-xs py-0.5 rounded bg-surface-container-low text-secondary font-bold">0 Breaches</span>
+</div>
+<!-- Lunch & Tea Breakdown -->
+<div class="flex flex-col gap-space-sm my-space-sm">
+<!-- Lunch Break Item -->
+<div class="p-space-sm rounded-lg bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[20px] text-secondary">lunch_dining</span>
+<div>
+<div class="font-label-lg text-label-lg text-on-surface font-semibold">Lunch Quota (45m Statutory)</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Logged: 13:15 – 13:57 (42 mins)</div>
+</div>
+</div>
+<span class="px-space-xs py-0.5 rounded bg-surface-container text-secondary font-label-sm text-label-sm font-bold">Completed</span>
+</div>
+<!-- Afternoon Tea Break Item -->
+<div class="p-space-sm rounded-lg bg-surface-container-lowest shadow-sm flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-[20px] text-on-surface-variant">coffee</span>
+<div>
+<div class="font-label-lg text-label-lg text-on-surface font-semibold">Afternoon Tea Quota (15m)</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Scheduled: 16:30 – 16:45 IST</div>
+</div>
+</div>
+<button class="px-space-sm py-1 rounded bg-secondary-container text-on-secondary font-label-sm text-label-sm font-semibold hover:opacity-90 transition-opacity" id="teaBreakBtn" onclick="toggleTeaBreak()">
+            Log Tea Break
+          </button>
+</div>
+</div>
+<div class="flex items-center justify-between pt-space-xs">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Floor Coverage Lead: P. Nayak on stand-by</span>
+<span class="font-label-md text-label-md text-on-surface font-bold">3m Quota Saved</span>
+</div>
+</div>
+<!-- Card 3: Quick Action Hub & Custody Assets (4 cols) -->
+<div class="lg:col-span-4 rounded-xl bg-surface-container-lowest shadow-sm p-space-lg flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">bolt</span>
+</div>
+<div>
+<div class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Self-Service Hub</div>
+<div class="font-headline-sm text-headline-sm text-on-surface">Floor Shortcuts</div>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline-variant text-[18px]">verified</span>
+</div>
+<div class="grid grid-cols-2 gap-space-xs my-space-sm">
+<button class="p-space-sm rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors flex flex-col text-left group" onclick="downloadPayslipDirect()">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:scale-110 transition-transform">receipt_long</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold mt-1">Oct Payslip</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">₹50,940 Disbursed</span>
+</button>
+<button class="p-space-sm rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors flex flex-col text-left group" onclick="openPunchModal()">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:scale-110 transition-transform">fingerprint</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold mt-1">Punch Correction</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Regularize Logs</span>
+</button>
+<button class="p-space-sm rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors flex flex-col text-left group" onclick="openAssetsModal()">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:scale-110 transition-transform">devices</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold mt-1">Custody Assets</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Zebra TC52 • Locker</span>
+</button>
+<button class="p-space-sm rounded-lg bg-surface-container-low hover:bg-surface-container transition-colors flex flex-col text-left group" onclick="openDossierModal()">
+<span class="material-symbols-outlined text-[20px] text-secondary group-hover:scale-110 transition-transform">assignment_ind</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold mt-1">ID &amp; Dossier</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Aadhaar • ESIC • PF</span>
+</button>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant font-body-sm text-body-sm">
+<span>Store Security Keycard: #BEL-VLT-12</span>
+<span class="font-label-sm text-label-sm text-secondary font-bold uppercase tracking-wider">Active</span>
+</div>
+</div>
+</section>
+<!-- Middle Section: October Attendance Ledger & Weekly Velocity Chart -->
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
+<!-- Visual Attendance Strip & Velocity Bar Chart (8 cols) -->
+<div class="lg:col-span-8 rounded-xl bg-surface-container-lowest shadow-sm p-space-lg flex flex-col gap-space-md">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm pb-space-xs">
+<div>
+<div class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Monthly Performance Dossier</div>
+<h2 class="font-headline-md text-headline-md text-on-surface">October 2024 Attendance &amp; Shift Velocity</h2>
+</div>
+<div class="flex items-center gap-space-xs">
+<span class="px-space-sm py-1 rounded-lg bg-surface-container-low text-secondary font-label-md text-label-md font-bold">20 Present</span>
+<span class="px-space-sm py-1 rounded-lg bg-surface-container text-on-surface-variant font-label-md text-label-md">2 Week-Off</span>
+<span class="px-space-sm py-1 rounded-lg bg-surface-container-high text-on-surface font-label-md text-label-md">1 EL</span>
+</div>
+</div>
+<!-- High-Density Monthly Calendar Strip (Day 1 through 24) -->
+<div class="overflow-x-auto pb-space-xs">
+<div class="min-w-[680px] grid grid-cols-12 gap-1.5">
+<!-- Days 1 - 12 -->
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">01 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">8.8h</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">02 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">8.6h</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">03 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">8.9h</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">04 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">8.7h</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">05 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">8.8h</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">06 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">8.5h</span>
+</div>
+<!-- 07 Oct Approved EL -->
+<div class="p-2 rounded bg-surface-container-high text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface">07 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">beach_access</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">EL</span>
+</div>
+<!-- 08 Oct Tuesday Off -->
+<div class="p-2 rounded bg-surface-container text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">08 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-outline my-0.5">weekend</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface-variant">OFF</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">09 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">8.9h</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">10 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">9.0h</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">11 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">8.8h</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">12 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">8.6h</span>
+</div>
+<!-- Days 13 - 24 -->
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">13 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">8.5h</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">14 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">8.8h</span>
+</div>
+<!-- 15 Oct Tuesday Off -->
+<div class="p-2 rounded bg-surface-container text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">15 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-outline my-0.5">weekend</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface-variant">OFF</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">16 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">9.1h</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">17 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">8.7h</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">18 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">8.8h</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">19 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">8.9h</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">20 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">8.7h</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">21 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">8.9h</span>
+</div>
+<!-- 22 Oct Tuesday Off -->
+<div class="p-2 rounded bg-surface-container text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">22 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-outline my-0.5">weekend</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface-variant">OFF</span>
+</div>
+<div class="p-2 rounded bg-surface-container-low text-center flex flex-col items-center">
+<span class="font-label-sm text-label-sm text-on-surface-variant">23 Oct</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5">check_circle</span>
+<span class="font-label-sm text-label-sm font-bold text-on-surface">9.2h</span>
+</div>
+<!-- Today 24 Oct (Active) -->
+<div class="p-2 rounded bg-secondary-fixed text-center flex flex-col items-center ring-2 ring-secondary">
+<span class="font-label-sm text-label-sm text-on-secondary-fixed font-bold">24 Today</span>
+<span class="material-symbols-outlined text-[14px] text-secondary my-0.5 animate-pulse">pending</span>
+<span class="font-label-sm text-label-sm font-bold text-secondary">4.9h...</span>
+</div>
+</div>
+</div>
+<!-- Weekly Hours Chart Vector Breakdown -->
+<div class="pt-space-sm flex flex-col gap-space-xs">
+<div class="flex items-center justify-between text-on-surface-variant font-label-sm text-label-sm uppercase">
+<span>Rolling 7-Day Velocity Comparison</span>
+<span class="text-secondary font-bold">Average 8.85 hrs / Day</span>
+</div>
+<div class="grid grid-cols-7 gap-space-sm pt-space-xs items-end h-32">
+<!-- Mon -->
+<div class="flex flex-col items-center h-full justify-end gap-1">
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">8.9h</span>
+<div class="w-full bg-secondary rounded-t h-[89%] transition-all"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Mon</span>
+</div>
+<!-- Tue (Off) -->
+<div class="flex flex-col items-center h-full justify-end gap-1">
+<span class="font-label-sm text-label-sm text-outline-variant font-semibold">Off</span>
+<div class="w-full bg-surface-container rounded-t h-[10%]"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Tue</span>
+</div>
+<!-- Wed -->
+<div class="flex flex-col items-center h-full justify-end gap-1">
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">9.2h</span>
+<div class="w-full bg-secondary rounded-t h-[92%] transition-all"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Wed</span>
+</div>
+<!-- Thu (Today) -->
+<div class="flex flex-col items-center h-full justify-end gap-1">
+<span class="font-label-sm text-label-sm text-secondary font-semibold">8.8h*</span>
+<div class="w-full bg-secondary-container rounded-t h-[88%] transition-all"></div>
+<span class="font-label-sm text-label-sm text-on-surface font-bold">Thu</span>
+</div>
+<!-- Fri -->
+<div class="flex flex-col items-center h-full justify-end gap-1">
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">8.8h</span>
+<div class="w-full bg-secondary rounded-t h-[88%] transition-all"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Fri</span>
+</div>
+<!-- Sat -->
+<div class="flex flex-col items-center h-full justify-end gap-1">
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">8.7h</span>
+<div class="w-full bg-secondary rounded-t h-[87%] transition-all"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Sat</span>
+</div>
+<!-- Sun -->
+<div class="flex flex-col items-center h-full justify-end gap-1">
+<span class="font-label-sm text-label-sm text-on-surface font-semibold">8.5h</span>
+<div class="w-full bg-secondary rounded-t h-[85%] transition-all"></div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Sun</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Leave Balances & Upcoming Holidays (4 cols) -->
+<div class="lg:col-span-4 rounded-xl bg-surface-container-lowest shadow-sm p-space-lg flex flex-col justify-between">
+<div class="flex items-center justify-between pb-space-xs">
+<div>
+<div class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Available Quota</div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Leave Balances</h3>
+</div>
+<button class="px-space-sm py-1 rounded bg-surface-container-low text-secondary font-label-sm text-label-sm font-bold hover:bg-surface-container transition-colors" onclick="openLeaveModal()">
+          + Request
+        </button>
+</div>
+<!-- Balances List -->
+<div class="flex flex-col gap-space-sm my-space-xs">
+<!-- Casual Leave -->
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Casual Leave (CL)</span>
+<span class="font-label-lg text-label-lg text-secondary font-bold">4 / 8 Days Left</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-1.5 overflow-hidden">
+<div class="bg-secondary h-full rounded-full" style="width: 50%;"></div>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">50% balance available</span>
+</div>
+<!-- Sick Leave -->
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Sick Leave (SL)</span>
+<span class="font-label-lg text-label-lg text-secondary font-bold">6 / 10 Days Left</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-1.5 overflow-hidden">
+<div class="bg-secondary h-full rounded-full" style="width: 60%;"></div>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Requires medical certificate beyond 2 days</span>
+</div>
+<!-- Earned Leave -->
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col gap-1">
+<div class="flex items-center justify-between">
+<span class="font-label-lg text-label-lg text-on-surface font-semibold">Earned Leave (EL / Privilege)</span>
+<span class="font-label-lg text-label-lg text-secondary font-bold">12 / 15 Days Left</span>
+</div>
+<div class="w-full bg-surface-container rounded-full h-1.5 overflow-hidden">
+<div class="bg-secondary h-full rounded-full" style="width: 80%;"></div>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Eligible for encashment at fiscal year end</span>
+</div>
+<!-- Comp Off Badge -->
+<div class="p-space-sm rounded-lg bg-surface-container-high flex items-center justify-between">
+<div class="flex items-center gap-space-xs font-label-md text-label-md text-on-surface font-semibold">
+<span class="material-symbols-outlined text-[16px] text-secondary">verified</span>
+<span>Comp-Off Credit: 1.0 Day</span>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Valid till 30 Nov</span>
+</div>
+</div>
+<!-- Upcoming Festive Holidays -->
+<div class="pt-space-sm border-t-0 flex flex-col gap-space-xs">
+<div class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Upcoming Public Holidays</div>
+<div class="flex flex-col gap-1">
+<div class="flex items-center justify-between text-on-surface font-body-sm text-body-sm">
+<span class="font-semibold">Karnataka Rajyotsava</span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.5 rounded bg-surface-container-low text-secondary font-bold">01 Nov (Fri)</span>
+</div>
+<div class="flex items-center justify-between text-on-surface font-body-sm text-body-sm">
+<span class="font-semibold">Diwali / Deepavali Holiday</span>
+<span class="font-label-sm text-label-sm px-1.5 py-0.5 rounded bg-surface-container-low text-secondary font-bold">31 Oct – 02 Nov</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Bottom Grid: Compensation Summary, Custody & Scanner Tasks, HR Broadcasts -->
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
+<!-- Compensation & October Payslip Card (4 cols) -->
+<div class="lg:col-span-4 rounded-xl bg-surface-container-lowest shadow-sm p-space-lg flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">payments</span>
+</div>
+<div>
+<div class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Payroll Dossier</div>
+<div class="font-headline-sm text-headline-sm text-on-surface">Compensation</div>
+</div>
+</div>
+<span class="px-space-xs py-0.5 rounded bg-surface-container-low text-secondary font-label-sm text-label-sm font-bold">Oct Finalized</span>
+</div>
+<div class="my-space-md p-space-md rounded-xl bg-surface-container-low flex flex-col gap-space-xs">
+<span class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Net In-Hand Credited</span>
+<div class="flex items-baseline justify-between">
+<span class="font-display-lg text-display-lg text-on-surface font-bold">₹50,940</span>
+<span class="font-label-md text-label-md text-on-surface-variant">SBI A/C ••4912</span>
+</div>
+<div class="flex items-center justify-between pt-space-xs font-body-sm text-body-sm text-on-surface-variant">
+<span>Gross CTC: <strong class="text-on-surface">₹54,500</strong></span>
+<span>Deductions: <strong class="text-on-surface">₹3,560</strong></span>
+</div>
+</div>
+<div class="flex flex-col gap-space-xs font-body-sm text-body-sm">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span>Provident Fund (EPF 12%):</span>
+<span class="font-semibold text-on-surface">₹3,360</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant">
+<span>Professional Tax (Karnataka PT):</span>
+<span class="font-semibold text-on-surface">₹200</span>
+</div>
+<div class="flex items-center justify-between text-on-surface-variant">
+<span>ESIC &amp; Insurance:</span>
+<span class="font-semibold text-secondary">Covered (Zero Ded.)</span>
+</div>
+</div>
+<div class="pt-space-md">
+<button class="w-full py-space-sm px-space-md rounded-lg bg-primary text-on-primary font-label-lg text-label-lg flex items-center justify-center gap-space-xs hover:bg-surface-tint transition-all" onclick="downloadPayslipDirect()">
+<span class="material-symbols-outlined text-[18px]">download</span>
+<span>Download Sealed Payslip PDF</span>
+</button>
+</div>
+</div>
+<!-- Retail Floor Tasks & Custody Badges (4 cols) -->
+<div class="lg:col-span-4 rounded-xl bg-surface-container-lowest shadow-sm p-space-lg flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">qr_code_scanner</span>
+</div>
+<div>
+<div class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Floor Custody &amp; Devices</div>
+<div class="font-headline-sm text-headline-sm text-on-surface">Active Assets</div>
+</div>
+</div>
+<span class="material-symbols-outlined text-secondary text-[18px]">lock</span>
+</div>
+<div class="flex flex-col gap-space-sm my-space-sm">
+<!-- Asset 1: Handheld Scanner -->
+<div class="p-space-sm rounded-lg bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-secondary text-[22px]">inventory_2</span>
+<div>
+<div class="font-label-lg text-label-lg text-on-surface font-semibold">Zebra TC52 Scanner</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">SN: BEL-302 • Out @ 09:30 AM</div>
+</div>
+</div>
+<div class="text-right">
+<span class="font-label-sm text-label-sm px-1.5 py-0.5 rounded bg-surface-container text-secondary font-bold">84% Batt</span>
+</div>
+</div>
+<!-- Asset 2: Vault Card -->
+<div class="p-space-sm rounded-lg bg-surface-container-low flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<span class="material-symbols-outlined text-secondary text-[22px]">badge</span>
+<div>
+<div class="font-label-lg text-label-lg text-on-surface font-semibold">Saree Vault Smartcard</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Mifare RFID • Belagavi Locker B-14</div>
+</div>
+</div>
+<span class="font-label-sm text-label-sm px-1.5 py-0.5 rounded bg-surface-container text-secondary font-bold">Assigned</span>
+</div>
+<!-- Store Directive Note -->
+<div class="p-space-sm rounded-lg bg-surface-container-high flex flex-col gap-1">
+<div class="flex items-center gap-1 text-on-surface font-label-md text-label-md font-bold">
+<span class="material-symbols-outlined text-[16px] text-secondary">campaign</span>
+<span>Floor Lead Directive • Anand Kulkarni</span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-snug">
+            "Anticipate heavy pre-festive footfall in Bridal Kanjeevaram counter. Ensure handoffs during tea rotations."
+          </p>
+</div>
+</div>
+<div class="flex items-center justify-between pt-space-xs font-label-sm text-label-sm text-on-surface-variant">
+<span>Asset Audit: Complete (Morning Log)</span>
+<span class="text-secondary font-bold">Belagavi Security OK</span>
+</div>
+</div>
+<!-- Personal Notifications & HR Broadcasts (4 cols) -->
+<div class="lg:col-span-4 rounded-xl bg-surface-container-lowest shadow-sm p-space-lg flex flex-col justify-between">
+<div class="flex items-center justify-between">
+<div class="flex items-center gap-space-sm">
+<div class="w-9 h-9 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">notifications_active</span>
+</div>
+<div>
+<div class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Real-Time Alerts</div>
+<div class="font-headline-sm text-headline-sm text-on-surface">HR Broadcasts</div>
+</div>
+</div>
+<span class="font-label-sm text-label-sm font-bold text-secondary">3 Unread</span>
+</div>
+<div class="flex flex-col gap-space-sm my-space-sm">
+<!-- Broadcast 1 -->
+<div class="p-space-sm rounded-lg bg-surface-container-low flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">fingerprint</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Biometric In-Punch Verified</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Logged 09:28:14 IST on BEL-IN-02. Zero drift recorded.</span>
+<span class="font-label-sm text-label-sm text-outline-variant mt-0.5">4h ago</span>
+</div>
+</div>
+<!-- Broadcast 2 -->
+<div class="p-space-sm rounded-lg bg-surface-container-low flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">receipt</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">October Payslip Released</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Bank reconciliation confirmed. Sealed statement available.</span>
+<span class="font-label-sm text-label-sm text-outline-variant mt-0.5">Today 10:15 AM</span>
+</div>
+</div>
+<!-- Broadcast 3 -->
+<div class="p-space-sm rounded-lg bg-surface-container-low flex items-start gap-space-sm">
+<span class="material-symbols-outlined text-secondary text-[18px] mt-0.5">school</span>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md text-on-surface font-semibold">Mandatory POS 4.2 Training</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Belagavi Conference Room B • Friday 17:00 IST.</span>
+<span class="font-label-sm text-label-sm text-outline-variant mt-0.5">Yesterday</span>
+</div>
+</div>
+</div>
+<div class="pt-space-xs flex items-center justify-between">
+<button class="text-secondary font-label-md text-label-md font-bold hover:underline" onclick="markAllAlertsRead()">Mark all as read</button>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Auto-cleared in 7d</span>
+</div>
+</div>
+</section>
+<!-- Interactive Slide-Over / Modal 1: Punch Regularization Request -->
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/40 backdrop-blur-sm hidden" id="punchModal">
+<div class="w-full max-w-lg rounded-2xl bg-surface-container-lowest shadow-2xl p-space-lg flex flex-col gap-space-md mx-4">
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">edit_calendar</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Punch Regularization Request</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Employee: Rajeshwari V. Patil (BSC-EMP-0042)</span>
+</div>
+</div>
+<button class="w-8 h-8 rounded-lg hover:bg-surface-container-low flex items-center justify-center text-on-surface-variant" onclick="closePunchModal()">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<form class="flex flex-col gap-space-md" id="punchForm" onsubmit="handlePunchSubmit(event)">
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Date of Irregular Punch</label>
+<input class="h-9 px-space-sm rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none" required="" type="date" value="2024-10-24"/>
+</div>
+<div class="grid grid-cols-2 gap-space-sm">
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Punch Type</label>
+<select class="h-9 px-space-sm rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none">
+<option value="in">Missed In-Punch</option>
+<option value="out">Missed Out-Punch</option>
+<option value="lunch_out">Missed Lunch Out</option>
+<option value="lunch_in">Missed Lunch In</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Actual Time</label>
+<input class="h-9 px-space-sm rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none" required="" type="time" value="09:30"/>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Reason for Regularization</label>
+<select class="h-9 px-space-sm rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none">
+<option>Biometric Scanner Failure at Hub Gate</option>
+<option>On Authorized Client Bridal Consultation Outside</option>
+<option>RFID Smartcard Unresponsive / Magnetic Error</option>
+<option>Deputed to Stock Delivery Counter BEL-Dock</option>
+</select>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Remarks / Explanatory Note</label>
+<textarea class="p-space-sm rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none" placeholder="Provide context for Floor Lead Anand Kulkarni..." rows="2"></textarea>
+</div>
+<div class="flex items-center justify-end gap-space-sm pt-space-xs">
+<button class="px-space-md py-space-sm rounded-lg bg-surface-container text-on-surface font-label-lg text-label-lg" onclick="closePunchModal()" type="button">Cancel</button>
+<button class="px-space-md py-space-sm rounded-lg bg-secondary text-on-secondary font-label-lg text-label-lg" type="submit">Submit for Approval</button>
+</div>
+</form>
+</div>
+</div>
+<!-- Interactive Slide-Over / Modal 2: Leave Application -->
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/40 backdrop-blur-sm hidden" id="leaveModal">
+<div class="w-full max-w-lg rounded-2xl bg-surface-container-lowest shadow-2xl p-space-lg flex flex-col gap-space-md mx-4">
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">calendar_add_on</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Apply for Authorized Leave</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">BSC Textiles Self-Service Portal</span>
+</div>
+</div>
+<button class="w-8 h-8 rounded-lg hover:bg-surface-container-low flex items-center justify-center text-on-surface-variant" onclick="closeLeaveModal()">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<form class="flex flex-col gap-space-md" id="leaveForm" onsubmit="handleLeaveSubmit(event)">
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Leave Category</label>
+<select class="h-9 px-space-sm rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none">
+<option>Casual Leave (CL) • 4.0 Days Available</option>
+<option>Sick Leave (SL) • 6.0 Days Available</option>
+<option>Earned Leave (EL) • 12.0 Days Available</option>
+<option>Compensatory Off • 1.0 Day Available</option>
+</select>
+</div>
+<div class="grid grid-cols-2 gap-space-sm">
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Start Date</label>
+<input class="h-9 px-space-sm rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none" required="" type="date" value="2024-11-04"/>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">End Date</label>
+<input class="h-9 px-space-sm rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none" required="" type="date" value="2024-11-05"/>
+</div>
+</div>
+<div class="flex flex-col gap-1">
+<label class="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant">Reason for Absence</label>
+<textarea class="p-space-sm rounded-lg bg-surface-container-low text-on-surface font-body-md text-body-md focus:outline-none" placeholder="Brief rationale for leave records..." required="" rows="2"></textarea>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-high flex items-center justify-between text-on-surface">
+<span class="font-body-sm text-body-sm">Total Requested: <strong>2 Days</strong></span>
+<span class="font-label-sm text-label-sm font-semibold text-secondary">Approver: Anand Kulkarni</span>
+</div>
+<div class="flex items-center justify-end gap-space-sm pt-space-xs">
+<button class="px-space-md py-space-sm rounded-lg bg-surface-container text-on-surface font-label-lg text-label-lg" onclick="closeLeaveModal()" type="button">Cancel</button>
+<button class="px-space-md py-space-sm rounded-lg bg-secondary text-on-secondary font-label-lg text-label-lg" type="submit">Submit Application</button>
+</div>
+</form>
+</div>
+</div>
+<!-- Interactive Slide-Over / Modal 3: Custody Assets Dossier -->
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/40 backdrop-blur-sm hidden" id="assetsModal">
+<div class="w-full max-w-lg rounded-2xl bg-surface-container-lowest shadow-2xl p-space-lg flex flex-col gap-space-md mx-4">
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">inventory</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Custody Assets Assigned</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Belagavi Flagship Store • Security Register</span>
+</div>
+</div>
+<button class="w-8 h-8 rounded-lg hover:bg-surface-container-low flex items-center justify-center text-on-surface-variant" onclick="closeAssetsModal()">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<div class="flex flex-col gap-space-sm">
+<div class="p-space-md rounded-xl bg-surface-container-low flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-lg text-label-lg text-on-surface font-bold">1. Zebra TC52 Android Barcode Scanner</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-secondary font-label-sm text-label-sm font-bold">Active</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Serial Number: ZBR-BEL-302 • Checked out by Security Desk: 09:30 AM</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Condition: Flawless • Return Due: 18:35 PM IST</div>
+</div>
+<div class="p-space-md rounded-xl bg-surface-container-low flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-lg text-label-lg text-on-surface font-bold">2. High-Value Bridal Vault Keycard</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-secondary font-label-sm text-label-sm font-bold">Mifare RFID</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Authorization: Level 2 Bridal &amp; Pure Zari Silk Safes</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Tag: BEL-VLT-12 • Linked to BSC-EMP-0042</div>
+</div>
+<div class="p-space-md rounded-xl bg-surface-container-low flex flex-col gap-space-xs">
+<div class="flex items-center justify-between">
+<span class="font-label-lg text-label-lg text-on-surface font-bold">3. Staff Changing Room Locker</span>
+<span class="px-2 py-0.5 rounded bg-surface-container text-on-surface font-label-sm text-label-sm font-bold">Locker B-14</span>
+</div>
+<div class="font-body-sm text-body-sm text-on-surface-variant">Physical Brass Key #42 assigned permanently</div>
+</div>
+</div>
+<div class="flex items-center justify-end pt-space-xs">
+<button class="px-space-md py-space-sm rounded-lg bg-primary text-on-primary font-label-lg text-label-lg" onclick="closeAssetsModal()">Close Asset Dossier</button>
+</div>
+</div>
+</div>
+<!-- Interactive Slide-Over / Modal 4: ID & Dossier Details -->
+<div class="fixed inset-0 z-50 flex items-center justify-center bg-inverse-surface/40 backdrop-blur-sm hidden" id="dossierModal">
+<div class="w-full max-w-lg rounded-2xl bg-surface-container-lowest shadow-2xl p-space-lg flex flex-col gap-space-md mx-4">
+<div class="flex items-center justify-between pb-space-xs">
+<div class="flex items-center gap-space-sm">
+<div class="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
+<span class="material-symbols-outlined text-[20px]">badge</span>
+</div>
+<div>
+<h3 class="font-headline-sm text-headline-sm text-on-surface">Employee Identity Dossier</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Rajeshwari V. Patil • Verified HRMS Record</span>
+</div>
+</div>
+<button class="w-8 h-8 rounded-lg hover:bg-surface-container-low flex items-center justify-center text-on-surface-variant" onclick="closeDossierModal()">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<div class="grid grid-cols-2 gap-space-sm font-body-sm text-body-sm">
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col">
+<span class="font-label-sm text-label-sm uppercase text-on-surface-variant">Aadhaar Card (UIDAI)</span>
+<span class="font-semibold text-on-surface">•••• •••• 8812</span>
+<span class="font-label-sm text-label-sm text-secondary font-bold">Verified Biometrically</span>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col">
+<span class="font-label-sm text-label-sm uppercase text-on-surface-variant">Permanent Account (PAN)</span>
+<span class="font-semibold text-on-surface">ABC**4291D</span>
+<span class="font-label-sm text-label-sm text-secondary font-bold">NSDL Active</span>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col">
+<span class="font-label-sm text-label-sm uppercase text-on-surface-variant">Universal Account (UAN - PF)</span>
+<span class="font-semibold text-on-surface">1019 4482 9901</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">EPFO Regional Hub Belagavi</span>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-low flex flex-col">
+<span class="font-label-sm text-label-sm uppercase text-on-surface-variant">ESIC Identification</span>
+<span class="font-semibold text-on-surface">53-09-881273</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Exempt (Above Wage Ceiling)</span>
+</div>
+</div>
+<div class="p-space-sm rounded-lg bg-surface-container-high flex flex-col gap-1">
+<span class="font-label-md text-label-md text-on-surface font-bold">Emergency Contact:</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant">Virendra Patil (Spouse) • +91 94481 02938 • Belagavi</span>
+</div>
+<div class="flex items-center justify-end pt-space-xs">
+<button class="px-space-md py-space-sm rounded-lg bg-primary text-on-primary font-label-lg text-label-lg" onclick="closeDossierModal()">Close Dossier</button>
+</div>
+</div>
+</div>
+<!-- Toast Notification Container -->
+<div class="fixed bottom-6 right-6 z-50 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none" id="toastNotification">
+<div class="px-space-md py-space-sm rounded-xl bg-inverse-surface text-inverse-on-surface shadow-xl flex items-center gap-space-sm font-label-md text-label-md">
+<span class="material-symbols-outlined text-[18px] text-secondary-fixed">check_circle</span>
+<span id="toastMessage">Action completed successfully</span>
+</div>
+</div>
+</div>
+<script>
+  // UI Toast helper
+  function showToast(message) {
+    const toast = document.getElementById('toastNotification');
+    const msg = document.getElementById('toastMessage');
+    if (!toast || !msg) return;
+    msg.textContent = message;
+    toast.classList.remove('translate-y-20', 'opacity-0', 'pointer-events-none');
+    toast.classList.add('translate-y-0', 'opacity-100');
+    setTimeout(() => {
+      toast.classList.add('translate-y-20', 'opacity-0', 'pointer-events-none');
+      toast.classList.remove('translate-y-0', 'opacity-100');
+    }, 3200);
+  }
+
+  // Modals Controller
+  function openPunchModal() {
+    document.getElementById('punchModal').classList.remove('hidden');
+  }
+  function closePunchModal() {
+    document.getElementById('punchModal').classList.add('hidden');
+  }
+  function handlePunchSubmit(e) {
+    e.preventDefault();
+    closePunchModal();
+    showToast('Regularization request submitted to Floor Lead Anand Kulkarni');
+  }
+
+  function openLeaveModal() {
+    document.getElementById('leaveModal').classList.remove('hidden');
+  }
+  function closeLeaveModal() {
+    document.getElementById('leaveModal').classList.add('hidden');
+  }
+  function handleLeaveSubmit(e) {
+    e.preventDefault();
+    closeLeaveModal();
+    showToast('Leave application submitted to HR Operations');
+  }
+
+  function openAssetsModal() {
+    document.getElementById('assetsModal').classList.remove('hidden');
+  }
+  function closeAssetsModal() {
+    document.getElementById('assetsModal').classList.add('hidden');
+  }
+
+  function openDossierModal() {
+    document.getElementById('dossierModal').classList.remove('hidden');
+  }
+  function closeDossierModal() {
+    document.getElementById('dossierModal').classList.add('hidden');
+  }
+
+  // Break micro-interactions
+  let teaBreakActive = false;
+  function toggleTeaBreak() {
+    const btn = document.getElementById('teaBreakBtn');
+    teaBreakActive = !teaBreakActive;
+    if (teaBreakActive) {
+      btn.textContent = 'End Tea Break';
+      btn.classList.remove('bg-secondary-container', 'text-on-secondary');
+      btn.classList.add('bg-error', 'text-on-error');
+      showToast('Afternoon Tea Break started. Floor coverage standby alerted.');
+    } else {
+      btn.textContent = 'Break Logged';
+      btn.classList.remove('bg-error', 'text-on-error');
+      btn.classList.add('bg-surface-container', 'text-secondary');
+      btn.disabled = true;
+      showToast('Afternoon Tea Break ended. Logged 14m (compliant).');
+    }
+  }
+
+  // Clock Out Simulation
+  function toggleClockModal() {
+    if (confirm('Confirm Shift Clock Out for Rajeshwari V. Patil? Current time: 14:22 IST (Early Shift Out requires Supervisor Auth).')) {
+      showToast('Shift Out authorization requested from Anand Kulkarni');
+    }
+  }
+
+  // Payslip Download Simulation
+  function downloadPayslipDirect() {
+    showToast('Oct 2024 Sealed Payslip PDF downloaded (₹50,940)');
+  }
+
+  function markAllAlertsRead() {
+    showToast('All notifications marked as read');
+  }
+</script></main></div></body></html>

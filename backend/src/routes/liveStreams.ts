@@ -228,7 +228,14 @@ router.post('/:id/leave', authorize('VIEW'), async (req: AuthRequest, res) => {
 
 router.post('/:id/messages', authorize('RECORD'), async (req: AuthRequest, res) => {
   try {
-    const { content } = req.body;
+    // Accept both `content` (existing clients) and `message` (chat UI)
+    const content = typeof req.body?.content === 'string' && req.body.content.trim()
+      ? req.body.content.trim()
+      : typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+
+    if (!content) {
+      return res.status(400).json({ error: 'Message content is required' });
+    }
     
     const existing = await prisma.liveStream.findUnique({ where: { id: req.params.id } });
     if (!existing) {
@@ -252,6 +259,30 @@ router.post('/:id/messages', authorize('RECORD'), async (req: AuthRequest, res) 
   } catch (error) {
     console.error('Add stream message error:', error);
     res.status(500).json({ error: 'Failed to add message' });
+  }
+});
+
+router.get('/:id/messages', authorize('VIEW'), async (req: AuthRequest, res) => {
+  try {
+    const stream = await prisma.liveStream.findUnique({ where: { id: req.params.id } });
+    if (!stream) {
+      return res.status(404).json({ error: 'Live stream not found' });
+    }
+
+    if (req.user!.role !== 'SUPER_ADMIN' && stream.locationId !== req.user!.locationId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const messages = await prisma.liveStreamMessage.findMany({
+      where: { streamId: req.params.id },
+      orderBy: { createdAt: 'asc' },
+      include: { user: { select: { id: true, fullName: true } } },
+    });
+
+    res.json({ messages, total: messages.length });
+  } catch (error) {
+    console.error('Get stream messages error:', error);
+    res.status(500).json({ error: 'Failed to get messages' });
   }
 });
 
