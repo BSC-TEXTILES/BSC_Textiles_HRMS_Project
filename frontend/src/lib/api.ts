@@ -4,6 +4,7 @@ import { getSession } from 'next-auth/react';
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api',
   withCredentials: true,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -66,6 +67,7 @@ api.interceptors.response.use(
       localStorage.removeItem('token');
       localStorage.removeItem('bsc_user');
       document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      document.cookie = 'bsc_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
 
       if (!pathname.startsWith('/login')) {
         const redirectTarget = `/login?callbackUrl=${encodeURIComponent(pathname + window.location.search)}`;

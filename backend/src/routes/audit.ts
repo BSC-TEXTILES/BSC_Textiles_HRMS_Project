@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../index.js';
-import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
+import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -11,7 +11,9 @@ router.get(['/', '/logs'], authorize('VIEW_SENSITIVE_DATA'), async (req: AuthReq
     const { locationId, userId, action, entityType, startDate, endDate, page = 1, limit = 50 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
     
-    const where: any = { locationId: req.user!.role === 'SUPER_ADMIN' ? locationId : req.user!.locationId };
+    const scopedLocId = getScopedLocationId(req.user, locationId);
+    const where: any = {};
+    if (scopedLocId) where.locationId = scopedLocId;
     if (userId) where.userId = userId;
     if (action) where.action = action;
     if (entityType) where.entityType = entityType;

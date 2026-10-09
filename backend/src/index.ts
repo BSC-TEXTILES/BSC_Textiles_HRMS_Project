@@ -74,14 +74,14 @@ app.use(cors({
   credentials: true,
 }));
 app.use(compression());
-app.use(morgan('combined'));
+app.use(process.env.NODE_ENV === 'production' ? morgan('combined') : morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 1000,
+  max: 10000,
   message: { error: 'Too many requests, please try again later' },
 });
 app.use('/api/', limiter);
