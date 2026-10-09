@@ -76,44 +76,6 @@ export default function QRScannerPage() {
   const cameraStartingRef = useRef(false);
   const cameraMountedRef = useRef(true);
 
-  const startCamera = async () => {
-    // Guard against overlapping starts: React StrictMode double-invokes effects in
-    // dev, which fired a second getUserMedia while the first prompt was still open
-    // (the browser then dismissed the first one with "Permission dismissed").
-    if (cameraStartingRef.current || streamRef.current) return;
-    cameraStartingRef.current = true;
-    try {
-      setCameraError(null);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
-      });
-      if (!cameraMountedRef.current) {
-        // Page was unmounted while the permission prompt was open — release the camera.
-        stream.getTracks().forEach(track => track.stop());
-        return;
-      }
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setScanning(true);
-      startScanLoop();
-    } catch (err: any) {
-      const name = err?.name;
-      if (name === 'NotAllowedError' || name === 'SecurityError') {
-        // Permission dismissed/denied — expected; the panel below guides the user.
-        console.warn('Camera permission not granted:', name);
-      } else {
-        console.warn('Camera unavailable:', name || err?.message || err);
-      }
-      setCameraError('Camera access is required for QR scanning. Please allow camera permissions or use manual entry.');
-      setScanning(false);
-    } finally {
-      cameraStartingRef.current = false;
-    }
-  };
-
   const fetchEmployeeInfo = useCallback(async (employeeId: number) => {
     try {
       const res = await api.get<EmployeeInfo>(`/staff-ops/live-status?employee_id=${employeeId}`);
@@ -200,11 +162,17 @@ export default function QRScannerPage() {
   }, [scanning, processScan]);
 
   const startCamera = useCallback(async () => {
+    if (cameraStartingRef.current || streamRef.current) return;
+    cameraStartingRef.current = true;
     try {
       setCameraError(null);
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
       });
+      if (!cameraMountedRef.current) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -212,10 +180,17 @@ export default function QRScannerPage() {
       }
       setScanning(true);
       startScanLoop();
-    } catch (err) {
-      console.error('Camera access denied:', err);
+    } catch (err: any) {
+      const name = err?.name;
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        console.warn('Camera permission not granted:', name);
+      } else {
+        console.warn('Camera unavailable:', name || err?.message || err);
+      }
       setCameraError('Camera access is required for QR scanning. Please allow camera permissions or use manual entry.');
       setScanning(false);
+    } finally {
+      cameraStartingRef.current = false;
     }
   }, [startScanLoop]);
 
@@ -255,7 +230,7 @@ export default function QRScannerPage() {
       cameraMountedRef.current = false;
       stopCamera();
     };
-  }, []);
+  }, [startCamera]);
 
   const getResultIcon = (result?: string) => {
     switch (result) {

@@ -212,7 +212,7 @@ router.get('/live-status', async (req: AuthRequest, res) => {
       }),
     ]);
 
-    const attBy = new Map(attRows.map((a) => [a.employeeId, a]));
+    const attBy = new Map<string, any>(attRows.map((a: any) => [a.employeeId, a]));
     const breaksBy = new Map<string, any[]>();
     for (const b of breakRows) {
       const list = breaksBy.get(b.employeeId);

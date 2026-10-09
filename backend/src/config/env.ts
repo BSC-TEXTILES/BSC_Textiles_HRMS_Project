@@ -2,7 +2,6 @@ import dotenv from 'dotenv';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import type { SignOptions } from 'jsonwebtoken';
-import dotenv from 'dotenv';
 
 // Load .env HERE, before any secret is read. index.ts also calls dotenv.config(),
 // but ESM/CJS module evaluation may run this file first (via route imports), which

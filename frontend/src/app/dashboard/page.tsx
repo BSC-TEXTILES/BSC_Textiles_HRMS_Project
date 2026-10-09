@@ -40,10 +40,8 @@ interface PunchRecord {
   status: 'ON_TIME' | 'EARLY' | 'LATE' | 'OVERTIME' | 'PRESENT';
   incentive?: string;
 }
-}
 
 export default function DashboardPage() {
-  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedHub, setSelectedHub] = useState('all');
@@ -202,7 +200,6 @@ export default function DashboardPage() {
       status: 'Optimal',
       badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     },
->>>>>>> main
   ];
 
   return (
