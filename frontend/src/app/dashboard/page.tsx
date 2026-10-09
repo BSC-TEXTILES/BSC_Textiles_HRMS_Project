@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { MetricDrillDownModal, type MetricKey } from '@/components/dashboard/MetricDrillDownModal';
+import { OperationsSummaryChart } from '@/components/dashboard/OperationsSummaryChart';
 import api from '@/lib/api';
 
 interface DashboardStats {
@@ -286,7 +287,7 @@ export default function DashboardPage() {
                 </span>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-[#eff4ff] text-slate-700 text-[11px] font-medium border border-slate-200">
                   <span className="material-symbols-outlined text-[13px] text-[#0058be]">verified</span>
-                  FY 2024-25 Q3
+                  FY 2026-27 Q3
                 </span>
               </div>
               <h1 className="text-2xl font-bold text-[#0b1c30] tracking-tight">
@@ -404,9 +405,8 @@ export default function DashboardPage() {
               </div>
               <button
                 onClick={handleManualSync}
-                className={`flex items-center justify-center p-2 rounded-lg bg-white text-slate-600 hover:text-[#0058be] border border-slate-200 shadow-xs hover:bg-slate-50 transition-all ${
-                  syncing ? 'animate-spin' : ''
-                }`}
+                className={`flex items-center justify-center p-2 rounded-lg bg-white text-slate-600 hover:text-[#0058be] border border-slate-200 shadow-xs hover:bg-slate-50 transition-all ${syncing ? 'animate-spin' : ''
+                  }`}
                 title="Sync Live Biometric Feeds"
               >
                 <span className="material-symbols-outlined text-[18px]">sync</span>
@@ -567,6 +567,17 @@ export default function DashboardPage() {
           </button>
         </div>
 
+        {/* SECTION 1.5: OVERALL OPERATIONS SUMMARY (HORIZONTAL BAR CHART) */}
+        <OperationsSummaryChart
+          filters={{
+            locationId: selectedHub,
+            departmentId: selectedDept,
+            shiftId: selectedShift,
+            date: selectedDate,
+          }}
+          onSelectMetric={setActiveMetric}
+        />
+
         {/* SECTION 2: KARNATAKA STORE HUBS MONITOR */}
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
@@ -681,11 +692,10 @@ export default function DashboardPage() {
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                          punch.status === 'EARLY' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                          punch.status === 'LATE' ? 'bg-red-50 text-red-700 border border-red-200' :
-                          'bg-blue-50 text-blue-700 border border-blue-200'
-                        }`}>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${punch.status === 'EARLY' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                            punch.status === 'LATE' ? 'bg-red-50 text-red-700 border border-red-200' :
+                              'bg-blue-50 text-blue-700 border border-blue-200'
+                          }`}>
                           {punch.status}
                         </span>
                         {punch.incentive && (
