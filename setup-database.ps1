@@ -52,21 +52,20 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Host "Database '$DatabaseName' is ready (root password: $MySqlRootPassword)." -ForegroundColor Green
 
-# --- 3. Apply Prisma schema + seed -----------------------------------------
+# --- 3. Apply Native MySQL 8.0 schema + seed -------------------------------
 Push-Location $PSScriptRoot
 try {
-    Write-Host "Applying Prisma schema (npx prisma db push) ..." -ForegroundColor Cyan
-    Write-Host "(tables not part of the Prisma schema are replaced - this is a dev setup)" -ForegroundColor DarkGray
-    npx prisma db push --schema=backend/prisma/schema.prisma --accept-data-loss
+    Write-Host "Applying Native MySQL schema and migrations (npm run db:migrate) ..." -ForegroundColor Cyan
+    npm run db:migrate
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "prisma db push failed."
+        Write-Error "Database migration failed."
         exit 1
     }
 
-    Write-Host "Seeding users, locations and employees ..." -ForegroundColor Cyan
-    npx tsx backend/prisma/seed.ts
+    Write-Host "Seeding native MySQL users, locations and employees (npm run db:seed) ..." -ForegroundColor Cyan
+    npm run db:seed
     if ($LASTEXITCODE -ne 0) {
-        Write-Error "Prisma seed failed."
+        Write-Error "Database seed failed."
         exit 1
     }
 }
