@@ -135,6 +135,29 @@ function LoginForm() {
     setErrorMessage(null);
     
     try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+
+      // 1. Direct login to acquire guaranteed fresh JWT token immediately
+      try {
+        const directRes = await fetch(`${apiUrl}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: data.email, password: data.password }),
+        });
+        const directData = await directRes.json().catch(() => null);
+        if (directRes.ok && directData?.token) {
+          localStorage.setItem('bsc_token', directData.token);
+          localStorage.setItem('token', directData.token);
+          if (directData.user) {
+            localStorage.setItem('bsc_user', JSON.stringify(directData.user));
+          }
+          document.cookie = `token=${encodeURIComponent(directData.token)}; path=/; max-age=604800; SameSite=Lax`;
+        }
+      } catch (e) {
+        console.warn('[Login] Direct token pre-fetch warning:', e);
+      }
+
+      // 2. NextAuth session synchronization
       const result = await signIn('credentials', {
         email: data.email,
         password: data.password,
