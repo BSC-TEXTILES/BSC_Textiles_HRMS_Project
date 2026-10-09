@@ -229,33 +229,19 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         } bg-white border-r border-slate-200/80 shadow-[0_1px_8px_rgba(0,0,0,0.03)] z-50 flex flex-col justify-between overflow-y-auto hidden lg:flex transition-all duration-300 ease-in-out`}
       >
         <div className="flex flex-col">
-          {/* Top Logo Brand Header & 3-line Toggle */}
+          {/* Top Logo Brand Header */}
           <div className={`h-14 flex items-center ${
-            isCollapsed ? 'justify-center px-2' : 'justify-between px-4'
+            isCollapsed ? 'justify-center px-2' : 'px-4'
           } bg-white border-b border-slate-100 flex-shrink-0 transition-all`}>
-            {!isCollapsed && (
-              <div className="flex items-center gap-2.5 overflow-hidden">
-                <Logo variant="icon" size="sm" />
+            <div className={`flex items-center overflow-hidden ${isCollapsed ? '' : 'gap-2.5'}`}>
+              <Logo variant="icon" size="sm" className="flex-shrink-0" />
+              {!isCollapsed && (
                 <div className="flex flex-col leading-tight truncate">
                   <span className="text-[15px] font-bold tracking-tight text-[#0b1c30] truncate">BSC Textiles</span>
                   <span className="text-[10px] font-bold tracking-wider uppercase text-slate-400">HRMS Portal</span>
                 </div>
-              </div>
-            )}
-
-            {/* 3-line Toggle Button (Hamburger / Collapse) */}
-            <button
-              onClick={toggleSidebar}
-              className={`p-1.5 rounded-lg text-slate-500 hover:text-[#0058be] hover:bg-[#eff4ff] transition-colors flex items-center justify-center flex-shrink-0 ${
-                isCollapsed ? 'w-10 h-10' : ''
-              }`}
-              title={isCollapsed ? 'Expand Sidebar (Show full text)' : 'Collapse Sidebar (Show icons only)'}
-              aria-label={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-            >
-              <span className="material-symbols-outlined text-[22px]">
-                {isCollapsed ? 'menu' : 'menu_open'}
-              </span>
-            </button>
+              )}
+            </div>
           </div>
 
           {/* Navigation Links */}
