@@ -230,9 +230,9 @@ function LoginForm() {
       <div className="relative z-10 w-full max-w-7xl mx-auto">
         
         {/* Top Floating Header Banner */}
-        <header className="mb-6 lg:mb-10 flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/40 backdrop-blur-md border border-white/10 shadow-2xl">
+        <header className="mb-4 lg:mb-6 flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-slate-900/60 backdrop-blur-md border border-white/15 shadow-2xl">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-700 flex items-center justify-center shadow-lg shadow-amber-500/20">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-700 flex items-center justify-center shadow-lg shadow-amber-500/20 flex-shrink-0">
               <span className="font-extrabold text-slate-950 text-base tracking-tighter">BSC</span>
             </div>
             <div>
@@ -242,16 +242,21 @@ function LoginForm() {
                   Est. 1938
                 </span>
               </div>
-              <p className="text-xs text-slate-400">Master Retail Workforce & Enterprise HRMS Platform</p>
+              <p className="text-xs text-slate-300">Master Retail Workforce & Enterprise HRMS Platform</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
+          <div className="flex items-center gap-2.5 flex-wrap justify-end">
+            {/* Prominent BSC HRMS v2.4 Release Badge */}
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-amber-500/25 to-amber-600/15 border border-amber-400/50 text-amber-300 text-xs font-black shadow-lg shadow-amber-500/15 tracking-wide">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>BSC HRMS v2.4</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-semibold">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>Biometric Cloud: Live 99.8%</span>
             </div>
-            <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-slate-300 text-xs">
+            <div className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-slate-200 text-xs font-medium">
               <Shield className="w-3.5 h-3.5 text-amber-400" />
               <span>Karnataka Regional Network</span>
             </div>
@@ -259,49 +264,49 @@ function LoginForm() {
         </header>
 
         {/* Two-Column Grid: Heritage Brand Story + Glass Login Card */}
-        <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
+        <div className="grid lg:grid-cols-12 gap-6 lg:gap-8 items-start">
           
           {/* LEFT COLUMN: BRAND STORY & ENTERPRISE TELEMETRY (7 Cols) */}
-          <div className="lg:col-span-7 flex flex-col space-y-6 text-white">
+          <div className="lg:col-span-7 flex flex-col space-y-4 text-white">
             
             {/* Main Headline Cluster */}
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-gradient-to-r from-amber-500/15 via-indigo-500/15 to-transparent border border-amber-500/30 text-amber-300 text-xs font-bold uppercase tracking-wider">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                 <span>Weaving Dreams, Building Futures</span>
               </div>
               
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-[1.15]">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight leading-[1.15]">
                 Intelligent Retail Workforce & Biometric Operations
               </h1>
               
-              <p className="text-slate-300 text-sm sm:text-base leading-relaxed max-w-2xl font-light">
+              <p className="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-2xl font-light">
                 Seamlessly orchestrating Karnataka retail store operations across 3 flagship hubs, 350+ artisans, IoT face verification, and instant ₹1/sec early login incentive calculation.
               </p>
             </div>
 
             {/* 3 Flagship Hubs Matrix */}
-            <div className="p-5 rounded-2xl bg-slate-900/60 backdrop-blur-xl border border-white/10 shadow-2xl space-y-3">
-              <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-400">
+            <div className="p-4 rounded-2xl bg-slate-900/70 backdrop-blur-xl border border-white/15 shadow-2xl space-y-2.5">
+              <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-300">
                 <span className="flex items-center gap-1.5 text-amber-300">
                   <Store className="w-4 h-4 text-amber-400" />
                   Karnataka Enterprise Hub Network
                 </span>
-                <span className="text-emerald-400">3 Active Outlets</span>
+                <span className="text-emerald-400 font-extrabold">3 Active Outlets</span>
               </div>
 
-              <div className="grid sm:grid-cols-3 gap-2.5">
+              <div className="grid sm:grid-cols-3 gap-2">
                 {STORE_HUBS.map((hub) => (
                   <div 
                     key={hub.code}
-                    className="p-3 rounded-xl bg-white/[0.03] border border-white/5 hover:border-amber-500/30 transition-all flex items-center justify-between"
+                    className="p-2.5 rounded-xl bg-white/[0.05] border border-white/10 hover:border-amber-500/40 transition-all flex items-center justify-between"
                   >
                     <div>
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-[11px] font-bold text-amber-400">{hub.code}</span>
-                        <span className="text-xs font-semibold text-slate-200">{hub.name}</span>
+                        <span className="text-xs font-semibold text-slate-100">{hub.name}</span>
                       </div>
-                      <span className="text-[10px] text-slate-400">{hub.count}</span>
+                      <span className="text-[10px] text-slate-300">{hub.count}</span>
                     </div>
                     <span className="w-2 h-2 rounded-full bg-emerald-400" title={hub.status} />
                   </div>
@@ -310,51 +315,64 @@ function LoginForm() {
             </div>
 
             {/* Feature Metric Strip */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="p-4 rounded-xl bg-slate-900/50 backdrop-blur-md border border-white/10 text-center">
-                <Fingerprint className="w-5 h-5 text-amber-400 mx-auto mb-1.5" />
-                <div className="text-xl font-extrabold text-white">96.4%</div>
-                <div className="text-[11px] text-slate-400 font-medium">Face Match Rate</div>
+            <div className="grid grid-cols-3 gap-2.5">
+              <div className="p-3 rounded-xl bg-slate-900/60 backdrop-blur-md border border-white/15 text-center">
+                <Fingerprint className="w-5 h-5 text-amber-400 mx-auto mb-1" />
+                <div className="text-lg font-extrabold text-white">96.4%</div>
+                <div className="text-[10px] text-slate-300 font-medium">Face Match Rate</div>
               </div>
 
-              <div className="p-4 rounded-xl bg-slate-900/50 backdrop-blur-md border border-white/10 text-center">
-                <Clock className="w-5 h-5 text-emerald-400 mx-auto mb-1.5" />
-                <div className="text-xl font-extrabold text-white">3 Shifts</div>
-                <div className="text-[11px] text-slate-400 font-medium">Automated Rosters</div>
+              <div className="p-3 rounded-xl bg-slate-900/60 backdrop-blur-md border border-white/15 text-center">
+                <Clock className="w-5 h-5 text-emerald-400 mx-auto mb-1" />
+                <div className="text-lg font-extrabold text-white">3 Shifts</div>
+                <div className="text-[10px] text-slate-300 font-medium">Automated Rosters</div>
               </div>
 
-              <div className="p-4 rounded-xl bg-slate-900/50 backdrop-blur-md border border-white/10 text-center">
-                <Award className="w-5 h-5 text-cyan-400 mx-auto mb-1.5" />
-                <div className="text-xl font-extrabold text-white">₹1 / sec</div>
-                <div className="text-[11px] text-slate-400 font-medium">Early Login Bonus</div>
+              <div className="p-3 rounded-xl bg-slate-900/60 backdrop-blur-md border border-white/15 text-center">
+                <Award className="w-5 h-5 text-cyan-400 mx-auto mb-1" />
+                <div className="text-lg font-extrabold text-white">₹1 / sec</div>
+                <div className="text-[10px] text-slate-300 font-medium">Early Login Bonus</div>
               </div>
             </div>
           </div>
 
           {/* RIGHT COLUMN: FROSTED GLASS LOGIN CARD (5 Cols) */}
           <div className="lg:col-span-5 w-full">
-            <div className="relative rounded-3xl bg-slate-900/80 backdrop-blur-2xl border border-white/15 p-6 sm:p-8 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)]">
+            <div className="relative rounded-3xl bg-slate-900/90 backdrop-blur-2xl border border-white/20 p-5 sm:p-7 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.85)]">
               
-              {/* Card Header */}
-              <div className="mb-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
-                    <Lock className="w-4 h-4 text-amber-400" />
+              {/* Card Header with Visible BSC HRMS v2.4 Badge */}
+              <div className="mb-5 flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center">
+                      <Lock className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">Sign In</h2>
                   </div>
-                  <h2 className="text-2xl font-black text-white tracking-tight">Sign In</h2>
+                  <p className="text-xs text-slate-300">
+                    Authenticate to your BSC Textiles workspace
+                  </p>
                 </div>
-                <p className="text-xs text-slate-400">
-                  Authenticate to your BSC Textiles enterprise workspace
-                </p>
+                
+                {/* Prominently visible v2.4 card badge */}
+                <div className="flex flex-col items-end flex-shrink-0">
+                  <span className="px-2.5 py-1 rounded-lg bg-amber-400/20 border border-amber-400/50 text-amber-300 font-black text-xs shadow-sm tracking-wide">
+                    BSC HRMS v2.4
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-bold mt-0.5 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Enterprise Portal
+                  </span>
+                </div>
               </div>
 
               {/* Error Alert Banner */}
               {errorMessage && (
                 <div 
-                  className="mb-5 p-3.5 bg-rose-500/15 border border-rose-500/30 rounded-xl flex items-start gap-3 animate-slide-down text-rose-200 text-xs" 
+                  className="mb-4 p-3 bg-rose-500/20 border border-rose-500/40 rounded-xl flex items-start gap-3 animate-slide-down text-rose-200 text-xs" 
                   role="alert"
                 >
-                  <div className="w-4 h-4 rounded-full bg-rose-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 text-rose-400">
+                  <div className="w-4 h-4 rounded-full bg-rose-500/30 flex items-center justify-center flex-shrink-0 mt-0.5 text-rose-400 font-bold">
                     !
                   </div>
                   <div>
@@ -365,9 +383,9 @@ function LoginForm() {
               )}
 
               {/* Form Element */}
-              <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5">
                 <div>
-                  <Label htmlFor="email" className="text-xs font-semibold text-slate-200 mb-1.5 block">
+                  <Label htmlFor="email" className="text-xs font-semibold text-slate-200 mb-1 block">
                     Enterprise Email or Username
                   </Label>
                   <Input
@@ -377,7 +395,7 @@ function LoginForm() {
                     placeholder="name@bsctextiles.com"
                     {...register('email')}
                     disabled={isLoading}
-                    className="w-full bg-slate-950/60 border-slate-700/80 text-white placeholder:text-slate-500 rounded-xl focus:border-amber-400 focus:ring-amber-400/20 text-xs h-11"
+                    className="w-full bg-slate-950/70 border-slate-700/80 text-white placeholder:text-slate-400 rounded-xl focus:border-amber-400 focus:ring-amber-400/20 text-xs h-10"
                   />
                   {errors.email && (
                     <p className="mt-1 text-[11px] text-rose-400 font-medium">
@@ -387,11 +405,13 @@ function LoginForm() {
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center justify-between mb-1">
                     <Label htmlFor="password" className="text-xs font-semibold text-slate-200 block">
                       Security Password
                     </Label>
-                    <span className="text-[10px] text-amber-400/80 font-mono">Default: password123</span>
+                    <span className="text-[10px] text-amber-300 font-mono font-semibold bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                      Default: password123
+                    </span>
                   </div>
                   <div className="relative">
                     <Input
@@ -401,7 +421,7 @@ function LoginForm() {
                       placeholder="••••••••••••"
                       {...register('password')}
                       disabled={isLoading}
-                      className="w-full bg-slate-950/60 border-slate-700/80 text-white placeholder:text-slate-500 rounded-xl focus:border-amber-400 focus:ring-amber-400/20 text-xs h-11 pr-11 font-mono"
+                      className="w-full bg-slate-950/70 border-slate-700/80 text-white placeholder:text-slate-400 rounded-xl focus:border-amber-400 focus:ring-amber-400/20 text-xs h-10 pr-11 font-mono"
                     />
                     <button
                       type="button"
@@ -409,7 +429,7 @@ function LoginForm() {
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 rounded transition-colors"
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showPassword ? <EyeOff className="w-4 h-4 text-slate-300" /> : <Eye className="w-4 h-4 text-slate-300" />}
                     </button>
                   </div>
                   {errors.password && (
@@ -423,7 +443,7 @@ function LoginForm() {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full h-11 mt-2 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 text-slate-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-lg shadow-amber-500/25 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full h-10 mt-1 rounded-xl font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 text-slate-950 bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500 hover:from-amber-300 hover:to-amber-400 shadow-lg shadow-amber-500/25 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {isLoading ? (
                     <>
@@ -439,14 +459,16 @@ function LoginForm() {
                 </button>
               </form>
 
-              {/* QUICK TEST PERSONAS SECTION */}
-              <div className="mt-6 pt-5 border-t border-white/10">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-400">
+              {/* QUICK TEST PERSONAS SECTION - HIGH VISIBILITY */}
+              <div className="mt-5 pt-4 border-t border-white/15">
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-amber-300">
                     <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                     <span>Quick-Select Test Personas</span>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-medium">Click to auto-fill</span>
+                  <span className="text-[10px] text-slate-200 font-bold bg-white/10 px-2 py-0.5 rounded-full border border-white/15">
+                    Click to auto-fill
+                  </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2" role="list" aria-label="Quick test personas">
@@ -459,25 +481,28 @@ function LoginForm() {
                         onClick={() => setPersona(persona.email)}
                         disabled={isLoading}
                         className={cn(
-                          'p-2.5 rounded-xl border text-left transition-all duration-200 relative group',
-                          'bg-gradient-to-br backdrop-blur-sm',
+                          'p-2 rounded-xl border text-left transition-all duration-200 relative group cursor-pointer',
+                          'bg-gradient-to-br backdrop-blur-sm shadow-sm',
                           isSelected 
-                            ? 'ring-2 ring-amber-400 border-amber-400 bg-amber-500/20' 
-                            : persona.accent
+                            ? 'ring-2 ring-amber-400 border-amber-400 bg-amber-500/25 shadow-amber-500/20 shadow-md' 
+                            : cn(persona.accent, 'bg-slate-950/60 hover:bg-slate-950/90')
                         )}
                         role="listitem"
                       >
                         <div className="flex items-start gap-2">
-                          <div className={cn('p-1.5 rounded-lg bg-black/30 flex-shrink-0', persona.iconColor)}>
+                          <div className={cn('p-1 rounded-lg bg-black/40 flex-shrink-0 mt-0.5', persona.iconColor)}>
                             <persona.icon className="w-3.5 h-3.5" aria-hidden="true" />
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-1">
-                              <span className="font-bold text-white text-xs truncate">
+                              <span className="font-extrabold text-white text-xs truncate">
                                 {persona.label}
                               </span>
+                              {isSelected && (
+                                <CheckCircle2 className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                              )}
                             </div>
-                            <span className={cn('text-[9px] font-extrabold uppercase px-1 py-0.2 rounded border inline-block mt-0.5', persona.badge)}>
+                            <span className={cn('text-[9px] font-black uppercase px-1.5 py-0.2 rounded border inline-block mt-0.5', persona.badge)}>
                               {persona.roleTag}
                             </span>
                           </div>
@@ -488,21 +513,24 @@ function LoginForm() {
                 </div>
               </div>
 
-              {/* Security Footnote */}
-              <div className="mt-5 pt-4 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-400">
-                <span className="flex items-center gap-1 text-slate-400">
+              {/* Security Footnote with High-Contrast BSC HRMS v2.4 Badge */}
+              <div className="mt-4 pt-3.5 border-t border-white/15 flex items-center justify-between text-xs font-medium">
+                <span className="flex items-center gap-1.5 text-slate-300 text-[11px]">
                   <Shield className="w-3.5 h-3.5 text-emerald-400" />
                   AES-256 Encrypted Session
                 </span>
-                <span>BSC HRMS v2.4</span>
+                <span className="px-2.5 py-0.5 rounded-full bg-slate-950/80 border border-amber-400/40 text-amber-300 font-extrabold text-[11px] tracking-wide shadow-sm flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                  BSC HRMS v2.4
+                </span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Global Footer */}
-        <footer className="mt-8 text-center text-xs text-slate-400 font-light">
-          © 2024 BSC Textiles Pvt Ltd • Karnataka Retail Operations Network • All Rights Reserved.
+        <footer className="mt-6 text-center text-xs text-slate-300 font-normal">
+          © 2024 BSC Textiles Pvt Ltd • Karnataka Retail Operations Network • Version 2.4 Active
         </footer>
       </div>
     </div>
