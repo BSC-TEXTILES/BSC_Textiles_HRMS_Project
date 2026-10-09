@@ -10,7 +10,7 @@ export default withAuth(
       return NextResponse.redirect(new URL(`/403?from=${encodeURIComponent(pathname)}`, req.url));
     }
 
-    if (pathname.startsWith('/operations') && !['SUPER_ADMIN', 'ADMIN', 'HR', 'FLOOR_MANAGER'].includes(token?.role || '')) {
+    if (pathname.startsWith('/operations') && !['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'LOCATION_MANAGER', 'FLOOR_MANAGER'].includes(token?.role || '')) {
       return NextResponse.redirect(new URL(`/403?from=${encodeURIComponent(pathname)}`, req.url));
     }
 
