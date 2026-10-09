@@ -578,6 +578,27 @@ function applySelect(row: any, select: any): any {
   return out;
 }
 
+const tableColumnsCache = new Map<string, Set<string>>();
+
+async function getTableColumns(tableName: string, client: any): Promise<Set<string>> {
+  if (tableColumnsCache.has(tableName)) {
+    return tableColumnsCache.get(tableName)!;
+  }
+  try {
+    const [cols]: any = await client.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
+      [tableName]
+    );
+    const set = new Set<string>(cols.map((c: any) => String(c.COLUMN_NAME)));
+    if (set.size > 0) {
+      tableColumnsCache.set(tableName, set);
+    }
+    return set;
+  } catch {
+    return new Set<string>();
+  }
+}
+
 export class ModelDelegate {
   constructor(
     private modelName: string,
@@ -665,15 +686,29 @@ export class ModelDelegate {
 
   async create(args: { data: any; select?: any; include?: any }): Promise<any> {
     const client = await this.getClient();
+    const cols = await getTableColumns(this.tableName, client);
     const data = { ...args.data };
-    if (!data.id) {
-      data.id = generateId();
-    }
-    if (!data.createdAt && !data.created_at) {
-      data.createdAt = new Date();
-    }
-    if (!data.updatedAt && !data.updated_at) {
-      data.updatedAt = new Date();
+
+    if (cols.size > 0) {
+      if (!data.id && cols.has('id')) {
+        data.id = generateId();
+      }
+      if (!data.createdAt && !data.created_at && cols.has('createdAt')) {
+        data.createdAt = new Date();
+      }
+      if (!data.updatedAt && !data.updated_at && cols.has('updatedAt')) {
+        data.updatedAt = new Date();
+      }
+    } else {
+      if (!data.id) {
+        data.id = generateId();
+      }
+      if (!data.createdAt && !data.created_at) {
+        data.createdAt = new Date();
+      }
+      if (!data.updatedAt && !data.updated_at) {
+        data.updatedAt = new Date();
+      }
     }
 
     const keys: string[] = [];
@@ -681,6 +716,7 @@ export class ModelDelegate {
 
     for (const [k, v] of Object.entries(data)) {
       if (v === undefined) continue;
+      if (cols.size > 0 && !cols.has(k)) continue;
       if (typeof v === 'object' && v !== null && !(v instanceof Date) && !Array.isArray(v)) {
         if ('create' in v || 'connect' in v) continue;
       }
@@ -722,14 +758,18 @@ export class ModelDelegate {
       throw new Error(`Record to update not found in ${this.modelName}`);
     }
 
+    const cols = await getTableColumns(this.tableName, client);
     const data = { ...args.data };
-    data.updatedAt = new Date();
+    if (cols.size === 0 || cols.has('updatedAt')) {
+      data.updatedAt = new Date();
+    }
 
     const setClauses: string[] = [];
     const values: any[] = [];
 
     for (const [k, v] of Object.entries(data)) {
       if (v === undefined) continue;
+      if (cols.size > 0 && !cols.has(k)) continue;
       if (typeof v === 'object' && v !== null && !(v instanceof Date) && !Array.isArray(v)) {
         if ('increment' in v) {
           setClauses.push(`\`${k}\` = \`${k}\` + ?`);
