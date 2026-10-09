@@ -106,6 +106,18 @@ const RELATION_META: Record<
     section: { table: 'section', foreignKey: 'sectionId' },
     shift: { table: 'shift', foreignKey: 'shiftId' },
     user: { table: 'user', parentKey: 'id', foreignKey: 'employeeId' },
+    faceProfile: { table: 'faceprofile', parentKey: 'id', foreignKey: 'employeeId' },
+    qrCode: { table: 'qrcode', foreignKey: 'qrCodeId' },
+    dailyQRCode: { table: 'qrcode', foreignKey: 'dailyQRCodeId' },
+    attendances: { table: 'attendance', parentKey: 'id', foreignKey: 'employeeId', isMany: true },
+    breaks: { table: 'employeebreak', parentKey: 'id', foreignKey: 'employeeId', isMany: true },
+    faceVerifications: { table: 'faceverification', parentKey: 'id', foreignKey: 'employeeId', isMany: true },
+    qrScanRecords: { table: 'qrscanrecord', parentKey: 'id', foreignKey: 'employeeId', isMany: true },
+    observations: { table: 'observation', parentKey: 'id', foreignKey: 'employeeId', isMany: true },
+    sellingPoints: { table: 'employeesellingpoint', parentKey: 'id', foreignKey: 'employeeId', isMany: true },
+    leaves: { table: 'leaverequest', parentKey: 'id', foreignKey: 'employeeId', isMany: true },
+    leaveRequests: { table: 'leaverequest', parentKey: 'id', foreignKey: 'employeeId', isMany: true },
+    payrollItems: { table: 'payrollitem', parentKey: 'id', foreignKey: 'employeeId', isMany: true },
   },
   location: {
     manager: { table: 'user', foreignKey: 'managerId' },
@@ -199,6 +211,18 @@ const RELATION_META: Record<
     messages: { table: 'livestreammessage', foreignKey: 'streamId', isMany: true },
     reactions: { table: 'livestreamreaction', foreignKey: 'streamId', isMany: true },
     viewers: { table: 'livestreamviewer', foreignKey: 'streamId', isMany: true },
+  },
+  employeesellingpoint: {
+    employee: { table: 'employee', foreignKey: 'employeeId' },
+    sellingPoint: { table: 'sellingpoint', foreignKey: 'sellingPointId' },
+  },
+  employeeSellingPoint: {
+    employee: { table: 'employee', foreignKey: 'employeeId' },
+    sellingPoint: { table: 'sellingpoint', foreignKey: 'sellingPointId' },
+  },
+  sellingPoints: {
+    employee: { table: 'employee', foreignKey: 'employeeId' },
+    sellingPoint: { table: 'sellingpoint', foreignKey: 'sellingPointId' },
   },
 };
 
@@ -468,7 +492,8 @@ async function resolveIncludes(
 
     if (isMany) {
       const foreignKey = relMeta.foreignKey || `${modelName}Id`;
-      const parentIds = rows.map((r) => r.id).filter(Boolean);
+      const parentKey = relMeta.parentKey || 'id';
+      const parentIds = rows.map((r) => r[parentKey]).filter(Boolean);
       if (parentIds.length === 0) {
         for (const row of rows) row[relKey] = [];
         continue;
@@ -498,7 +523,11 @@ async function resolveIncludes(
         map.get(pid)!.push(child);
       }
       for (const row of rows) {
-        row[relKey] = map.get(String(row.id)) || [];
+        let children = map.get(String(row[parentKey])) || [];
+        if (cfg?.take && typeof cfg.take === 'number') {
+          children = children.slice(0, cfg.take);
+        }
+        row[relKey] = children;
       }
     } else {
       const fk = relMeta.foreignKey || `${relKey}Id`;

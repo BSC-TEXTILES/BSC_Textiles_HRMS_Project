@@ -6,6 +6,17 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { Logo } from '@/components/ui/Logo';
 import api from '@/lib/api';
+import { 
+  Bell, 
+  User, 
+  CheckCheck, 
+  ExternalLink, 
+  LogOut, 
+  ShieldCheck, 
+  Clock, 
+  Sparkles,
+  ChevronDown
+} from 'lucide-react';
 
 interface NavSectionConfig {
   title: string;
@@ -75,6 +86,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [selectedHub, setSelectedHub] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(3);
+
+  // Close dropdowns on route changes
+  useEffect(() => {
+    setNotificationsOpen(false);
+    setProfileMenuOpen(false);
+  }, [pathname]);
 
   // Persist sidebar collapsed state
   useEffect(() => {
@@ -437,23 +457,187 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <span className="text-[10px] text-slate-500 font-medium">Today • Shift A</span>
           </div>
 
-          {/* Notification Icon */}
-          <div className="relative flex items-center justify-center p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors cursor-pointer">
-            <span className="material-symbols-outlined text-[20px]">notifications</span>
-            <span className="absolute top-1 right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-600 text-white text-[9px] font-bold">
-              3
-            </span>
+          {/* Notification Icon & Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setNotificationsOpen(!notificationsOpen);
+                setProfileMenuOpen(false);
+              }}
+              className="relative flex items-center justify-center p-2 rounded-lg text-slate-500 hover:text-[#0058be] hover:bg-[#eff4ff] transition-colors cursor-pointer border border-transparent hover:border-blue-100"
+              title="Notifications & System Alerts"
+              aria-label="Notifications"
+            >
+              <Bell className="w-5 h-5 text-slate-600 hover:text-[#0058be] transition-colors" />
+              {unreadNotifications > 0 && (
+                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-bold shadow-sm">
+                  {unreadNotifications}
+                </span>
+              )}
+            </button>
+
+            {/* Notification Dropdown Popover */}
+            {notificationsOpen && (
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="p-3.5 bg-gradient-to-r from-slate-900 to-[#131b2e] text-white flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Bell className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-bold tracking-tight">System Notifications</span>
+                    {unreadNotifications > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full bg-amber-400/20 text-amber-300 text-[10px] font-bold border border-amber-400/30">
+                        {unreadNotifications} new
+                      </span>
+                    )}
+                  </div>
+                  {unreadNotifications > 0 && (
+                    <button
+                      onClick={() => setUnreadNotifications(0)}
+                      className="text-[11px] text-slate-300 hover:text-white flex items-center gap-1 transition-colors"
+                    >
+                      <CheckCheck className="w-3.5 h-3.5" />
+                      Mark read
+                    </button>
+                  )}
+                </div>
+
+                <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
+                  <div className="p-3 hover:bg-slate-50 transition-colors flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5 font-bold">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-900">IoT Face Recognition Sync</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                        Belagavi Terminal-01 confirmed 99.8% biometric face match across 42 morning punch events.
+                      </p>
+                      <span className="text-[10px] text-slate-400 mt-1 block font-mono">2 mins ago • BEL-01</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 hover:bg-slate-50 transition-colors flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0058be] flex items-center justify-center shrink-0 mt-0.5 font-bold">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-900">Early Login Incentive Credited</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                        ₹1/sec early login incentive of ₹720 awarded for 12m early arrival on Shift A.
+                      </p>
+                      <span className="text-[10px] text-slate-400 mt-1 block font-mono">14 mins ago • INCENTIVE</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 hover:bg-slate-50 transition-colors flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 mt-0.5 font-bold">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-900">Shift Roster Auto-Published</p>
+                      <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                        Davanagere &amp; Shivamogga retail rosters synchronized for 3 shifts and 350+ artisans.
+                      </p>
+                      <span className="text-[10px] text-slate-400 mt-1 block font-mono">1 hour ago • SHIFT-A</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                  <Link
+                    href="/operations/observations"
+                    onClick={() => setNotificationsOpen(false)}
+                    className="text-[#0058be] hover:underline font-semibold flex items-center gap-1"
+                  >
+                    View Operations Log
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
+                  <button
+                    onClick={() => setNotificationsOpen(false)}
+                    className="text-slate-500 hover:text-slate-800 font-medium"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* User Profile Capsule */}
-          <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-            <div className="hidden sm:flex flex-col text-right">
-              <span className="text-xs font-bold text-[#0b1c30] leading-none">{userName}</span>
-              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mt-0.5">{userRole}</span>
-            </div>
-            <div className="w-8 h-8 rounded-full bg-[#131b2e] text-white flex items-center justify-center font-bold text-xs shadow-sm">
-              {userName.split(' ').map(n => n[0]).join('').slice(0, 2) || 'SA'}
-            </div>
+          {/* User Profile Capsule with Interactive Dropdown */}
+          <div className="relative pl-2 border-l border-slate-200">
+            <button
+              onClick={() => {
+                setProfileMenuOpen(!profileMenuOpen);
+                setNotificationsOpen(false);
+              }}
+              className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer text-left"
+              title="User Account & Profile"
+              aria-label="User Account"
+            >
+              <div className="hidden sm:flex flex-col text-right">
+                <span className="text-xs font-bold text-[#0b1c30] leading-none">{userName}</span>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mt-0.5">{userRole}</span>
+              </div>
+              <div className="w-8 h-8 rounded-full bg-[#131b2e] text-white flex items-center justify-center font-bold text-xs shadow-sm ring-2 ring-blue-500/20">
+                {userName.split(' ').map((n: string) => n[0]).join('').slice(0, 2) || 'SA'}
+              </div>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
+            </button>
+
+            {/* Profile Menu Dropdown */}
+            {profileMenuOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="p-3 bg-slate-50 border-b border-slate-100">
+                  <p className="text-xs font-bold text-slate-900 truncate">{userName}</p>
+                  <p className="text-[11px] text-slate-500 truncate">{userEmail}</p>
+                  <span className="inline-block mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-100 text-[#0058be]">
+                    {userRole}
+                  </span>
+                </div>
+
+                <div className="p-1.5 space-y-0.5 text-xs">
+                  <Link
+                    href="/employees/profile"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 hover:bg-[#eff4ff] hover:text-[#0058be] font-medium transition-colors"
+                  >
+                    <User className="w-4 h-4 text-slate-500" />
+                    <span>My Profile &amp; 360° Dossier</span>
+                  </Link>
+
+                  <Link
+                    href="/my-desk"
+                    onClick={() => setProfileMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 hover:bg-[#eff4ff] hover:text-[#0058be] font-medium transition-colors"
+                  >
+                    <Clock className="w-4 h-4 text-slate-500" />
+                    <span>My Desk Self-Service</span>
+                  </Link>
+
+                  {['SUPER_ADMIN', 'ADMIN'].includes(rawRole) && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setProfileMenuOpen(false)}
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 hover:bg-[#eff4ff] hover:text-[#0058be] font-medium transition-colors"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-slate-500" />
+                      <span>Security &amp; User RBAC</span>
+                    </Link>
+                  )}
+                </div>
+
+                <div className="p-1.5 border-t border-slate-100">
+                  <button
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      handleSignOut();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors text-left"
+                  >
+                    <LogOut className="w-4 h-4 text-red-500" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </header>

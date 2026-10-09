@@ -32,7 +32,13 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
     const { locationId, floorId, departmentId, sectionId, shiftId, status, page = 1, limit = 20, search } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
     
-    const where: any = { locationId: req.user!.role === 'SUPER_ADMIN' ? locationId : req.user!.locationId };
+    const isElevated = ['SUPER_ADMIN', 'ADMIN', 'HR_AUDITOR'].includes(req.user!.role);
+    const where: any = {};
+    if (locationId) {
+      where.locationId = locationId;
+    } else if (!isElevated && req.user!.locationId) {
+      where.locationId = req.user!.locationId;
+    }
     if (floorId) where.floorId = floorId;
     if (departmentId) where.departmentId = departmentId;
     if (sectionId) where.sectionId = sectionId;
@@ -95,7 +101,11 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Employee not found' });
     }
     
-    if (req.user!.role !== 'SUPER_ADMIN' && employee.locationId !== req.user!.locationId) {
+    const isProfileElevated = ['SUPER_ADMIN', 'ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE', 'HR_AUDITOR'].includes(req.user!.role);
+    const isOwnProfile = req.user!.employeeId && req.user!.employeeId === employee.id;
+    const isSameLocation = req.user!.locationId && req.user!.locationId === employee.locationId;
+
+    if (!isProfileElevated && !isOwnProfile && !isSameLocation) {
       return res.status(403).json({ error: 'Access denied' });
     }
     
@@ -110,7 +120,8 @@ router.post('/', authorize('ADD'), validate(employeeSchema), async (req: AuthReq
   try {
     const { employeeCode, firstName, lastName, email, phone, gender, locationId, floorId, departmentId, sectionId, shiftId, designation, role, joiningDate } = req.body;
     
-    if (req.user!.role !== 'SUPER_ADMIN' && locationId !== req.user!.locationId) {
+    const isMutationElevated = ['SUPER_ADMIN', 'ADMIN'].includes(req.user!.role);
+    if (!isMutationElevated && locationId !== req.user!.locationId) {
       return res.status(403).json({ error: 'Access denied' });
     }
     
@@ -204,7 +215,8 @@ router.put('/:id', authorize('EDIT'), validate(employeeSchema), async (req: Auth
       return res.status(404).json({ error: 'Employee not found' });
     }
     
-    if (req.user!.role !== 'SUPER_ADMIN' && existing.locationId !== req.user!.locationId) {
+    const isEditElevated = ['SUPER_ADMIN', 'ADMIN'].includes(req.user!.role);
+    if (!isEditElevated && existing.locationId !== req.user!.locationId) {
       return res.status(403).json({ error: 'Access denied' });
     }
     
@@ -246,7 +258,8 @@ router.patch('/:id/status', authorize('EDIT'), async (req: AuthRequest, res) => 
       return res.status(404).json({ error: 'Employee not found' });
     }
     
-    if (req.user!.role !== 'SUPER_ADMIN' && existing.locationId !== req.user!.locationId) {
+    const isStatusElevated = ['SUPER_ADMIN', 'ADMIN'].includes(req.user!.role);
+    if (!isStatusElevated && existing.locationId !== req.user!.locationId) {
       return res.status(403).json({ error: 'Access denied' });
     }
     
