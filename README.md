@@ -57,7 +57,7 @@ Weaving Dreams, Building Futures
 33. [Environment Configuration](#33-environment-configuration)
 34. [Local Development](#34-local-development)
 35. [Database Setup](#35-database-setup)
-36. [Prisma Setup](#36-prisma-setup)
+36. [Database Migrations & Seeds](#36-database-migrations--seeds)
 37. [Seed Data](#37-seed-data)
 38. [Testing](#38-testing)
 39. [Deployment](#39-deployment)
@@ -144,7 +144,7 @@ graph TB
     end
 
     subgraph DATA_TIER["Persistence & Storage Tier"]
-        PRISMA["Prisma ORM Client v5.7"]:::cDark
+        MYSQL_POOL["Native MySQL 8.0 Pool (mysql2)"]:::cDark
         MYSQL[("MySQL 8.0 Normalized Database")]:::cDb
         UPLOADS[("Local Media / Upload Storage")]:::cTeal
     end
@@ -166,8 +166,8 @@ graph TB
     UI_DESK <--> SOCKET_SRV
 
     API_ROUTER --> BIZ_RULES
-    BIZ_RULES --> PRISMA
-    PRISMA --> MYSQL
+    BIZ_RULES --> MYSQL_POOL
+    MYSQL_POOL --> MYSQL
     API_ROUTER --> UPLOADS
     API_ROUTER <--> EXT_TIER
 
@@ -298,10 +298,10 @@ BSC-Textiles-HRMS/
 │   ├── package.json
 │   └── tsconfig.json
 │
-├── database/                     # MySQL 8.0 Schema & Prisma Engine
-│   ├── prisma/
-│   │   ├── schema.prisma         # 38 Normalized models & relational mappings
-│   │   └── seed.ts               # Complete synthetic seed data generator
+├── database/                     # Pure Native MySQL 8.0 Engine
+│   ├── migrations/               # 10 DDL SQL Migration files
+│   ├── seeds/                    # Enterprise multi-branch SQL seed files
+│   ├── src/                      # Connection pool (mysql2/promise)
 │   └── package.json
 │
 ├── .env                          # Root environment configuration
@@ -403,7 +403,7 @@ flowchart TD
     IS_SUPER -- "YES" --> UNRESTRICTED["Permit Global Query Access (No location filter applied)"]:::cGreen
     IS_SUPER -- "NO" --> CHECK_SCOPE{"Target Resource Matches req.user.locationId?"}:::cOrange
 
-    CHECK_SCOPE -- "MATCH / OWN BRANCH" --> INJECT_FILTER["Force locationId Filter in Prisma Query Builder"]:::cGreen
+    CHECK_SCOPE -- "MATCH / OWN BRANCH" --> INJECT_FILTER["Force locationId Filter in MySQL Query"]:::cGreen
     CHECK_SCOPE -- "MISMATCH / TAMPERING" --> REJECT_403["Reject: 403 Forbidden ('Access denied to this location')"]:::cRed
 
     INJECT_FILTER --> EXECUTE_DB["Execute Query on MySQL (Branch Records Only)"]:::cDb
@@ -489,7 +489,7 @@ flowchart TD
     SCHEMA_VAL -- "Valid" --> BIZ_CTRL["Domain Business Controller Execution"]:::cGreen
 
     BIZ_CTRL --> CALC["Mathematical Rules Engine (Incentive / Break / Overtime)"]:::cOrange
-    CALC --> DB_TX["Prisma Multi-Model ACID Transaction"]:::cDb
+    CALC --> DB_TX["MySQL Multi-Table ACID Transaction"]:::cDb
 
     DB_TX --> WRITE_AUDIT["Append-Only Audit Log Transaction Record"]:::cDb
     DB_TX --> DISPATCH_WS["Socket.IO Event Broadcast to Location Room"]:::cPurple
@@ -508,7 +508,7 @@ flowchart TD
 
 ## 12. Database Architecture
 
-The data tier is structured around 38 relational models managed via Prisma ORM on MySQL 8.0:
+The data tier is structured around 38 relational tables on Native MySQL 8.0:
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#00758F', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
@@ -1297,42 +1297,52 @@ CREATE DATABASE IF NOT EXISTS bsc_textiles_hrms
 
 ---
 
-## 36. Prisma Setup
+## 36. Database Migrations & Native MySQL Setup
 
-From the `database/` directory:
+The data persistence layer operates purely on **Native MySQL 8.0** using connection pooling via `mysql2/promise`.
+
+From the project root:
 
 ```bash
-cd database
-npm install
-
-# Generate Prisma Client
-npm run prisma:generate
-
-# Push schema directly or apply migrations
-npm run db:push
+# Automated setup (executes all SQL migrations and provisions multi-branch seed data)
+npm run db:setup
 ```
 
-To inspect the database graphically:
+Or execute discrete migration and seeding steps:
+
 ```bash
-npm run prisma:studio
+# Apply schema migrations (DDL SQL files in database/migrations)
+npm run db:migrate
+
+# Seed synthetic retail branches, rosters, and test personas
+npm run db:seed
 ```
 
 ---
 
-## 37. Seed Data
+## 37. Seed Data & Test Personas
 
-To populate the database with complete synthetic store locations, departments, selling points, employee rosters, and test accounts:
+The seed script provisions complete synthetic store locations, departments, selling points, employee rosters, and test accounts:
 
 ```bash
-cd database
-npm run prisma:seed
+npm run db:seed
 ```
 
 This provisions:
-- 3 Store locations (`Belagavi`, `Davanagere`, `Shivamogga`)
-- 12 Showroom floors, departments, and selling point registers
-- 14 Test user accounts across all system personas
-- 50+ Active staff records with realistic historical punches and break records
+- **3 Karnataka Retail Flagship Hubs:** `Belagavi (BEL-01)`, `Davanagere (DAV-02)`, `Shivamogga (SHI-03)`
+- **12 Showroom floors, departments, and selling point registers**
+- **36 Enterprise users & employees** across all operational personas
+- **Complete historical attendance punches, biometric face verification logs, and break records**
+
+### Standard Testing Credentials:
+| Persona / Role | Email | Password | Location Scope |
+| :--- | :--- | :--- | :--- |
+| **Super Admin** | `admin@bsctextiles.com` | `password123` | **Global (All 3 Hubs)** |
+| **Belagavi HR** | `kavita.bhat@bsctextiles.com` | `password123` | **Belagavi Flagship (BEL-01)** |
+| **Shivamogga HR** | `vikram.singh@bsctextiles.com` | `password123` | **Shivamogga Apex (SHI-03)** |
+| **Floor Manager** | `amit.patel@bsctextiles.com` | `password123` | **Belagavi Floor 1** |
+| **T-Shop Scanner** | `ramesh.gowda@bsctextiles.com` | `password123` | **Belagavi Tea Point** |
+| **Sales Employee** | `rajesh.kumar@bsctextiles.com` | `password123` | **Belagavi Men's Wear** |
 
 ---
 
@@ -1341,8 +1351,7 @@ This provisions:
 The repository contains an automated integration test runner compliant with **PRD Section 60**:
 
 ```bash
-cd backend
-npm test
+npm run test --workspace=backend
 ```
 
 ### Verified Test Categories (43 / 43 Passed — 100% Pass Rate):
@@ -1361,12 +1370,11 @@ npm test
 ### Production Build Steps
 
 ```bash
-# 1. Build Database Client
-cd database
-npm run prisma:generate
+# 1. Typecheck all workspaces
+npm run typecheck
 
 # 2. Build Backend Server
-cd ../backend
+cd backend
 npm run build
 
 # 3. Build Next.js Production Bundle
@@ -1442,7 +1450,7 @@ mysql -u bsc_admin -p bsc_textiles_hrms < /var/backups/bsc_hrms_20261008_120000.
 
 | Symptom | Root Cause | Remediation Step |
 |---|---|---|
-| `PrismaClientInitializationError: Can't reach database server` | MySQL server stopped or `DATABASE_URL` misconfigured | Verify MySQL service status (`systemctl status mysql`) and confirm credentials in `.env`. |
+| `MySQL Connection Error: Can't reach database server` | MySQL server stopped or `DATABASE_URL` misconfigured | Verify MySQL service status (`systemctl status mysql`) and confirm credentials in `.env`. |
 | `JWT secret is set to a committed placeholder value` | Server refused to boot in production with default test secret | Generate a cryptographically random secret with `crypto.randomBytes(48).toString('base64url')`. |
 | `Cross-Origin Request Blocked (CORS)` | Origin mismatch between frontend and backend | Update `FRONTEND_URL` in `.env` to match the exact frontend URL (including port/protocol). |
 | `403 Forbidden: Access denied to this location` | User attempting to query resource outside assigned store branch | Ensure user possesses `SUPER_ADMIN` role or restrict queries to their assigned `locationId`. |
@@ -1453,7 +1461,7 @@ mysql -u bsc_admin -p bsc_textiles_hrms < /var/backups/bsc_hrms_20261008_120000.
 ## 43. Maintenance
 
 - **Log Rotation:** Configure `logrotate` for PM2 log outputs (`/root/.pm2/logs/*.log`) retaining 14 days of logs.
-- **Prisma Schema Updates:** Always execute migrations via `prisma migrate deploy` in production environments.
+- **Database Migrations:** Always execute schema updates via `npm run db:migrate` in production environments.
 - **Index Optimization:** Monitor high-frequency query indexes on `Attendance(employeeId, attendanceDate)` and `QRCode(token)`.
 
 ---
