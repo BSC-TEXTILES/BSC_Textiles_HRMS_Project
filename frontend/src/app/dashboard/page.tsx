@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { MetricDrillDownModal, type MetricKey } from '@/components/dashboard/MetricDrillDownModal';
 import api from '@/lib/api';
 
 interface DashboardStats {
@@ -41,11 +42,33 @@ interface PunchRecord {
   incentive?: string;
 }
 
+// Detail-view titles for each drill-down KPI card.
+const METRIC_TITLES: Record<MetricKey, string> = {
+  workforce: 'Workforce Register',
+  adherence: 'Floor Adherence',
+  punches: 'Biometric Punches',
+  breaks: 'Active Floor Breaks',
+  incentives: 'Incentives Today',
+};
+
+// Human-readable hub labels for the drill-down filter context.
+const HUB_LABELS: Record<string, string> = {
+  all: 'All Hubs (Karnataka)',
+  loc_bel: 'Belagavi Flagship (BEL-01)',
+  loc_dav: 'Davanagere Hub (DAV-02)',
+  loc_shi: 'Shivamogga Hub (SHI-03)',
+};
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedHub, setSelectedHub] = useState('all');
   const [selectedDept, setSelectedDept] = useState('all');
+  const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
+  const [selectedShift, setSelectedShift] = useState('all');
+  const [shiftOptions, setShiftOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [deptOptions, setDeptOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null);
   const [recentPunches, setRecentPunches] = useState<PunchRecord[]>([]);
   const [syncing, setSyncing] = useState(false);
 
@@ -156,6 +179,36 @@ export default function DashboardPage() {
     fetchDashboardData();
   }, [selectedHub, fetchDashboardData]);
 
+  // Load shift & department options for the filters (used by card drill-downs)
+  useEffect(() => {
+    let ignore = false;
+    const loadOptions = async () => {
+      try {
+        const loc = selectedHub !== 'all' ? `&locationId=${selectedHub}` : '';
+        const [shiftRes, deptRes] = await Promise.all([
+          api.get(`/shifts?limit=100${loc}`).catch(() => ({ data: null })),
+          api.get(`/departments?limit=100${loc}`).catch(() => ({ data: null })),
+        ]);
+        if (!ignore) {
+          setShiftOptions(shiftRes.data?.shifts || []);
+          setDeptOptions(deptRes.data?.departments || []);
+        }
+      } catch {
+        if (!ignore) {
+          setShiftOptions([]);
+          setDeptOptions([]);
+        }
+      }
+    };
+    loadOptions();
+    // Reset dependent filters when the hub changes to avoid stale selections.
+    setSelectedDept('all');
+    setSelectedShift('all');
+    return () => {
+      ignore = true;
+    };
+  }, [selectedHub]);
+
   const handleManualSync = async () => {
     setSyncing(true);
     await fetchDashboardData();
@@ -206,6 +259,18 @@ export default function DashboardPage() {
       badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     },
   ];
+
+  // Shared interactive styles for the 5 drill-down KPI cards.
+  const cardActionClass =
+    'group flex flex-col justify-between w-full text-left bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#0058be] focus:ring-offset-2 active:scale-[0.99]';
+
+  // Small "View details" affordance shown at the bottom of each clickable card.
+  const viewDetailsHint = (
+    <span className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#0058be] opacity-70 group-hover:opacity-100 transition-opacity">
+      <span>View Details</span>
+      <span className="material-symbols-outlined text-[14px] transition-transform group-hover:translate-x-0.5">arrow_forward</span>
+    </span>
+  );
 
   return (
     <DashboardLayout>
@@ -287,20 +352,42 @@ export default function DashboardPage() {
                   className="bg-transparent font-semibold text-xs text-[#0b1c30] focus:outline-none cursor-pointer pr-1"
                 >
                   <option value="all">All Departments</option>
-                  <option value="bridal">Bridal & Silk Atelier</option>
-                  <option value="ops">Store Ops & Cashiering</option>
-                  <option value="vm">Visual Merchandising</option>
-                  <option value="logistics">Logistics & Warehousing</option>
+                  {deptOptions.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
                 </select>
               </div>
 
-              {/* Date Range Pill */}
-              <div className="inline-flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-xs text-xs text-[#0b1c30]">
+              {/* Date Filter */}
+              <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-xs text-xs">
                 <span className="material-symbols-outlined text-[#0058be] text-[16px]">calendar_today</span>
-                <span className="font-semibold">Today: Oct 2024</span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-[#eff4ff] text-[#0058be] font-bold border border-[#dce9ff]">
-                  Shift A (09:30 - 18:30)
-                </span>
+                <span className="text-[10px] uppercase text-slate-400 font-bold">Date:</span>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="bg-transparent font-semibold text-xs text-[#0b1c30] focus:outline-none cursor-pointer"
+                />
+              </div>
+
+              {/* Shift Filter */}
+              <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-slate-200 shadow-xs text-xs">
+                <span className="material-symbols-outlined text-slate-400 text-[16px]">schedule</span>
+                <span className="text-[10px] uppercase text-slate-400 font-bold">Shift:</span>
+                <select
+                  value={selectedShift}
+                  onChange={(e) => setSelectedShift(e.target.value)}
+                  className="bg-transparent font-semibold text-xs text-[#0b1c30] focus:outline-none cursor-pointer pr-1"
+                >
+                  <option value="all">All Shifts</option>
+                  {shiftOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -331,7 +418,12 @@ export default function DashboardPage() {
         {/* 5 KEY METRIC KPI CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Card 1: Total Workforce */}
-          <div className="flex flex-col justify-between bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+          <button
+            type="button"
+            onClick={() => setActiveMetric('workforce')}
+            aria-label="View Workforce Register details"
+            className={cardActionClass}
+          >
             <div className="flex items-start justify-between">
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Workforce Register</span>
@@ -351,10 +443,16 @@ export default function DashboardPage() {
                 <span className="text-[#0058be] font-bold">+3 MTD</span>
               </div>
             </div>
-          </div>
+            {viewDetailsHint}
+          </button>
 
           {/* Card 2: Live Floor Adherence */}
-          <div className="flex flex-col justify-between bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+          <button
+            type="button"
+            onClick={() => setActiveMetric('adherence')}
+            aria-label="View Floor Adherence details"
+            className={cardActionClass}
+          >
             <div className="flex items-start justify-between">
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Floor Adherence</span>
@@ -378,10 +476,16 @@ export default function DashboardPage() {
                 {totalEmp - activeFloor} Off/Leave • 0 Unexcused
               </div>
             </div>
-          </div>
+            {viewDetailsHint}
+          </button>
 
           {/* Card 3: Biometric Activity */}
-          <div className="flex flex-col justify-between bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+          <button
+            type="button"
+            onClick={() => setActiveMetric('punches')}
+            aria-label="View Biometric Punches details"
+            className={cardActionClass}
+          >
             <div className="flex items-start justify-between">
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Biometric Punches</span>
@@ -401,10 +505,16 @@ export default function DashboardPage() {
                 <span className="font-semibold text-slate-700">{stats?.qrScans ?? 52} scans</span>
               </div>
             </div>
-          </div>
+            {viewDetailsHint}
+          </button>
 
           {/* Card 4: Break Tracker */}
-          <div className="flex flex-col justify-between bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+          <button
+            type="button"
+            onClick={() => setActiveMetric('breaks')}
+            aria-label="View Active Floor Breaks details"
+            className={cardActionClass}
+          >
             <div className="flex items-start justify-between">
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Active Floor Breaks</span>
@@ -424,10 +534,16 @@ export default function DashboardPage() {
                 <span>0 Overruns</span>
               </div>
             </div>
-          </div>
+            {viewDetailsHint}
+          </button>
 
           {/* Card 5: Incentives Earned */}
-          <div className="flex flex-col justify-between bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs hover:shadow-md transition-shadow">
+          <button
+            type="button"
+            onClick={() => setActiveMetric('incentives')}
+            aria-label="View Incentives Today details"
+            className={cardActionClass}
+          >
             <div className="flex items-start justify-between">
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Incentives Today</span>
@@ -447,7 +563,8 @@ export default function DashboardPage() {
                 <span className="font-semibold text-slate-700">₹3,700</span>
               </div>
             </div>
-          </div>
+            {viewDetailsHint}
+          </button>
         </div>
 
         {/* SECTION 2: KARNATAKA STORE HUBS MONITOR */}
@@ -705,6 +822,33 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Card drill-down detail modal */}
+      {activeMetric && (
+        <MetricDrillDownModal
+          metric={activeMetric}
+          title={METRIC_TITLES[activeMetric]}
+          filters={{
+            locationId: selectedHub,
+            departmentId: selectedDept,
+            shiftId: selectedShift,
+            date: selectedDate,
+          }}
+          context={{
+            hub: HUB_LABELS[selectedHub] || 'All Hubs (Karnataka)',
+            dept:
+              selectedDept === 'all'
+                ? 'All Departments'
+                : deptOptions.find((d) => d.id === selectedDept)?.name || 'All Departments',
+            shift:
+              selectedShift === 'all'
+                ? 'All Shifts'
+                : shiftOptions.find((s) => s.id === selectedShift)?.name || 'All Shifts',
+            date: selectedDate,
+          }}
+          onClose={() => setActiveMetric(null)}
+        />
+      )}
     </DashboardLayout>
   );
 }
