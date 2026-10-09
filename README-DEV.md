@@ -9,7 +9,7 @@
 ## Quick Start (Windows)
 
 ```powershell
-# 1. Start MySQL + create database + apply Prisma schema + seed users
+# 1. Start MySQL + create database + apply native MySQL schema + seed users
 .\setup-database.ps1
 
 # 2. Start development servers (backend :4000, frontend :3000)
@@ -89,19 +89,19 @@ taskkill /PID <PID> /F
 
 ### Reset the database from scratch
 ```powershell
-.\setup-database.ps1    # re-applies Prisma schema + reseeds all users
+.\setup-database.ps1    # runs native MySQL migrations + seeds baseline users
 ```
 
 ## Project Structure
 
 ```
-├── backend/            # Express + TypeScript + Prisma API
-├── frontend/           # Next.js 14 + React + Tailwind (env: frontend/.env.local)
-├── database/           # Native MySQL schema/migrations/seed (future layer)
+├── backend/            # Express + TypeScript + Native MySQL 8.0 API
+├── frontend/           # Next.js 15 + React + Tailwind (env: frontend/.env.local)
+├── database/           # Native MySQL 8.0 schema, versioned migrations & seeds
 ├── docker-compose.yml  # Optional Docker setup (requires Docker Desktop)
-├── .env                # Backend + Prisma environment configuration
+├── .env                # Backend + Database environment configuration
 ├── start-mysql.ps1     # Start mysqld background process on :3306
-├── setup-database.ps1  # MySQL + prisma db push + seed
+├── setup-database.ps1  # MySQL check + native migration + seed
 ├── start-dev.ps1       # MySQL check + start both servers
 └── start-dev.ps1 / npm run dev
 ```
