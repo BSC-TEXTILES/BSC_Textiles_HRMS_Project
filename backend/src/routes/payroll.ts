@@ -493,33 +493,39 @@ router.put('/payslip/:itemId', async (req: AuthRequest, res) => {
     const [existingRows]: any = await pool.query(`SELECT * FROM payrollitem WHERE id = ?`, [itemId]);
     if (!existingRows.length) return res.status(404).json({ error: 'Payslip not found' });
     const existing = existingRows[0];
+    let existingCalc: any = {};
+    if (existing.calculationDetails) {
+      existingCalc = typeof existing.calculationDetails === 'string'
+        ? JSON.parse(existing.calculationDetails)
+        : existing.calculationDetails;
+    }
 
     const basicSalary = body.basicSalary ?? Number(existing.basicSalary);
-    const hra = body.hra ?? Number(existing.hra || basicSalary * 0.4);
-    const allowances = body.allowances ?? Number(existing.allowances || 0);
-    const bonus = body.bonus ?? Number(existing.bonus || 0);
+    const hra = body.hra ?? Number(existingCalc.hra || basicSalary * 0.4);
+    const allowances = body.allowances ?? Number(existingCalc.allowances || 0);
+    const bonus = body.bonus ?? Number(existingCalc.bonus || 0);
     const earlyIncentive = body.earlyIncentive ?? Number(existing.earlyIncentive || 0);
     const attendanceIncentive = body.attendanceIncentive ?? Number(existing.attendanceIncentive || 0);
     const salesIncentive = body.salesIncentive ?? Number(existing.salesIncentive || 0);
     const overtime = body.overtime ?? Number(existing.overtime || 0);
 
-    const pfDeduction = body.pfDeduction ?? Number(existing.pfDeduction || basicSalary * 0.12);
-    const taxDeduction = body.taxDeduction ?? Number(existing.taxDeduction || 0);
-    const lopDeduction = body.lopDeduction ?? Number(existing.lopDeduction || 0);
+    const pfDeduction = body.pfDeduction ?? Number(existingCalc.pfDeduction || basicSalary * 0.12);
+    const taxDeduction = body.taxDeduction ?? Number(existingCalc.taxDeduction || 0);
+    const lopDeduction = body.lopDeduction ?? Number(existingCalc.lopDeduction || 0);
     const penalties = body.penalties ?? Number(existing.penalties || 0);
 
     // Calculate Custom Sections sum
     let customEarnings = 0;
     let customDeductions = 0;
-    const customSections = body.customSections ?? (existing.customSections ? (typeof existing.customSections === 'string' ? JSON.parse(existing.customSections) : existing.customSections) : []);
+    const customSections = body.customSections ?? (existingCalc.customSections || []);
 
     if (Array.isArray(customSections)) {
       customSections.forEach((sec: any) => {
         if (Array.isArray(sec.items)) {
           sec.items.forEach((it: any) => {
             const amt = Number(it.amount || 0);
-            if (it.type === 'earning') customEarnings += amt;
-            if (it.type === 'deduction') customDeductions += amt;
+            if (it.type === 'earning' || it.type === 'EARNING') customEarnings += amt;
+            if (it.type === 'deduction' || it.type === 'DEDUCTION') customDeductions += amt;
           });
         }
       });
@@ -529,20 +535,47 @@ router.put('/payslip/:itemId', async (req: AuthRequest, res) => {
     const totalDeductions = pfDeduction + taxDeduction + lopDeduction + penalties + customDeductions;
     const netPay = Math.max(0, totalGross - totalDeductions);
 
+    const updatedCalculationDetails = {
+      ...existingCalc,
+      basic: basicSalary,
+      hra,
+      allowances,
+      bonus,
+      earlyIncentive,
+      attendanceIncentive,
+      salesIncentive,
+      overtime,
+      pfDeduction,
+      taxDeduction,
+      lopDeduction,
+      penalties,
+      customSections,
+      remarks: body.remarks ?? existingCalc.remarks,
+    };
+
     await pool.query(`
       UPDATE payrollitem SET
-        basicSalary = ?, hra = ?, allowances = ?, bonus = ?,
-        earlyIncentive = ?, attendanceIncentive = ?, salesIncentive = ?, overtime = ?,
-        pfDeduction = ?, taxDeduction = ?, lopDeduction = ?, penalties = ?,
-        deductions = ?, netPay = ?,
-        customSections = ?, remarks = ?, updatedAt = NOW()
+        basicSalary = ?,
+        earlyIncentive = ?,
+        attendanceIncentive = ?,
+        salesIncentive = ?,
+        overtime = ?,
+        penalties = ?,
+        deductions = ?,
+        netPay = ?,
+        calculationDetails = ?,
+        updatedAt = NOW()
       WHERE id = ?
     `, [
-      basicSalary, hra, allowances, bonus,
-      earlyIncentive, attendanceIncentive, salesIncentive, overtime,
-      pfDeduction, taxDeduction, lopDeduction, penalties,
-      totalDeductions, netPay,
-      JSON.stringify(customSections), body.remarks ?? existing.remarks,
+      basicSalary,
+      earlyIncentive,
+      attendanceIncentive,
+      salesIncentive,
+      overtime,
+      penalties,
+      totalDeductions,
+      netPay,
+      JSON.stringify(updatedCalculationDetails),
       itemId,
     ]);
 

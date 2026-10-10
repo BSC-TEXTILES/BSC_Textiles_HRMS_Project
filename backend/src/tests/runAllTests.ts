@@ -10,7 +10,7 @@ import { runKycTests } from './kyc.test.js';
 import { runPayrollTestSuite } from './payroll.test.js';
 import { runFnfAndLeaveTestSuite } from './fnfAndLeave.test.js';
 
-const BASE_URL = process.env.API_URL || 'http://localhost:4000';
+const BASE_URL = (process.env.API_URL || 'http://localhost:4000').replace(/\/api\/?$/, '');
 
 async function loginUser(email: string, password = 'password123'): Promise<string> {
   const res = await fetch(`${BASE_URL}/api/auth/login`, {
