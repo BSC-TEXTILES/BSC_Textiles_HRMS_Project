@@ -177,7 +177,7 @@ io.on('connection', (socket) => {
   socket.on('join-location', (locationId: string) => {
     socket.join(`location:${locationId}`);
   });
-  
+
   socket.on('join-stream', (streamId: string) => {
     socket.join(`stream:${streamId}`);
   });
@@ -189,10 +189,8 @@ const PORT = Number(process.env.PORT) || 4000;
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 BSC Textiles HRMS Security-Hardened Server running on port ${PORT}`);
   console.log(`📡 WebSocket server ready`);
-}).on('error', (err: Error) => {
-  console.error('Server listen error:', err);
-  process.exit(1);
 });
+console.log('Listen called, waiting for callback...');
 
 process.on('SIGINT', async () => {
   await prisma.$disconnect();
