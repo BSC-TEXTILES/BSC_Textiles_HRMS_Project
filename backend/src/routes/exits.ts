@@ -41,7 +41,15 @@ router.get(['/former-employees', '/'], authorize('VIEW'), async (req: AuthReques
       page: Number(page),
       limit: Number(limit),
     });
-    res.json(data);
+    res.json({
+      ...data,
+      exits: data.employees,
+      pagination: {
+        total: data.total,
+        page: data.page,
+        limit: data.limit,
+      },
+    });
   } catch (error: any) {
     console.error('[Exits] List former employees error:', error);
     res.status(500).json({ error: 'Failed to list former employees', message: error.message });
