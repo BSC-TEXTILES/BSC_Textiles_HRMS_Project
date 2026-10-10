@@ -25,16 +25,34 @@ const attendanceSchema = z.object({
 
 router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
-    const { locationId, employeeId, shiftId, startDate, endDate, status, page = 1, limit = 20 } = req.query;
+    const { locationId, employeeId, shiftId, departmentId, date, startDate, endDate, status, page = 1, limit = 20 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
     
-    const scopedLocId = getScopedLocationId(req.user, locationId);
+    let scopedLocId = getScopedLocationId(req.user, locationId);
+    if (scopedLocId === 'all') scopedLocId = undefined;
+    if (scopedLocId) {
+      const cleanCode = scopedLocId.replace(/^loc_/, '').toUpperCase();
+      const locMatch = await prisma.location.findFirst({
+        where: { OR: [{ id: scopedLocId }, { code: cleanCode }] },
+      });
+      if (locMatch) scopedLocId = locMatch.id;
+    }
+
     const where: any = {};
     if (scopedLocId) where.locationId = scopedLocId;
     if (employeeId) where.employeeId = employeeId;
-    if (shiftId) where.shiftId = shiftId;
-    if (status) where.status = status;
-    if (startDate || endDate) {
+    if (shiftId && shiftId !== 'all') where.shiftId = shiftId;
+    if (status && status !== 'all') where.status = status;
+    if (departmentId && departmentId !== 'all') {
+      where.employee = { ...(where.employee || {}), departmentId: String(departmentId) };
+    }
+    if (date) {
+      const d = new Date(String(date));
+      d.setHours(0, 0, 0, 0);
+      const nextD = new Date(d);
+      nextD.setDate(nextD.getDate() + 1);
+      where.attendanceDate = { gte: d, lt: nextD };
+    } else if (startDate || endDate) {
       where.attendanceDate = {};
       if (startDate) where.attendanceDate.gte = new Date(String(startDate));
       if (endDate) where.attendanceDate.lte = new Date(String(endDate));
@@ -49,6 +67,7 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
         include: {
           employee: { select: { id: true, employeeCode: true, fullName: true } },
           shift: { select: { id: true, name: true } },
+          location: { select: { id: true, name: true, code: true } },
         },
       }),
       prisma.attendance.count({ where }),

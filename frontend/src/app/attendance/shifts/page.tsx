@@ -2,15 +2,25 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { DetailDrillDownModal, type DetailMetric } from '@/components/dashboard/DetailDrillDownModal';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
 export default function ShiftsRosterPage() {
   const [shifts, setShifts] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState('');
+  const [selectedDept, setSelectedDept] = useState('all');
+  const [selectedShift, setSelectedShift] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [drill, setDrill] = useState<{ metric: DetailMetric; title: string; shiftId?: string; shiftName?: string } | null>(null);
   const [newShift, setNewShift] = useState({
     name: '',
     code: '',
@@ -32,6 +42,15 @@ export default function ShiftsRosterPage() {
     }
   }, []);
 
+  const fetchDepartments = useCallback(async () => {
+    try {
+      const res = await api.get('/departments');
+      setDepartments(res.data?.departments || []);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
   const fetchShifts = useCallback(async () => {
     try {
       setLoading(true);
@@ -47,7 +66,8 @@ export default function ShiftsRosterPage() {
 
   useEffect(() => {
     fetchLocations();
-  }, [fetchLocations]);
+    fetchDepartments();
+  }, [fetchLocations, fetchDepartments]);
 
   useEffect(() => {
     fetchShifts();
@@ -77,6 +97,30 @@ export default function ShiftsRosterPage() {
       toast.error(err.response?.data?.error || 'Failed to create shift');
     }
   };
+
+  /** Resolve a shift definition by its code (e.g. MORNING / GENERAL). */
+  const shiftByCode = (code: string) =>
+    shifts.find((s) => String(s.code || '').toUpperCase() === code) || null;
+
+  const openDrill = (metric: DetailMetric, title: string, shiftId?: string, shiftName?: string) =>
+    setDrill({ metric, title, shiftId, shiftName });
+
+  /** Filters + chips passed to the drill-down detail view. */
+  const activeShiftId = drill?.shiftId || (selectedShift !== 'all' ? selectedShift : undefined);
+  const drillFilters = {
+    locationId: selectedLocation || 'all',
+    departmentId: selectedDept,
+    shiftId: activeShiftId || 'all',
+    status: selectedStatus,
+    date: selectedDate,
+  };
+  const drillChips = [
+    { label: 'Hub', value: locations.find((l) => l.id === selectedLocation)?.name || 'All Hubs' },
+    { label: 'Dept', value: departments.find((d) => d.id === selectedDept)?.name || 'All Departments' },
+    { label: 'Shift', value: drill?.shiftName || shifts.find((s) => s.id === activeShiftId)?.name || 'All Shifts' },
+    { label: 'Status', value: selectedStatus === 'all' ? 'All Statuses' : selectedStatus },
+    { label: 'Date', value: selectedDate },
+  ];
 
   return (
     <DashboardLayout>
@@ -115,7 +159,12 @@ export default function ShiftsRosterPage() {
 
         {/* 5 SHIFT KPIS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <button
+            type="button"
+            onClick={() => openDrill('shift-configs', 'Active Shifts')}
+            aria-label="View Floor Shift Regularization details: Active Shifts"
+            className="group bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+          >
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Shifts</span>
               <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center text-[#0058be]">
@@ -129,9 +178,18 @@ export default function ShiftsRosterPage() {
             <div className="pt-2 border-t border-slate-100 text-[11px] text-[#0058be] font-semibold">
               <span>All 4 Locations Active</span>
             </div>
-          </div>
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#0058be] transition-colors">
+              <span>View Details</span>
+              <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+            </div>
+          </button>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <button
+            type="button"
+            onClick={() => openDrill('shift-roster', 'Total Staff Rostered')}
+            aria-label="View Floor Shift Regularization details: Total Staff Rostered"
+            className="group bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+          >
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Staff Rostered</span>
               <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center text-[#0058be]">
@@ -145,9 +203,20 @@ export default function ShiftsRosterPage() {
             <div className="pt-2 border-t border-slate-100 text-[11px] text-emerald-600 font-semibold">
               <span>No Unassigned Personnel</span>
             </div>
-          </div>
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#0058be] transition-colors">
+              <span>View Details</span>
+              <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+            </div>
+          </button>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <button
+            type="button"
+            onClick={() =>
+              openDrill('shift-roster', 'Shift A (Morning)', shiftByCode('MORNING')?.id, shiftByCode('MORNING')?.name)
+            }
+            aria-label="View Floor Shift Regularization details: Shift A (Morning)"
+            className="group bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+          >
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Shift A (Morning)</span>
               <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center text-[#0058be]">
@@ -161,9 +230,20 @@ export default function ShiftsRosterPage() {
             <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500">
               <span>Primary Floor Retail</span>
             </div>
-          </div>
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#0058be] transition-colors">
+              <span>View Details</span>
+              <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+            </div>
+          </button>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <button
+            type="button"
+            onClick={() =>
+              openDrill('shift-roster', 'Shift B (General)', shiftByCode('GENERAL')?.id, shiftByCode('GENERAL')?.name)
+            }
+            aria-label="View Floor Shift Regularization details: Shift B (General)"
+            className="group bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+          >
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Shift B (General)</span>
               <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center text-[#0058be]">
@@ -177,9 +257,18 @@ export default function ShiftsRosterPage() {
             <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500">
               <span>Weaving & Management</span>
             </div>
-          </div>
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#0058be] transition-colors">
+              <span>View Details</span>
+              <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+            </div>
+          </button>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <button
+            type="button"
+            onClick={() => openDrill('shift-exceptions', 'Grace Period & Regularization')}
+            aria-label="View Floor Shift Regularization details: Grace Period"
+            className="group bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+          >
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Grace Period</span>
               <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
@@ -193,7 +282,11 @@ export default function ShiftsRosterPage() {
             <div className="pt-2 border-t border-slate-100 text-[11px] text-emerald-600 font-semibold">
               <span>Statutory Rule Enforced</span>
             </div>
-          </div>
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#0058be] transition-colors">
+              <span>View Details</span>
+              <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+            </div>
+          </button>
         </div>
 
         {/* Location Filter & Shift Cards Grid */}
@@ -219,10 +312,86 @@ export default function ShiftsRosterPage() {
           <span className="text-xs text-slate-400">{shifts.length} Shifts Configured</span>
         </div>
 
+        {/* Detail Drill-down Filters (Department / Shift / Status / Date) */}
+        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <label htmlFor="fsr-dept" className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Department</label>
+            <select
+              id="fsr-dept"
+              value={selectedDept}
+              onChange={(e) => setSelectedDept(e.target.value)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#0058be]/40 cursor-pointer"
+            >
+              <option value="all">All Departments</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label htmlFor="fsr-shift" className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Shift</label>
+            <select
+              id="fsr-shift"
+              value={selectedShift}
+              onChange={(e) => setSelectedShift(e.target.value)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#0058be]/40 cursor-pointer"
+            >
+              <option value="all">All Shifts</option>
+              {shifts.map((s) => (
+                <option key={s.id} value={s.id}>{s.name} ({s.code || '—'})</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label htmlFor="fsr-status" className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Employee Status</label>
+            <select
+              id="fsr-status"
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#0058be]/40 cursor-pointer"
+            >
+              <option value="all">All Statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="PROBATION">Probation</option>
+              <option value="ON_LEAVE">On Leave</option>
+              <option value="INACTIVE">Inactive</option>
+              <option value="TERMINATED">Terminated</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label htmlFor="fsr-date" className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date</label>
+            <input
+              id="fsr-date"
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#0058be]/40 cursor-pointer"
+            />
+          </div>
+
+          <span className="text-[11px] text-slate-400 ml-auto">Filters apply to every card drill-down detail view</span>
+        </div>
+
         {/* SHIFTS GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {shifts.map((s) => (
-            <div key={s.id} className="bg-white rounded-xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+            <div
+              key={s.id}
+              role="button"
+              tabIndex={0}
+              aria-label={`View Floor Shift Regularization details: ${s.name}`}
+              onClick={() => openDrill('shift-roster', `Shift: ${s.name}`, s.id, s.name)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  openDrill('shift-roster', `Shift: ${s.name}`, s.id, s.name);
+                }
+              }}
+              className="group bg-white rounded-xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/30 transition-all flex flex-col justify-between cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+            >
               <div>
                 <div className="flex items-start justify-between">
                   <div>
@@ -258,12 +427,19 @@ export default function ShiftsRosterPage() {
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                 <span className="text-slate-400 font-medium">Auto-assigned</span>
                 <button
-                  onClick={() => toast.success(`Shift ${s.name} details verified`)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toast.success(`Shift ${s.name} details verified`);
+                  }}
                   className="font-semibold text-[#0058be] hover:underline flex items-center gap-1"
                 >
                   <span>Edit Roster Rules</span>
                   <span className="material-symbols-outlined text-[14px]">chevron_right</span>
                 </button>
+              </div>
+              <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#0058be] transition-colors">
+                <span>View Roster Details</span>
+                <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
               </div>
             </div>
           ))}
@@ -374,6 +550,18 @@ export default function ShiftsRosterPage() {
               </form>
             </div>
           </div>
+        )}
+
+        {/* CARD DRILL-DOWN DETAIL VIEW */}
+        {drill && (
+          <DetailDrillDownModal
+            metric={drill.metric}
+            title={drill.title}
+            filters={drillFilters}
+            chips={drillChips}
+            preloaded={{ shifts, locations }}
+            onClose={() => setDrill(null)}
+          />
         )}
       </div>
     </DashboardLayout>

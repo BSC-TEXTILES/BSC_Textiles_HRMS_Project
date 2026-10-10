@@ -1,193 +1,13 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import toast from 'react-hot-toast';
 
-interface CorrectionRecord {
-  id: string;
-  empCode: string;
-  name: string;
-  role: string;
-  hub: string;
-  dept: string;
-  avatar: string;
-  shift: string;
-  rawIn: string;
-  rawOut: string;
-  terminal: string;
-  overrideOut: string;
-  overrideIn?: string;
-  totalHours: string;
-  otHours: string;
-  reason: string;
-  evidence: string;
-  invoiceOrDoc?: string;
-  supervisor: string;
-  pipelineStep: string;
-  pipelineTotal: string;
-  status: 'PENDING' | 'SUPERVISOR_OK' | 'APPROVED' | 'REJECTED';
-  type: 'MISSED_OUT' | 'LATE_GRACE' | 'ON_DUTY' | 'SENSOR_GLITCH';
-  notes: string;
-}
-
-const INITIAL_RECORDS: CorrectionRecord[] = [
-  {
-    id: 'CORR-4029',
-    empCode: 'BSC-EMP-0042',
-    name: 'Rajeshwari V. Patil',
-    role: 'Senior Floor Specialist',
-    hub: 'BEL-01 Flagship',
-    dept: 'Bridal Silk & Atelier',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80',
-    shift: 'Shift A (09:30 – 18:30)',
-    rawIn: '09:28 IN',
-    rawOut: 'Missed OUT',
-    terminal: 'BEL-IN-02',
-    overrideOut: '19:15 OUT',
-    totalHours: '9h 47m Total',
-    otHours: '+1h 15m Overtime (1.25x)',
-    reason: 'VIP Bridal Kanjeevaram Showcase extended handover for royal wedding party.',
-    evidence: 'Bill #SLK-8819 (₹3.4L) & CCTV CAM-04 Bridal Vault confirmed presence.',
-    invoiceOrDoc: 'Invoice #SLK-8819',
-    supervisor: 'Anand Kulkarni (Store Lead)',
-    pipelineStep: '2',
-    pipelineTotal: '3',
-    status: 'PENDING',
-    type: 'MISSED_OUT',
-    notes: 'Rajeshwari was actively presenting heritage Kanjeevaram sarees to the royal wedding party until 19:10 IST. Card tap missed due to vault register lockdown protocol.',
-  },
-  {
-    id: 'CORR-4030',
-    empCode: 'BSC-EMP-0089',
-    name: 'Amit Deshpande',
-    role: 'Master Tailor',
-    hub: 'SHI-03 Apex',
-    dept: 'Tailoring & Alterations',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    shift: 'Shift B (11:30 – 20:30)',
-    rawIn: '14:02 IN (Late 2h 32m)',
-    rawOut: '20:38 OUT',
-    terminal: 'SHI-GATE-01',
-    overrideOut: '20:38 OUT',
-    overrideIn: 'Half-Day Credit 6.5h',
-    totalHours: '6.5h Credited',
-    otHours: '0.5 Casual Leave applied',
-    reason: 'KSRTC Shivamogga regional bus strike stranded inter-district transit.',
-    evidence: 'Official KSRTC Transit Strike Press Release attached.',
-    invoiceOrDoc: 'News Bulletin Ref #NB-442',
-    supervisor: 'V. Hiremath (Floor Lead)',
-    pipelineStep: '2',
-    pipelineTotal: '3',
-    status: 'SUPERVISOR_OK',
-    type: 'LATE_GRACE',
-    notes: 'District bus depot strike confirmed by district magistrate notice. Staff communicated delay by telephone at 10:15 AM.',
-  },
-  {
-    id: 'CORR-4031',
-    empCode: 'BSC-MGR-0021',
-    name: 'Veeranna Pattar',
-    role: 'Jacquard Loom Master',
-    hub: 'DAV-02 Hub',
-    dept: 'Jacquard Loom Yard',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
-    shift: 'Shift C Night (20:30 – 05:30)',
-    rawIn: 'Sensor Glitch IN',
-    rawOut: '05:32 OUT',
-    terminal: 'DAV-GATE-01',
-    overrideOut: '05:32 OUT',
-    overrideIn: '20:25 IN Logged',
-    totalHours: '9h 07m Full Shift',
-    otHours: '100% Shift Paid',
-    reason: 'Terminal turnstile DAV-GATE-01 rebooted during shift transition due to power fluctuation.',
-    evidence: 'Security Gate Physical Logbook Entry #318 signed by Sub-Inspector.',
-    invoiceOrDoc: 'Gate Pass #GP-882',
-    supervisor: 'Security Inspector Patil',
-    pipelineStep: '3',
-    pipelineTotal: '3',
-    status: 'SUPERVISOR_OK',
-    type: 'SENSOR_GLITCH',
-    notes: 'Optical glass scanner cleaned & system re-initialized at 20:28. Security ledger verifies physical entry timestamp of 20:25 IST.',
-  },
-  {
-    id: 'CORR-4032',
-    empCode: 'BSC-EMP-0144',
-    name: 'Kavita M.',
-    role: 'Cashier & POS Lead',
-    hub: 'BEL-01 Flagship',
-    dept: 'Cashiering & POS',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80',
-    shift: 'Shift A (09:30 – 18:30)',
-    rawIn: '09:34 IN',
-    rawOut: '13:45 OUT (Premature Tag)',
-    terminal: 'BEL-POS-01',
-    overrideOut: '18:32 OUT',
-    totalHours: '8h 58m Total Shift',
-    otHours: 'Break swipe error corrected',
-    reason: 'Accidentally scanned exit turnstile reader during lunch interval instead of cafeteria terminal.',
-    evidence: 'Vault Cash Handover Register signed at 18:30 IST.',
-    invoiceOrDoc: 'Vault Handover #V-102',
-    supervisor: 'R. Deshmukh (Cash Head)',
-    pipelineStep: '2',
-    pipelineTotal: '3',
-    status: 'SUPERVISOR_OK',
-    type: 'MISSED_OUT',
-    notes: 'Cash counter register verifies cash drawer settlement completed at 18:25 PM with zero variance.',
-  },
-  {
-    id: 'CORR-4033',
-    empCode: 'BSC-EMP-0094',
-    name: 'Rekha Naik',
-    role: 'Saree Depot Associate',
-    hub: 'BEL-01 Flagship',
-    dept: 'Finished Goods Depot',
-    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=200&q=80',
-    shift: 'General (09:00 – 18:00)',
-    rawIn: '08:58 IN',
-    rawOut: 'On-Duty Slip (15:00-19:30)',
-    terminal: 'BEL-LOG-01',
-    overrideOut: '19:35 OUT DAV',
-    totalHours: '10h 37m Net Shift',
-    otHours: '+1h 35m Inter-store transfer',
-    reason: 'Urgent stock dispatch to Davanagere Mega Store via company transit van.',
-    evidence: 'E-Way Bill #EWB-9041 and Gate Delivery Receipt confirmed.',
-    invoiceOrDoc: 'Transit Waybill #EWB-9041',
-    supervisor: 'G. Kulkarni (Logistics Lead)',
-    pipelineStep: '2',
-    pipelineTotal: '3',
-    status: 'PENDING',
-    type: 'ON_DUTY',
-    notes: 'Inter-hub saree bundle transfer initiated for festival inventory replenishment. Returned via Davanagere transit corridor.',
-  },
-  {
-    id: 'CORR-4034',
-    empCode: 'BSC-EMP-0112',
-    name: 'Manjunath Swamy',
-    role: 'Visual Merchandiser',
-    hub: 'SHI-03 Apex',
-    dept: 'Visual Merchandising',
-    avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=200&q=80',
-    shift: 'Shift B (11:30 – 20:30)',
-    rawIn: '11:42 IN (Grace 12m)',
-    rawOut: '21:10 OUT',
-    terminal: 'SHI-VM-01',
-    overrideOut: '21:10 OUT',
-    totalHours: '9h 28m Total',
-    otHours: '+40m Floor Overtime',
-    reason: 'Diwali showcase mannequin styling window rearrangement beyond store hours.',
-    evidence: 'Store Manager signoff note & CCTV Front Glass feed verified.',
-    invoiceOrDoc: 'VM Window Slip #VM-77',
-    supervisor: 'V. Hiremath (Floor Lead)',
-    pipelineStep: '3',
-    pipelineTotal: '3',
-    status: 'APPROVED',
-    type: 'LATE_GRACE',
-    notes: 'Visual merchandising team required extended window after mall shutter closure at 20:30.',
-  },
-];
+import { CORRECTION_RECORDS, type CorrectionRecord } from '@/lib/correctionRecords';
 
 export default function AttendanceCorrectionsPage() {
-  const [records, setRecords] = useState<CorrectionRecord[]>(INITIAL_RECORDS);
+  const [records, setRecords] = useState<CorrectionRecord[]>(CORRECTION_RECORDS);
   const [activeTab, setActiveTab] = useState<'ALL' | 'MISSED_OUT' | 'LATE_GRACE' | 'ON_DUTY' | 'SENSOR_GLITCH'>('ALL');
   const [hubFilter, setHubFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -198,7 +18,7 @@ export default function AttendanceCorrectionsPage() {
     name: '',
     empCode: '',
     hub: 'BEL-01 Flagship',
-    shift: 'Shift A (09:30 – 18:30)',
+    shift: 'Shift A (09:30 â€“ 18:30)',
     overrideIn: '09:30 AM',
     overrideOut: '18:30 PM',
     reason: '',
@@ -287,7 +107,7 @@ export default function AttendanceCorrectionsPage() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0058be] opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0058be]"></span>
                 </span>
-                Active Pay Cycle: 21 Oct – 27 Oct 2024
+                Active Pay Cycle: 21 Oct â€“ 27 Oct 2024
               </div>
               <div className="inline-flex items-center gap-1.5 text-slate-600 text-xs bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/60 font-medium">
                 <span className="material-symbols-outlined text-[15px] text-[#0058be]">verified_user</span>
@@ -354,7 +174,7 @@ export default function AttendanceCorrectionsPage() {
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 flex items-center gap-1">
               <span className="material-symbols-outlined text-[14px] text-[#0058be]">subdirectory_arrow_right</span>
-              4 Floor Approved • 2 with HR
+              4 Floor Approved â€¢ 2 with HR
             </div>
           </div>
 
@@ -375,7 +195,7 @@ export default function AttendanceCorrectionsPage() {
               </div>
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 truncate">
-              14 Single Punches • 6 Grace Breaches
+              14 Single Punches â€¢ 6 Grace Breaches
             </div>
           </div>
 
@@ -439,7 +259,7 @@ export default function AttendanceCorrectionsPage() {
                 Payroll Impact Saved
               </span>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-emerald-600 tracking-tight">₹18,420</span>
+                <span className="text-2xl font-black text-emerald-600 tracking-tight">â‚¹18,420</span>
               </div>
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500">
@@ -451,7 +271,7 @@ export default function AttendanceCorrectionsPage() {
         {/* MULTI-LEVEL FILTER, TAB STRIP & QUERY TOOLS */}
         <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-200/90 flex flex-col gap-4">
           {/* Tab Strip */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-thin">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
             <button
               onClick={() => setActiveTab('ALL')}
               className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${
@@ -636,7 +456,7 @@ export default function AttendanceCorrectionsPage() {
                                   {r.empCode}
                                 </span>
                                 <span className="inline-flex mt-1 items-center px-1.5 py-0.5 rounded text-[10px] font-semibold text-[#0058be] bg-[#eff4ff] border border-[#dce9ff] w-max">
-                                  {r.hub} • {r.dept}
+                                  {r.hub} â€¢ {r.dept}
                                 </span>
                               </div>
                             </div>
@@ -649,7 +469,7 @@ export default function AttendanceCorrectionsPage() {
                               </span>
                               <div className="flex items-center gap-1 text-slate-500 mt-0.5">
                                 <span className="font-mono text-slate-900">{r.rawIn}</span>
-                                <span>•</span>
+                                <span>â€¢</span>
                                 <span className="px-1 py-0.2 rounded bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200">
                                   {r.rawOut}
                                 </span>
@@ -767,7 +587,7 @@ export default function AttendanceCorrectionsPage() {
                   <span>
                     Showing <strong>{filteredRecords.length}</strong> of <strong>{records.length}</strong> regularization requests
                   </span>
-                  <span className="hidden sm:inline">•</span>
+                  <span className="hidden sm:inline">â€¢</span>
                   <span className="hidden sm:inline">428 Active Floor Staff Registered</span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -840,10 +660,10 @@ export default function AttendanceCorrectionsPage() {
                       <span className="material-symbols-outlined text-[#0058be] text-[16px]">verified</span>
                     </div>
                     <span className="text-[11px] text-slate-500 font-mono">
-                      {selectedRecord.empCode} • {selectedRecord.role}
+                      {selectedRecord.empCode} â€¢ {selectedRecord.role}
                     </span>
                     <span className="text-[11px] text-slate-400 mt-0.5">
-                      {selectedRecord.hub} • {selectedRecord.dept}
+                      {selectedRecord.hub} â€¢ {selectedRecord.dept}
                     </span>
                   </div>
                 </div>
@@ -862,7 +682,7 @@ export default function AttendanceCorrectionsPage() {
                   <div className="flex flex-col">
                     <span className="text-[10px] font-bold text-slate-400 uppercase">Raw Ingestion</span>
                     <span className="font-mono text-xs text-slate-800 font-bold mt-0.5">
-                      {selectedRecord.rawIn} → <span className="text-rose-600 font-bold">{selectedRecord.rawOut}</span>
+                      {selectedRecord.rawIn} â†’ <span className="text-rose-600 font-bold">{selectedRecord.rawOut}</span>
                     </span>
                   </div>
                   <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200">
@@ -874,7 +694,7 @@ export default function AttendanceCorrectionsPage() {
                   <div className="flex flex-col">
                     <span className="text-[10px] font-bold text-[#0058be] uppercase">Proposed Approved Ledger</span>
                     <span className="font-mono text-xs text-slate-900 font-bold mt-0.5">
-                      {selectedRecord.rawIn} → <span className="text-[#0058be] font-bold">{selectedRecord.overrideOut}</span>
+                      {selectedRecord.rawIn} â†’ <span className="text-[#0058be] font-bold">{selectedRecord.overrideOut}</span>
                     </span>
                   </div>
                   <span className="px-2 py-0.5 rounded-full bg-[#0058be] text-white text-[10px] font-bold">
@@ -905,10 +725,10 @@ export default function AttendanceCorrectionsPage() {
                 </span>
                 <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 flex flex-col gap-1.5">
                   <p className="text-xs text-slate-700 italic leading-relaxed">
-                    “{selectedRecord.notes}”
+                    â€œ{selectedRecord.notes}â€
                   </p>
                   <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-[11px] text-slate-500">
-                    <span className="font-bold text-slate-800">— {selectedRecord.supervisor}</span>
+                    <span className="font-bold text-slate-800">â€” {selectedRecord.supervisor}</span>
                     <span className="font-mono">24 Oct 19:40 IST</span>
                   </div>
                 </div>

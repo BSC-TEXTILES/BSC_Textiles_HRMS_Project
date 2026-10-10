@@ -17,13 +17,24 @@ export default function Home() {
     if (status === 'unauthenticated') {
       router.replace('/login');
     } else if (status === 'authenticated') {
+      const callback = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('callbackUrl') : null;
       const target = sanitizeCallbackUrl(
-        new URLSearchParams(window.location.search).get('callbackUrl'),
+        callback,
         getRoleHomePath(session?.user?.role)
       );
       router.replace(target);
     }
   }, [status, session?.user?.role, router]);
+
+  // Fallback: If auth check doesn't resolve in 2.5 seconds, redirect to /login safely
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (status !== 'authenticated') {
+        router.replace('/login');
+      }
+    }, 2500);
+    return () => clearTimeout(timeout);
+  }, [status, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f8f9ff]">

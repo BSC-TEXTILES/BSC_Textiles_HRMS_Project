@@ -1,16 +1,30 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { DetailDrillDownModal, monthRange, type DetailMetric } from '@/components/dashboard/DetailDrillDownModal';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
 export default function ReportsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<'attendance' | 'face' | 'qr' | 'incentives' | 'payroll'>('attendance');
   const [locations, setLocations] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [shifts, setShifts] = useState<any[]>([]);
+  const [empIdByCode, setEmpIdByCode] = useState<Record<string, string>>({});
   const [selectedLocation, setSelectedLocation] = useState('ALL');
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [selectedDept, setSelectedDept] = useState('all');
+  const [selectedShift, setSelectedShift] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('all');
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [drill, setDrill] = useState<{ metric: DetailMetric; title: string } | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -30,23 +44,92 @@ export default function ReportsPage() {
     }
   }, []);
 
+  /** Filter options + roster map used to resolve employee codes to profile ids. */
+  const fetchFilterOptions = useCallback(async () => {
+    try {
+      const res = await api.get('/departments');
+      setDepartments(res.data?.departments || []);
+    } catch (e) {
+      console.error(e);
+    }
+    try {
+      const res = await api.get('/shifts');
+      setShifts(res.data?.shifts || []);
+    } catch (e) {
+      console.error(e);
+    }
+    try {
+      const res = await api.get('/employees?limit=1000');
+      const list = res.data?.employees || [];
+      const map: Record<string, string> = {};
+      for (const e of list) if (e.employeeCode) map[e.employeeCode] = e.id;
+      setEmpIdByCode(map);
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  /** Map the hub filter code (BEL/DAV/SHI) to its real location id for API calls. */
+  const resolvedLocationId = useMemo(() => {
+    if (selectedLocation === 'ALL') return null;
+    return locations.find((l) => l.code === selectedLocation)?.id || null;
+  }, [locations, selectedLocation]);
+
+  /** Shift options scoped to the selected hub (deduped by shift code). */
+  const shiftOptions = useMemo(() => {
+    const scoped = resolvedLocationId ? shifts.filter((s) => s.locationId === resolvedLocationId) : shifts;
+    const seen = new Set<string>();
+    return scoped.filter((s) => {
+      const key = String(s.code || s.name);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [shifts, resolvedLocationId]);
+
+  /** Last 12 months for the Monthly Report month filter. */
+  const monthOptions = useMemo(() => {
+    const opts: { value: string; label: string }[] = [];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      opts.push({
+        value: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
+        label: d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' }),
+      });
+    }
+    return opts;
+  }, []);
+
+  // Hub change invalidates an explicit shift selection.
+  useEffect(() => {
+    setSelectedShift('all');
+  }, [selectedLocation]);
+
   const fetchReportData = useCallback(async () => {
     try {
       setLoading(true);
       let rows: any[] = [];
-      const locQuery = selectedLocation !== 'ALL' ? `?locationId=${selectedLocation}` : '';
+      const { start, end } = monthRange(selectedMonth);
+      const base = new URLSearchParams();
+      if (resolvedLocationId) base.set('locationId', resolvedLocationId);
+      base.set('startDate', start);
+      base.set('endDate', end);
+      if (selectedDept !== 'all') base.set('departmentId', selectedDept);
+      if (selectedShift !== 'all') base.set('shiftId', selectedShift);
+      const baseQ = `?${base.toString()}`;
 
       if (activeTab === 'attendance') {
-        const res = await api.get(`/reports/attendance-summary${locQuery}`).catch(() => null);
+        const res = await api.get(`/reports/attendance-summary${baseQ}`).catch(() => null);
         rows = Array.isArray(res?.data) ? res.data : (res?.data?.summary || res?.data?.data || []);
       } else if (activeTab === 'face') {
-        const res = await api.get(`/reports/face-verification-accuracy${locQuery}`).catch(() => null);
+        const res = await api.get(`/reports/face-verification-accuracy${baseQ}`).catch(() => null);
         rows = Array.isArray(res?.data) ? res.data : (res?.data?.records || res?.data?.rows || res?.data?.data || []);
       } else if (activeTab === 'qr') {
-        const res = await api.get(`/reports/qr-scans-summary${locQuery}`).catch(() => null);
+        const res = await api.get(`/reports/qr-scans-summary${baseQ}`).catch(() => null);
         rows = Array.isArray(res?.data) ? res.data : (res?.data?.records || res?.data?.scans || res?.data?.data || []);
       } else if (activeTab === 'incentives') {
-        const res = await api.get(`/reports/incentives-summary${locQuery}`).catch(() => null);
+        const res = await api.get(`/reports/incentives-summary${baseQ}`).catch(() => null);
         rows = Array.isArray(res?.data) ? res.data : (res?.data?.summary || res?.data?.records || res?.data?.data || []);
       } else if (activeTab === 'payroll') {
         const res = await api.get('/payroll/runs').catch(() => null);
@@ -93,11 +176,12 @@ export default function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, selectedLocation]);
+  }, [activeTab, resolvedLocationId, selectedMonth, selectedDept, selectedShift]);
 
   useEffect(() => {
     fetchLocations();
-  }, [fetchLocations]);
+    fetchFilterOptions();
+  }, [fetchLocations, fetchFilterOptions]);
 
   useEffect(() => {
     fetchReportData();
@@ -120,6 +204,41 @@ export default function ReportsPage() {
     document.body.removeChild(link);
     toast.success('Statutory report exported to CSV!');
   };
+
+  /** Resolve an employee profile id from a report row (employee code based). */
+  const resolveEmployeeId = (row: any): string | null => {
+    if (row.employeeId) return row.employeeId;
+    const code = row.employeeCode || row.code;
+    return code && empIdByCode[code] ? empIdByCode[code] : null;
+  };
+
+  const isEmployeeRow = (row: any) => Boolean(resolveEmployeeId(row));
+
+  const openEmployeeProfile = (row: any) => {
+    const id = resolveEmployeeId(row);
+    if (id) router.push(`/employees/profile/${id}`);
+  };
+
+  const openDrill = (metric: DetailMetric, title: string) => setDrill({ metric, title });
+
+  /** Filters + chips shared by the Monthly Report drill-down detail views. */
+  const drillFilters = {
+    locationId: resolvedLocationId || 'all',
+    departmentId: selectedDept,
+    shiftId: selectedShift,
+    status: selectedStatus,
+    month: selectedMonth,
+  };
+  const drillChips = [
+    { label: 'Hub', value: locations.find((l) => l.id === resolvedLocationId)?.name || 'All Hubs (Karnataka)' },
+    {
+      label: 'Month',
+      value: monthOptions.find((m) => m.value === selectedMonth)?.label || selectedMonth,
+    },
+    { label: 'Dept', value: departments.find((d) => d.id === selectedDept)?.name || 'All Departments' },
+    { label: 'Shift', value: shifts.find((s) => s.id === selectedShift)?.name || 'All Shifts' },
+    { label: 'Status', value: selectedStatus === 'all' ? 'All Statuses' : selectedStatus },
+  ];
 
   return (
     <DashboardLayout>
@@ -168,7 +287,12 @@ export default function ReportsPage() {
 
         {/* 5 KPI Metric Horizon */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-space-md mb-space-lg">
-          <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between">
+          <button
+            type="button"
+            onClick={() => openDrill('muster', 'Muster Attendance')}
+            aria-label="View Monthly Report details: Muster Attendance"
+            className="group bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+          >
             <div className="flex items-center justify-between mb-space-sm">
               <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-bold">Muster Attendance</span>
               <div className="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
@@ -177,9 +301,18 @@ export default function ReportsPage() {
             </div>
             <div className="text-2xl font-bold font-mono text-on-surface">98.2%</div>
             <span className="text-xs text-secondary font-medium mt-1">Across 4 Karnataka Hubs</span>
-          </div>
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-secondary transition-colors">
+              <span>View Details</span>
+              <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+            </div>
+          </button>
 
-          <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between">
+          <button
+            type="button"
+            onClick={() => openDrill('face', 'Biometric Optical SLA')}
+            aria-label="View Monthly Report details: Biometric Optical SLA"
+            className="group bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+          >
             <div className="flex items-center justify-between mb-space-sm">
               <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-bold">Biometric Optical SLA</span>
               <div className="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
@@ -188,9 +321,18 @@ export default function ReportsPage() {
             </div>
             <div className="text-2xl font-bold font-mono text-on-surface">99.4% Match</div>
             <span className="text-xs text-on-surface-variant mt-1">0.18s Ingestion Latency</span>
-          </div>
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-secondary transition-colors">
+              <span>View Details</span>
+              <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+            </div>
+          </button>
 
-          <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between">
+          <button
+            type="button"
+            onClick={() => openDrill('qr', 'Canteen QR Tokens')}
+            aria-label="View Monthly Report details: Canteen QR Tokens"
+            className="group bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+          >
             <div className="flex items-center justify-between mb-space-sm">
               <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-bold">Canteen QR Tokens</span>
               <div className="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
@@ -199,9 +341,18 @@ export default function ReportsPage() {
             </div>
             <div className="text-2xl font-bold font-mono text-on-surface">100% Verified</div>
             <span className="text-xs text-on-surface-variant mt-1">Zero Meal Overage</span>
-          </div>
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-secondary transition-colors">
+              <span>View Details</span>
+              <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+            </div>
+          </button>
 
-          <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between">
+          <button
+            type="button"
+            onClick={() => openDrill('incentives', 'Festive Incentives')}
+            aria-label="View Monthly Report details: Festive Incentives"
+            className="group bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+          >
             <div className="flex items-center justify-between mb-space-sm">
               <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-bold">Festive Incentives</span>
               <div className="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
@@ -210,9 +361,18 @@ export default function ReportsPage() {
             </div>
             <div className="text-2xl font-bold font-mono text-secondary">₹1,84,500</div>
             <span className="text-xs text-on-surface-variant mt-1">Diwali Peak Accrued</span>
-          </div>
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-secondary transition-colors">
+              <span>View Details</span>
+              <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+            </div>
+          </button>
 
-          <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between">
+          <button
+            type="button"
+            onClick={() => openDrill('compliance', 'Statutory Form F/T')}
+            aria-label="View Monthly Report details: Statutory Form F/T"
+            className="group bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+          >
             <div className="flex items-center justify-between mb-space-sm">
               <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-bold">Statutory Form F/T</span>
               <div className="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
@@ -221,7 +381,11 @@ export default function ReportsPage() {
             </div>
             <div className="text-2xl font-bold font-mono text-on-surface">Audited</div>
             <span className="text-xs text-emerald-600 font-medium mt-1">Zero Compliance Leakage</span>
-          </div>
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-secondary transition-colors">
+              <span>View Details</span>
+              <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+            </div>
+          </button>
         </div>
 
         {/* Tab Strip and Filters */}
@@ -251,19 +415,93 @@ export default function ReportsPage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-space-sm pt-space-xs border-t border-slate-100">
-            <div className="flex items-center gap-space-sm">
+            <div className="flex items-center gap-space-sm flex-wrap">
               <span className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold">
                 Filter by Store Hub:
               </span>
               <select
                 value={selectedLocation}
                 onChange={(e) => setSelectedLocation(e.target.value)}
+                aria-label="Filter by Store Hub"
                 className="bg-surface-container-low rounded-lg px-space-md py-1.5 font-label-md text-label-md text-on-surface focus:outline-none cursor-pointer border border-slate-200/50"
               >
                 <option value="ALL">All Hubs (Karnataka)</option>
                 <option value="BEL">BEL-01 Flagship Belagavi</option>
                 <option value="DAV">DAV-02 Weaving Davanagere</option>
                 <option value="SHI">SHI-03 Retail Apex Shivamogga</option>
+              </select>
+
+              <label
+                htmlFor="rep-month"
+                className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold"
+              >
+                Month:
+              </label>
+              <select
+                id="rep-month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className="bg-surface-container-low rounded-lg px-space-md py-1.5 font-label-md text-label-md text-on-surface focus:outline-none cursor-pointer border border-slate-200/50"
+              >
+                {monthOptions.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+
+              <label
+                htmlFor="rep-dept"
+                className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold"
+              >
+                Dept:
+              </label>
+              <select
+                id="rep-dept"
+                value={selectedDept}
+                onChange={(e) => setSelectedDept(e.target.value)}
+                className="bg-surface-container-low rounded-lg px-space-md py-1.5 font-label-md text-label-md text-on-surface focus:outline-none cursor-pointer border border-slate-200/50"
+              >
+                <option value="all">All Departments</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+
+              <label
+                htmlFor="rep-shift"
+                className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold"
+              >
+                Shift:
+              </label>
+              <select
+                id="rep-shift"
+                value={selectedShift}
+                onChange={(e) => setSelectedShift(e.target.value)}
+                className="bg-surface-container-low rounded-lg px-space-md py-1.5 font-label-md text-label-md text-on-surface focus:outline-none cursor-pointer border border-slate-200/50"
+              >
+                <option value="all">All Shifts</option>
+                {shiftOptions.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+
+              <label
+                htmlFor="rep-status"
+                className="font-label-sm text-label-sm uppercase tracking-wider text-on-surface-variant font-bold"
+              >
+                Status:
+              </label>
+              <select
+                id="rep-status"
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="bg-surface-container-low rounded-lg px-space-md py-1.5 font-label-md text-label-md text-on-surface focus:outline-none cursor-pointer border border-slate-200/50"
+              >
+                <option value="all">All Statuses</option>
+                <option value="ACTIVE">Active</option>
+                <option value="PROBATION">Probation</option>
+                <option value="ON_LEAVE">On Leave</option>
+                <option value="INACTIVE">Inactive</option>
+                <option value="TERMINATED">Terminated</option>
               </select>
             </div>
             <span className="text-xs text-on-surface-variant font-mono">
@@ -302,32 +540,68 @@ export default function ReportsPage() {
                     </td>
                   </tr>
                 ) : (
-                  data.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-surface-container-low/50 transition-colors">
-                      {Object.entries(row)
-                        .filter(([k]) => k !== 'id')
-                        .map(([k, val], vIdx) => (
-                          <td key={vIdx} className="py-space-sm px-space-md font-medium text-on-surface">
-                            {typeof val === 'string' && val.includes('%') ? (
-                              <span className="font-mono font-bold text-secondary">{val}</span>
-                            ) : typeof val === 'string' && val.startsWith('₹') ? (
-                              <span className="font-mono font-bold text-on-surface">{val}</span>
-                            ) : typeof val === 'string' && (val === 'AUDITED' || val === 'COMMITTED') ? (
-                              <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[11px] font-bold">
-                                {val}
-                              </span>
-                            ) : (
-                              String(val)
-                            )}
-                          </td>
-                        ))}
-                    </tr>
-                  ))
+                  data.map((row, idx) => {
+                    const clickable = isEmployeeRow(row);
+                    const rowName = row.employeeName || row.employee || row.code || '';
+                    return (
+                      <tr
+                        key={idx}
+                        tabIndex={clickable ? 0 : undefined}
+                        role={clickable ? 'button' : undefined}
+                        aria-label={clickable ? `Open employee profile for ${rowName}` : undefined}
+                        onClick={() => clickable && openEmployeeProfile(row)}
+                        onKeyDown={(e) => {
+                          if (clickable && (e.key === 'Enter' || e.key === ' ')) {
+                            e.preventDefault();
+                            openEmployeeProfile(row);
+                          }
+                        }}
+                        className={`transition-colors ${
+                          clickable
+                            ? 'cursor-pointer group hover:bg-[#eff4ff]/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0058be]'
+                            : 'hover:bg-surface-container-low/50'
+                        }`}
+                      >
+                        {Object.entries(row)
+                          .filter(([k]) => k !== 'id')
+                          .map(([k, val], vIdx) => (
+                            <td key={vIdx} className="py-space-sm px-space-md font-medium text-on-surface">
+                              {typeof val === 'string' && val.includes('%') ? (
+                                <span className="font-mono font-bold text-secondary">{val}</span>
+                              ) : typeof val === 'string' && val.startsWith('₹') ? (
+                                <span className="font-mono font-bold text-on-surface">{val}</span>
+                              ) : typeof val === 'string' && (val === 'AUDITED' || val === 'COMMITTED') ? (
+                                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[11px] font-bold">
+                                  {val}
+                                </span>
+                              ) : (k === 'employeeName' || k === 'employee' || k === 'employeeCode' || k === 'code') && clickable ? (
+                                <span className="group-hover:text-secondary group-hover:underline font-semibold">
+                                  {String(val)}
+                                </span>
+                              ) : (
+                                String(val)
+                              )}
+                            </td>
+                          ))}
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
           </div>
         </div>
+
+        {/* CARD DRILL-DOWN DETAIL VIEW */}
+        {drill && (
+          <DetailDrillDownModal
+            metric={drill.metric}
+            title={drill.title}
+            filters={drillFilters}
+            chips={drillChips}
+            onClose={() => setDrill(null)}
+          />
+        )}
       </div>
     </DashboardLayout>
   );

@@ -53,11 +53,112 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
   }
 });
 
-router.post('/', authorize('ADD'), validate(holidaySchema), async (req: AuthRequest, res) => {
+// Download CSV template for BSC Holidays
+router.get('/template', authorize('VIEW'), async (_req: AuthRequest, res) => {
+  const csvHeaders = 'Name,Date,Type,Description,Location\n';
+  const sampleRows = [
+    'Makara Sankranti / Pongal,2025-01-15,MANDATORY,Karnataka State Harvest Festival,ALL',
+    'Republic Day,2025-01-26,NATIONAL,National Holiday (Full Paid),ALL',
+    'Ugadi (Kannada New Year),2025-03-30,MANDATORY,Karnataka Gazetted Festival,ALL',
+    'May Day (Labour Day),2025-05-01,NATIONAL,International Workers Day,ALL',
+    'Independence Day,2025-08-15,NATIONAL,National Holiday (Full Paid),ALL',
+    'Ganesh Chaturthi,2025-08-27,MANDATORY,Regional Festival Holiday,ALL',
+    'Gandhi Jayanti,2025-10-02,NATIONAL,National Holiday (Full Paid),ALL',
+    'Ayudha Puja (Machinery Sanctification),2025-10-01,MANDATORY,Textile Machinery Sanctification,ALL',
+    'Deepavali / Naraka Chaturdashi,2025-10-20,MANDATORY,Diwali Festive Bonus Day,ALL',
+    'Kannada Rajyotsava,2025-11-01,STATE,Karnataka State Formation Day,ALL',
+    'Christmas,2025-12-25,NATIONAL,Statutory Declared Holiday,ALL',
+  ].join('\n');
+
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename="bsc_holidays_template.csv"');
+  return res.status(200).send(csvHeaders + sampleRows);
+});
+
+// Helper to check HR / Admin management authority
+function isHolidayManager(user: any): boolean {
+  if (!user) return false;
+  const role = user.role;
+  return (
+    role === 'SUPER_ADMIN' ||
+    role === 'HR_MANAGER' ||
+    role === 'HR_EXECUTIVE' ||
+    role === 'LOCATION_MANAGER' ||
+    (Array.isArray(user.permissions) && user.permissions.includes('ADD'))
+  );
+}
+
+// Bulk upload holidays via CSV / JSON
+router.post('/bulk', async (req: AuthRequest, res) => {
   try {
+    if (!isHolidayManager(req.user)) {
+      return res.status(403).json({ error: 'Access denied: HR Manager or Admin privileges required' });
+    }
+
+    const { holidays } = req.body;
+    if (!Array.isArray(holidays) || holidays.length === 0) {
+      return res.status(400).json({ error: 'Array of holidays is required' });
+    }
+
+    const createdRecords: any[] = [];
+    const errors: string[] = [];
+
+    for (const item of holidays) {
+      try {
+        if (!item.name || !item.date) {
+          errors.push(`Skipped record missing name or date: ${JSON.stringify(item)}`);
+          continue;
+        }
+
+        const parsedDate = new Date(item.date);
+        if (isNaN(parsedDate.getTime())) {
+          errors.push(`Invalid date format for ${item.name}: ${item.date}`);
+          continue;
+        }
+
+        const targetLocationId = req.user!.role === 'SUPER_ADMIN'
+          ? (item.locationId && item.locationId !== 'ALL' ? item.locationId : null)
+          : (req.user!.locationId || null);
+
+        const record = await prisma.holiday.create({
+          data: {
+            name: String(item.name).trim(),
+            date: parsedDate,
+            locationId: targetLocationId,
+            departmentId: item.departmentId || null,
+            isRecurring: Boolean(item.isRecurring),
+          },
+        });
+        createdRecords.push(record);
+      } catch (err: any) {
+        errors.push(`Failed to insert ${item.name}: ${err.message}`);
+      }
+    }
+
+    return res.status(201).json({
+      message: `Successfully imported ${createdRecords.length} holidays`,
+      count: createdRecords.length,
+      holidays: createdRecords,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+  } catch (error: any) {
+    console.error('Bulk holiday import error:', error);
+    return res.status(500).json({ error: error.message || 'Failed to import holidays' });
+  }
+});
+
+router.post('/', async (req: AuthRequest, res) => {
+  try {
+    if (!isHolidayManager(req.user)) {
+      return res.status(403).json({ error: 'Access denied: HR Manager or Admin privileges required' });
+    }
+
     const { name, date, locationId, departmentId, isRecurring } = req.body;
+    if (!name || !date) {
+      return res.status(400).json({ error: 'Name and date are required' });
+    }
     
-    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? locationId : req.user!.locationId;
+    const targetLocationId = req.user!.role === 'SUPER_ADMIN' ? (locationId || null) : req.user!.locationId;
     if (req.user!.role !== 'SUPER_ADMIN' && locationId && locationId !== req.user!.locationId) {
       return res.status(403).json({ error: 'Access denied' });
     }

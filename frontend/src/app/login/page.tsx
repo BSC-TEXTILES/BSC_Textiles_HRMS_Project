@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Logo } from '@/components/ui/Logo';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { sanitizeCallbackUrl, getRoleHomePath } from '@/lib/roles';
 
 const loginSchema = z.object({
@@ -199,7 +200,12 @@ function LoginFormContent() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 bg-[#f4f7fb] text-[#0b1c30] relative overflow-hidden">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 bg-[#f4f7fb] dark:bg-[#090e17] text-[#0b1c30] dark:text-slate-100 relative overflow-hidden transition-colors duration-300">
+      {/* Floating Theme Toggle Switch in Login View */}
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20">
+        <ThemeToggle size="md" />
+      </div>
+
       {/* Subtle modern ambient background decorations */}
       <div 
         aria-hidden="true" 
@@ -219,18 +225,25 @@ function LoginFormContent() {
         {/* ================================================================= */}
         {/* PROFILE CARD CONTAINER                                            */}
         {/* ================================================================= */}
-        <div className="bg-white/95 backdrop-blur-xl rounded-[28px] border border-slate-200/90 shadow-[0_20px_50px_-15px_rgba(11,28,48,0.12),0_4px_16px_rgba(0,0,0,0.03)] px-6 py-8 sm:px-8 sm:py-9 transition-all">
+        <div className="bg-white/95 dark:bg-[#0e172a]/95 backdrop-blur-xl rounded-[28px] border border-slate-200/90 dark:border-slate-800 shadow-[0_20px_50px_-15px_rgba(11,28,48,0.12),0_4px_16px_rgba(0,0,0,0.03)] px-6 py-8 sm:px-8 sm:py-9 transition-all">
           
           {/* Top Company Brand Header */}
           <div className="flex flex-col items-center justify-center">
-            <div className="flex items-center gap-2.5">
-              <Logo variant="icon" size="md" />
-              <div className="flex flex-col text-left">
-                <span className="text-[17px] font-black tracking-tight text-[#0b1c30] leading-none">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-white dark:bg-slate-900 p-2 border border-slate-200/90 dark:border-slate-800 shadow-[0_8px_20px_-4px_rgba(11,28,48,0.08)] flex items-center justify-center overflow-hidden hover:scale-105 transition-transform">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/bsc_logo.png"
+                  alt="BSC Textiles Since 1938"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <div className="flex flex-col text-center mt-0.5">
+                <span className="text-[17px] font-black tracking-tight text-[#0b1c30] dark:text-slate-100 leading-none">
                   BSC Textiles
                 </span>
-                <span className="text-[10px] uppercase font-bold tracking-widest text-[#0058be] mt-0.5">
-                  HRMS Enterprise
+                <span className="text-[10px] uppercase font-bold tracking-widest text-[#0058be] dark:text-blue-400 mt-0.5">
+                  Since 1938 • Enterprise HRMS
                 </span>
               </div>
             </div>
@@ -239,11 +252,11 @@ function LoginFormContent() {
           {/* Profile Card Silhouette Avatar */}
           <div className="mt-6 flex flex-col items-center">
             <div className="relative">
-              <div className="w-[76px] h-[76px] rounded-full bg-gradient-to-tr from-[#0058be] via-[#1d63d8] to-[#3b82f6] text-white flex items-center justify-center shadow-[0_12px_24px_-6px_rgba(0,88,190,0.4)] ring-4 ring-blue-50/80">
+              <div className="w-[76px] h-[76px] rounded-full bg-gradient-to-tr from-[#0058be] via-[#1d63d8] to-[#3b82f6] text-white flex items-center justify-center shadow-[0_12px_24px_-6px_rgba(0,88,190,0.4)] ring-4 ring-blue-50/80 dark:ring-blue-900/40">
                 <UserRound className="w-9 h-9 text-white/95" strokeWidth={1.75} aria-hidden="true" />
               </div>
               <span
-                className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-emerald-500 border-[3px] border-white flex items-center justify-center shadow-xs"
+                className="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-emerald-500 border-[3px] border-white dark:border-slate-800 flex items-center justify-center shadow-xs"
                 title="Portal Online & Ready"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
@@ -252,10 +265,10 @@ function LoginFormContent() {
 
             {/* Profile Welcome Information */}
             <div className="mt-3.5 text-center">
-              <h1 className="text-xl font-bold tracking-tight text-[#0b1c30]">
+              <h1 className="text-xl font-bold tracking-tight text-[#0b1c30] dark:text-slate-100">
                 {activePersonaObj ? activePersonaObj.label : 'Welcome Back'}
               </h1>
-              <p className="mt-0.5 text-xs text-slate-500">
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                 {activePersonaObj 
                   ? activePersonaObj.desc 
                   : 'Please sign in to your workforce account'}
@@ -288,11 +301,11 @@ function LoginFormContent() {
           <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-1 space-y-4">
             {/* Email Field */}
             <div>
-              <label htmlFor="email" className="block text-xs font-bold text-slate-700 mb-1.5">
+              <label htmlFor="email" className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
                 Email Address or Employee Code
               </label>
               <div className="relative">
-                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
                   <Mail className="w-4 h-4" aria-hidden="true" />
                 </span>
                 <input
@@ -305,14 +318,14 @@ function LoginFormContent() {
                   aria-invalid={errors.email ? 'true' : 'false'}
                   aria-describedby={errors.email ? 'email-error' : undefined}
                   {...register('email')}
-                  className={`w-full h-11 rounded-xl border bg-slate-50/50 pl-10 pr-3.5 text-xs font-medium text-[#0b1c30] placeholder:text-slate-400 outline-none transition-all
-                    disabled:bg-slate-100 disabled:text-slate-400
-                    focus:bg-white focus:ring-4 focus:ring-[#0058be]/10
-                    ${errors.email ? 'border-red-400 focus:border-red-500 focus:ring-red-500/15' : 'border-slate-200/90 hover:border-slate-300 focus:border-[#0058be]'}`}
+                  className={`w-full h-11 rounded-xl border bg-slate-50/50 dark:bg-[#131f38] pl-10 pr-3.5 text-xs font-medium text-[#0b1c30] dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-all
+                    disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400
+                    focus:bg-white dark:focus:bg-[#152342] focus:ring-4 focus:ring-[#0058be]/10
+                    ${errors.email ? 'border-red-400 focus:border-red-500 focus:ring-red-500/15' : 'border-slate-200/90 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 focus:border-[#0058be]'}`}
                 />
               </div>
               {errors.email && (
-                <p id="email-error" role="alert" className="mt-1.5 text-[11px] font-semibold text-red-600">
+                <p id="email-error" role="alert" className="mt-1.5 text-[11px] font-semibold text-red-600 dark:text-red-400">
                   {errors.email.message}
                 </p>
               )}
@@ -321,19 +334,19 @@ function LoginFormContent() {
             {/* Password Field */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="password" className="block text-xs font-bold text-slate-700">
+                <label htmlFor="password" className="block text-xs font-bold text-slate-700 dark:text-slate-300">
                   Security Password
                 </label>
                 <button
                   type="button"
                   onClick={() => toast('Please contact HR/IT Administrator to initiate password reset.', { icon: '🔐' })}
-                  className="text-[11px] font-semibold text-[#0058be] hover:underline focus:outline-none"
+                  className="text-[11px] font-semibold text-[#0058be] dark:text-blue-400 hover:underline focus:outline-none"
                 >
                   Forgot password?
                 </button>
               </div>
               <div className="relative">
-                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
                   <Lock className="w-4 h-4" aria-hidden="true" />
                 </span>
                 <input
@@ -345,23 +358,23 @@ function LoginFormContent() {
                   aria-invalid={errors.password ? 'true' : 'false'}
                   aria-describedby={errors.password ? 'password-error' : undefined}
                   {...register('password')}
-                  className={`w-full h-11 rounded-xl border bg-slate-50/50 pl-10 pr-11 text-xs font-medium text-[#0b1c30] placeholder:text-slate-400 outline-none transition-all
-                    disabled:bg-slate-100 disabled:text-slate-400
-                    focus:bg-white focus:ring-4 focus:ring-[#0058be]/10
-                    ${errors.password ? 'border-red-400 focus:border-red-500 focus:ring-red-500/15' : 'border-slate-200/90 hover:border-slate-300 focus:border-[#0058be]'}`}
+                  className={`w-full h-11 rounded-xl border bg-slate-50/50 dark:bg-[#131f38] pl-10 pr-11 text-xs font-medium text-[#0b1c30] dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-all
+                    disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400
+                    focus:bg-white dark:focus:bg-[#152342] focus:ring-4 focus:ring-[#0058be]/10
+                    ${errors.password ? 'border-red-400 focus:border-red-500 focus:ring-red-500/15' : 'border-slate-200/90 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 focus:border-[#0058be]'}`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   disabled={isLoading}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 hover:text-slate-600 focus:outline-none"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
               {errors.password && (
-                <p id="password-error" role="alert" className="mt-1.5 text-[11px] font-semibold text-red-600">
+                <p id="password-error" role="alert" className="mt-1.5 text-[11px] font-semibold text-red-600 dark:text-red-400">
                   {errors.password.message}
                 </p>
               )}
@@ -369,15 +382,15 @@ function LoginFormContent() {
 
             {/* Remember Me Option */}
             <div className="flex items-center justify-between pt-0.5">
-              <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
+              <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   defaultChecked
-                  className="w-4 h-4 rounded border-slate-300 text-[#0058be] focus:ring-[#0058be]/20 cursor-pointer"
+                  className="w-4 h-4 rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#0058be] focus:ring-[#0058be]/20 cursor-pointer"
                 />
                 <span>Remember this terminal</span>
               </label>
-              <span className="text-[10px] text-slate-400">12h secure session</span>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500">12h secure session</span>
             </div>
 
             {/* Primary Login Button */}
@@ -401,13 +414,13 @@ function LoginFormContent() {
           </form>
 
           {/* Quick Demo Personas (1-click fill) */}
-          <div className="mt-6 border-t border-slate-100 pt-4">
+          <div className="mt-6 border-t border-slate-100 dark:border-slate-800 pt-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-[#0058be]" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-[#0058be] dark:text-blue-400" />
                 <span>Quick Role Access</span>
               </span>
-              <span className="text-[10px] text-slate-400">1-click test</span>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500">1-click test</span>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
@@ -421,15 +434,15 @@ function LoginFormContent() {
                     disabled={isLoading}
                     className={`p-2 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                       isSelected
-                        ? 'border-[#0058be] bg-[#eff4ff] ring-2 ring-[#0058be]/20 shadow-xs'
-                        : 'border-slate-200 bg-slate-50/70 hover:bg-slate-100/70 hover:border-slate-300'
+                        ? 'border-[#0058be] dark:border-blue-500 bg-[#eff4ff] dark:bg-[#15274d] ring-2 ring-[#0058be]/20 shadow-xs'
+                        : 'border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-[#131f38]/60 hover:bg-slate-100/70 dark:hover:bg-[#172545]'
                     }`}
                   >
                     <div className="flex items-center justify-between w-full">
-                      <span className="text-[11px] font-bold text-[#0b1c30] truncate">{p.label}</span>
-                      {isSelected && <CheckCircle2 className="w-3 h-3 text-[#0058be]" />}
+                      <span className="text-[11px] font-bold text-[#0b1c30] dark:text-slate-100 truncate">{p.label}</span>
+                      {isSelected && <CheckCircle2 className="w-3 h-3 text-[#0058be] dark:text-blue-400" />}
                     </div>
-                    <span className="text-[9px] text-slate-500 font-medium truncate mt-0.5">{p.badge}</span>
+                    <span className="text-[9px] text-slate-500 dark:text-slate-400 font-medium truncate mt-0.5">{p.badge}</span>
                   </button>
                 );
               })}
