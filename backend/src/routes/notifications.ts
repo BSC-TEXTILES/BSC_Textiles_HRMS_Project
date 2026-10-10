@@ -1,151 +1,148 @@
 import { Router } from 'express';
-import { prisma } from '../index.js';
+import { container } from '../core/container/ServiceContainer.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { validate } from '../middleware/validation.js';
+import { z } from 'zod';
 
 const router = Router();
 router.use(authenticate);
 
-// In-memory set of read notification IDs for active sessions
-const readNotificationIds = new Set<string>();
+const notificationFilterSchema = z.object({
+  query: z.object({
+    isRead: z.enum(['true', 'false']).optional(),
+    type: z.enum(['INFO', 'WARNING', 'DANGER', 'CRITICAL']).optional(),
+    severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']).optional(),
+    eventId: z.string().optional(),
+    entityType: z.string().optional(),
+    locationId: z.string().optional(),
+    startDate: z.string().datetime().optional(),
+    endDate: z.string().datetime().optional(),
+    page: z.coerce.number().int().positive().default(1),
+    limit: z.coerce.number().int().positive().max(100).default(20),
+    sortBy: z.enum(['createdAt', 'readAt']).default('createdAt'),
+    sortOrder: z.enum(['ASC', 'DESC']).default('DESC'),
+  }),
+});
 
-router.get('/', async (req: AuthRequest, res) => {
+const markReadSchema = z.object({
+  params: z.object({
+    id: z.string().min(1),
+  }),
+});
+
+router.get('/', validate(notificationFilterSchema), async (req: AuthRequest, res) => {
   try {
-    const user = req.user!;
-    const locationWhere = user.role === 'SUPER_ADMIN' ? {} : { locationId: user.locationId };
+    const userId = req.user!.id;
+    const query = req.query as any;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const filter: any = { userId };
+    if (query.isRead !== undefined) filter.isRead = query.isRead === 'true';
+    if (query.type) filter.type = query.type;
+    if (query.severity) filter.severity = query.severity;
+    if (query.eventId) filter.eventId = query.eventId;
+    if (query.entityType) filter.entityType = query.entityType;
+    if (query.locationId) filter.locationId = query.locationId;
+    if (query.startDate) filter.startDate = new Date(query.startDate);
+    if (query.endDate) filter.endDate = new Date(query.endDate);
+    filter.page = query.page;
+    filter.limit = query.limit;
+    filter.sortBy = query.sortBy;
+    filter.sortOrder = query.sortOrder;
 
-    // 1. Fetch recent late attendance events
-    const lateAttendances = await prisma.attendance.findMany({
-      where: {
-        ...locationWhere,
-        attendanceDate: { gte: today },
-        lateLoginSeconds: { gt: 0 },
-      },
-      take: 5,
-      orderBy: { actualLogin: 'desc' },
-      include: {
-        employee: { select: { fullName: true, employeeCode: true } },
-      },
-    });
-
-    // 2. Fetch break overruns
-    const exceededBreaks = await prisma.employeeBreak.findMany({
-      where: {
-        ...locationWhere,
-        status: 'EXCEEDED',
-      },
-      take: 5,
-      orderBy: { startTime: 'desc' },
-      include: {
-        employee: { select: { fullName: true, employeeCode: true } },
-      },
-    });
-
-    // 3. Fetch critical observations
-    const criticalObservations = await prisma.observation.findMany({
-      where: {
-        ...locationWhere,
-        level: 'CRITICAL',
-      },
-      take: 5,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        employee: { select: { fullName: true, employeeCode: true } },
-      },
-    });
-
-    // 4. Fetch failed QR scans
-    const failedScans = await prisma.qRScanRecord.findMany({
-      where: {
-        ...locationWhere,
-        result: { not: 'SUCCESS' },
-      },
-      take: 5,
-      orderBy: { scannedAt: 'desc' },
-      include: {
-        employee: { select: { fullName: true, employeeCode: true } },
-      },
-    });
-
-    const notifications: any[] = [];
-
-    lateAttendances.forEach((att) => {
-      const id = `late-${att.id}`;
-      notifications.push({
-        id,
-        title: 'Late Arrival Alert',
-        message: `${att.employee.fullName} (${att.employee.employeeCode}) was late by ${Math.round(
-          (att.lateLoginSeconds || 0) / 60
-        )} minutes.`,
-        type: 'WARNING',
-        createdAt: att.actualLogin || att.createdAt,
-        isRead: readNotificationIds.has(id),
-      });
-    });
-
-    exceededBreaks.forEach((brk) => {
-      const id = `break-${brk.id}`;
-      notifications.push({
-        id,
-        title: 'Break Overrun Warning',
-        message: `${brk.employee.fullName} exceeded ${brk.breakType} break by ${Math.round(
-          (brk.excessDuration || 0) / 60
-        )} mins.`,
-        type: 'DANGER',
-        createdAt: brk.endTime || brk.startTime,
-        isRead: readNotificationIds.has(id),
-      });
-    });
-
-    criticalObservations.forEach((obs) => {
-      const id = `obs-${obs.id}`;
-      notifications.push({
-        id,
-        title: 'Critical Observation Logged',
-        message: `${obs.observationType} for ${obs.employee?.fullName || 'Floor'}: ${obs.description.substring(0, 60)}...`,
-        type: 'CRITICAL',
-        createdAt: obs.createdAt,
-        isRead: readNotificationIds.has(id),
-      });
-    });
-
-    failedScans.forEach((scan) => {
-      const id = `scan-${scan.id}`;
-      notifications.push({
-        id,
-        title: 'QR Scan Rejection',
-        message: `QR Scan failed (${scan.result}) for ${scan.employee?.fullName || 'token'}.`,
-        type: 'INFO',
-        createdAt: scan.scannedAt,
-        isRead: readNotificationIds.has(id),
-      });
-    });
-
-    // Sort by timestamp desc
-    notifications.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    const unreadCount = notifications.filter((n) => !n.isRead).length;
+    const result = await container.notificationService.getUserNotifications(userId, filter);
 
     res.json({
-      notifications,
-      unreadCount,
+      notifications: result.notifications,
+      unreadCount: result.unreadCount,
+      pagination: {
+        page: result.page,
+        limit: result.limit,
+        total: result.total,
+        totalPages: result.totalPages,
+      },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Get notifications error:', error);
     res.status(500).json({ error: 'Failed to retrieve notifications' });
   }
 });
 
-router.post('/:id/read', async (req: AuthRequest, res) => {
-  const { id } = req.params;
-  readNotificationIds.add(id);
-  res.json({ success: true, message: 'Notification marked as read' });
+router.get('/unread-count', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const count = await container.notificationService.getUnreadCount(userId);
+    res.json({ unreadCount: count });
+  } catch (error: any) {
+    console.error('Get unread count error:', error);
+    res.status(500).json({ error: 'Failed to get unread count' });
+  }
+});
+
+router.get('/:id', async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const notification = await container.notificationService.getNotificationById(req.params.id, userId);
+    if (!notification) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+    res.json(notification);
+  } catch (error: any) {
+    console.error('Get notification error:', error);
+    res.status(500).json({ error: 'Failed to get notification' });
+  }
+});
+
+router.post('/:id/read', validate(markReadSchema), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const success = await container.notificationService.markAsRead(req.params.id, userId);
+    if (!success) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+    res.json({ success: true, message: 'Notification marked as read' });
+  } catch (error: any) {
+    console.error('Mark as read error:', error);
+    res.status(500).json({ error: 'Failed to mark notification as read' });
+  }
+});
+
+router.post('/:id/unread', validate(markReadSchema), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const success = await container.notificationService.markAsUnread(req.params.id, userId);
+    if (!success) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+    res.json({ success: true, message: 'Notification marked as unread' });
+  } catch (error: any) {
+    console.error('Mark as unread error:', error);
+    res.status(500).json({ error: 'Failed to mark notification as unread' });
+  }
 });
 
 router.post('/mark-all-read', async (req: AuthRequest, res) => {
-  res.json({ success: true, message: 'All notifications marked as read' });
+  try {
+    const userId = req.user!.id;
+    const count = await container.notificationService.markAllAsRead(userId);
+    res.json({ success: true, message: `${count} notifications marked as read` });
+  } catch (error: any) {
+    console.error('Mark all read error:', error);
+    res.status(500).json({ error: 'Failed to mark all notifications as read' });
+  }
+});
+
+router.delete('/:id', validate(markReadSchema), async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.id;
+    const success = await container.notificationService.deleteNotification(req.params.id, userId);
+    if (!success) {
+      return res.status(404).json({ error: 'Notification not found' });
+    }
+    res.json({ success: true, message: 'Notification deleted' });
+  } catch (error: any) {
+    console.error('Delete notification error:', error);
+    res.status(500).json({ error: 'Failed to delete notification' });
+  }
 });
 
 export default router;

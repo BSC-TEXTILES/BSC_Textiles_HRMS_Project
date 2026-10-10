@@ -51,28 +51,8 @@ import { timingMiddleware } from './middleware/timing.js';
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
-  cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    credentials: true,
-  },
-});
 
-export { prisma };
-export const socketIO = io;
-
-// 0. High-resolution timing, latency metrics, and request correlation IDs
-app.use(timingMiddleware);
-
-// 1. Basic security headers via helmet
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-}));
-
-// 2. Comprehensive enterprise security headers (CSP, HSTS, X-Content-Type-Options, etc.)
-app.use(securityHeaders);
-
-// 3. Strict CORS configuration
+// 0. Strict CORS configuration with local network dev support
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:3000',
@@ -81,14 +61,44 @@ const allowedOrigins = [
   'http://127.0.0.1:3001',
 ].filter(Boolean) as string[];
 
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
+const corsOriginHandler = (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+  if (
+    !origin ||
+    allowedOrigins.includes(origin) ||
+    origin.startsWith('http://localhost:') ||
+    origin.startsWith('http://127.0.0.1:') ||
+    origin.startsWith('http://192.168.') ||
+    process.env.NODE_ENV !== 'production'
+  ) {
+    callback(null, true);
+  } else {
+    callback(new Error('Not allowed by CORS'));
+  }
+};
+
+const io = new Server(httpServer, {
+  cors: {
+    origin: corsOriginHandler,
+    credentials: true,
   },
+});
+
+export { prisma };
+export const socketIO = io;
+
+// 1. High-resolution timing, latency metrics, and request correlation IDs
+app.use(timingMiddleware);
+
+// 2. Basic security headers via helmet
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+
+// 3. Comprehensive enterprise security headers (CSP, HSTS, X-Content-Type-Options, etc.)
+app.use(securityHeaders);
+
+app.use(cors({
+  origin: corsOriginHandler,
   credentials: true,
 }));
 
@@ -174,6 +184,12 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 });
 
 io.on('connection', (socket) => {
+  const userId = socket.handshake.auth?.userId || socket.handshake.query?.userId;
+  if (userId) {
+    socket.join(`user:${userId}`);
+    socket.data.userId = userId;
+  }
+
   socket.on('join-location', (locationId: string) => {
     socket.join(`location:${locationId}`);
   });
@@ -181,7 +197,7 @@ io.on('connection', (socket) => {
   socket.on('join-stream', (streamId: string) => {
     socket.join(`stream:${streamId}`);
   });
-  
+
   socket.on('disconnect', () => {});
 });
 

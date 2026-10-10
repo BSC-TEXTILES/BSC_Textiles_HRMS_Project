@@ -7,6 +7,27 @@ import { MetricDrillDownModal, type MetricKey } from '@/components/dashboard/Met
 import { OperationsSummaryChart } from '@/components/dashboard/OperationsSummaryChart';
 import { BscHolidaysCalendar } from '@/components/dashboard/BscHolidaysCalendar';
 import api from '@/lib/api';
+import {
+  Users,
+  CheckCircle2,
+  Fingerprint,
+  Coffee,
+  Coins,
+  Building2,
+  Calendar,
+  Clock,
+  RotateCw,
+  Search,
+  Filter,
+  X,
+  ChevronRight,
+  ArrowRight,
+  ShieldCheck,
+  Banknote,
+  FileText,
+  UserCheck,
+  UserPlus
+} from 'lucide-react';
 
 interface DashboardStats {
   totalEmployees: number;
@@ -86,7 +107,10 @@ const DEFAULT_SHIFTS = [
   { id: 'EVENING', name: 'Evening Shift (12:00 - 21:00)' },
 ];
 
+import { useSession } from 'next-auth/react';
+
 export default function DashboardPage() {
+  const { data: session, status: authStatus } = useSession();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedHub, setSelectedHub] = useState('all');
@@ -251,13 +275,16 @@ export default function DashboardPage() {
     }
   }, [selectedHub, selectedDept, selectedDate, selectedShift]);
 
-  // Execute reactive refresh whenever any filter changes
+  // Execute reactive refresh whenever any filter changes (only when authenticated)
   useEffect(() => {
-    fetchDashboardData();
-  }, [fetchDashboardData]);
+    if (authStatus === 'authenticated') {
+      fetchDashboardData();
+    }
+  }, [authStatus, fetchDashboardData]);
 
   // Load shift, department, and location options dynamically from backend
   useEffect(() => {
+    if (authStatus !== 'authenticated') return;
     let ignore = false;
     const loadOptions = async () => {
       try {
@@ -304,7 +331,7 @@ export default function DashboardPage() {
     return () => {
       ignore = true;
     };
-  }, [selectedHub]);
+  }, [authStatus, selectedHub]);
 
   const handleManualSync = async () => {
     setSyncing(true);
@@ -382,13 +409,13 @@ export default function DashboardPage() {
 
   // Shared interactive styles for the 5 drill-down KPI cards.
   const cardActionClass =
-    'group flex flex-col justify-between w-full text-left bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 dark:hover:border-blue-500/40 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#0058be] focus:ring-offset-2 active:scale-[0.99]';
+    'group flex flex-col justify-between w-full text-left bg-white dark:bg-[#161920] p-4 rounded-xl border border-gray-200/90 dark:border-slate-800 shadow-xs cursor-pointer transition-all hover:border-[#722F37]/50 dark:hover:border-[#E8DCC6]/40 hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-[#722F37]/30 active:scale-[0.99]';
 
   // Small "View details" affordance shown at the bottom of each clickable card.
   const viewDetailsHint = (
-    <span className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400 opacity-70 group-hover:opacity-100 transition-opacity">
+    <span className="mt-3 pt-2 border-t border-gray-100 dark:border-slate-800 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#722F37] dark:text-[#E8DCC6] opacity-75 group-hover:opacity-100 transition-opacity">
       <span>View Details</span>
-      <span className="material-symbols-outlined text-[14px] transition-transform group-hover:translate-x-0.5">arrow_forward</span>
+      <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-0.5" />
     </span>
   );
 
@@ -396,25 +423,25 @@ export default function DashboardPage() {
     <DashboardLayout>
       <div className="flex flex-col w-full gap-5">
         {/* TOP HEADER & CONTROLS BANNER */}
-        <div className="flex flex-col gap-4 bg-white dark:bg-[#0e172a] p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+        <div className="flex flex-col gap-4 bg-white dark:bg-[#161920] p-5 rounded-xl border border-gray-200/90 dark:border-slate-800 shadow-xs">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-400 text-[11px] font-bold uppercase tracking-wider border border-[#dce9ff] dark:border-blue-900/50">
-                  <span className="material-symbols-outlined text-[14px]">corporate_fare</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-[#E8DCC6]/30 dark:bg-[#722F37]/20 text-[#722F37] dark:text-[#E8DCC6] text-[11px] font-bold uppercase tracking-wider border border-[#E8DCC6] dark:border-[#722F37]/40">
+                  <Building2 className="w-3 h-3" />
                   BSC Retail Enterprise Hubs
                 </span>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-[#eff4ff] dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-medium border border-slate-200 dark:border-slate-700">
-                  <span className="material-symbols-outlined text-[13px] text-[#0058be] dark:text-blue-400">verified</span>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-gray-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-medium border border-gray-200 dark:border-slate-700">
+                  <CheckCircle2 className="w-3 h-3 text-[#722F37] dark:text-[#E8DCC6]" />
                   Since 1938 • FY 2026-27 Q3
                 </span>
               </div>
               <div className="flex items-center gap-3 mt-0.5">
-                <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 p-0.5 border border-slate-200/90 dark:border-slate-800 shadow-xs flex items-center justify-center shrink-0 overflow-hidden">
+                <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 p-0.5 border border-gray-200 dark:border-slate-800 shadow-xs flex items-center justify-center shrink-0 overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/images/bsc_logo.png" alt="BSC Textiles Since 1938" className="w-full h-full object-contain" />
                 </div>
-                <h1 className="text-2xl font-bold text-[#0b1c30] dark:text-slate-100 tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-bold text-[#18181B] dark:text-slate-100 tracking-tight">
                   Executive Workforce & Operations Dashboard
                 </h1>
               </div>
@@ -427,43 +454,43 @@ export default function DashboardPage() {
             <div className="flex items-center flex-wrap gap-2 self-start lg:self-center">
               <Link
                 href="/employees"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#0b1c30] dark:bg-blue-600 text-white rounded-lg text-xs font-semibold shadow-sm hover:bg-slate-800 dark:hover:bg-blue-500 transition-all active:scale-[0.98]"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#722F37] hover:bg-[#5B232A] text-white rounded-lg text-xs font-semibold shadow-xs transition-all active:scale-[0.98]"
               >
-                <span className="material-symbols-outlined text-[17px]">person_add</span>
-                <span>+ Quick Onboard Employee</span>
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>+ Add Employee</span>
               </Link>
               <Link
                 href="/attendance/shifts"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-400 rounded-lg text-xs font-semibold hover:bg-[#dce9ff] dark:hover:bg-blue-900/60 transition-colors border border-[#dce9ff] dark:border-blue-900/50"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-gray-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-lg text-xs font-semibold transition-colors border border-gray-200 dark:border-slate-700"
               >
-                <span className="material-symbols-outlined text-[17px]">edit_calendar</span>
-                <span>Floor Shift Regularization</span>
+                <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                <span>Shift Rosters</span>
               </Link>
               <Link
                 href="/reports"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-lg text-xs font-medium border border-gray-200 dark:border-slate-700 shadow-xs hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
               >
-                <span className="material-symbols-outlined text-[17px] text-slate-400 dark:text-slate-400">summarize</span>
-                <span>Monthly Report</span>
+                <FileText className="w-3.5 h-3.5 text-slate-500" />
+                <span>Monthly Reports</span>
               </Link>
             </div>
           </div>
 
-          {/* Filter & Terminal Connectivity Bar */}
-          <div className="flex flex-col gap-3 pt-3 bg-[#eff4ff]/60 dark:bg-[#131f38]/60 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800 transition-all">
+          {/* Filter Bar */}
+          <div className="flex flex-col gap-3 pt-3 bg-gray-50/80 dark:bg-slate-800/40 p-3.5 rounded-xl border border-gray-200/80 dark:border-slate-800 transition-all">
             <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2.5">
                 {/* Hub Selector */}
-                <div className="flex items-center gap-1.5 bg-white dark:bg-[#0c1424] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs text-xs group hover:border-[#0058be] dark:hover:border-blue-500 transition-colors">
-                  <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[16px] group-hover:scale-110 transition-transform">storefront</span>
+                <div className="flex items-center gap-1.5 bg-white dark:bg-[#1A1D24] px-3 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 shadow-xs text-xs">
+                  <Building2 className="w-3.5 h-3.5 text-[#722F37] dark:text-[#E8DCC6]" />
                   <span className="text-[10px] uppercase text-slate-400 font-bold">Hub:</span>
                   <select
                     value={selectedHub}
                     onChange={(e) => setSelectedHub(e.target.value)}
-                    className="bg-transparent font-semibold text-xs text-[#0b1c30] dark:text-slate-100 focus:outline-none cursor-pointer pr-1"
+                    className="bg-transparent font-semibold text-xs text-[#18181B] dark:text-slate-100 focus:outline-none cursor-pointer pr-1"
                   >
                     {hubOptions.map((h) => (
-                      <option key={h.id} value={h.id} className="dark:bg-[#0c1424]">
+                      <option key={h.id} value={h.id} className="dark:bg-[#1A1D24]">
                         {h.name}
                       </option>
                     ))}
@@ -471,41 +498,41 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Department Filter */}
-                <div className="flex items-center gap-1.5 bg-white dark:bg-[#0c1424] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs text-xs group hover:border-[#0058be] dark:hover:border-blue-500 transition-colors">
-                  <span className="material-symbols-outlined text-slate-400 text-[16px] group-hover:scale-110 transition-transform">category</span>
+                <div className="flex items-center gap-1.5 bg-white dark:bg-[#1A1D24] px-3 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 shadow-xs text-xs">
+                  <Users className="w-3.5 h-3.5 text-slate-400" />
                   <span className="text-[10px] uppercase text-slate-400 font-bold">Dept:</span>
                   <select
                     value={selectedDept}
                     onChange={(e) => setSelectedDept(e.target.value)}
-                    className="bg-transparent font-semibold text-xs text-[#0b1c30] dark:text-slate-100 focus:outline-none cursor-pointer pr-1"
+                    className="bg-transparent font-semibold text-xs text-[#18181B] dark:text-slate-100 focus:outline-none cursor-pointer pr-1"
                   >
-                    <option value="all" className="dark:bg-[#0c1424]">All Departments</option>
+                    <option value="all" className="dark:bg-[#1A1D24]">All Departments</option>
                     {deptOptions.map((d) => (
-                      <option key={d.id} value={d.id} className="dark:bg-[#0c1424]">
+                      <option key={d.id} value={d.id} className="dark:bg-[#1A1D24]">
                         {d.name}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                {/* Date Filter with Quick Today/Yesterday toggles */}
-                <div className="flex items-center gap-1.5 bg-white dark:bg-[#0c1424] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs text-xs group hover:border-[#0058be] dark:hover:border-blue-500 transition-colors">
-                  <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[16px] group-hover:scale-110 transition-transform">calendar_today</span>
+                {/* Date Filter */}
+                <div className="flex items-center gap-1.5 bg-white dark:bg-[#1A1D24] px-3 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 shadow-xs text-xs">
+                  <Calendar className="w-3.5 h-3.5 text-[#722F37] dark:text-[#E8DCC6]" />
                   <span className="text-[10px] uppercase text-slate-400 font-bold">Date:</span>
                   <input
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="bg-transparent font-semibold text-xs text-[#0b1c30] dark:text-slate-100 focus:outline-none cursor-pointer"
+                    className="bg-transparent font-semibold text-xs text-[#18181B] dark:text-slate-100 focus:outline-none cursor-pointer"
                   />
-                  <div className="flex items-center gap-1 pl-1 border-l border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-1 pl-1 border-l border-gray-200 dark:border-slate-700">
                     <button
                       type="button"
                       onClick={() => handleSetQuickDate('today')}
                       className={`px-1.5 py-0.5 text-[10px] font-bold rounded transition-colors ${
                         selectedDate === new Date().toISOString().slice(0, 10)
-                          ? 'bg-[#0058be] text-white dark:bg-blue-600'
-                          : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          ? 'bg-[#722F37] text-white'
+                          : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'
                       }`}
                       title="Set to Today"
                     >
@@ -514,7 +541,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={() => handleSetQuickDate('yesterday')}
-                      className="px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
+                      className="px-1.5 py-0.5 text-[10px] font-medium text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
                       title="Set to Yesterday"
                     >
                       Yest
@@ -523,17 +550,17 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Shift Filter */}
-                <div className="flex items-center gap-1.5 bg-white dark:bg-[#0c1424] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs text-xs group hover:border-[#0058be] dark:hover:border-blue-500 transition-colors">
-                  <span className="material-symbols-outlined text-slate-400 text-[16px] group-hover:scale-110 transition-transform">schedule</span>
+                <div className="flex items-center gap-1.5 bg-white dark:bg-[#1A1D24] px-3 py-1.5 rounded-lg border border-gray-200 dark:border-slate-700 shadow-xs text-xs">
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
                   <span className="text-[10px] uppercase text-slate-400 font-bold">Shift:</span>
                   <select
                     value={selectedShift}
                     onChange={(e) => setSelectedShift(e.target.value)}
-                    className="bg-transparent font-semibold text-xs text-[#0b1c30] dark:text-slate-100 focus:outline-none cursor-pointer pr-1"
+                    className="bg-transparent font-semibold text-xs text-[#18181B] dark:text-slate-100 focus:outline-none cursor-pointer pr-1"
                   >
-                    <option value="all" className="dark:bg-[#0c1424]">All Shifts</option>
+                    <option value="all" className="dark:bg-[#1A1D24]">All Shifts</option>
                     {shiftOptions.map((s) => (
-                      <option key={s.id} value={s.id} className="dark:bg-[#0c1424]">
+                      <option key={s.id} value={s.id} className="dark:bg-[#1A1D24]">
                         {s.name}
                       </option>
                     ))}
@@ -541,89 +568,86 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Live Sync Beacon & Refresh */}
+              {/* Status and Refresh */}
               <div className="flex items-center justify-between lg:justify-end gap-3">
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-[#0c1424] rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0058be] opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0058be]"></span>
-                  </span>
-                  <span className="text-[10px] font-bold text-[#0b1c30] dark:text-slate-100 uppercase tracking-wider">
-                    {loading ? 'Refreshing Feed...' : 'Terminal Sync: Live 99.8%'}
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-[#1A1D24] rounded-lg border border-gray-200 dark:border-slate-700 shadow-xs">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-[10px] font-bold text-[#18181B] dark:text-slate-100 uppercase tracking-wider">
+                    {loading ? 'Refreshing...' : 'Feeds Active'}
                   </span>
                 </div>
                 <button
                   onClick={handleManualSync}
-                  className={`flex items-center justify-center p-2 rounded-lg bg-white dark:bg-[#0c1424] text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 ${
-                    syncing || loading ? 'animate-spin text-[#0058be]' : ''
+                  className={`flex items-center justify-center p-2 rounded-lg bg-white dark:bg-[#1A1D24] text-slate-600 dark:text-slate-300 hover:text-[#722F37] border border-gray-200 dark:border-slate-700 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-all ${
+                    syncing || loading ? 'animate-spin text-[#722F37]' : ''
                   }`}
-                  title="Sync Live Biometric Feeds"
+                  title="Refresh Dashboard Feeds"
                 >
-                  <span className="material-symbols-outlined text-[18px]">sync</span>
+                  <RotateCw className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
             {/* Active Filters Pill Bar with Reset CTA */}
             {activeFilterCount > 0 && (
-              <div className="flex items-center flex-wrap gap-2 pt-2 border-t border-slate-200/80 dark:border-slate-800 animate-pop-in">
+              <div className="flex items-center flex-wrap gap-2 pt-2 border-t border-gray-200 dark:border-slate-800 animate-pop-in">
                 <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                  <span className="material-symbols-outlined text-[14px] text-[#0058be] dark:text-blue-400">filter_alt</span>
+                  <Filter className="w-3.5 h-3.5 text-[#722F37]" />
                   Active Filters ({activeFilterCount}):
                 </span>
 
                 {selectedHub !== 'all' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white dark:bg-slate-800 text-[#0058be] dark:text-blue-400 border border-blue-200 dark:border-blue-900 shadow-xs animate-pop-in">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white dark:bg-slate-800 text-[#722F37] dark:text-[#E8DCC6] border border-gray-200 dark:border-slate-700 shadow-xs">
                     <span>Hub: {hubOptions.find(h => h.id === selectedHub)?.name || selectedHub}</span>
                     <button
                       type="button"
                       onClick={() => setSelectedHub('all')}
-                      className="hover:text-red-600 dark:hover:text-red-400 p-0.5 rounded-full"
+                      className="hover:text-red-600 p-0.5 rounded-full"
                       title="Clear Hub filter"
                     >
-                      <span className="material-symbols-outlined text-[13px] leading-none">close</span>
+                      <X className="w-3 h-3" />
                     </button>
                   </span>
                 )}
 
                 {selectedDept !== 'all' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white dark:bg-slate-800 text-[#0058be] dark:text-blue-400 border border-blue-200 dark:border-blue-900 shadow-xs animate-pop-in">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white dark:bg-slate-800 text-[#722F37] dark:text-[#E8DCC6] border border-gray-200 dark:border-slate-700 shadow-xs">
                     <span>Dept: {deptOptions.find(d => d.id === selectedDept)?.name || selectedDept}</span>
                     <button
                       type="button"
                       onClick={() => setSelectedDept('all')}
-                      className="hover:text-red-600 dark:hover:text-red-400 p-0.5 rounded-full"
+                      className="hover:text-red-600 p-0.5 rounded-full"
                       title="Clear Dept filter"
                     >
-                      <span className="material-symbols-outlined text-[13px] leading-none">close</span>
+                      <X className="w-3 h-3" />
                     </button>
                   </span>
                 )}
 
                 {selectedShift !== 'all' && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white dark:bg-slate-800 text-[#0058be] dark:text-blue-400 border border-blue-200 dark:border-blue-900 shadow-xs animate-pop-in">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white dark:bg-slate-800 text-[#722F37] dark:text-[#E8DCC6] border border-gray-200 dark:border-slate-700 shadow-xs">
                     <span>Shift: {shiftOptions.find(s => s.id === selectedShift)?.name || selectedShift}</span>
                     <button
                       type="button"
                       onClick={() => setSelectedShift('all')}
-                      className="hover:text-red-600 dark:hover:text-red-400 p-0.5 rounded-full"
+                      className="hover:text-red-600 p-0.5 rounded-full"
                       title="Clear Shift filter"
                     >
-                      <span className="material-symbols-outlined text-[13px] leading-none">close</span>
+                      <X className="w-3 h-3" />
                     </button>
                   </span>
                 )}
 
                 {selectedDate !== new Date().toISOString().slice(0, 10) && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white dark:bg-slate-800 text-[#0058be] dark:text-blue-400 border border-blue-200 dark:border-blue-900 shadow-xs animate-pop-in">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white dark:bg-slate-800 text-[#722F37] dark:text-[#E8DCC6] border border-gray-200 dark:border-slate-700 shadow-xs">
                     <span>Date: {selectedDate}</span>
                     <button
                       type="button"
                       onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}
-                      className="hover:text-red-600 dark:hover:text-red-400 p-0.5 rounded-full"
+                      className="hover:text-red-600 p-0.5 rounded-full"
                       title="Reset Date to Today"
                     >
-                      <span className="material-symbols-outlined text-[13px] leading-none">close</span>
+                      <X className="w-3 h-3" />
                     </button>
                   </span>
                 )}
@@ -631,9 +655,9 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={handleResetFilters}
-                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50 border border-red-200 dark:border-red-900/50 transition-colors ml-auto"
+                  className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 border border-red-200 dark:border-red-900/50 transition-colors ml-auto"
                 >
-                  <span className="material-symbols-outlined text-[14px]">filter_alt_off</span>
+                  <X className="w-3 h-3" />
                   <span>Reset All</span>
                 </button>
               </div>
@@ -653,20 +677,20 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between">
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Workforce Register</span>
-                <span className="text-2xl font-bold text-[#0b1c30] dark:text-slate-100 mt-1">{totalEmp}</span>
+                <span className="text-2xl font-bold text-[#18181B] dark:text-slate-100 mt-1">{totalEmp}</span>
               </div>
-              <div className="w-9 h-9 rounded-lg bg-[#eff4ff] dark:bg-blue-950/60 flex items-center justify-center text-[#0058be] dark:text-blue-400">
-                <span className="material-symbols-outlined text-[20px]">badge</span>
+              <div className="w-8 h-8 rounded-lg bg-[#E8DCC6]/40 dark:bg-[#722F37]/30 flex items-center justify-center text-[#722F37] dark:text-[#E8DCC6]">
+                <Users className="w-4 h-4" />
               </div>
             </div>
-            <div className="flex flex-col gap-1 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex flex-col gap-1 mt-3 pt-2 border-t border-gray-100 dark:border-slate-800">
               <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
                 <span>Active On Floor:</span>
-                <span className="font-bold text-[#0b1c30] dark:text-slate-100">{activeFloor}</span>
+                <span className="font-bold text-[#18181B] dark:text-slate-100">{activeFloor}</span>
               </div>
               <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500">
                 <span>Probation: 4 • Off: {totalEmp - activeFloor}</span>
-                <span className="text-[#0058be] dark:text-blue-400 font-bold">+3 MTD</span>
+                <span className="text-[#722F37] dark:text-[#E8DCC6] font-bold">+3 MTD</span>
               </div>
             </div>
             {viewDetailsHint}
@@ -683,18 +707,18 @@ export default function DashboardPage() {
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Floor Adherence</span>
                 <div className="flex items-baseline gap-1 mt-1">
-                  <span className="text-2xl font-bold text-[#0b1c30] dark:text-slate-100">{activeFloor}</span>
+                  <span className="text-2xl font-bold text-[#18181B] dark:text-slate-100">{activeFloor}</span>
                   <span className="text-xs text-slate-400 dark:text-slate-500">/ {totalEmp}</span>
                 </div>
               </div>
-              <div className="w-9 h-9 rounded-lg bg-[#dce9ff] dark:bg-blue-950/60 flex items-center justify-center text-[#0058be] dark:text-blue-400">
-                <span className="material-symbols-outlined text-[20px]">how_to_reg</span>
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="w-4 h-4" />
               </div>
             </div>
-            <div className="flex flex-col gap-1 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex flex-col gap-1 mt-3 pt-2 border-t border-gray-100 dark:border-slate-800">
               <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 font-bold border border-[#dce9ff] dark:border-blue-900/50">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#0058be]"></span> 94.0% Present
+                <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span> 94.0% Present
                 </span>
                 <span className="text-[11px] text-red-600 dark:text-red-400 font-semibold">{lateCount} Late</span>
               </div>
@@ -715,16 +739,16 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between">
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Biometric Punches</span>
-                <span className="text-2xl font-bold text-[#0b1c30] dark:text-slate-100 mt-1">{punchesToday}</span>
+                <span className="text-2xl font-bold text-[#18181B] dark:text-slate-100 mt-1">{punchesToday}</span>
               </div>
-              <div className="w-9 h-9 rounded-lg bg-[#eff4ff] dark:bg-blue-950/60 flex items-center justify-center text-[#0058be] dark:text-blue-400">
-                <span className="material-symbols-outlined text-[20px]">fingerprint</span>
+              <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-slate-800 flex items-center justify-center text-[#722F37] dark:text-[#E8DCC6]">
+                <Fingerprint className="w-4 h-4" />
               </div>
             </div>
-            <div className="flex flex-col gap-1 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex flex-col gap-1 mt-3 pt-2 border-t border-gray-100 dark:border-slate-800">
               <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
                 <span>Face Verified:</span>
-                <span className="font-bold text-[#0058be] dark:text-blue-400">96.4% Avg</span>
+                <span className="font-bold text-slate-700 dark:text-slate-300">96.4% Avg</span>
               </div>
               <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500">
                 <span>RFID & QR Scans:</span>
@@ -744,13 +768,13 @@ export default function DashboardPage() {
             <div className="flex items-start justify-between">
               <div className="flex flex-col">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Active Floor Breaks</span>
-                <span className="text-2xl font-bold text-[#0b1c30] dark:text-slate-100 mt-1">{onBreakCount}</span>
+                <span className="text-2xl font-bold text-[#18181B] dark:text-slate-100 mt-1">{onBreakCount}</span>
               </div>
-              <div className="w-9 h-9 rounded-lg bg-[#eff4ff] dark:bg-blue-950/60 flex items-center justify-center text-[#0058be] dark:text-blue-400">
-                <span className="material-symbols-outlined text-[20px]">coffee</span>
+              <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 flex items-center justify-center text-amber-700 dark:text-amber-400">
+                <Coffee className="w-4 h-4" />
               </div>
             </div>
-            <div className="flex flex-col gap-1 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex flex-col gap-1 mt-3 pt-2 border-t border-gray-100 dark:border-slate-800">
               <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
                 <span>Lunch: {stats?.onLunch ?? 0}</span>
                 <span>Tea: {stats?.onTeaBreak ?? 0}</span>
@@ -775,11 +799,11 @@ export default function DashboardPage() {
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Incentives Today</span>
                 <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">₹{totalIncentive.toLocaleString()}</span>
               </div>
-              <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                <span className="material-symbols-outlined text-[20px]">price_change</span>
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                <Coins className="w-4 h-4" />
               </div>
             </div>
-            <div className="flex flex-col gap-1 mt-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex flex-col gap-1 mt-3 pt-2 border-t border-gray-100 dark:border-slate-800">
               <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
                 <span>Early Login ₹1/sec:</span>
                 <span className="font-bold text-emerald-600 dark:text-emerald-400">₹3,200</span>
@@ -815,327 +839,327 @@ export default function DashboardPage() {
           <div className="lg:col-span-8 xl:col-span-8 flex flex-col gap-5">
             {/* SECTION 2: KARNATAKA STORE HUBS MONITOR */}
             <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">domain</span>
-              <h2 className="text-base font-bold text-[#0b1c30] dark:text-slate-100">Karnataka Enterprise Hubs & Store Outlets</h2>
-              <span className="text-xs text-slate-400 dark:text-slate-500">• 3 Active Branches</span>
-            </div>
-            <Link href="/organization/locations" className="text-xs font-semibold text-[#0058be] dark:text-blue-400 hover:underline flex items-center gap-1">
-              <span>View All Branches</span>
-              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {hubs.map((hub) => {
-              const isSelected = selectedHub === hub.code || (selectedHub !== 'all' && (
-                hub.name.toLowerCase().includes(selectedHub.toLowerCase()) ||
-                (selectedHub.includes('bel') && hub.code.includes('BEL')) ||
-                (selectedHub.includes('dav') && hub.code.includes('DAV')) ||
-                (selectedHub.includes('shi') && hub.code.includes('SHI'))
-              ));
-              return (
-                <div
-                  key={hub.code}
-                  onClick={() => setSelectedHub(isSelected ? 'all' : hub.code)}
-                  className={`bg-white dark:bg-[#0e172a] p-4 rounded-xl border transition-all cursor-pointer card-interactive ${
-                    isSelected
-                      ? 'border-[#0058be] dark:border-blue-500 ring-2 ring-[#0058be]/25 dark:ring-blue-500/25 shadow-md scale-[1.01]'
-                      : 'border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700'
-                  }`}
-                  title={isSelected ? 'Click to show all hubs' : `Click to filter by ${hub.name}`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">{hub.code}</span>
-                        {isSelected && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 animate-pop-in">
-                            Active Filter Target
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100 mt-0.5 leading-tight">{hub.name}</h3>
-                      <p className="text-[11px] text-slate-400 dark:text-slate-500">{hub.type}</p>
-                    </div>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${hub.badgeClass}`}>
-                      {hub.status}
-                    </span>
-                  </div>
-
-                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500 dark:text-slate-400">Floor Staff:</span>
-                      <span className="font-bold text-[#0b1c30] dark:text-slate-100">{hub.present} / {hub.headcount}</span>
-                    </div>
-                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                      <div
-                        className="bg-[#0058be] h-1.5 rounded-full transition-all duration-500"
-                        style={{ width: `${(hub.present / hub.headcount) * 100}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
-                      <span>Terminals: {hub.terminals}</span>
-                      <span className="text-[#0058be] dark:text-blue-400 font-bold">{hub.rate} Attendance</span>
-                    </div>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Building2 className="w-4 h-4 text-[#722F37] dark:text-[#E8DCC6]" />
+                  <h2 className="text-sm font-bold text-[#18181B] dark:text-slate-100">Karnataka Enterprise Hubs & Outlets</h2>
+                  <span className="text-xs text-slate-400 dark:text-slate-500">• 3 Active Outlets</span>
                 </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* SECTION 3: RECENT BIOMETRIC TERMINAL PUNCHES LEDGER */}
-        <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">fingerprint</span>
-              <div>
-                <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Live Biometric & IoT Terminal Punch Ledger</h3>
-                <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                  {recentPunches.length} punch records • {selectedHub !== 'all' ? (HUB_LABELS[selectedHub] || selectedHub) : 'Karnataka Hubs'} • {selectedDate}
-                </p>
+                <Link href="/organization/locations" className="text-xs font-semibold text-[#722F37] dark:text-[#E8DCC6] hover:underline flex items-center gap-1">
+                  <span>View All Outlets</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
               </div>
-            </div>
 
-            <div className="flex items-center gap-2">
-              <Link
-                href="/attendance/punches"
-                className="px-3 py-1.5 text-xs font-semibold text-[#0058be] dark:text-blue-400 bg-[#eff4ff] dark:bg-blue-950/60 hover:bg-[#dce9ff] dark:hover:bg-blue-900/60 rounded-lg transition-colors border border-[#dce9ff] dark:border-blue-900/50"
-              >
-                Open Terminal Console
-              </Link>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto no-scrollbar">
-            {recentPunches.length === 0 ? (
-              <div className="py-12 px-4 flex flex-col items-center justify-center text-center gap-2.5 animate-pop-in">
-                <div className="w-12 h-12 rounded-full bg-[#eff4ff] dark:bg-slate-800 flex items-center justify-center text-[#0058be] dark:text-blue-400">
-                  <span className="material-symbols-outlined text-[24px]">search_off</span>
-                </div>
-                <h4 className="text-sm font-bold text-[#0b1c30] dark:text-slate-200">No punches found for the selected filter combination</h4>
-                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
-                  There are no attendance records matching this specific Hub, Department, Date, or Shift criteria.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  className="mt-1 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-[#0058be] dark:bg-blue-600 hover:bg-blue-700 transition-colors shadow-xs"
-                >
-                  Reset All Filters
-                </button>
-              </div>
-            ) : (
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#eff4ff]/60 dark:bg-[#111c33] text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 tracking-wider">
-                  <tr>
-                    <th className="py-3 px-4">Employee</th>
-                    <th className="py-3 px-4">Store Hub & Terminal</th>
-                    <th className="py-3 px-4">Scheduled</th>
-                    <th className="py-3 px-4">Actual Punch</th>
-                    <th className="py-3 px-4">Biometric Verification</th>
-                    <th className="py-3 px-4">Status & Incentive</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  {recentPunches.map((punch) => (
-                    <tr key={punch.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-[#131b2e] dark:bg-blue-600 text-white flex items-center justify-center font-bold text-[10px]">
-                            {punch.employeeName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {hubs.map((hub) => {
+                  const isSelected = selectedHub === hub.code || (selectedHub !== 'all' && (
+                    hub.name.toLowerCase().includes(selectedHub.toLowerCase()) ||
+                    (selectedHub.includes('bel') && hub.code.includes('BEL')) ||
+                    (selectedHub.includes('dav') && hub.code.includes('DAV')) ||
+                    (selectedHub.includes('shi') && hub.code.includes('SHI'))
+                  ));
+                  return (
+                    <div
+                      key={hub.code}
+                      onClick={() => setSelectedHub(isSelected ? 'all' : hub.code)}
+                      className={`bg-white dark:bg-[#161920] p-4 rounded-xl border transition-all cursor-pointer card-interactive ${
+                        isSelected
+                          ? 'border-[#722F37] dark:border-[#E8DCC6] ring-1 ring-[#722F37]/30 shadow-xs'
+                          : 'border-gray-200/90 dark:border-slate-800 shadow-xs hover:border-gray-300 dark:hover:border-slate-700'
+                      }`}
+                      title={isSelected ? 'Click to show all hubs' : `Click to filter by ${hub.name}`}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#722F37] dark:text-[#E8DCC6]">{hub.code}</span>
+                            {isSelected && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[#E8DCC6]/40 dark:bg-[#722F37]/30 text-[#722F37] dark:text-[#E8DCC6]">
+                                Active Target
+                              </span>
+                            )}
                           </div>
-                          <div>
-                            <div className="font-bold text-[#0b1c30] dark:text-slate-100">{punch.employeeName}</div>
-                            <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{punch.employeeCode}</div>
-                          </div>
+                          <h3 className="text-sm font-bold text-[#18181B] dark:text-slate-100 mt-0.5 leading-tight">{hub.name}</h3>
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500">{hub.type}</p>
                         </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="font-medium text-[#0b1c30] dark:text-slate-200">{punch.locationName}</div>
-                        <div className="text-[10px] text-slate-400 dark:text-slate-500">{punch.terminal}</div>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400">
-                        {punch.scheduledTime}
-                      </td>
-                      <td className="py-3 px-4 font-mono font-bold text-[#0b1c30] dark:text-slate-100">
-                        {punch.actualTime}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="inline-flex items-center gap-1 text-[11px] text-[#0058be] dark:text-blue-400 font-medium bg-[#eff4ff] dark:bg-blue-950/60 px-2 py-0.5 rounded border border-[#dce9ff] dark:border-blue-900/50">
-                          <span className="material-symbols-outlined text-[13px]">verified</span>
-                          {punch.method}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${hub.badgeClass}`}>
+                          {hub.status}
                         </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                            punch.status === 'EARLY' ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' :
-                            punch.status === 'LATE' ? 'bg-red-50 dark:bg-red-950/80 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800' :
-                            'bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                          }`}>
-                            {punch.status}
-                          </span>
-                          {punch.incentive && (
-                            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                              {punch.incentive}
-                            </span>
-                          )}
+                      </div>
+
+                      <div className="mt-3 pt-3 border-t border-gray-100 dark:border-slate-800 space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-slate-500 dark:text-slate-400">Floor Staff:</span>
+                          <span className="font-bold text-[#18181B] dark:text-slate-100">{hub.present} / {hub.headcount}</span>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
+                        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                          <div
+                            className="bg-[#722F37] h-1.5 rounded-full transition-all duration-300"
+                            style={{ width: `${(hub.present / hub.headcount) * 100}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
+                          <span>Terminals: {hub.terminals}</span>
+                          <span className="text-[#722F37] dark:text-[#E8DCC6] font-bold">{hub.rate} Present</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
-        {/* SECTION 4: FLOOR SHIFT ALLOCATION & ROSTER SUMMARY */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="bg-white dark:bg-[#0e172a] p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Floor Shifts Overview</h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-400">3 Shift Windows</span>
-              </div>
-              <div className="space-y-3">
-                <div
-                  onClick={() => setSelectedShift(selectedShift === 'MORNING' ? 'all' : 'MORNING')}
-                  className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                    selectedShift.toLowerCase().includes('morning')
-                      ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 ring-1 ring-blue-400'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
-                  }`}
-                  title="Click to filter by Morning Shift"
-                >
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="font-semibold text-[#0b1c30] dark:text-slate-200">Shift A (Morning Floor)</span>
-                    <span className="font-mono text-slate-500 dark:text-slate-400">09:00 - 18:00 (24 Staff)</span>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
-                    <div className="bg-[#0058be] h-2 rounded-full" style={{ width: '92%' }} />
+            {/* SECTION 3: RECENT BIOMETRIC TERMINAL PUNCHES LEDGER */}
+            <div className="bg-white dark:bg-[#161920] rounded-xl border border-gray-200/90 dark:border-slate-800 shadow-xs overflow-hidden">
+              <div className="p-4 border-b border-gray-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Fingerprint className="w-4 h-4 text-[#722F37] dark:text-[#E8DCC6]" />
+                  <div>
+                    <h3 className="text-sm font-bold text-[#18181B] dark:text-slate-100">Live Biometric Punch Ledger</h3>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      {recentPunches.length} records • {selectedHub !== 'all' ? (HUB_LABELS[selectedHub] || selectedHub) : 'Karnataka Hubs'} • {selectedDate}
+                    </p>
                   </div>
                 </div>
-                <div
-                  onClick={() => setSelectedShift(selectedShift === 'GENERAL' ? 'all' : 'GENERAL')}
-                  className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                    selectedShift.toLowerCase().includes('general')
-                      ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 ring-1 ring-emerald-400'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
-                  }`}
-                  title="Click to filter by General Shift"
-                >
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="font-semibold text-[#0b1c30] dark:text-slate-200">Shift B (General Floor)</span>
-                    <span className="font-mono text-slate-500 dark:text-slate-400">09:30 - 18:30 (8 Staff)</span>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
-                    <div className="bg-emerald-500 h-2 rounded-full" style={{ width: '100%' }} />
-                  </div>
-                </div>
-                <div
-                  onClick={() => setSelectedShift(selectedShift === 'EVENING' ? 'all' : 'EVENING')}
-                  className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                    selectedShift.toLowerCase().includes('evening')
-                      ? 'bg-amber-50/70 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 ring-1 ring-amber-400'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
-                  }`}
-                  title="Click to filter by Evening Shift"
-                >
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="font-semibold text-[#0b1c30] dark:text-slate-200">Shift C (Evening Cashier)</span>
-                    <span className="font-mono text-slate-500 dark:text-slate-400">12:00 - 21:00 (3 Staff)</span>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
-                    <div className="bg-amber-500 h-2 rounded-full" style={{ width: '100%' }} />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <Link
-              href="/attendance/shifts"
-              className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs font-semibold text-[#0058be] dark:text-blue-400 hover:underline flex items-center justify-between"
-            >
-              <span>Manage Shift Rosters</span>
-              <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-            </Link>
-          </div>
 
-          <div className="bg-white dark:bg-[#0e172a] p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Break Compliance Policy</h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">Audit Grade</span>
-              </div>
-              <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
-                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60">
-                  <span>Male Lunch Limit:</span>
-                  <span className="font-bold text-[#0b1c30] dark:text-slate-100">45 Mins (Zero Tolerance)</span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60">
-                  <span>Female Lunch Limit:</span>
-                  <span className="font-bold text-[#0b1c30] dark:text-slate-100">45 Mins</span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60">
-                  <span>Tea Break (Morning/Eve):</span>
-                  <span className="font-bold text-[#0b1c30] dark:text-slate-100">20 Mins Allowed</span>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/attendance/punches"
+                    className="px-3 py-1.5 text-xs font-semibold text-[#722F37] dark:text-[#E8DCC6] bg-[#E8DCC6]/20 dark:bg-[#722F37]/20 hover:bg-[#E8DCC6]/40 rounded-lg transition-colors border border-[#E8DCC6] dark:border-[#722F37]/40"
+                  >
+                    Open Punch Console
+                  </Link>
                 </div>
               </div>
-            </div>
-            <Link
-              href="/attendance/breaks"
-              className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs font-semibold text-[#0058be] dark:text-blue-400 hover:underline flex items-center justify-between"
-            >
-              <span>Open Lunch & Break Monitor</span>
-              <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-            </Link>
-          </div>
 
-          <div className="bg-white dark:bg-[#0e172a] p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Instant Quick Links</h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">HR Tools</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <Link
-                  href="/payroll"
-                  className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-[#0058be] dark:hover:border-blue-500 hover:bg-[#eff4ff] dark:hover:bg-slate-800/60 transition-all flex flex-col items-center justify-center text-center gap-1 group"
-                >
-                  <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">payments</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#0058be] dark:group-hover:text-blue-400">Payroll Ledger</span>
-                </Link>
-                <Link
-                  href="/operations/face-verification"
-                  className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-[#0058be] dark:hover:border-blue-500 hover:bg-[#eff4ff] dark:hover:bg-slate-800/60 transition-all flex flex-col items-center justify-center text-center gap-1 group"
-                >
-                  <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">shield</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#0058be] dark:group-hover:text-blue-400">Face Verify</span>
-                </Link>
-                <Link
-                  href="/admin/audit-logs"
-                  className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-[#0058be] dark:hover:border-blue-500 hover:bg-[#eff4ff] dark:hover:bg-slate-800/60 transition-all flex flex-col items-center justify-center text-center gap-1 group"
-                >
-                  <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">rule</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#0058be] dark:group-hover:text-blue-400">Audit Logs</span>
-                </Link>
-                <Link
-                  href="/my-desk"
-                  className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-[#0058be] dark:hover:border-blue-500 hover:bg-[#eff4ff] dark:hover:bg-slate-800/60 transition-all flex flex-col items-center justify-center text-center gap-1 group"
-                >
-                  <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">person</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#0058be] dark:group-hover:text-blue-400">My Desk</span>
-                </Link>
+              <div className="overflow-x-auto no-scrollbar">
+                {recentPunches.length === 0 ? (
+                  <div className="py-12 px-4 flex flex-col items-center justify-center text-center gap-2.5">
+                    <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                      <Search className="w-5 h-5" />
+                    </div>
+                    <h4 className="text-sm font-bold text-[#18181B] dark:text-slate-200">No punches found for the selected criteria</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
+                      There are no attendance records matching this specific Hub, Department, Date, or Shift criteria.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleResetFilters}
+                      className="mt-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#722F37] hover:bg-[#5B232A] transition-colors shadow-xs"
+                    >
+                      Reset All Filters
+                    </button>
+                  </div>
+                ) : (
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#F4F5F7] dark:bg-[#1A1D24] text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 border-b border-gray-200 dark:border-slate-800 tracking-wider">
+                      <tr>
+                        <th className="py-3 px-4">Employee</th>
+                        <th className="py-3 px-4">Store Hub & Terminal</th>
+                        <th className="py-3 px-4">Scheduled</th>
+                        <th className="py-3 px-4">Actual Punch</th>
+                        <th className="py-3 px-4">Biometric Verification</th>
+                        <th className="py-3 px-4">Status & Incentive</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                      {recentPunches.map((punch) => (
+                        <tr key={punch.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-7 h-7 rounded-full bg-[#722F37] text-white flex items-center justify-center font-bold text-[10px]">
+                                {punch.employeeName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                              </div>
+                              <div>
+                                <div className="font-semibold text-[#18181B] dark:text-slate-100">{punch.employeeName}</div>
+                                <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{punch.employeeCode}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-medium text-[#18181B] dark:text-slate-200">{punch.locationName}</div>
+                            <div className="text-[10px] text-slate-400 dark:text-slate-500">{punch.terminal}</div>
+                          </td>
+                          <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400">
+                            {punch.scheduledTime}
+                          </td>
+                          <td className="py-3 px-4 font-mono font-bold text-[#18181B] dark:text-slate-100">
+                            {punch.actualTime}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="inline-flex items-center gap-1 text-[11px] text-[#722F37] dark:text-[#E8DCC6] font-medium bg-[#E8DCC6]/20 dark:bg-[#722F37]/20 px-2 py-0.5 rounded border border-[#E8DCC6] dark:border-[#722F37]/40">
+                              <CheckCircle2 className="w-3 h-3 text-[#722F37] dark:text-[#E8DCC6]" />
+                              {punch.method}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                punch.status === 'EARLY' ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' :
+                                punch.status === 'LATE' ? 'bg-red-50 dark:bg-red-950/80 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800' :
+                                'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                              }`}>
+                                {punch.status}
+                              </span>
+                              {punch.incentive && (
+                                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                                  {punch.incentive}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 dark:text-slate-500 text-center">
-              BSC Textiles Workforce v2.0 • Karnataka Regional Network
+
+            {/* SECTION 4: FLOOR SHIFT ALLOCATION & ROSTER SUMMARY */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="bg-white dark:bg-[#161920] p-5 rounded-xl border border-gray-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-[#18181B] dark:text-slate-100">Floor Shifts Overview</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">3 Windows</span>
+                  </div>
+                  <div className="space-y-3">
+                    <div
+                      onClick={() => setSelectedShift(selectedShift === 'MORNING' ? 'all' : 'MORNING')}
+                      className={`p-2 rounded-lg border transition-all cursor-pointer ${
+                        selectedShift.toLowerCase().includes('morning')
+                          ? 'bg-[#E8DCC6]/20 border-[#722F37] ring-1 ring-[#722F37]'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
+                      }`}
+                      title="Click to filter by Morning Shift"
+                    >
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="font-semibold text-[#18181B] dark:text-slate-200">Shift A (Morning Floor)</span>
+                        <span className="font-mono text-slate-500 dark:text-slate-400">09:00 - 18:00 (24 Staff)</span>
+                      </div>
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-[#722F37] h-1.5 rounded-full" style={{ width: '92%' }} />
+                      </div>
+                    </div>
+                    <div
+                      onClick={() => setSelectedShift(selectedShift === 'GENERAL' ? 'all' : 'GENERAL')}
+                      className={`p-2 rounded-lg border transition-all cursor-pointer ${
+                        selectedShift.toLowerCase().includes('general')
+                          ? 'bg-emerald-50/70 border-emerald-400 ring-1 ring-emerald-400'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
+                      }`}
+                      title="Click to filter by General Shift"
+                    >
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="font-semibold text-[#18181B] dark:text-slate-200">Shift B (General Floor)</span>
+                        <span className="font-mono text-slate-500 dark:text-slate-400">09:30 - 18:30 (8 Staff)</span>
+                      </div>
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-emerald-600 h-1.5 rounded-full" style={{ width: '100%' }} />
+                      </div>
+                    </div>
+                    <div
+                      onClick={() => setSelectedShift(selectedShift === 'EVENING' ? 'all' : 'EVENING')}
+                      className={`p-2 rounded-lg border transition-all cursor-pointer ${
+                        selectedShift.toLowerCase().includes('evening')
+                          ? 'bg-amber-50/70 border-amber-400 ring-1 ring-amber-400'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
+                      }`}
+                      title="Click to filter by Evening Shift"
+                    >
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="font-semibold text-[#18181B] dark:text-slate-200">Shift C (Evening Cashier)</span>
+                        <span className="font-mono text-slate-500 dark:text-slate-400">12:00 - 21:00 (3 Staff)</span>
+                      </div>
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                        <div className="bg-amber-600 h-1.5 rounded-full" style={{ width: '100%' }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <Link
+                  href="/attendance/shifts"
+                  className="mt-4 pt-3 border-t border-gray-100 dark:border-slate-800 text-xs font-semibold text-[#722F37] dark:text-[#E8DCC6] hover:underline flex items-center justify-between"
+                >
+                  <span>Manage Shift Rosters</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              <div className="bg-white dark:bg-[#161920] p-5 rounded-xl border border-gray-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-[#18181B] dark:text-slate-100">Break Compliance Policy</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700">Audit Grade</span>
+                  </div>
+                  <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60">
+                      <span>Male Lunch Limit:</span>
+                      <span className="font-bold text-[#18181B] dark:text-slate-100">45 Mins</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60">
+                      <span>Female Lunch Limit:</span>
+                      <span className="font-bold text-[#18181B] dark:text-slate-100">45 Mins</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60">
+                      <span>Tea Break:</span>
+                      <span className="font-bold text-[#18181B] dark:text-slate-100">20 Mins Allowed</span>
+                    </div>
+                  </div>
+                </div>
+                <Link
+                  href="/attendance/breaks"
+                  className="mt-4 pt-3 border-t border-gray-100 dark:border-slate-800 text-xs font-semibold text-[#722F37] dark:text-[#E8DCC6] hover:underline flex items-center justify-between"
+                >
+                  <span>Open Break Monitor</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              <div className="bg-white dark:bg-[#161920] p-5 rounded-xl border border-gray-200/90 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-[#18181B] dark:text-slate-100">Enterprise Modules</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">Shortcuts</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <Link
+                      href="/payroll"
+                      className="p-3 rounded-lg border border-gray-200 dark:border-slate-800 hover:border-[#722F37] hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all flex flex-col items-center justify-center text-center gap-1 group"
+                    >
+                      <Banknote className="w-4 h-4 text-[#722F37] dark:text-[#E8DCC6]" />
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#722F37]">Payroll</span>
+                    </Link>
+                    <Link
+                      href="/operations/face-verification"
+                      className="p-3 rounded-lg border border-gray-200 dark:border-slate-800 hover:border-[#722F37] hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all flex flex-col items-center justify-center text-center gap-1 group"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-[#722F37] dark:text-[#E8DCC6]" />
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#722F37]">Face Verify</span>
+                    </Link>
+                    <Link
+                      href="/admin/audit-logs"
+                      className="p-3 rounded-lg border border-gray-200 dark:border-slate-800 hover:border-[#722F37] hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all flex flex-col items-center justify-center text-center gap-1 group"
+                    >
+                      <FileText className="w-4 h-4 text-[#722F37] dark:text-[#E8DCC6]" />
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#722F37]">Audit Logs</span>
+                    </Link>
+                    <Link
+                      href="/my-desk"
+                      className="p-3 rounded-lg border border-gray-200 dark:border-slate-800 hover:border-[#722F37] hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-all flex flex-col items-center justify-center text-center gap-1 group"
+                    >
+                      <UserCheck className="w-4 h-4 text-[#722F37] dark:text-[#E8DCC6]" />
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#722F37]">My Desk</span>
+                    </Link>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-gray-100 dark:border-slate-800 text-[11px] text-slate-400 dark:text-slate-500 text-center font-mono">
+                  BSC Textiles HRMS • Karnataka Network
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
       </div>
     </div>
   </div>

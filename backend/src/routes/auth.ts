@@ -14,6 +14,7 @@ import { SecurityMonitoringService } from '../services/securityMonitoringService
 import { AuditService } from '../services/auditService.js';
 import { authCriticalLimiter, authSensitiveLimiter } from '../middleware/rateLimiting.js';
 import { setCsrfTokenCookie } from '../middleware/csrfProtection.js';
+import { container } from '../core/container/ServiceContainer.js';
 
 const router = Router();
 
@@ -386,6 +387,21 @@ router.post('/register', authCriticalLimiter, validate(schemas.register), async 
   try {
     const result = await RegistrationService.registerUser(req.body);
 
+    // Publish notification for new registration
+    await container.notificationService.publishEvent({
+      eventId: 'AUTH.REGISTER',
+      title: 'New Employee Registration',
+      message: `New registration submitted by ${result.fullName} (${result.email}).`,
+      type: 'INFO',
+      severity: 'MEDIUM',
+      entityType: 'user',
+      entityId: result.userId,
+      locationId: result.locationId,
+      actionUrl: '/admin/registrations',
+      correlationId: `auth_register_${result.userId}`,
+      metadata: { email: result.email, fullName: result.fullName, role: result.role },
+    });
+
     res.status(201).json({
       message: 'Registration submitted successfully. A verification email has been dispatched to your address.',
       email: result.email,
@@ -457,6 +473,21 @@ router.post('/approve/:userId', authenticate, requireRole('SUPER_ADMIN', 'ADMIN'
       after: { approvedBy: req.user!.id, role: approvedUser.role, status: 'ACTIVE' },
     });
 
+    // Publish notification for account approval
+    await container.notificationService.publishEvent({
+      eventId: 'AUTH.APPROVED',
+      title: 'Account Approved',
+      message: `Account for ${approvedUser.fullName} (${approvedUser.email}) has been approved with role ${approvedUser.role}.`,
+      type: 'INFO',
+      severity: 'MEDIUM',
+      entityType: 'user',
+      entityId: userId,
+      locationId: approvedUser.locationId,
+      actionUrl: '/auth/login',
+      correlationId: `auth_approved_${userId}`,
+      metadata: { role: approvedUser.role, approvedBy: req.user!.id },
+    });
+
     res.json({ message: 'User approved successfully', user: approvedUser });
   } catch (error: any) {
     res.status(400).json({ error: error.message || 'Approval failed' });
@@ -483,6 +514,21 @@ router.post('/reject/:userId', authenticate, requireRole('SUPER_ADMIN', 'ADMIN',
       ipAddress: req.ip,
       tags: ['hr-rejection', 'user-lifecycle'],
       after: { rejectedBy: req.user!.id, reason },
+    });
+
+    // Publish notification for account rejection
+    await container.notificationService.publishEvent({
+      eventId: 'AUTH.REJECTED',
+      title: 'Account Registration Rejected',
+      message: `Account registration for ${rejectedUser.fullName} (${rejectedUser.email}) has been rejected. Reason: ${reason}`,
+      type: 'WARNING',
+      severity: 'HIGH',
+      entityType: 'user',
+      entityId: userId,
+      locationId: rejectedUser.locationId,
+      actionUrl: '/admin/registrations',
+      correlationId: `auth_rejected_${userId}`,
+      metadata: { reason, rejectedBy: req.user!.id },
     });
 
     res.json({ message: 'Registration rejected', user: rejectedUser });

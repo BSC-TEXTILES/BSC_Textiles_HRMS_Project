@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../index.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
+import { container } from '../core/container/ServiceContainer.js';
 
 const router = Router();
 
@@ -219,7 +220,22 @@ router.post('/', authorize('ADD'), validate(employeeSchema), async (req: AuthReq
         },
       });
     }
-    
+
+    // Publish notification for new employee creation
+    await container.notificationService.publishEvent({
+      eventId: 'EMP.CREATED',
+      title: 'New Employee Created',
+      message: `New employee ${fullName} (${employeeCode}) has been added to ${locationId}.`,
+      type: 'INFO',
+      severity: 'MEDIUM',
+      entityType: 'employee',
+      entityId: employee.id,
+      locationId,
+      actionUrl: `/employees/profile/${employee.id}`,
+      correlationId: `emp_created_${employee.id}`,
+      metadata: { employeeCode, fullName, locationId, departmentId, role: role || 'EMPLOYEE' },
+    });
+
     res.status(201).json(employee);
   } catch (error) {
     console.error('Create employee error:', error);
@@ -262,7 +278,38 @@ router.put('/:id', authorize('EDIT'), validate(employeeSchema), async (req: Auth
         exitDate: exitDate ? new Date(exitDate) : null,
       },
     });
-    
+
+    // Publish notification for employee profile update
+    const changes: string[] = [];
+    if (existing.firstName !== firstName || existing.lastName !== lastName) changes.push('name');
+    if (existing.email !== email) changes.push('email');
+    if (existing.phone !== phone) changes.push('phone');
+    if (existing.floorId !== floorId) changes.push('floor');
+    if (existing.departmentId !== departmentId) changes.push('department');
+    if (existing.sectionId !== sectionId) changes.push('section');
+    if (existing.shiftId !== shiftId) changes.push('shift');
+    if (existing.designation !== designation) changes.push('designation');
+    if (existing.role !== role) changes.push('role');
+    if (existing.status !== status) changes.push('status');
+
+    if (changes.length > 0) {
+      await container.notificationService.publishEvent({
+        eventId: changes.includes('status') ? 'EMP.STATUS_CHANGED' : 
+               changes.some(c => ['department', 'floor', 'section'].includes(c)) ? 'EMP.DEPT_CHANGED' : 'EMP.PROFILE_UPDATED',
+        title: changes.includes('status') ? 'Employee Status Changed' : 
+               changes.some(c => ['department', 'floor', 'section'].includes(c)) ? 'Employee Department/Location Changed' : 'Employee Profile Updated',
+        message: `Employee ${fullName} (${existing.employeeCode}) profile updated. Changed fields: ${changes.join(', ')}.`,
+        type: changes.includes('status') ? 'CRITICAL' : 'INFO',
+        severity: changes.includes('status') ? 'CRITICAL' : 'MEDIUM',
+        entityType: 'employee',
+        entityId: employee.id,
+        locationId: existing.locationId,
+        actionUrl: `/employees/profile/${employee.id}`,
+        correlationId: `emp_updated_${employee.id}_${Date.now()}`,
+        metadata: { changes, previousValues: { floorId: existing.floorId, departmentId: existing.departmentId, status: existing.status } },
+      });
+    }
+
     res.json(employee);
   } catch (error) {
     console.error('Update employee error:', error);
@@ -288,7 +335,23 @@ router.patch('/:id/status', authorize('EDIT'), async (req: AuthRequest, res) => 
       where: { id: req.params.id },
       data: { status, exitDate: status === 'TERMINATED' ? new Date() : null },
     });
-    
+
+    // Publish notification for status change
+    const eventId = status === 'TERMINATED' ? 'EMP.RESIGNATION' : 'EMP.STATUS_CHANGED';
+    await container.notificationService.publishEvent({
+      eventId,
+      title: status === 'TERMINATED' ? 'Employee Resignation/Termination' : 'Employee Status Changed',
+      message: `Employee ${existing.fullName} (${existing.employeeCode}) status changed from ${existing.status} to ${status}.`,
+      type: status === 'TERMINATED' ? 'CRITICAL' : 'WARNING',
+      severity: status === 'TERMINATED' ? 'CRITICAL' : 'HIGH',
+      entityType: 'employee',
+      entityId: employee.id,
+      locationId: existing.locationId,
+      actionUrl: `/employees/profile/${employee.id}`,
+      correlationId: `emp_status_${employee.id}_${Date.now()}`,
+      metadata: { previousStatus: existing.status, newStatus: status },
+    });
+
     res.json(employee);
   } catch (error) {
     console.error('Update employee status error:', error);

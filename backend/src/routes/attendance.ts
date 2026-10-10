@@ -5,6 +5,7 @@ import { dbDate } from '../utils/dates.js';
 import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 import { socketIO } from '../index.js';
 import { validate } from '../middleware/validation.js';
+import { container } from '../core/container/ServiceContainer.js';
 
 const router = Router();
 
@@ -156,6 +157,46 @@ router.post('/punch', authorize('RECORD'), async (req: AuthRequest, res) => {
         where: { id: existing.id },
         data: updateData,
       });
+    }
+
+    // Publish notifications for attendance events
+    if (punchType === 'IN') {
+      // Check for late arrival
+      if (existing.scheduledLogin && existing.actualLogin) {
+        const lateSeconds = Math.max(0, (new Date(existing.actualLogin).getTime() - new Date(existing.scheduledLogin).getTime()) / 1000);
+        if (lateSeconds > 300) { // 5 minutes grace
+          await container.notificationService.publishEvent({
+            eventId: 'ATT.LATE_ARRIVAL',
+            title: 'Late Arrival Detected',
+            message: `${employee.fullName} (${employee.employeeCode}) arrived ${Math.round(lateSeconds / 60)} minutes late.`,
+            type: 'WARNING',
+            severity: 'MEDIUM',
+            entityType: 'attendance',
+            entityId: existing.id,
+            locationId: employee.locationId,
+            actionUrl: `/attendance/punches?employeeId=${employee.id}`,
+            correlationId: `att_late_${existing.id}`,
+            metadata: { lateMinutes: Math.round(lateSeconds / 60), employeeCode: employee.employeeCode },
+          });
+        }
+      }
+
+      // Check for face verification failure
+      if (faceMatchPercentage < 85) {
+        await container.notificationService.publishEvent({
+          eventId: 'ATT.FACE_VERIFY_FAILED',
+          title: 'Face Verification Failed',
+          message: `${employee.fullName} (${employee.employeeCode}) face verification failed with ${faceMatchPercentage}% match.`,
+          type: 'DANGER',
+          severity: 'HIGH',
+          entityType: 'faceVerification',
+          entityId: existing.id,
+          locationId: employee.locationId,
+          actionUrl: `/operations/face-verification?employeeId=${employee.id}`,
+          correlationId: `fv_failed_${employee.id}_${Date.now()}`,
+          metadata: { matchPercentage: faceMatchPercentage, employeeCode: employee.employeeCode },
+        });
+      }
     }
 
     res.json({
@@ -640,7 +681,22 @@ router.put('/:id', authorize('EDIT'), async (req: AuthRequest, res) => {
       where: { id: req.params.id },
       data: updateData,
     });
-    
+
+    // Publish notification for manual attendance change
+    await container.notificationService.publishEvent({
+      eventId: 'ATT.MANUAL_CHANGE',
+      title: 'Attendance Record Manually Updated',
+      message: `Attendance record for ${existing.employeeId} was manually updated by ${req.user!.fullName}.`,
+      type: 'INFO',
+      severity: 'MEDIUM',
+      entityType: 'attendance',
+      entityId: attendance.id,
+      locationId: existing.locationId,
+      actionUrl: `/attendance/punches?id=${attendance.id}`,
+      correlationId: `att_manual_${attendance.id}_${Date.now()}`,
+      metadata: { updatedBy: req.user!.id, updatedFields: Object.keys(updateData) },
+    });
+
     socketIO.to(`location:${existing.locationId}`).emit('attendance:updated', attendance);
     
     res.json(attendance);

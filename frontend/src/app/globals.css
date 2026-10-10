@@ -85,16 +85,16 @@
   }
   
   body {
-    @apply bg-gray-50 text-gray-900 dark:bg-[#090e17] dark:text-slate-100 antialiased;
+    @apply bg-[#F8F9FA] text-[#18181B] dark:bg-[#111317] dark:text-slate-100 antialiased;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
   
   :focus-visible {
-    @apply outline-none ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-slate-900;
+    @apply outline-none ring-2 ring-[#722F37]/40 ring-offset-2 dark:ring-offset-slate-900;
   }
   
   ::selection {
-    @apply bg-primary-200 text-primary-900 dark:bg-primary-900/60 dark:text-primary-100;
+    @apply bg-[#E8DCC6] text-[#722F37] dark:bg-[#722F37]/40 dark:text-cream-100;
   }
 }
 
@@ -103,75 +103,75 @@ html.theme-transitioning,
 html.theme-transitioning *,
 html.theme-transitioning *::before,
 html.theme-transitioning *::after {
-  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-              border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-              color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-              box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-              fill 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition: background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              fill 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
   transition-delay: 0s !important;
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 
+    @apply inline-flex items-center justify-center font-semibold rounded-lg transition-all duration-150 
            focus:outline-none focus:ring-2 focus:ring-offset-2 
            disabled:opacity-50 disabled:cursor-not-allowed
-           active:scale-[0.98];
+           active:scale-[0.99];
   }
   
   .btn-primary {
-    @apply btn bg-primary-800 text-white hover:bg-primary-900 focus:ring-primary-500 
-           shadow-sm hover:shadow-md;
+    @apply btn bg-[#722F37] text-white hover:bg-[#5B232A] focus:ring-[#722F37]/30 
+           shadow-xs hover:shadow-sm;
   }
   
   .btn-secondary {
-    @apply btn bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-700 focus:ring-gray-500;
+    @apply btn bg-gray-100 dark:bg-slate-800 text-gray-800 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-700 focus:ring-gray-400;
   }
   
   .btn-danger {
-    @apply btn bg-burgundy-600 text-white hover:bg-burgundy-700 focus:ring-burgundy-500;
+    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 shadow-xs;
   }
   
   .btn-ghost {
-    @apply btn bg-transparent hover:bg-gray-100 dark:hover:bg-slate-800 focus:ring-gray-500 text-gray-700 dark:text-slate-200;
+    @apply btn bg-transparent hover:bg-gray-100 dark:hover:bg-slate-800 focus:ring-gray-400 text-gray-700 dark:text-slate-200;
   }
   
   .btn-outline {
-    @apply btn border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800/80 hover:bg-gray-50 dark:hover:bg-slate-700 focus:ring-primary-500 text-gray-700 dark:text-slate-200;
+    @apply btn border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800/80 hover:bg-gray-50 dark:hover:bg-slate-700 focus:ring-[#722F37]/30 text-gray-700 dark:text-slate-200;
   }
   
   .btn-success {
-    @apply btn bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500;
+    @apply btn bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500 shadow-xs;
   }
   
   .input {
-    @apply w-full px-4 py-2.5 text-sm bg-white dark:bg-[#111c33] border border-gray-300 dark:border-slate-700/80 rounded-lg 
+    @apply w-full px-3.5 py-2 text-xs bg-white dark:bg-[#161920] border border-gray-300 dark:border-slate-700/80 rounded-lg 
            placeholder:text-gray-400 dark:placeholder:text-slate-500 
-           text-gray-900 dark:text-slate-100
-           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 
-           transition-all duration-200
-           disabled:bg-gray-50 dark:disabled:bg-slate-900/60 disabled:text-gray-500 dark:disabled:text-slate-400 disabled:cursor-not-allowed
+           text-[#18181B] dark:text-slate-100
+           focus:outline-none focus:ring-2 focus:ring-[#722F37]/20 focus:border-[#722F37] 
+           transition-all duration-150
+           disabled:bg-gray-50 dark:disabled:bg-slate-900/60 disabled:text-gray-400 dark:disabled:text-slate-500 disabled:cursor-not-allowed
            hover:border-gray-400 dark:hover:border-slate-600;
   }
   
   .input-error {
-    @apply border-red-500 focus:ring-red-500 focus:border-red-500;
+    @apply border-red-500 focus:ring-red-500/20 focus:border-red-500;
   }
   
   .label {
-    @apply block text-sm font-semibold text-gray-700 dark:text-slate-300 mb-1.5;
+    @apply block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1;
   }
   
   .card {
-    @apply bg-white dark:bg-[#0e172a] rounded-xl shadow-sm border border-gray-200 dark:border-slate-800/80 overflow-hidden text-gray-900 dark:text-slate-100;
+    @apply bg-white dark:bg-[#161920] rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.04)] border border-gray-200/90 dark:border-slate-800/80 overflow-hidden text-[#18181B] dark:text-slate-100;
   }
   
   .card-hover {
-    @apply card transition-all duration-200 hover:shadow-md dark:hover:border-slate-700;
+    @apply card transition-all duration-150 hover:shadow-sm hover:border-gray-300 dark:hover:border-slate-700;
   }
   
   .card-elevated {
-    @apply bg-white dark:bg-[#0e172a] rounded-xl shadow-lg border border-gray-100 dark:border-slate-800 overflow-hidden text-gray-900 dark:text-slate-100;
+    @apply bg-white dark:bg-[#161920] rounded-xl shadow-md border border-gray-200/90 dark:border-slate-800 overflow-hidden text-[#18181B] dark:text-slate-100;
   }
   
   .badge {
@@ -396,7 +396,7 @@ body::-webkit-scrollbar {
 @keyframes popIn {
   0% {
     opacity: 0;
-    transform: scale(0.92) translateY(4px);
+    transform: scale(0.98) translateY(2px);
   }
   100% {
     opacity: 1;
@@ -404,45 +404,17 @@ body::-webkit-scrollbar {
   }
 }
 
-@keyframes pulseGlow {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(0, 88, 190, 0.35);
-  }
-  50% {
-    box-shadow: 0 0 0 6px rgba(0, 88, 190, 0);
-  }
-}
-
-@keyframes radarWave {
-  0% {
-    transform: scale(0.95);
-    opacity: 0.8;
-  }
-  100% {
-    transform: scale(2.2);
-    opacity: 0;
-  }
-}
-
 .animate-pop-in {
-  animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-.animate-pulse-glow {
-  animation: pulseGlow 2.2s infinite ease-in-out;
-}
-
-.animate-radar-wave {
-  animation: radarWave 2s infinite cubic-bezier(0, 0.2, 0.8, 1);
+  animation: popIn 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .card-interactive {
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-              border-color 0.25s ease;
+  transition: transform 0.15s ease,
+              box-shadow 0.15s ease,
+              border-color 0.15s ease;
 }
 
 .card-interactive:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px -4px rgba(0, 88, 190, 0.12), 0 4px 10px -2px rgba(0, 0, 0, 0.04);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.05);
 }

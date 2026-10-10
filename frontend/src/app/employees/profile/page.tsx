@@ -11,6 +11,11 @@ export default function ProfileRedirectPage() {
 
   useEffect(() => {
     if (status === 'loading') return;
+    if (status === 'unauthenticated') {
+      const query = typeof window !== 'undefined' ? window.location.search : '';
+      router.replace(`/login?callbackUrl=${encodeURIComponent('/employees/profile' + query)}`);
+      return;
+    }
 
     async function redirect() {
       const query = typeof window !== 'undefined' ? window.location.search : '';
@@ -20,7 +25,7 @@ export default function ProfileRedirectPage() {
       }
       try {
         const res = await api.get('/employees?limit=1');
-        const first = res.data.employees?.[0];
+        const first = res.data?.employees?.[0];
         if (first?.id) {
           router.replace(`/employees/profile/${first.id}${query}`);
         } else {

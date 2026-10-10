@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { container } from '../core/container/ServiceContainer.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
+import { prisma } from '../index.js';
 
 const router = Router();
 router.use(authenticate);
@@ -79,6 +80,29 @@ router.post('/apply', authorize('RECORD'), async (req: AuthRequest, res) => {
       documentUrl,
     });
 
+    // Get employee details for notification
+    const employee = await prisma.employee.findUnique({
+      where: { id: targetEmpId },
+      select: { fullName: true, employeeCode: true, locationId: true },
+    });
+
+    // Publish notification for leave request
+    if (employee) {
+      await container.notificationService.publishEvent({
+        eventId: 'LEAVE.REQUESTED',
+        title: 'New Leave Request',
+        message: `${employee.fullName} (${employee.employeeCode}) requested leave from ${startDate} to ${endDate}.`,
+        type: 'INFO',
+        severity: 'MEDIUM',
+        entityType: 'leaveRequest',
+        entityId: application.id,
+        locationId: employee.locationId,
+        actionUrl: `/leaves/applications?id=${application.id}`,
+        correlationId: `leave_req_${application.id}`,
+        metadata: { leaveTypeId, startDate, endDate, isHalfDay, reason },
+      });
+    }
+
     res.status(201).json(application);
   } catch (error: any) {
     res.status(400).json({ error: error.message || 'Failed to submit leave application' });
@@ -127,6 +151,29 @@ router.post('/applications/:id/approve', authorize('APPROVE'), async (req: AuthR
       req.params.id,
       req.user?.id || 'system'
     );
+
+    // Get application details for notification
+    const application = await prisma.leaveRequest.findUnique({
+      where: { id: req.params.id },
+      include: { employee: { select: { fullName: true, employeeCode: true, locationId: true } } },
+    });
+
+    if (application?.employee) {
+      await container.notificationService.publishEvent({
+        eventId: 'LEAVE.APPROVED',
+        title: 'Leave Request Approved',
+        message: `Leave request for ${application.employee.fullName} (${application.employee.employeeCode}) has been approved.`,
+        type: 'INFO',
+        severity: 'MEDIUM',
+        entityType: 'leaveRequest',
+        entityId: application.id,
+        locationId: application.employee.locationId,
+        actionUrl: `/leaves/applications?id=${application.id}`,
+        correlationId: `leave_approved_${application.id}`,
+        metadata: { approvedBy: req.user!.id },
+      });
+    }
+
     res.json(approved);
   } catch (error: any) {
     res.status(400).json({ error: error.message || 'Failed to approve leave application' });
@@ -149,6 +196,29 @@ router.post('/applications/:id/reject', authorize('REJECT'), async (req: AuthReq
       req.user?.id || 'system',
       reason
     );
+
+    // Get application details for notification
+    const application = await prisma.leaveRequest.findUnique({
+      where: { id: req.params.id },
+      include: { employee: { select: { fullName: true, employeeCode: true, locationId: true } } },
+    });
+
+    if (application?.employee) {
+      await container.notificationService.publishEvent({
+        eventId: 'LEAVE.REJECTED',
+        title: 'Leave Request Rejected',
+        message: `Leave request for ${application.employee.fullName} (${application.employee.employeeCode}) has been rejected. Reason: ${reason}`,
+        type: 'WARNING',
+        severity: 'HIGH',
+        entityType: 'leaveRequest',
+        entityId: application.id,
+        locationId: application.employee.locationId,
+        actionUrl: `/leaves/applications?id=${application.id}`,
+        correlationId: `leave_rejected_${application.id}`,
+        metadata: { rejectedBy: req.user!.id, reason },
+      });
+    }
+
     res.json(rejected);
   } catch (error: any) {
     res.status(400).json({ error: error.message || 'Failed to reject leave application' });
