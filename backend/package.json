@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
-    "test": "tsx src/tests/runAllTests.ts"
+    "test": "tsx src/tests/runAllTests.ts",
+    "benchmark": "tsx src/tests/benchmarkApis.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^1.7.0",

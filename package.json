@@ -20,6 +20,7 @@
     "db:schema": "npm run db:schema --workspace=database",
     "install:all": "npm install",
     "test": "npm test --workspace=backend",
+    "benchmark": "npm run benchmark --workspace=backend",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "mobile:start": "npm start --prefix mobile",
