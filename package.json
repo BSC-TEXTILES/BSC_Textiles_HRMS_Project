@@ -19,11 +19,15 @@
     "db:setup": "npm run db:setup --workspace=database",
     "db:schema": "npm run db:schema --workspace=database",
     "install:all": "npm install",
+    "test": "npm test --workspace=backend",
+    "benchmark": "npm run benchmark --workspace=backend",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "npm run lint --workspaces --if-present",
+    "mobile:start": "npm start --prefix mobile",
+    "mobile:typecheck": "npm run typecheck --prefix mobile"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2",
+    "concurrently": "^9.2.5",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   },
@@ -34,7 +38,17 @@
     "glob": "^10.5.0",
     "dompurify": "^3.4.16",
     "braces": "npm:@xiaoxige1/braces@^3.2.2",
-    "nodemailer": "^10.0.16"
+    "nodemailer": "^10.0.16",
+    "@xmldom/xmldom": "^0.9.12",
+    "fast-xml-parser": "^5.11.2",
+    "image-size": "^2.0.4",
+    "ip": "^2.0.1",
+    "node-forge": "^1.4.0",
+    "semver": "^7.8.5",
+    "send": "0.19.0",
+    "sprintf-js": "^1.1.3",
+    "tar": "^7.5.22",
+    "uuid": "^11.1.1"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -1,21 +1,25 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 import { Modal } from '@/components/ui/Modal';
+import { fetchScope, empOf, ROSTER_LIMIT, type DrillFilters } from '@/lib/dashboardScope';
+import {
+  Pill,
+  EmpCell,
+  fmtTime,
+  fmtDate,
+  prettyEnum,
+  EMP_STATUS_TONE,
+  ATT_STATUS_TONE,
+  INC_STATUS_TONE,
+  BREAK_TYPE_TONE,
+  ON_FLOOR,
+  type DrillColumn,
+  type Tone,
+} from '@/components/dashboard/drillParts';
 
 export type MetricKey = 'workforce' | 'adherence' | 'punches' | 'breaks' | 'incentives';
-
-export interface DrillFilters {
-  /** Hub / location id, or 'all' */
-  locationId?: string;
-  /** Department id, or 'all' */
-  departmentId?: string;
-  /** Shift id, or 'all' */
-  shiftId?: string;
-  /** yyyy-mm-dd */
-  date?: string;
-}
 
 interface DrillContext {
   hub?: string;
@@ -24,161 +28,14 @@ interface DrillContext {
   date?: string;
 }
 
-interface DrillColumn {
-  key: string;
-  header: string;
-  render: (row: any) => ReactNode;
-  className?: string;
-}
-
-interface Scope {
-  ready: boolean;
-  employees: any[];
-  inScope: Set<string>;
-  empById: Map<string, any>;
-}
-
 const PAGE_SIZE = 10;
-const ROSTER_LIMIT = 1000;
 const METRIC_LIMIT = 500;
-
-const TONE = {
-  green: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-  red: 'bg-red-50 text-red-700 border border-red-200',
-  amber: 'bg-amber-50 text-amber-700 border border-amber-200',
-  blue: 'bg-blue-50 text-blue-700 border border-blue-200',
-  slate: 'bg-slate-100 text-slate-600 border border-slate-200',
-} as const;
-
-type Tone = keyof typeof TONE;
-
-function Pill({ tone = 'slate', children }: { tone?: Tone; children: ReactNode }) {
-  return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded whitespace-nowrap ${TONE[tone]}`}>
-      {children}
-    </span>
-  );
-}
-
-function EmpCell({ code, name }: { code?: string; name?: string }) {
-  const initials = (name || '?')
-    .split(' ')
-    .filter(Boolean)
-    .map((n: string) => n[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-  return (
-    <div className="flex items-center gap-2 min-w-[150px]">
-      <div className="w-7 h-7 rounded-full bg-[#131b2e] text-white flex items-center justify-center font-bold text-[10px] flex-shrink-0">
-        {initials}
-      </div>
-      <div className="min-w-0">
-        <div className="font-bold text-[#0b1c30] truncate max-w-[160px]">{name || '—'}</div>
-        <div className="text-[10px] font-mono text-slate-400">{code || '—'}</div>
-      </div>
-    </div>
-  );
-}
-
-function fmtTime(v?: string | null): string {
-  if (!v) return '—';
-  try {
-    const d = new Date(v);
-    if (!isNaN(d.getTime())) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch {
-    /* fall through */
-  }
-  return String(v);
-}
-
-function fmtDate(v?: string | null): string {
-  if (!v) return '—';
-  try {
-    const d = new Date(v);
-    if (!isNaN(d.getTime())) return d.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
-  } catch {
-    /* fall through */
-  }
-  return String(v);
-}
-
-function prettyEnum(v?: string | null): string {
-  if (!v) return '—';
-  return String(v)
-    .toLowerCase()
-    .split('_')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
-}
 
 function punchTypeFromPurpose(purpose?: string | null): string {
   if (!purpose) return 'In';
   const p = String(purpose).toUpperCase();
   if (p.includes('END') || p.includes('OUT') || p.includes('LOGOUT')) return 'Out';
   return 'In';
-}
-
-const EMP_STATUS_TONE: Record<string, Tone> = {
-  ACTIVE: 'green',
-  PROBATION: 'amber',
-  ON_LEAVE: 'amber',
-  LEAVE: 'amber',
-  INACTIVE: 'slate',
-  TERMINATED: 'red',
-};
-
-const ATT_STATUS_TONE: Record<string, Tone> = {
-  PRESENT: 'green',
-  EARLY: 'green',
-  ON_TIME: 'green',
-  OVERTIME: 'blue',
-  LATE: 'amber',
-  ON_LUNCH: 'blue',
-  ON_TEA_BREAK: 'blue',
-  WEEKLY_OFF: 'slate',
-  ABSENT: 'red',
-  FACE_VERIFICATION_FAILED: 'red',
-};
-
-const ON_FLOOR = new Set(['PRESENT', 'EARLY', 'ON_TIME', 'OVERTIME']);
-
-/** Build a scope map (filtered roster) used for enrichment + dept/shift filtering. */
-async function fetchScope(filters: DrillFilters): Promise<Scope> {
-  const { locationId, departmentId, shiftId } = filters;
-  const p = new URLSearchParams();
-  p.set('limit', String(ROSTER_LIMIT));
-  if (locationId && locationId !== 'all') p.set('locationId', locationId);
-  if (departmentId && departmentId !== 'all') p.set('departmentId', departmentId);
-  if (shiftId && shiftId !== 'all') p.set('shiftId', shiftId);
-  const res = await api.get(`/employees?${p.toString()}`);
-  const employees: any[] = res.data?.employees || [];
-  const empById = new Map<string, any>();
-  const inScope = new Set<string>();
-  for (const e of employees) {
-    inScope.add(e.id);
-    empById.set(e.id, {
-      code: e.employeeCode,
-      name: e.fullName || `${e.firstName || ''} ${e.lastName || ''}`.trim(),
-      department: e.department?.name || '—',
-      hub: e.location?.name || '—',
-      shift: e.shift?.name || '—',
-      designation: e.designation || '—',
-      status: e.status,
-    });
-  }
-  return { ready: true, employees, inScope, empById };
-}
-
-function empOf(scope: Scope, id?: string, fallback?: any): any {
-  const scoped = id ? scope.empById.get(id) : undefined;
-  return {
-    code: scoped?.code || fallback?.employeeCode || '—',
-    name: scoped?.name || fallback?.fullName || '—',
-    department: scoped?.department || fallback?.department?.name || '—',
-    hub: scoped?.hub || fallback?.location?.name || '—',
-    shift: scoped?.shift || fallback?.shift?.name || '—',
-  };
 }
 
 function employeeCols(): DrillColumn[] {
@@ -302,15 +159,6 @@ function incentiveCols(): DrillColumn[] {
     },
   ];
 }
-
-const INC_STATUS_TONE: Record<string, Tone> = {
-  APPROVED: 'green',
-  PAID: 'green',
-  PENDING: 'amber',
-  REJECTED: 'red',
-};
-
-const BREAK_TYPE_TONE: Record<string, Tone> = { LUNCH: 'amber', TEA: 'blue', OTHER: 'slate' };
 
 export function MetricDrillDownModal({
   metric,

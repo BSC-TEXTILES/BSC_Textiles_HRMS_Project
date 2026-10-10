@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
 import { Logo } from '@/components/ui/Logo';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import api from '@/lib/api';
 import { 
   Bell, 
@@ -41,6 +42,7 @@ const stitchNavigation: NavSectionConfig[] = [
     items: [
       { title: 'All Employees', href: '/employees', icon: 'badge' },
       { title: 'Profile 360 & Dossier', href: '/employees/profile', icon: 'person_search' },
+      { title: 'Former Employees & F&F', href: '/employees/former', icon: 'person_off', badge: 'Settlement' },
       { title: 'Departments & Units', href: '/organization/departments', icon: 'corporate_fare' },
     ],
   },
@@ -179,8 +181,18 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (status === 'unauthenticated' && typeof window !== 'undefined' && !localStorage.getItem('bsc_token') && !localStorage.getItem('token')) {
-    return null;
+  if (status === 'unauthenticated') {
+    const hasToken = typeof window !== 'undefined' ? (localStorage.getItem('bsc_token') || localStorage.getItem('token')) : null;
+    if (!hasToken) {
+      return (
+        <div className="min-h-screen bg-[#f8f9ff] flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-[#0058be] border-t-transparent rounded-full animate-spin" />
+            <p className="text-slate-600 text-sm">Redirecting to login...</p>
+          </div>
+        </div>
+      );
+    }
   }
 
   const handleSignOut = () => {
@@ -248,24 +260,24 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     .filter((section) => section.items.length > 0);
 
   return (
-    <div className="min-h-screen bg-[#f8f9ff] text-[#0b1c30] font-sans antialiased">
+    <div className="min-h-screen bg-[#f8f9ff] dark:bg-[#090e17] text-[#0b1c30] dark:text-slate-100 font-sans antialiased">
       {/* SIDEBAR (Desktop) */}
       <aside 
         className={`fixed left-0 top-0 h-full ${
           isCollapsed ? 'w-20' : 'w-64'
-        } bg-white border-r border-slate-200/80 shadow-[0_1px_8px_rgba(0,0,0,0.03)] z-50 flex flex-col justify-between overflow-y-auto hidden lg:flex transition-all duration-300 ease-in-out`}
+        } bg-white dark:bg-[#0c1322] border-r border-slate-200/80 dark:border-slate-800 shadow-[0_1px_8px_rgba(0,0,0,0.03)] dark:shadow-none z-50 flex flex-col justify-between overflow-y-auto no-scrollbar hidden lg:flex transition-all duration-300 ease-in-out`}
       >
         <div className="flex flex-col">
           {/* Top Logo Brand Header */}
           <div className={`h-14 flex items-center ${
             isCollapsed ? 'justify-center px-2' : 'px-4'
-          } bg-white border-b border-slate-100 flex-shrink-0 transition-all`}>
+          } bg-white dark:bg-[#0c1322] border-b border-slate-100 dark:border-slate-800 flex-shrink-0 transition-all`}>
             <div className={`flex items-center overflow-hidden ${isCollapsed ? '' : 'gap-2.5'}`}>
               <Logo variant="icon" size="sm" className="flex-shrink-0" />
               {!isCollapsed && (
                 <div className="flex flex-col leading-tight truncate">
-                  <span className="text-[15px] font-bold tracking-tight text-[#0b1c30] truncate">BSC Textiles</span>
-                  <span className="text-[10px] font-bold tracking-wider uppercase text-slate-400">HRMS Portal</span>
+                  <span className="text-[15px] font-black tracking-tight text-[#0b1c30] dark:text-slate-100 truncate">BSC Textiles</span>
+                  <span className="text-[10px] font-bold tracking-wider uppercase text-[#0058be] dark:text-blue-400">Since 1938</span>
                 </div>
               )}
             </div>
@@ -276,11 +288,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             {visibleNavigation.map((section) => (
               <div key={section.title} className="mb-2">
                 {!isCollapsed ? (
-                  <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">
+                  <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 truncate">
                     {section.title}
                   </div>
                 ) : (
-                  <div className="my-2 border-t border-slate-100 mx-1" title={section.title} />
+                  <div className="my-2 border-t border-slate-100 dark:border-slate-800 mx-1" title={section.title} />
                 )}
                 <div className="space-y-0.5">
                   {section.items.map((item) => {
@@ -295,16 +307,16 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                           isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'
                         } rounded-lg text-xs transition-all ${
                           isActive
-                            ? 'bg-[#e5eeff] text-[#0058be] font-bold shadow-sm'
-                            : 'text-slate-600 hover:bg-[#eff4ff] hover:text-[#0b1c30] font-medium'
+                            ? 'bg-[#e5eeff] dark:bg-[#15274d] text-[#0058be] dark:text-blue-400 font-bold shadow-sm'
+                            : 'text-slate-600 dark:text-slate-400 hover:bg-[#eff4ff] dark:hover:bg-[#131d33] hover:text-[#0b1c30] dark:hover:text-slate-100 font-medium'
                         }`}
                       >
-                        <span className={`material-symbols-outlined text-[20px] flex-shrink-0 ${isActive ? 'text-[#0058be]' : 'text-slate-500'}`}>
+                        <span className={`material-symbols-outlined text-[20px] flex-shrink-0 ${isActive ? 'text-[#0058be] dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'}`}>
                           {item.icon}
                         </span>
                         {!isCollapsed && <span className="truncate flex-1">{item.title}</span>}
                         {!isCollapsed && item.badge && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-[#dce9ff] text-[#0058be]">
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-[#dce9ff] dark:bg-blue-950/80 text-[#0058be] dark:text-blue-300">
                             {item.badge}
                           </span>
                         )}
@@ -318,21 +330,21 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Bottom Telemetry Card & User Logout */}
-        <div className={`p-3 border-t border-slate-100 bg-white space-y-2`}>
+        <div className={`p-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-[#0c1322] space-y-2`}>
           {!isCollapsed ? (
-            <div className="p-2.5 bg-[#eff4ff] rounded-xl border border-slate-100">
+            <div className="p-2.5 bg-[#eff4ff] dark:bg-[#131f38] rounded-xl border border-slate-100 dark:border-slate-800">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Biometric Server</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Biometric Server</span>
                 <span className="flex h-2 w-2 relative">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0058be] opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0058be]"></span>
                 </span>
               </div>
-              <div className="text-xs font-bold text-[#0b1c30]">Synced Live</div>
-              <div className="text-[11px] text-slate-500">99.8% Terminal Uptime</div>
+              <div className="text-xs font-bold text-[#0b1c30] dark:text-slate-100">Synced Live</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400">99.8% Terminal Uptime</div>
             </div>
           ) : (
-            <div className="flex items-center justify-center p-2 rounded-xl bg-[#eff4ff]" title="Biometric Server Live 99.8%">
+            <div className="flex items-center justify-center p-2 rounded-xl bg-[#eff4ff] dark:bg-[#131f38]" title="Biometric Server Live 99.8%">
               <span className="relative flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0058be] opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#0058be]"></span>
@@ -344,7 +356,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             onClick={handleSignOut}
             className={`w-full flex items-center justify-center ${
               isCollapsed ? 'p-2' : 'gap-2 px-3 py-1.5'
-            } rounded-lg text-xs font-semibold text-slate-600 hover:text-red-700 hover:bg-red-50 transition-colors`}
+            } rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors`}
             title={isCollapsed ? "Sign Out" : undefined}
           >
             <span className="material-symbols-outlined text-[18px]">logout</span>
@@ -356,23 +368,32 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       {/* MOBILE DRAWER */}
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
-          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
-          <div className="relative w-64 bg-white h-full shadow-2xl flex flex-col justify-between overflow-y-auto z-10">
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+          <div className="relative w-64 bg-white dark:bg-[#0c1322] h-full shadow-2xl flex flex-col justify-between overflow-y-auto no-scrollbar z-10 border-r border-slate-200 dark:border-slate-800">
             <div>
-              <div className="h-14 flex items-center justify-between px-4 border-b border-slate-100">
+              <div className="h-14 flex items-center justify-between px-4 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2">
                   <Logo variant="icon" size="sm" />
-                  <span className="font-bold text-sm text-[#0b1c30]">BSC Textiles</span>
+                  <div className="flex flex-col leading-none">
+                    <span className="font-black text-sm text-[#0b1c30] dark:text-slate-100">BSC Textiles</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">Since 1938</span>
+                  </div>
                 </div>
-                <button onClick={() => setMobileMenuOpen(false)} className="p-1 text-slate-400 hover:text-slate-600">
+                <button onClick={() => setMobileMenuOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                   <span className="material-symbols-outlined text-[20px]">close</span>
                 </button>
+              </div>
+
+              {/* Mobile Theme Toggle */}
+              <div className="p-2.5 mx-3 my-2 rounded-xl bg-slate-50 dark:bg-[#131f38] border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
+                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Theme</span>
+                <ThemeToggle showLabel={true} size="sm" />
               </div>
 
               <nav className="p-3 space-y-2">
                 {visibleNavigation.map((sec) => (
                   <div key={sec.title}>
-                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                       {sec.title}
                     </div>
                     {sec.items.map((i) => {
@@ -384,7 +405,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                           href={i.href}
                           onClick={() => setMobileMenuOpen(false)}
                           className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs ${
-                            isItemActive ? 'bg-[#e5eeff] text-[#0058be] font-bold' : 'text-slate-600'
+                            isItemActive ? 'bg-[#e5eeff] dark:bg-[#15274d] text-[#0058be] dark:text-blue-400 font-bold' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                           }`}
                         >
                           <span className="material-symbols-outlined text-[18px]">{i.icon}</span>
@@ -397,10 +418,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               </nav>
             </div>
 
-            <div className="p-3 border-t border-slate-100">
+            <div className="p-3 border-t border-slate-100 dark:border-slate-800">
               <button
                 onClick={handleSignOut}
-                className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-xs font-bold text-red-600 hover:bg-red-50"
+                className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
               >
                 <span className="material-symbols-outlined text-[16px]">logout</span>
                 <span>Sign Out</span>
@@ -413,12 +434,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       {/* TOP HEADER (Fixed) */}
       <header className={`fixed top-0 left-0 ${
         isCollapsed ? 'lg:left-20' : 'lg:left-64'
-      } right-0 h-14 bg-white/95 backdrop-blur-xl border-b border-slate-200/80 shadow-[0_1px_8px_rgba(0,0,0,0.03)] z-40 flex items-center justify-between px-4 lg:px-6 transition-all duration-300 ease-in-out`}>
+      } right-0 h-14 bg-white/95 dark:bg-[#0c1322]/95 backdrop-blur-xl border-b border-slate-200/80 dark:border-slate-800 shadow-[0_1px_8px_rgba(0,0,0,0.03)] dark:shadow-none z-40 flex items-center justify-between px-4 lg:px-6 transition-all duration-300 ease-in-out`}>
         <div className="flex items-center gap-3 flex-1 max-w-2xl">
           {/* Mobile Drawer Trigger */}
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className="p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden"
+            className="p-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 lg:hidden"
             aria-label="Open navigation menu"
           >
             <span className="material-symbols-outlined text-[22px]">menu</span>
@@ -427,7 +448,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           {/* Desktop 3-line Toggle Button in Top Header */}
           <button
             onClick={toggleSidebar}
-            className="p-1.5 rounded-lg text-slate-600 hover:text-[#0058be] hover:bg-slate-100 hidden lg:flex items-center justify-center transition-colors"
+            className="p-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-[#0058be] dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 hidden lg:flex items-center justify-center transition-colors"
             title={isCollapsed ? 'Expand Sidebar (Show full text)' : 'Collapse Sidebar (Show icons only)'}
             aria-label={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           >
@@ -437,43 +458,46 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           </button>
 
           {/* Hub Location Dropdown */}
-          <div className="relative flex items-center bg-[#eff4ff] rounded-lg px-2.5 py-1 text-xs border border-slate-200/60 hidden sm:flex">
-            <span className="material-symbols-outlined text-[#0058be] text-[16px] mr-1.5">pin_drop</span>
+          <div className="relative flex items-center bg-[#eff4ff] dark:bg-[#131f38] rounded-lg px-2.5 py-1 text-xs border border-slate-200/60 dark:border-slate-700/80 hidden sm:flex">
+            <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[16px] mr-1.5">pin_drop</span>
             <select
               value={selectedHub}
               onChange={(e) => setSelectedHub(e.target.value)}
-              className="bg-transparent font-semibold text-xs text-[#0b1c30] focus:outline-none cursor-pointer pr-1"
+              className="bg-transparent font-semibold text-xs text-[#0b1c30] dark:text-slate-100 focus:outline-none cursor-pointer pr-1"
             >
-              <option value="all">All Hubs (Karnataka)</option>
-              <option value="bel">Belagavi Flagship (BEL-01)</option>
-              <option value="dav">Davanagere Hub (DAV-02)</option>
-              <option value="shi">Shivamogga Hub (SHI-03)</option>
+              <option value="all" className="dark:bg-[#0c1322]">All Hubs (Karnataka)</option>
+              <option value="bel" className="dark:bg-[#0c1322]">Belagavi Flagship (BEL-01)</option>
+              <option value="dav" className="dark:bg-[#0c1322]">Davanagere Hub (DAV-02)</option>
+              <option value="shi" className="dark:bg-[#0c1322]">Shivamogga Hub (SHI-03)</option>
             </select>
           </div>
 
           {/* Global Search Bar */}
-          <div className="relative flex-1 flex items-center bg-white rounded-lg border border-slate-200/80 shadow-[0_1px_4px_rgba(0,0,0,0.02)] px-3 py-1">
-            <span className="material-symbols-outlined text-slate-400 text-[18px] mr-2">search</span>
+          <div className="relative flex-1 flex items-center bg-white dark:bg-[#131f38] rounded-lg border border-slate-200/80 dark:border-slate-700/80 shadow-[0_1px_4px_rgba(0,0,0,0.02)] px-3 py-1">
+            <span className="material-symbols-outlined text-slate-400 dark:text-slate-500 text-[18px] mr-2">search</span>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by ID (e.g. BSC-4029), Name, Dept..."
-              className="w-full bg-transparent text-xs text-[#0b1c30] placeholder:text-slate-400 focus:outline-none"
+              className="w-full bg-transparent text-xs text-[#0b1c30] dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none"
             />
           </div>
         </div>
 
         {/* Right Header Cluster */}
-        <div className="flex items-center gap-3 sm:gap-4">
+        <div className="flex items-center gap-2.5 sm:gap-3.5">
           {/* Real-time Clock */}
           <div className="hidden md:flex flex-col text-right pr-2">
             <div className="flex items-center gap-1 justify-end">
-              <span className="material-symbols-outlined text-[13px] text-[#0058be]">schedule</span>
-              <span className="text-xs font-bold text-[#0b1c30] font-mono">{currentTime || '14:22:08 IST'}</span>
+              <span className="material-symbols-outlined text-[13px] text-[#0058be] dark:text-blue-400">schedule</span>
+              <span className="text-xs font-bold text-[#0b1c30] dark:text-slate-100 font-mono">{currentTime || '14:22:08 IST'}</span>
             </div>
-            <span className="text-[10px] text-slate-500 font-medium">Today • Shift A</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Today • Shift A</span>
           </div>
+
+          {/* Animated Dark / Bright Mode Toggle Switch */}
+          <ThemeToggle size="md" />
 
           {/* Notification Icon & Dropdown */}
           <div className="relative">
@@ -482,11 +506,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 setNotificationsOpen(!notificationsOpen);
                 setProfileMenuOpen(false);
               }}
-              className="relative flex items-center justify-center p-2 rounded-lg text-slate-500 hover:text-[#0058be] hover:bg-[#eff4ff] transition-colors cursor-pointer border border-transparent hover:border-blue-100"
+              className="relative flex items-center justify-center p-2 rounded-lg text-slate-500 dark:text-slate-400 hover:text-[#0058be] dark:hover:text-blue-400 hover:bg-[#eff4ff] dark:hover:bg-slate-800 transition-colors cursor-pointer border border-transparent hover:border-blue-100 dark:hover:border-slate-700"
               title="Notifications & System Alerts"
               aria-label="Notifications"
             >
-              <Bell className="w-5 h-5 text-slate-600 hover:text-[#0058be] transition-colors" />
+              <Bell className="w-5 h-5 text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-blue-400 transition-colors" />
               {unreadNotifications > 0 && (
                 <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-bold shadow-sm">
                   {unreadNotifications}
@@ -496,8 +520,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
             {/* Notification Dropdown Popover */}
             {notificationsOpen && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-                <div className="p-3.5 bg-gradient-to-r from-slate-900 to-[#131b2e] text-white flex items-center justify-between">
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-[#0f172a] rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="p-3.5 bg-gradient-to-r from-slate-900 to-[#131b2e] dark:from-slate-950 dark:to-[#0f172a] text-white flex items-center justify-between border-b border-slate-800">
                   <div className="flex items-center gap-2">
                     <Bell className="w-4 h-4 text-amber-400" />
                     <span className="text-xs font-bold tracking-tight">System Notifications</span>
@@ -518,59 +542,59 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   )}
                 </div>
 
-                <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
-                  <div className="p-3 hover:bg-slate-50 transition-colors flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5 font-bold">
+                <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-80 overflow-y-auto no-scrollbar">
+                  <div className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 font-bold">
                       <ShieldCheck className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-slate-900">IoT Face Recognition Sync</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                      <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">IoT Face Recognition Sync</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
                         Belagavi Terminal-01 confirmed 99.8% biometric face match across 42 morning punch events.
                       </p>
-                      <span className="text-[10px] text-slate-400 mt-1 block font-mono">2 mins ago • BEL-01</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block font-mono">2 mins ago • BEL-01</span>
                     </div>
                   </div>
 
-                  <div className="p-3 hover:bg-slate-50 transition-colors flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0058be] flex items-center justify-center shrink-0 mt-0.5 font-bold">
+                  <div className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5 font-bold">
                       <Sparkles className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-slate-900">Early Login Incentive Credited</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                      <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">Early Login Incentive Credited</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
                         ₹1/sec early login incentive of ₹720 awarded for 12m early arrival on Shift A.
                       </p>
-                      <span className="text-[10px] text-slate-400 mt-1 block font-mono">14 mins ago • INCENTIVE</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block font-mono">14 mins ago • INCENTIVE</span>
                     </div>
                   </div>
 
-                  <div className="p-3 hover:bg-slate-50 transition-colors flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 mt-0.5 font-bold">
+                  <div className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5 font-bold">
                       <Clock className="w-4 h-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-slate-900">Shift Roster Auto-Published</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                      <p className="text-xs font-semibold text-slate-900 dark:text-slate-100">Shift Roster Auto-Published</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
                         Davanagere &amp; Shivamogga retail rosters synchronized for 3 shifts and 350+ artisans.
                       </p>
-                      <span className="text-[10px] text-slate-400 mt-1 block font-mono">1 hour ago • SHIFT-A</span>
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block font-mono">1 hour ago • SHIFT-A</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="p-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                <div className="p-2.5 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
                   <Link
                     href="/operations/observations"
                     onClick={() => setNotificationsOpen(false)}
-                    className="text-[#0058be] hover:underline font-semibold flex items-center gap-1"
+                    className="text-[#0058be] dark:text-blue-400 hover:underline font-semibold flex items-center gap-1"
                   >
                     View Operations Log
                     <ExternalLink className="w-3 h-3" />
                   </Link>
                   <button
                     onClick={() => setNotificationsOpen(false)}
-                    className="text-slate-500 hover:text-slate-800 font-medium"
+                    className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 font-medium"
                   >
                     Dismiss
                   </button>
@@ -580,33 +604,33 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* User Profile Capsule with Interactive Dropdown */}
-          <div className="relative pl-2 border-l border-slate-200">
+          <div className="relative pl-2 border-l border-slate-200 dark:border-slate-800">
             <button
               onClick={() => {
                 setProfileMenuOpen(!profileMenuOpen);
                 setNotificationsOpen(false);
               }}
-              className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer text-left"
+              className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer text-left"
               title="User Account & Profile"
               aria-label="User Account"
             >
               <div className="hidden sm:flex flex-col text-right">
-                <span className="text-xs font-bold text-[#0b1c30] leading-none">{userName}</span>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mt-0.5">{userRole}</span>
+                <span className="text-xs font-bold text-[#0b1c30] dark:text-slate-100 leading-none">{userName}</span>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500 mt-0.5">{userRole}</span>
               </div>
-              <div className="w-8 h-8 rounded-full bg-[#131b2e] text-white flex items-center justify-center font-bold text-xs shadow-sm ring-2 ring-blue-500/20">
+              <div className="w-8 h-8 rounded-full bg-[#131b2e] dark:bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-sm ring-2 ring-blue-500/20">
                 {userName.split(' ').map((n: string) => n[0]).join('').slice(0, 2) || 'SA'}
               </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 hidden sm:block" />
             </button>
 
             {/* Profile Menu Dropdown */}
             {profileMenuOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-                <div className="p-3 bg-slate-50 border-b border-slate-100">
-                  <p className="text-xs font-bold text-slate-900 truncate">{userName}</p>
-                  <p className="text-[11px] text-slate-500 truncate">{userEmail}</p>
-                  <span className="inline-block mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-100 text-[#0058be]">
+              <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-[#0f172a] rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="p-3 bg-slate-50 dark:bg-slate-900/80 border-b border-slate-100 dark:border-slate-800">
+                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">{userName}</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{userEmail}</p>
+                  <span className="inline-block mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-100 dark:bg-blue-950/80 text-[#0058be] dark:text-blue-300">
                     {userRole}
                   </span>
                 </div>
@@ -615,18 +639,18 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   <Link
                     href="/employees/profile"
                     onClick={() => setProfileMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 hover:bg-[#eff4ff] hover:text-[#0058be] font-medium transition-colors"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-[#eff4ff] dark:hover:bg-slate-800/80 hover:text-[#0058be] dark:hover:text-blue-400 font-medium transition-colors"
                   >
-                    <User className="w-4 h-4 text-slate-500" />
+                    <User className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                     <span>My Profile &amp; 360° Dossier</span>
                   </Link>
 
                   <Link
                     href="/my-desk"
                     onClick={() => setProfileMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 hover:bg-[#eff4ff] hover:text-[#0058be] font-medium transition-colors"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-[#eff4ff] dark:hover:bg-slate-800/80 hover:text-[#0058be] dark:hover:text-blue-400 font-medium transition-colors"
                   >
-                    <Clock className="w-4 h-4 text-slate-500" />
+                    <Clock className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                     <span>My Desk Self-Service</span>
                   </Link>
 
@@ -634,23 +658,23 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                     <Link
                       href="/admin"
                       onClick={() => setProfileMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 hover:bg-[#eff4ff] hover:text-[#0058be] font-medium transition-colors"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-[#eff4ff] dark:hover:bg-slate-800/80 hover:text-[#0058be] dark:hover:text-blue-400 font-medium transition-colors"
                     >
-                      <ShieldCheck className="w-4 h-4 text-slate-500" />
+                      <ShieldCheck className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                       <span>Security &amp; User RBAC</span>
                     </Link>
                   )}
                 </div>
 
-                <div className="p-1.5 border-t border-slate-100">
+                <div className="p-1.5 border-t border-slate-100 dark:border-slate-800">
                   <button
                     onClick={() => {
                       setProfileMenuOpen(false);
                       handleSignOut();
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors text-left"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors text-left"
                   >
-                    <LogOut className="w-4 h-4 text-red-500" />
+                    <LogOut className="w-4 h-4 text-red-500 dark:text-red-400" />
                     <span>Sign Out</span>
                   </button>
                 </div>
@@ -663,7 +687,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       {/* MAIN VIEWPORT CONTAINER */}
       <main className={`${
         isCollapsed ? 'lg:pl-20' : 'lg:pl-64'
-      } pt-14 min-h-screen transition-all duration-300 ease-in-out`}>
+      } pt-14 min-h-screen bg-[#f8f9ff] dark:bg-[#090e17] transition-all duration-300 ease-in-out`}>
         <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
           {children}
         </div>

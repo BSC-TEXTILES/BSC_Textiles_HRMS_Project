@@ -990,4 +990,202 @@ router.get('/emails/log', async (req: AuthRequest, res) => {
   }
 });
 
+// -------------------------------------------------------------
+// 14. Employee View-Only Payslips (/api/payroll/payslips/my-slips)
+// -------------------------------------------------------------
+router.get('/payslips/my-slips', async (req: AuthRequest, res) => {
+  try {
+    const employeeId = req.user?.employeeId;
+    if (!employeeId) {
+      return res.status(400).json({ error: 'Employee context not found for logged in user' });
+    }
+    const [rows]: any = await pool.query(`
+      SELECT pi.*, pr.period_start, pr.period_end, pr.status as run_status,
+             e.employee_code, e.full_name as employee_name,
+             l.name as location_name, d.name as department_name
+      FROM payroll_items pi
+      JOIN payroll_runs pr ON pi.payroll_run_id = pr.id
+      JOIN employees e ON pi.employee_id = e.id
+      LEFT JOIN locations l ON e.location_id = l.id
+      LEFT JOIN departments d ON e.department_id = d.id
+      WHERE pi.employee_id = ?
+      ORDER BY pr.period_start DESC
+    `, [employeeId]);
+    res.json({ payslips: rows });
+  } catch (error: any) {
+    console.error('Get my payslips error:', error);
+    res.status(500).json({ error: 'Failed to retrieve payslips', message: error.message });
+  }
+});
+
+// -------------------------------------------------------------
+// 15. Stream Payslip PDF (/api/payroll/payslips/:id/pdf)
+// -------------------------------------------------------------
+router.get('/payslips/:id/pdf', async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const [rows]: any = await pool.query(`
+      SELECT pi.*, pr.period_start, pr.period_end,
+             e.employee_code, e.full_name as employee_name,
+             l.name as location_name, d.name as department_name
+      FROM payroll_items pi
+      JOIN payroll_runs pr ON pi.payroll_run_id = pr.id
+      JOIN employees e ON pi.employee_id = e.id
+      LEFT JOIN locations l ON e.location_id = l.id
+      LEFT JOIN departments d ON e.department_id = d.id
+      WHERE pi.id = ?
+      LIMIT 1
+    `, [id]);
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ error: 'Payslip not found' });
+    }
+
+    const item = rows[0];
+
+    // IDOR verification: Employees may only stream their own payslip
+    if (req.user?.role === 'EMPLOYEE' || req.user?.role === 'SALES_EMPLOYEE') {
+      if (item.employee_id !== req.user?.employeeId) {
+        return res.status(403).json({ error: 'Forbidden: You are not authorized to view another employee payslip' });
+      }
+    }
+
+    const pdfBuffer = await generatePayslipPdf({
+      id: item.id,
+      employeeCode: item.employee_code || 'EMP',
+      fullName: item.employee_name || 'Staff Member',
+      designation: 'Sales Specialist',
+      departmentName: item.department_name || 'Showroom Sales',
+      locationName: item.location_name || 'BSC Belagavi Flagship',
+      periodStart: item.period_start || new Date().toISOString(),
+      periodEnd: item.period_end || new Date().toISOString(),
+      basicSalary: Number(item.basic_salary || 0),
+      hra: Number(item.allowances || 0) * 0.4,
+      allowances: Number(item.allowances || 0),
+      earlyIncentive: Number(item.early_incentive || 0),
+      attendanceIncentive: Number(item.attendance_incentive || 0),
+      salesIncentive: Number(item.sales_incentive || 0),
+      overtime: Number(item.overtime_pay || 0),
+      bonus: 0,
+      deductions: Number(item.total_deductions || 0),
+      pfDeduction: Number(item.statutory_deductions || 0) * 0.75,
+      taxDeduction: Number(item.statutory_deductions || 0) * 0.25,
+      lopDeduction: 0,
+      penalties: Number(item.late_penalties || 0) + Number(item.break_penalties || 0),
+      netPay: Number(item.net_pay || 0),
+      status: item.run_status || 'FINALIZED',
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="payslip_${item.employee_code}_${item.id}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (error: any) {
+    console.error('Stream payslip PDF error:', error);
+    res.status(500).json({ error: 'Failed to generate payslip PDF', message: error.message });
+  }
+});
+
+// -------------------------------------------------------------
+// 16. HR Edit Payslip Component (/api/payroll/payslips/:id/edit)
+// -------------------------------------------------------------
+router.put('/payslips/:id/edit', async (req: AuthRequest, res) => {
+  try {
+    if (!isHrOrAdmin(req.user?.role)) {
+      return res.status(403).json({ error: 'Forbidden: Only HR or Admin can edit payslips' });
+    }
+
+    const { id } = req.params;
+    const { basicSalary, allowances, statutoryDeductions, editReason } = req.body;
+
+    if (!editReason || editReason.trim().length < 5) {
+      return res.status(400).json({ error: 'Mandatory documented audit reason required for editing payslips' });
+    }
+
+    const [rows]: any = await pool.query('SELECT * FROM payroll_items WHERE id = ? LIMIT 1', [id]);
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ error: 'Payslip not found' });
+    }
+    const current = rows[0];
+
+    const basic = basicSalary !== undefined ? Number(basicSalary) : Number(current.basic_salary);
+    const allow = allowances !== undefined ? Number(allowances) : Number(current.allowances);
+    const statutory = statutoryDeductions !== undefined ? Number(statutoryDeductions) : Number(current.statutory_deductions);
+
+    const gross = basic + allow +
+      Number(current.early_incentive || 0) +
+      Number(current.sales_incentive || 0) +
+      Number(current.attendance_incentive || 0) +
+      Number(current.overtime_pay || 0);
+
+    const totalDed = statutory +
+      Number(current.late_penalties || 0) +
+      Number(current.break_penalties || 0);
+
+    const netPay = Math.round((gross - totalDed) * 100) / 100;
+
+    // Record superseded version in payslip_versions
+    await pool.query(`
+      INSERT INTO payslip_versions (
+        id, payroll_item_id, payroll_run_id, employee_id, version, is_superseded,
+        basic_salary, allowances, statutory_deductions, gross_earnings, total_deductions, net_pay,
+        edited_by, edit_reason
+      ) VALUES (?, ?, ?, ?, 2, FALSE, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [
+      `pv_${id}_${Date.now()}`,
+      id,
+      current.payroll_run_id,
+      current.employee_id,
+      basic,
+      allow,
+      statutory,
+      gross,
+      totalDed,
+      netPay,
+      req.user?.id || 'system',
+      editReason,
+    ]);
+
+    // Update active payroll_items
+    await pool.query(`
+      UPDATE payroll_items 
+      SET basic_salary = ?, allowances = ?, statutory_deductions = ?,
+          gross_earnings = ?, total_deductions = ?, net_pay = ?
+      WHERE id = ?
+    `, [basic, allow, statutory, gross, totalDed, netPay, id]);
+
+    res.json({
+      message: 'Payslip updated successfully with audit trail and recalculated totals',
+      payslip: {
+        id,
+        basicSalary: basic,
+        allowances: allow,
+        statutoryDeductions: statutory,
+        grossEarnings: gross,
+        totalDeductions: totalDed,
+        netPay,
+        editReason,
+      },
+    });
+  } catch (error: any) {
+    console.error('Edit payslip error:', error);
+    res.status(500).json({ error: 'Failed to update payslip', message: error.message });
+  }
+});
+
+// -------------------------------------------------------------
+// 17. Payslip Version History (/api/payroll/payslips/:id/versions)
+// -------------------------------------------------------------
+router.get('/payslips/:id/versions', async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const [rows]: any = await pool.query(
+      'SELECT * FROM payslip_versions WHERE payroll_item_id = ? ORDER BY created_at DESC',
+      [id]
+    );
+    res.json({ versions: rows });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;

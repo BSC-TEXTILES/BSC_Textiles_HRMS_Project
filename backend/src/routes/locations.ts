@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../index.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { validate, schemas } from '../middleware/validation.js';
+import { cacheService } from '../services/cacheService.js';
 
 const router = Router();
 
@@ -55,10 +56,23 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
 
 router.get('/all', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
+    const userRole = req.user?.role || 'EMPLOYEE';
+    const userLocId = req.user?.locationId || 'none';
+    const cacheKey = `locations:all:${userRole}:${userLocId}`;
+
+    const cached = cacheService.get<any[]>(cacheKey);
+    if (cached) {
+      if (req.headers['if-none-match'] === cached.etag) {
+        return res.status(304).end();
+      }
+      res.setHeader('ETag', cached.etag);
+      res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=30');
+      return res.json(cached.data);
+    }
+
     const where: any = { status: 'ACTIVE' };
-    
-    if (req.user!.role !== 'SUPER_ADMIN') {
-      where.id = req.user!.locationId;
+    if (userRole !== 'SUPER_ADMIN' && userLocId !== 'none') {
+      where.id = userLocId;
     }
     
     const locations = await prisma.location.findMany({
@@ -67,6 +81,9 @@ router.get('/all', authorize('VIEW'), async (req: AuthRequest, res) => {
       orderBy: { name: 'asc' },
     });
     
+    const etag = cacheService.set(cacheKey, locations, 60_000);
+    res.setHeader('ETag', etag);
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=30');
     res.json(locations);
   } catch (error) {
     console.error('Get all locations error:', error);
@@ -146,6 +163,7 @@ router.post('/', authorize('ADD'), validate(schemas.location), async (req: AuthR
       },
     });
     
+    cacheService.invalidateLocations();
     res.status(201).json(location);
   } catch (error) {
     console.error('Create location error:', error);
@@ -175,6 +193,7 @@ router.put('/:id', authorize('EDIT'), validate(schemas.location), async (req: Au
       data: updateData,
     });
     
+    cacheService.invalidateLocations();
     res.json(location);
   } catch (error) {
     console.error('Update location error:', error);
@@ -200,6 +219,7 @@ router.patch('/:id/status', authorize('EDIT'), async (req: AuthRequest, res) => 
       data: { status },
     });
     
+    cacheService.invalidateLocations();
     res.json(location);
   } catch (error) {
     console.error('Update location status error:', error);
@@ -231,6 +251,7 @@ router.delete('/:id', authorize('DELETE'), async (req: AuthRequest, res) => {
     }
     
     await prisma.location.delete({ where: { id: req.params.id } });
+    cacheService.invalidateLocations();
     res.json({ message: 'Location deleted successfully' });
   } catch (error) {
     console.error('Delete location error:', error);

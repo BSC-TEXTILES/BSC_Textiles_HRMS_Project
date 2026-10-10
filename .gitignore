@@ -40,8 +40,12 @@ coverage/
 # Prisma
 prisma/migrations/.migration_lock.toml
 
-# Uploads
+# Uploads and storage
 uploads/
+storage/
+quarantine/
+certbot/
+nginx/ssl/
 *.upload
 
 # TypeScript

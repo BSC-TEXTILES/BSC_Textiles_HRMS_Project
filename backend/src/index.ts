@@ -39,7 +39,15 @@ import roleRoutes from './routes/roles.js';
 import settingRoutes from './routes/settings.js';
 import deviceRoutes from './routes/devices.js';
 import kycRoutes from './routes/kyc.js';
+import exitRoutes from './routes/exits.js';
+import leaveRoutes from './routes/leaves.js';
+import mobileRoutes from './routes/mobile.js';
+import securityRoutes from './routes/security.js';
+import fileSecurityRoutes from './routes/fileSecurity.js';
 import { staffOpsRouter, observationLevelsRouter } from './routes/workerOps.js';
+import { securityHeaders } from './middleware/securityHeaders.js';
+import { csrfProtection } from './middleware/csrfProtection.js';
+import { timingMiddleware } from './middleware/timing.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -53,9 +61,18 @@ const io = new Server(httpServer, {
 export { prisma };
 export const socketIO = io;
 
+// 0. High-resolution timing, latency metrics, and request correlation IDs
+app.use(timingMiddleware);
+
+// 1. Basic security headers via helmet
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
+
+// 2. Comprehensive enterprise security headers (CSP, HSTS, X-Content-Type-Options, etc.)
+app.use(securityHeaders);
+
+// 3. Strict CORS configuration
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:3000',
@@ -74,12 +91,17 @@ app.use(cors({
   },
   credentials: true,
 }));
+
 app.use(compression());
 app.use(process.env.NODE_ENV === 'production' ? morgan('combined') : morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
+// 4. CSRF protection on mutating cookie requests
+app.use(csrfProtection);
+
+// 5. Baseline API Rate Limiter
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10000,
@@ -87,11 +109,27 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-app.get('/api/health', (req, res) => {
+app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    security: {
+      argon2: 'active',
+      mfa: 'enforced',
+      sessionTracking: 'active',
+      auditIntegrity: 'active',
+    },
+  });
+});
+
+// Domain & Security Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/security', securityRoutes);
+app.use('/api/files', fileSecurityRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/floors', floorRoutes);
@@ -120,15 +158,22 @@ app.use('/api/roles', roleRoutes);
 app.use('/api/settings', settingRoutes);
 app.use('/api/devices', deviceRoutes);
 app.use('/api/kyc', kycRoutes);
+app.use('/api/exits', exitRoutes);
+app.use('/api/leaves', leaveRoutes);
+app.use('/api/mobile', mobileRoutes);
 
+// Safe Production Error Handler
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err);
-  res.status(500).json({ error: 'Internal server error', message: err.message });
+  console.error('[Error caught by global handler]:', err);
+
+  const isProd = process.env.NODE_ENV === 'production';
+  res.status(500).json({
+    error: 'Internal server error',
+    message: isProd ? 'An unexpected error occurred. Please contact system administrator.' : err.message,
+  });
 });
 
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
-
   socket.on('join-location', (locationId: string) => {
     socket.join(`location:${locationId}`);
   });
@@ -136,15 +181,13 @@ io.on('connection', (socket) => {
   socket.on('join-stream', (streamId: string) => {
     socket.join(`stream:${streamId}`);
   });
-
-  socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id);
-  });
+  
+  socket.on('disconnect', () => {});
 });
 
-const PORT = process.env.PORT || 4000;
-httpServer.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+const PORT = Number(process.env.PORT) || 4000;
+httpServer.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 BSC Textiles HRMS Security-Hardened Server running on port ${PORT}`);
   console.log(`📡 WebSocket server ready`);
 });
 console.log('Listen called, waiting for callback...');

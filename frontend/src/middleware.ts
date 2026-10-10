@@ -82,6 +82,14 @@ export default withAuth(
     const token = req.nextauth?.token;
     const pathname = req.nextUrl.pathname;
 
+    // Direct root visitor to login or their dashboard immediately at the edge/server
+    if (pathname === '/') {
+      if (token) {
+        return NextResponse.redirect(new URL('/dashboard', req.url));
+      }
+      return NextResponse.redirect(new URL('/login', req.url));
+    }
+
     if (!isAllowed(pathname, token?.role)) {
       return NextResponse.redirect(
         new URL(`/403?from=${encodeURIComponent(pathname)}`, req.url)
@@ -91,12 +99,15 @@ export default withAuth(
     return NextResponse.next();
   },
   {
+    pages: {
+      signIn: '/login',
+    },
     callbacks: {
       authorized: ({ token, req }: { token: any; req: any }) => {
         const pathname = req.nextUrl.pathname;
 
         // Public routes.
-        if (pathname === '/login' || pathname === '/403') return true;
+        if (pathname === '/' || pathname === '/login' || pathname === '/403') return true;
         if (pathname.startsWith('/api/auth')) return true;
 
         return !!token;
@@ -107,17 +118,30 @@ export default withAuth(
 
 export const config = {
   matcher: [
+    '/',
+    '/dashboard',
     '/dashboard/:path*',
+    '/employees',
     '/employees/:path*',
+    '/attendance',
     '/attendance/:path*',
+    '/leaves',
     '/leaves/:path*',
+    '/payroll',
     '/payroll/:path*',
+    '/incentives',
     '/incentives/:path*',
+    '/reports',
     '/reports/:path*',
+    '/organization',
     '/organization/:path*',
+    '/operations',
     '/operations/:path*',
+    '/admin',
     '/admin/:path*',
+    '/my-desk',
     '/my-desk/:path*',
+    '/profile',
     '/profile/:path*',
   ],
 };
