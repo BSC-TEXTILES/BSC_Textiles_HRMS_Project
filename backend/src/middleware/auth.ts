@@ -4,6 +4,7 @@ import { prisma } from '../db.js';
 import { JWT_SECRET, JWT_ISSUER, TOKEN_TTL } from '../config/env.js';
 import { SessionService } from '../services/sessionService.js';
 import { AuditService } from '../services/auditService.js';
+import { cacheService } from '../services/cacheService.js';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -34,34 +35,44 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
       return res.status(401).json({ error: 'Invalid token payload' });
     }
 
-    // Check token revocation blocklist
-    if (decoded.jti && (await SessionService.isRevoked(decoded.jti))) {
-      return res.status(401).json({ error: 'Token has been revoked' });
-    }
+    // Fast-path: Check authenticated user cache (15s TTL) to eliminate repeated DB queries on every HTTP request
+    const cacheKey = `auth:user:${decoded.userId}`;
+    let user = cacheService.get<any>(cacheKey)?.data;
 
-    // If session ID is present, validate active session in database
-    if (decoded.sessionId) {
-      const sessionValidation = await SessionService.validateSession(decoded.sessionId);
-      if (!sessionValidation.valid) {
-        return res.status(401).json({ error: sessionValidation.reason || 'Session expired or invalidated' });
+    if (!user) {
+      // Check token revocation blocklist
+      if (decoded.jti && (await SessionService.isRevoked(decoded.jti))) {
+        return res.status(401).json({ error: 'Token has been revoked' });
+      }
+
+      // If session ID is present, validate active session in database
+      if (decoded.sessionId) {
+        const sessionValidation = await SessionService.validateSession(decoded.sessionId);
+        if (!sessionValidation.valid) {
+          return res.status(401).json({ error: sessionValidation.reason || 'Session expired or invalidated' });
+        }
+      }
+
+      user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          role: true,
+          permissions: true,
+          locationId: true,
+          employeeId: true,
+          isActive: true,
+          status: true,
+          lockedUntil: true,
+        },
+      });
+
+      if (user && user.isActive && (!user.status || user.status === 'ACTIVE')) {
+        cacheService.set(cacheKey, user, 15_000);
       }
     }
-
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        role: true,
-        permissions: true,
-        locationId: true,
-        employeeId: true,
-        isActive: true,
-        status: true,
-        lockedUntil: true,
-      },
-    });
 
     if (!user || !user.isActive) {
       return res.status(401).json({ error: 'User not found or inactive' });

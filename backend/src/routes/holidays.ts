@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../index.js';
 import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
+import { cacheService } from '../services/cacheService.js';
 
 const router = Router();
 
@@ -21,9 +22,20 @@ const holidaySchema = z.object({
 router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
     const { locationId, startDate, endDate, page = 1, limit = 20 } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
-    
     const scopedLocId = getScopedLocationId(req.user, locationId);
+
+    const cacheKey = `holidays:${scopedLocId || 'all'}:${startDate || ''}:${endDate || ''}:${page}:${limit}`;
+    const cached = cacheService.get<any>(cacheKey);
+    if (cached) {
+      if (req.headers['if-none-match'] === cached.etag) {
+        return res.status(304).end();
+      }
+      res.setHeader('ETag', cached.etag);
+      res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=30');
+      return res.json(cached.data);
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
     const where: any = {};
     if (scopedLocId) where.locationId = scopedLocId;
     if (startDate || endDate) {
@@ -46,7 +58,11 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
       prisma.holiday.count({ where }),
     ]);
     
-    res.json({ holidays, total, page: Number(page), limit: Number(limit) });
+    const result = { holidays, total, page: Number(page), limit: Number(limit) };
+    const etag = cacheService.set(cacheKey, result, 60_000);
+    res.setHeader('ETag', etag);
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=30');
+    res.json(result);
   } catch (error) {
     console.error('Get holidays error:', error);
     res.status(500).json({ error: 'Failed to get holidays' });
@@ -135,6 +151,7 @@ router.post('/bulk', async (req: AuthRequest, res) => {
       }
     }
 
+    cacheService.invalidateHolidays();
     return res.status(201).json({
       message: `Successfully imported ${createdRecords.length} holidays`,
       count: createdRecords.length,
@@ -173,6 +190,7 @@ router.post('/', async (req: AuthRequest, res) => {
       },
     });
     
+    cacheService.invalidateHolidays();
     res.status(201).json(holiday);
   } catch (error) {
     console.error('Create holiday error:', error);
@@ -203,6 +221,7 @@ router.put('/:id', authorize('EDIT'), validate(holidaySchema), async (req: AuthR
       },
     });
     
+    cacheService.invalidateHolidays();
     res.json(holiday);
   } catch (error) {
     console.error('Update holiday error:', error);
@@ -222,6 +241,7 @@ router.delete('/:id', authorize('DELETE'), async (req: AuthRequest, res) => {
     }
     
     await prisma.holiday.delete({ where: { id: req.params.id } });
+    cacheService.invalidateHolidays();
     res.json({ message: 'Holiday deleted successfully' });
   } catch (error) {
     console.error('Delete holiday error:', error);

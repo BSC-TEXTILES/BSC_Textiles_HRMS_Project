@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../index.js';
 import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
+import { cacheService } from '../services/cacheService.js';
 
 const router = Router();
 
@@ -21,9 +22,20 @@ const deptSchema = z.object({
 router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
     const { locationId, page = 1, limit = 20, search } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
-    
     const scopedLocId = getScopedLocationId(req.user, locationId);
+
+    const cacheKey = `departments:${scopedLocId || 'all'}:${page}:${limit}:${search || ''}`;
+    const cached = cacheService.get<any>(cacheKey);
+    if (cached) {
+      if (req.headers['if-none-match'] === cached.etag) {
+        return res.status(304).end();
+      }
+      res.setHeader('ETag', cached.etag);
+      res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=30');
+      return res.json(cached.data);
+    }
+
+    const skip = (Number(page) - 1) * Number(limit);
     const where: any = {};
     if (scopedLocId) where.locationId = scopedLocId;
     if (search) where.OR = [{ name: { contains: String(search), mode: 'insensitive' } }, { code: { contains: String(search), mode: 'insensitive' } }];
@@ -43,7 +55,11 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
       prisma.department.count({ where }),
     ]);
     
-    res.json({ departments, total, page: Number(page), limit: Number(limit) });
+    const result = { departments, total, page: Number(page), limit: Number(limit) };
+    const etag = cacheService.set(cacheKey, result, 60_000);
+    res.setHeader('ETag', etag);
+    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=30');
+    res.json(result);
   } catch (error) {
     console.error('Get departments error:', error);
     res.status(500).json({ error: 'Failed to get departments' });
@@ -98,6 +114,7 @@ router.post('/', authorize('ADD'), validate(deptSchema), async (req: AuthRequest
       data: { name, code, locationId, floorId, managerId },
     });
     
+    cacheService.invalidateDepartments();
     res.status(201).json(department);
   } catch (error) {
     console.error('Create department error:', error);
@@ -123,6 +140,7 @@ router.put('/:id', authorize('EDIT'), validate(deptSchema), async (req: AuthRequ
       data: { name, code, floorId, managerId },
     });
     
+    cacheService.invalidateDepartments();
     res.json(department);
   } catch (error) {
     console.error('Update department error:', error);
@@ -152,6 +170,7 @@ router.delete('/:id', authorize('DELETE'), async (req: AuthRequest, res) => {
     }
     
     await prisma.department.delete({ where: { id: req.params.id } });
+    cacheService.invalidateDepartments();
     res.json({ message: 'Department deleted successfully' });
   } catch (error) {
     console.error('Delete department error:', error);

@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { prisma, pool } from '../db.js';
+import { cacheService } from './cacheService.js';
 
 export interface CreateSessionOptions {
   userId: string;
@@ -155,11 +156,13 @@ export class SessionService {
       return { valid: false, reason: 'Session expired (idle timeout)' };
     }
 
-    // Update last activity timestamp
-    await prisma.session.update({
-      where: { id: sessionId },
-      data: { lastActivityAt: new Date() },
-    });
+    // Update last activity timestamp at most once every 60 seconds to eliminate row lock contention
+    if (now - lastActivity > 60_000) {
+      prisma.session.update({
+        where: { id: sessionId },
+        data: { lastActivityAt: new Date() },
+      }).catch((err) => console.warn('[SessionService] Throttled lastActivity update warning:', err.message));
+    }
 
     return { valid: true, session };
   }
@@ -206,6 +209,8 @@ export class SessionService {
           expiresAt: session.expiresAt,
         },
       }).catch((err: any) => console.warn('[SessionService] RevokedToken insert warning:', err.message));
+
+      cacheService.invalidatePrefix('auth:');
     } catch (err) {
       console.error('[SessionService] Revoke session error:', err);
     }

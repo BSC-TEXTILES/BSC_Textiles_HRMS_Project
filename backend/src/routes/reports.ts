@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '../index.js';
 import { dbDate } from '../utils/dates.js';
 import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
+import { cacheService } from '../services/cacheService.js';
 
 const router = Router();
 
@@ -11,17 +12,21 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
   try {
     let locationId = getScopedLocationId(req.user, req.query.locationId);
     if (locationId === 'all') locationId = undefined;
-    if (locationId) {
-      const cleanCode = locationId.replace(/^loc_/, '').toUpperCase();
-      const locMatch = await prisma.location.findFirst({
-        where: { OR: [{ id: locationId }, { code: cleanCode }] },
-      });
-      if (locMatch) locationId = locMatch.id;
-    }
 
     const departmentId = req.query.departmentId && req.query.departmentId !== 'all' ? String(req.query.departmentId) : undefined;
     const shiftId = req.query.shiftId && req.query.shiftId !== 'all' ? String(req.query.shiftId) : undefined;
     const dateParam = req.query.date ? String(req.query.date) : undefined;
+
+    const cacheKey = `dashboard:summary:${locationId || 'all'}:${departmentId || 'all'}:${shiftId || 'all'}:${dateParam || 'today'}`;
+    const cached = cacheService.get<any>(cacheKey);
+    if (cached) {
+      if (req.headers['if-none-match'] === cached.etag) {
+        return res.status(304).end();
+      }
+      res.setHeader('ETag', cached.etag);
+      res.setHeader('Cache-Control', 'public, max-age=5, stale-while-revalidate=5');
+      return res.json(cached.data);
+    }
 
     const today = dateParam ? new Date(dateParam) : new Date();
     today.setHours(0, 0, 0, 0);
@@ -126,7 +131,7 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
 
     const attAgg: any = attendanceAgg || {};
 
-    res.json({
+    const result = {
       totalEmployees,
       present,
       absent,
@@ -146,7 +151,12 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
       criticalObservations,
       liveStreams,
       activeSellingPoints,
-    });
+    };
+
+    const etag = cacheService.set(cacheKey, result, 5_000); // 5-second TTL
+    res.setHeader('ETag', etag);
+    res.setHeader('Cache-Control', 'public, max-age=5, stale-while-revalidate=5');
+    res.json(result);
   } catch (error) {
     console.error('Dashboard summary error:', error);
     res.status(500).json({ error: 'Failed to get dashboard summary' });

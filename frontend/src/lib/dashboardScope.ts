@@ -25,7 +25,7 @@ export interface Scope {
   empById: Map<string, any>;
 }
 
-export const ROSTER_LIMIT = 1000;
+export const ROSTER_LIMIT = 100;
 
 /** Build a scope map (filtered roster) used for enrichment + dept/shift filtering. */
 export async function fetchScope(filters: DrillFilters): Promise<Scope> {

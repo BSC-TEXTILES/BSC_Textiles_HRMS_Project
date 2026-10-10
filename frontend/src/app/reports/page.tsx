@@ -59,8 +59,8 @@ export default function ReportsPage() {
       console.error(e);
     }
     try {
-      const res = await api.get('/employees?limit=1000');
-      const list = res.data?.employees || [];
+      const res = await api.get('/employees/lookup').catch(() => api.get('/employees?limit=100'));
+      const list = Array.isArray(res.data) ? res.data : (res.data?.employees || []);
       const map: Record<string, string> = {};
       for (const e of list) if (e.employeeCode) map[e.employeeCode] = e.id;
       setEmpIdByCode(map);

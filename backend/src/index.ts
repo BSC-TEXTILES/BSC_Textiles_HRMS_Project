@@ -47,6 +47,7 @@ import fileSecurityRoutes from './routes/fileSecurity.js';
 import { staffOpsRouter, observationLevelsRouter } from './routes/workerOps.js';
 import { securityHeaders } from './middleware/securityHeaders.js';
 import { csrfProtection } from './middleware/csrfProtection.js';
+import { timingMiddleware } from './middleware/timing.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -59,6 +60,9 @@ const io = new Server(httpServer, {
 
 export { prisma };
 export const socketIO = io;
+
+// 0. High-resolution timing, latency metrics, and request correlation IDs
+app.use(timingMiddleware);
 
 // 1. Basic security headers via helmet
 app.use(helmet({

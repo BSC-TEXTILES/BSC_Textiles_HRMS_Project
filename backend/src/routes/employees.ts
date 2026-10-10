@@ -30,7 +30,8 @@ const employeeSchema = z.object({
 router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
     const { locationId, floorId, departmentId, sectionId, shiftId, status, page = 1, limit = 20, search } = req.query;
-    const skip = (Number(page) - 1) * Number(limit);
+    const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+    const skip = (Number(page) - 1) * safeLimit;
     
     const isElevated = ['SUPER_ADMIN', 'ADMIN', 'HR_AUDITOR'].includes(req.user!.role);
     const where: any = {};
@@ -54,7 +55,7 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
       prisma.employee.findMany({
         where,
         skip,
-        take: Number(limit),
+        take: safeLimit,
         orderBy: { employeeCode: 'asc' },
         include: {
           location: { select: { id: true, name: true, code: true } },
@@ -68,10 +69,30 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
       prisma.employee.count({ where }),
     ]);
     
-    res.json({ employees, total, page: Number(page), limit: Number(limit) });
+    res.json({ employees, total, page: Number(page), limit: safeLimit });
   } catch (error) {
     console.error('Get employees error:', error);
     res.status(500).json({ error: 'Failed to get employees' });
+  }
+});
+
+router.get('/lookup', authorize('VIEW'), async (req: AuthRequest, res) => {
+  try {
+    const isElevated = ['SUPER_ADMIN', 'ADMIN', 'HR_AUDITOR'].includes(req.user!.role);
+    const where: any = { status: 'ACTIVE' };
+    if (!isElevated && req.user!.locationId) {
+      where.locationId = req.user!.locationId;
+    }
+    const employees = await prisma.employee.findMany({
+      where,
+      select: { id: true, employeeCode: true, fullName: true, locationId: true, departmentId: true, shiftId: true },
+      orderBy: { employeeCode: 'asc' },
+    });
+    res.setHeader('Cache-Control', 'public, max-age=60');
+    res.json(employees);
+  } catch (error) {
+    console.error('Get employee lookup error:', error);
+    res.status(500).json({ error: 'Failed to get employee lookup' });
   }
 });
 
