@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { getRoleHomePath, sanitizeCallbackUrl } from '@/lib/roles';
 
@@ -11,30 +10,39 @@ import { getRoleHomePath, sanitizeCallbackUrl } from '@/lib/roles';
  */
 export default function Home() {
   const { data: session, status } = useSession();
-  const router = useRouter();
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.replace('/login');
-    } else if (status === 'authenticated') {
-      const callback = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('callbackUrl') : null;
+    if (typeof window === 'undefined') return;
+
+    if (status === 'authenticated' && session?.user) {
+      const callback = new URLSearchParams(window.location.search).get('callbackUrl');
       const target = sanitizeCallbackUrl(
         callback,
-        getRoleHomePath(session?.user?.role)
+        getRoleHomePath(session.user.role)
       );
-      router.replace(target);
+      window.location.replace(target);
+      return;
     }
-  }, [status, session?.user?.role, router]);
 
-  // Fallback: If auth check doesn't resolve in 2.5 seconds, redirect to /login safely
+    if (status === 'unauthenticated') {
+      const localToken = localStorage.getItem('bsc_token') || localStorage.getItem('token');
+      if (!localToken) {
+        window.location.replace('/login');
+      } else {
+        window.location.replace('/dashboard');
+      }
+    }
+  }, [status, session]);
+
+  // Instant safety fallback: if auth check hasn't resolved within 800ms, redirect to /login
   useEffect(() => {
     const timeout = setTimeout(() => {
-      if (status !== 'authenticated') {
-        router.replace('/login');
+      if (typeof window !== 'undefined') {
+        window.location.replace('/login');
       }
-    }, 2500);
+    }, 800);
     return () => clearTimeout(timeout);
-  }, [status, router]);
+  }, []);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#f8f9ff]">
@@ -43,6 +51,12 @@ export default function Home() {
         <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
           Redirecting to your workspace…
         </p>
+        <a
+          href="/login"
+          className="text-xs font-medium text-[#0058be] hover:underline mt-2 transition-colors"
+        >
+          Click here if not redirected automatically →
+        </a>
       </div>
     </div>
   );

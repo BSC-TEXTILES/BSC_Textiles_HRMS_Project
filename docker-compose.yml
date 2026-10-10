@@ -1,78 +1,107 @@
 version: '3.8'
 
 services:
+  # Hardened Reverse Proxy (TLS termination, Security Headers, Rate Limiting)
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: bsc-textiles-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./certbot/www:/var/www/certbot:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - frontend-network
+
+  # MySQL Database (Private Network Isolation, No Public Port Exposure)
   mysql:
     image: mysql:8.0
     container_name: bsc-textiles-mysql
+    restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: bsc_textiles_hrms
-      MYSQL_USER: bsc_user
-      MYSQL_PASSWORD: bsc_password
-    ports:
-      - "3306:3306"
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change_me_root_secret}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-bsc_textiles_hrms}
+      MYSQL_USER: ${MYSQL_USER:-bsc_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-change_me_user_secret}
+    # Security: Database port is NOT mapped to the host machine in production
+    expose:
+      - "3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
-      - ./database/seeds:/docker-entrypoint-initdb.d/seeds
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./database/seeds:/docker-entrypoint-initdb.d/seeds:ro
     command: >
       --default-authentication-plugin=mysql_native_password
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
       --max-connections=200
+      --require-secure-transport=OFF
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-ppassword"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-change_me_root_secret}"]
       interval: 10s
       timeout: 5s
       retries: 10
     networks:
-      - bsc-network
+      - backend-network
 
+  # Backend API Service
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: bsc-textiles-backend
+    restart: unless-stopped
     environment:
-      DATABASE_URL: mysql://root:password@mysql:3306/bsc_textiles_hrms
-      JWT_SECRET: bsc-textiles-hrms-super-secret-jwt-key-2024-production-ready-min-32-chars
-      NODE_ENV: development
+      DATABASE_URL: ${DATABASE_URL:-mysql://${MYSQL_USER:-bsc_user}:${MYSQL_PASSWORD:-change_me_user_secret}@mysql:3306/${MYSQL_DATABASE:-bsc_textiles_hrms}}
+      JWT_SECRET: ${JWT_SECRET:-change_me_to_cryptographically_random_32_chars_key}
+      NODE_ENV: ${NODE_ENV:-production}
       PORT: 4000
-      FRONTEND_URL: http://localhost:3000
-    ports:
-      - "4000:4000"
+      FRONTEND_URL: ${FRONTEND_URL:-https://hrms.bsctextiles.com}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-security@bsctextiles.com}
+    expose:
+      - "4000"
     depends_on:
       mysql:
         condition: service_healthy
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
     networks:
-      - bsc-network
+      - backend-network
+      - frontend-network
 
+  # Frontend Web Client
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: bsc-textiles-frontend
+    restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:4000/api
-      NEXTAUTH_SECRET: bsc-textiles-nextauth-secret-2024-production-ready-min-32-chars
-      NEXTAUTH_URL: http://localhost:3000
-    ports:
-      - "3000:3000"
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-change_me_to_cryptographically_random_secret}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://hrms.bsctextiles.com}
+    expose:
+      - "3000"
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
     networks:
-      - bsc-network
+      - frontend-network
 
 volumes:
   mysql_data:
 
 networks:
-  bsc-network:
+  frontend-network:
     driver: bridge
+  backend-network:
+    driver: bridge
+    internal: true

@@ -69,6 +69,11 @@ export function sanitizeCallbackUrl(
     if (url.origin !== base) return fallback;
     if (!url.pathname.startsWith('/')) return fallback;
 
+    // Never redirect a freshly authenticated user back to /login, /403, or root
+    if (url.pathname === '/login' || url.pathname.startsWith('/login/') || url.pathname === '/403' || url.pathname === '/') {
+      return fallback;
+    }
+
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
     return fallback;

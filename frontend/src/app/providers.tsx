@@ -7,7 +7,7 @@ import { ThemeProvider } from '@/context/ThemeContext';
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
-    <SessionProvider refetchOnWindowFocus={true}>
+    <SessionProvider refetchOnWindowFocus={false} refetchWhenOffline={false}>
       <ThemeProvider>
         {children}
         <Toaster position="top-right" />

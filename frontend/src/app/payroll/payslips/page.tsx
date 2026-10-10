@@ -116,16 +116,17 @@ export default function PayslipsPage() {
       if (monthFilter) params.month = monthFilter;
       if (yearFilter) params.year = yearFilter;
 
-      const res = await api.get('/payroll/payslips', { params });
+      const endpoint = isHrOrAdmin ? '/payroll/payslips' : '/payroll/payslips/my-slips';
+      const res = await api.get(endpoint, { params });
       setPayslips(res.data?.payslips || []);
-      setTotal(res.data?.total || 0);
+      setTotal(res.data?.total || (res.data?.payslips || []).length);
     } catch (err: any) {
       console.error(err);
       toast.error(err.response?.data?.error || 'Failed to fetch payslips');
     } finally {
       setLoading(false);
     }
-  }, [search, statusFilter, monthFilter, yearFilter]);
+  }, [isHrOrAdmin, search, statusFilter, monthFilter, yearFilter]);
 
   useEffect(() => {
     fetchPayslips();

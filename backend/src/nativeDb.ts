@@ -89,6 +89,19 @@ export const MODEL_TO_TABLE: Record<string, string> = {
   notification: 'notification',
   device: 'device',
   faceProfile: 'faceprofile',
+  mfaDevice: 'mfa_device',
+  mfaChallenge: 'mfa_challenge',
+  session: 'session',
+  deviceFingerprint: 'device_fingerprint',
+  approvalToken: 'approval_token',
+  passwordResetToken: 'password_reset_token',
+  loginAttempt: 'login_attempt',
+  revokedToken: 'revoked_token',
+  fileUpload: 'file_upload',
+  malwareSignature: 'malware_signature',
+  securityEvent: 'security_event',
+  securityAlertRule: 'security_alert_rule',
+  passwordHistory: 'password_history',
 };
 
 const RELATION_META: Record<
@@ -223,6 +236,47 @@ const RELATION_META: Record<
   sellingPoints: {
     employee: { table: 'employee', foreignKey: 'employeeId' },
     sellingPoint: { table: 'sellingpoint', foreignKey: 'sellingPointId' },
+  },
+  mfaDevice: {
+    user: { table: 'user', foreignKey: 'userId' },
+  },
+  mfaChallenge: {
+    user: { table: 'user', foreignKey: 'userId' },
+  },
+  session: {
+    user: { table: 'user', foreignKey: 'userId' },
+    location: { table: 'location', foreignKey: 'locationId' },
+  },
+  deviceFingerprint: {
+    user: { table: 'user', foreignKey: 'userId' },
+  },
+  approvalToken: {
+    user: { table: 'user', foreignKey: 'userId' },
+  },
+  passwordResetToken: {
+    user: { table: 'user', foreignKey: 'userId' },
+  },
+  loginAttempt: {
+    user: { table: 'user', foreignKey: 'userId' },
+    location: { table: 'location', foreignKey: 'locationId' },
+  },
+  revokedToken: {
+    user: { table: 'user', foreignKey: 'userId' },
+  },
+  fileUpload: {
+    user: { table: 'user', foreignKey: 'userId' },
+    approvedBy: { table: 'user', foreignKey: 'approvedById' },
+  },
+  malwareSignature: {},
+  securityEvent: {
+    user: { table: 'user', foreignKey: 'userId' },
+    location: { table: 'location', foreignKey: 'locationId' },
+    acknowledgedBy: { table: 'user', foreignKey: 'acknowledgedById' },
+    resolvedBy: { table: 'user', foreignKey: 'resolvedById' },
+  },
+  securityAlertRule: {},
+  passwordHistory: {
+    user: { table: 'user', foreignKey: 'userId' },
   },
 };
 

@@ -42,6 +42,7 @@ const stitchNavigation: NavSectionConfig[] = [
     items: [
       { title: 'All Employees', href: '/employees', icon: 'badge' },
       { title: 'Profile 360 & Dossier', href: '/employees/profile', icon: 'person_search' },
+      { title: 'Former Employees & F&F', href: '/employees/former', icon: 'person_off', badge: 'Settlement' },
       { title: 'Departments & Units', href: '/organization/departments', icon: 'corporate_fare' },
     ],
   },
@@ -180,8 +181,18 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (status === 'unauthenticated' && typeof window !== 'undefined' && !localStorage.getItem('bsc_token') && !localStorage.getItem('token')) {
-    return null;
+  if (status === 'unauthenticated') {
+    const hasToken = typeof window !== 'undefined' ? (localStorage.getItem('bsc_token') || localStorage.getItem('token')) : null;
+    if (!hasToken) {
+      return (
+        <div className="min-h-screen bg-[#f8f9ff] flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-[#0058be] border-t-transparent rounded-full animate-spin" />
+            <p className="text-slate-600 text-sm">Redirecting to login...</p>
+          </div>
+        </div>
+      );
+    }
   }
 
   const handleSignOut = () => {

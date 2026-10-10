@@ -80,15 +80,19 @@ function LoginFormContent() {
     [searchParams, session?.user?.role]
   );
 
-  // Auto-redirect if session already active
+  // Auto-redirect ONLY if visiting /login directly with an active, valid token (no callback redirect in progress)
   useEffect(() => {
-    if (status === 'authenticated') {
-      window.location.href = sanitizeCallbackUrl(
-        searchParams.get('callbackUrl'),
-        getRoleHomePath(session?.user?.role)
-      );
+    const hasCallback = searchParams.get('callbackUrl');
+    // If kicked to /login with a callbackUrl, never auto-redirect back to the failing page
+    if (hasCallback) return;
+
+    if (status === 'authenticated' && session?.user) {
+      const localToken = typeof window !== 'undefined' ? (localStorage.getItem('bsc_token') || localStorage.getItem('token')) : null;
+      if (localToken) {
+        window.location.href = getRoleHomePath(session.user.role);
+      }
     }
-  }, [status, searchParams, session?.user?.role]);
+  }, [status, searchParams, session]);
 
   const {
     register,
@@ -121,30 +125,7 @@ function LoginFormContent() {
     setErrorMessage(null);
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
-
-      // 1. Direct backend pre-flight login to prime local storage & cookies
-      try {
-        const directRes = await fetch(`${apiUrl}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: data.email, password: data.password }),
-        });
-        const directData = await directRes.json().catch(() => null);
-        if (directRes.ok && directData?.token) {
-          localStorage.setItem('bsc_token', directData.token);
-          localStorage.setItem('token', directData.token);
-          if (directData.user) {
-            localStorage.setItem('bsc_user', JSON.stringify(directData.user));
-          }
-          document.cookie = `token=${encodeURIComponent(directData.token)}; path=/; max-age=604800; SameSite=Lax`;
-          document.cookie = `bsc_token=${encodeURIComponent(directData.token)}; path=/; max-age=604800; SameSite=Lax`;
-        }
-      } catch (e) {
-        console.warn('[Login] Direct token sync notice:', e);
-      }
-
-      // 2. NextAuth credentials sign-in for RBAC session cookies
+      // 1. NextAuth credentials sign-in for RBAC session cookies
       const result = await signIn('credentials', {
         email: data.email,
         password: data.password,
@@ -162,9 +143,9 @@ function LoginFormContent() {
         return;
       }
 
-      // 3. Success → sync fresh session and redirect based on role
+      // 2. Success → sync fresh session tokens and cookies
       toast.success('Welcome to BSC Textiles HRMS!');
-      let landing = callbackUrl;
+      let landing = '/dashboard';
       try {
         const freshSession = await getSession();
         if (freshSession?.token) {
@@ -173,13 +154,16 @@ function LoginFormContent() {
           if (freshSession.user) {
             localStorage.setItem('bsc_user', JSON.stringify(freshSession.user));
           }
+          document.cookie = `token=${encodeURIComponent(freshSession.token)}; path=/; max-age=604800; SameSite=Lax`;
+          document.cookie = `bsc_token=${encodeURIComponent(freshSession.token)}; path=/; max-age=604800; SameSite=Lax`;
         }
         landing = sanitizeCallbackUrl(
           searchParams.get('callbackUrl'),
           getRoleHomePath(freshSession?.user?.role)
         );
       } catch {
-        // Best effort fallback
+        // Fallback to role-safe landing
+        landing = '/dashboard';
       }
 
       window.location.href = landing;

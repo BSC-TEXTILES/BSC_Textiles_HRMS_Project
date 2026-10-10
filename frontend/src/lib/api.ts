@@ -33,6 +33,8 @@ function getStoredToken(): string | null {
   return null;
 }
 
+let isRedirecting = false;
+
 api.interceptors.request.use(async (config) => {
   let token = getStoredToken() || sessionToken;
 
@@ -54,11 +56,22 @@ api.interceptors.request.use(async (config) => {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
+  // Attach CSRF header for double-submit cookie validation if present
+  if (typeof document !== 'undefined') {
+    const csrfMatch = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+    if (csrfMatch && csrfMatch[1]) {
+      config.headers['x-csrf-token'] = decodeURIComponent(csrfMatch[1]);
+    }
+  }
+
   return config;
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    isRedirecting = false;
+    return response;
+  },
   (error) => {
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       const pathname = window.location.pathname;
@@ -68,8 +81,11 @@ api.interceptors.response.use(
       localStorage.removeItem('bsc_user');
       document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       document.cookie = 'bsc_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      document.cookie = 'next-auth.session-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      document.cookie = '__Secure-next-auth.session-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
 
-      if (!pathname.startsWith('/login')) {
+      if (!pathname.startsWith('/login') && !isRedirecting) {
+        isRedirecting = true;
         const redirectTarget = `/login?callbackUrl=${encodeURIComponent(pathname + window.location.search)}`;
         window.location.href = redirectTarget;
       }

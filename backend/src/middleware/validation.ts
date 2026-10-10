@@ -28,8 +28,15 @@ export const validate = (schema: z.ZodSchema) => {
 export const schemas = {
   login: z.object({
     body: z.object({
-      email: z.string().email('Invalid email'),
-      password: z.string().min(6, 'Password must be at least 6 characters'),
+      email: z
+        .string()
+        .trim()
+        .min(1, 'Email or Employee Code is required')
+        .refine(
+          (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val) || /^(EMP|BSC|TEST)-[A-Z0-9-]+$/i.test(val),
+          'Invalid email or employee code format'
+        ),
+      password: z.string().min(1, 'Password is required'),
     }),
   }),
 
