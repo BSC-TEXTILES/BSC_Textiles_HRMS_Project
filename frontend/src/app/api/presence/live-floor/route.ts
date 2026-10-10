@@ -3,20 +3,20 @@ import { NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  // 12 staff physically present on floor
+  // 12 staff physically present on floor (5 in Zone A, 4 in Zone B, 3 in Zone C)
   const presentStaff = [
-    { id: 'STAFF-01', code: 'EMP-001', name: 'Ramesh Kulkarni', dept: 'Manufacturing (Looms)', zone: 'Zone B - Loom Hall', role: 'Master Weaver', punchIn: '08:45 AM', status: 'PRESENT', terminal: 'BEL-01' },
+    { id: 'STAFF-01', code: 'EMP-001', name: 'Ramesh Kulkarni', dept: 'Manufacturing (Looms)', zone: 'Zone B - Loom Hall', role: 'Master Weaver', punchIn: '08:45 AM', status: 'PRESENT', terminal: 'BEL-02' },
     { id: 'STAFF-02', code: 'EMP-003', name: 'Kavita Bhat', dept: 'Admin & HR', zone: 'Zone A - Executive Floor', role: 'HR Executive', punchIn: '08:52 AM', status: 'PRESENT', terminal: 'BEL-01' },
     { id: 'STAFF-03', code: 'EMP-004', name: 'Pooja Deshmukh', dept: 'Retail & Showroom', zone: 'Zone A - Retail Front', role: 'Showroom Lead', punchIn: '09:05 AM', status: 'PRESENT', terminal: 'BEL-01' },
     { id: 'STAFF-04', code: 'EMP-007', name: 'Mohammed Irfan', dept: 'Manufacturing (Spinning)', zone: 'Zone B - Loom Hall', role: 'Spinning Operator', punchIn: '09:12 AM', status: 'PRESENT', terminal: 'BEL-02' },
     { id: 'STAFF-05', code: 'EMP-009', name: 'Rajesh Kumar', dept: 'Retail & Showroom', zone: 'Zone A - Retail Front', role: 'Senior Sales Exec', punchIn: '09:15 AM', status: 'PRESENT', terminal: 'BEL-01' },
-    { id: 'STAFF-06', code: 'EMP-011', name: 'Amit Patel', dept: 'Manufacturing (QC)', zone: 'Zone B - Quality Testing', role: 'Floor Manager', punchIn: '08:30 AM', status: 'PRESENT', terminal: 'BEL-02' },
-    { id: 'STAFF-07', code: 'EMP-014', name: 'Sunita Rao', dept: 'Retail & Showroom', zone: 'Zone C - Billing Desk', role: 'Cashier / POS', punchIn: '09:33 AM', status: 'PRESENT', terminal: 'BEL-01' },
+    { id: 'STAFF-06', code: 'EMP-011', name: 'Amit Patel', dept: 'Manufacturing (QC)', zone: 'Zone B - Quality Testing', role: 'QC Floor Manager', punchIn: '08:30 AM', status: 'PRESENT', terminal: 'BEL-02' },
+    { id: 'STAFF-07', code: 'EMP-014', name: 'Sunita Rao', dept: 'Retail & Showroom', zone: 'Zone C - Billing Desk', role: 'Cashier / POS', punchIn: '09:33 AM', status: 'PRESENT', terminal: 'BEL-03' },
     { id: 'STAFF-08', code: 'EMP-016', name: 'Lakshmi Hegde', dept: 'Manufacturing (Finishing)', zone: 'Zone B - Loom Hall', role: 'Finishing Tech', punchIn: '09:00 AM', status: 'PRESENT', terminal: 'BEL-02' },
     { id: 'STAFF-09', code: 'EMP-018', name: 'Vijay Kamath', dept: 'Admin & HR', zone: 'Zone A - Executive Floor', role: 'Accounts Officer', punchIn: '09:10 AM', status: 'PRESENT', terminal: 'BEL-01' },
-    { id: 'STAFF-10', code: 'EMP-020', name: 'Divya Reddy', dept: 'Security & Facilities', zone: 'Zone C - Gate & Security', role: 'Security Supervisor', punchIn: '07:55 AM', status: 'PRESENT', terminal: 'BEL-01' },
+    { id: 'STAFF-10', code: 'EMP-020', name: 'Divya Reddy', dept: 'Security & Facilities', zone: 'Zone C - Gate & Security', role: 'Security Supervisor', punchIn: '07:55 AM', status: 'PRESENT', terminal: 'BEL-03' },
     { id: 'STAFF-11', code: 'EMP-023', name: 'Chetan Joshi', dept: 'Security & Facilities', zone: 'Zone C - Gate & Security', role: 'CCTV Operator', punchIn: '08:00 AM', status: 'PRESENT', terminal: 'BEL-03' },
-    { id: 'STAFF-12', code: 'EMP-025', name: 'Harish Rao', dept: 'Manufacturing (Maintenance)', zone: 'Zone B - Technical Bay', role: 'Electrical Tech', punchIn: '08:40 AM', status: 'PRESENT', terminal: 'BEL-02' },
+    { id: 'STAFF-12', code: 'EMP-025', name: 'Harish Rao', dept: 'Facilities & Maintenance', zone: 'Zone A - Executive Maintenance', role: 'Facilities Tech', punchIn: '08:40 AM', status: 'PRESENT', terminal: 'BEL-01' },
   ];
 
   // 23 missing staff breakdown
@@ -53,11 +53,134 @@ export async function GET(request: Request) {
     { name: 'Retail, Security & Facilities', present: 3, expected: 9, pct: 33.3, status: 'Front Doors Fully Manned', color: '#f59e0b' },
   ];
 
-  // Zone concentration heatmap
+  // Zone concentration heatmap with rich telemetry per zone
   const floorZones = [
-    { id: 'zone-a', name: 'Zone A - Retail Showroom & Executive', count: 5, capacity: 6, occupancyPct: 94.2, status: 'Active Peak', staff: presentStaff.filter(s => s.zone.includes('Zone A')) },
-    { id: 'zone-b', name: 'Zone B - Loom Hall & Spinning Mills', count: 4, capacity: 5, occupancyPct: 91.0, status: 'Optimal Cadence', staff: presentStaff.filter(s => s.zone.includes('Zone B')) },
-    { id: 'zone-c', name: 'Zone C - Gate, Fitting & Dispatch', count: 3, capacity: 4, occupancyPct: 92.5, status: 'Balanced Guard', staff: presentStaff.filter(s => s.zone.includes('Zone C')) },
+    {
+      id: 'zone-a',
+      name: 'Zone A - Retail Showroom & Executive',
+      badge: 'Active Peak',
+      count: 5,
+      capacity: 6,
+      occupancyPct: 94.2,
+      status: 'Active Peak',
+      staff: presentStaff.filter(s => s.zone.includes('Zone A')),
+      capacityUtilization: {
+        occupied: 5,
+        capacity: 6,
+        pct: 94.2,
+        unoccupiedSlot: {
+          slotNumber: 6,
+          slotName: 'Visual Merchandiser / Shift B Lead',
+          reason: 'Scheduled Shift B check-in pending at 14:00',
+        },
+        slots: [
+          { slotNumber: 1, slotName: 'Showroom Lead', isOccupied: true, occupant: { name: 'Pooja Deshmukh', code: 'EMP-004', role: 'Showroom Lead', punchIn: '09:05 AM' } },
+          { slotNumber: 2, slotName: 'Senior Sales Exec', isOccupied: true, occupant: { name: 'Rajesh Kumar', code: 'EMP-009', role: 'Senior Sales Exec', punchIn: '09:15 AM' } },
+          { slotNumber: 3, slotName: 'HR Executive', isOccupied: true, occupant: { name: 'Kavita Bhat', code: 'EMP-003', role: 'HR Executive', punchIn: '08:52 AM' } },
+          { slotNumber: 4, slotName: 'Accounts Officer', isOccupied: true, occupant: { name: 'Vijay Kamath', code: 'EMP-018', role: 'Accounts Officer', punchIn: '09:10 AM' } },
+          { slotNumber: 5, slotName: 'Executive Maintenance', isOccupied: true, occupant: { name: 'Harish Rao', code: 'EMP-025', role: 'Facilities Tech', punchIn: '08:40 AM' } },
+          { slotNumber: 6, slotName: 'Visual Merchandiser', isOccupied: false, unoccupiedReason: 'Shift B Lead - Scheduled check-in at 14:00' },
+        ],
+      },
+      sensorFeed: [
+        { terminalId: 'BEL-01', terminalName: 'Entrance Tablet A', timestamp: '09:15:22 AM', employeeCode: 'EMP-009', employeeName: 'Rajesh Kumar', authMethod: 'AI Face Verification (99.6%)', signalHealth: '14ms • Optical Optimal', status: 'VERIFIED' },
+        { terminalId: 'BEL-01', terminalName: 'Executive Turnstile', timestamp: '09:10:04 AM', employeeCode: 'EMP-018', employeeName: 'Vijay Kamath', authMethod: 'Encrypted RFID Badge', signalHealth: '18ms • Optical Strong', status: 'VERIFIED' },
+        { terminalId: 'BEL-01', terminalName: 'Entrance Tablet A', timestamp: '09:05:41 AM', employeeCode: 'EMP-004', employeeName: 'Pooja Deshmukh', authMethod: 'AI Face Verification (99.8%)', signalHealth: '16ms • Optical Optimal', status: 'VERIFIED' },
+        { terminalId: 'BEL-01', terminalName: 'Executive Turnstile', timestamp: '08:52:19 AM', employeeCode: 'EMP-003', employeeName: 'Kavita Bhat', authMethod: 'AI Face Verification (99.4%)', signalHealth: '15ms • Optical Strong', status: 'VERIFIED' },
+        { terminalId: 'BEL-01', terminalName: 'Executive Turnstile', timestamp: '08:40:02 AM', employeeCode: 'EMP-025', employeeName: 'Harish Rao', authMethod: 'Dynamic QR Pass', signalHealth: '19ms • Optical Normal', status: 'VERIFIED' },
+      ],
+      hourlyTrend: [
+        { hour: '06:00', occupancy: 40.0 },
+        { hour: '07:00', occupancy: 60.5 },
+        { hour: '08:00', occupancy: 83.3 },
+        { hour: '09:00', occupancy: 94.2 },
+        { hour: '10:00', occupancy: 94.2 },
+        { hour: '11:00', occupancy: 94.2 },
+        { hour: '12:00', occupancy: 94.2 },
+      ],
+    },
+    {
+      id: 'zone-b',
+      name: 'Zone B - Loom Hall & Spinning Mills',
+      badge: 'Optimal Cadence',
+      count: 4,
+      capacity: 5,
+      occupancyPct: 91.0,
+      status: 'Optimal Cadence',
+      staff: presentStaff.filter(s => s.zone.includes('Zone B')),
+      capacityUtilization: {
+        occupied: 4,
+        capacity: 5,
+        pct: 91.0,
+        unoccupiedSlot: {
+          slotNumber: 5,
+          slotName: 'Junior Weaver / Apprentice Line 3',
+          reason: 'On Approved Casual Leave (Anand Nayak - EMP-005)',
+        },
+        slots: [
+          { slotNumber: 1, slotName: 'Master Weaver', isOccupied: true, occupant: { name: 'Ramesh Kulkarni', code: 'EMP-001', role: 'Master Weaver', punchIn: '08:45 AM' } },
+          { slotNumber: 2, slotName: 'QC Floor Manager', isOccupied: true, occupant: { name: 'Amit Patel', code: 'EMP-011', role: 'QC Floor Manager', punchIn: '08:30 AM' } },
+          { slotNumber: 3, slotName: 'Spinning Operator', isOccupied: true, occupant: { name: 'Mohammed Irfan', code: 'EMP-007', role: 'Spinning Operator', punchIn: '09:12 AM' } },
+          { slotNumber: 4, slotName: 'Finishing Tech', isOccupied: true, occupant: { name: 'Lakshmi Hegde', code: 'EMP-016', role: 'Finishing Tech', punchIn: '09:00 AM' } },
+          { slotNumber: 5, slotName: 'Junior Weaver / Apprentice Line 3', isOccupied: false, unoccupiedReason: 'On Approved Leave (Anand Nayak - EMP-005)' },
+        ],
+      },
+      sensorFeed: [
+        { terminalId: 'BEL-02', terminalName: 'Floor 1 Gate Scanner B', timestamp: '09:12:11 AM', employeeCode: 'EMP-007', employeeName: 'Mohammed Irfan', authMethod: 'AI Face Verification (99.7%)', signalHealth: '18ms • Looms Optimal', status: 'VERIFIED' },
+        { terminalId: 'BEL-02', terminalName: 'Floor 1 Gate Scanner B', timestamp: '09:00:30 AM', employeeCode: 'EMP-016', employeeName: 'Lakshmi Hegde', authMethod: 'Encrypted RFID Badge', signalHealth: '19ms • Looms Optimal', status: 'VERIFIED' },
+        { terminalId: 'BEL-02', terminalName: 'Weaving Hall Sensor B', timestamp: '08:45:12 AM', employeeCode: 'EMP-001', employeeName: 'Ramesh Kulkarni', authMethod: 'AI Face Verification (99.9%)', signalHealth: '17ms • Looms Optimal', status: 'VERIFIED' },
+        { terminalId: 'BEL-02', terminalName: 'Weaving Hall Sensor B', timestamp: '08:30:55 AM', employeeCode: 'EMP-011', employeeName: 'Amit Patel', authMethod: 'Dynamic QR Pass', signalHealth: '21ms • Looms Optimal', status: 'VERIFIED' },
+      ],
+      hourlyTrend: [
+        { hour: '06:00', occupancy: 35.0 },
+        { hour: '07:00', occupancy: 60.0 },
+        { hour: '08:00', occupancy: 80.0 },
+        { hour: '09:00', occupancy: 91.0 },
+        { hour: '10:00', occupancy: 91.0 },
+        { hour: '11:00', occupancy: 91.0 },
+        { hour: '12:00', occupancy: 91.0 },
+      ],
+    },
+    {
+      id: 'zone-c',
+      name: 'Zone C - Gate, Fitting & Dispatch',
+      badge: 'Balanced Guard',
+      count: 3,
+      capacity: 4,
+      occupancyPct: 92.5,
+      status: 'Balanced Guard',
+      staff: presentStaff.filter(s => s.zone.includes('Zone C')),
+      capacityUtilization: {
+        occupied: 3,
+        capacity: 4,
+        pct: 92.5,
+        unoccupiedSlot: {
+          slotNumber: 4,
+          slotName: 'Dispatch Handler / Loading Lead',
+          reason: 'Field Transit / Scheduled Shift B at 13:30',
+        },
+        slots: [
+          { slotNumber: 1, slotName: 'Security Supervisor', isOccupied: true, occupant: { name: 'Divya Reddy', code: 'EMP-020', role: 'Security Supervisor', punchIn: '07:55 AM' } },
+          { slotNumber: 2, slotName: 'CCTV Operator', isOccupied: true, occupant: { name: 'Chetan Joshi', code: 'EMP-023', role: 'CCTV Operator', punchIn: '08:00 AM' } },
+          { slotNumber: 3, slotName: 'Cashier / POS Lead', isOccupied: true, occupant: { name: 'Sunita Rao', code: 'EMP-014', role: 'Cashier / POS', punchIn: '09:33 AM' } },
+          { slotNumber: 4, slotName: 'Dispatch Handler / Loading Lead', isOccupied: false, unoccupiedReason: 'Field Transit / Shift B (13:30)' },
+        ],
+      },
+      sensorFeed: [
+        { terminalId: 'BEL-03', terminalName: 'Canteen & Dispatch Scanner C', timestamp: '09:33:45 AM', employeeCode: 'EMP-014', employeeName: 'Sunita Rao', authMethod: 'Encrypted RFID Badge', signalHealth: '22ms • Dispatch Normal', status: 'VERIFIED' },
+        { terminalId: 'BEL-03', terminalName: 'Main Gate Scanner C', timestamp: '08:00:15 AM', employeeCode: 'EMP-023', employeeName: 'Chetan Joshi', authMethod: 'AI Face Verification (99.8%)', signalHealth: '16ms • Gate Optimal', status: 'VERIFIED' },
+        { terminalId: 'BEL-03', terminalName: 'Main Gate Scanner C', timestamp: '07:55:09 AM', employeeCode: 'EMP-020', employeeName: 'Divya Reddy', authMethod: 'AI Face Verification (99.5%)', signalHealth: '15ms • Gate Optimal', status: 'VERIFIED' },
+      ],
+      hourlyTrend: [
+        { hour: '06:00', occupancy: 50.0 },
+        { hour: '07:00', occupancy: 75.0 },
+        { hour: '08:00', occupancy: 92.5 },
+        { hour: '09:00', occupancy: 92.5 },
+        { hour: '10:00', occupancy: 92.5 },
+        { hour: '11:00', occupancy: 92.5 },
+        { hour: '12:00', occupancy: 92.5 },
+      ],
+    },
   ];
 
   // Historical trend comparison (Today vs Last Week)
