@@ -5,8 +5,7 @@
   "workspaces": [
     "frontend",
     "backend",
-    "database",
-    "mobile"
+    "database"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
@@ -22,7 +21,9 @@
     "install:all": "npm install",
     "test": "npm test --workspace=backend",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present"
+    "lint": "npm run lint --workspaces --if-present",
+    "mobile:start": "npm start --prefix mobile",
+    "mobile:typecheck": "npm run typecheck --prefix mobile"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
@@ -50,8 +51,5 @@
   },
   "engines": {
     "node": ">=20.0.0"
-  },
-  "dependencies": {
-    "send": "^0.19.0"
   }
 }
