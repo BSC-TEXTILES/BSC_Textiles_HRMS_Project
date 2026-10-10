@@ -16,43 +16,41 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Email and password are required');
         }
 
-        let response: Response;
-        try {
-          response = await fetch(`${API_URL}/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: credentials.email,
-              password: credentials.password,
-            }),
-          });
-        } catch (fetchErr: any) {
-          // If localhost failed (e.g. IPv6 ::1 issue), retry with 127.0.0.1
-          if (API_URL.includes('localhost')) {
-            const fallbackUrl = API_URL.replace('localhost', '127.0.0.1');
-            try {
-              response = await fetch(`${fallbackUrl}/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  email: credentials.email,
-                  password: credentials.password,
-                }),
-              });
-            } catch (err2: any) {
-              console.error('[NextAuth] Connection error:', err2.message);
-              throw new Error('Could not connect to authentication server. Please ensure backend is running on port 4000.');
-            }
-          } else {
-            console.error('[NextAuth] Connection error:', fetchErr.message);
-            throw new Error('Could not connect to authentication server. Please ensure backend is running on port 4000.');
+        let response: Response | null = null;
+        const candidateUrls = [
+          API_URL,
+          API_URL.includes('127.0.0.1') ? API_URL.replace('127.0.0.1', 'localhost') : API_URL.replace('localhost', '127.0.0.1'),
+          'http://127.0.0.1:4000/api',
+          'http://localhost:4000/api',
+        ];
+        const uniqueUrls = Array.from(new Set(candidateUrls));
+
+        let lastErrorMsg = '';
+        for (const url of uniqueUrls) {
+          try {
+            response = await fetch(`${url}/auth/login`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: credentials.email,
+                password: credentials.password,
+              }),
+            });
+            if (response) break;
+          } catch (err: any) {
+            lastErrorMsg = err?.message || 'Network request failed';
           }
+        }
+
+        if (!response) {
+          console.error('[NextAuth] Could not connect to backend across candidate URLs:', uniqueUrls, lastErrorMsg);
+          throw new Error('Could not connect to authentication server. Please ensure backend is running on port 4000.');
         }
 
         const data = await response.json().catch(() => ({}));
 
         if (!response.ok || !data?.user) {
-          throw new Error(data?.error || 'Invalid email or password');
+          throw new Error(data?.error || data?.message || 'Invalid email or password');
         }
 
         return {

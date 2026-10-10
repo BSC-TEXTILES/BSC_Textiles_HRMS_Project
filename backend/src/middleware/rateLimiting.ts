@@ -19,7 +19,7 @@ const createHandler = (message: string) => (req: any, res: any) => {
  */
 export const authCriticalLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 5,
+  max: process.env.NODE_ENV === 'production' ? 5 : 200,
   standardHeaders: true,
   legacyHeaders: false,
   handler: createHandler('Too many authentication attempts. Please wait a minute before trying again.'),
