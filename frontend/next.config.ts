@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import path from 'path';
 
 const API_URL = process.env.BACKEND_URL || 'http://localhost:4000';
 
@@ -44,6 +45,16 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: {
     remotePatterns: [{ protocol: 'http', hostname: 'localhost' }],
+  },
+  webpack: (config) => {
+    config.resolve = config.resolve || {};
+    config.resolve.modules = [
+      path.resolve(__dirname, 'node_modules'),
+      path.resolve(__dirname, '../node_modules'),
+      'node_modules',
+      ...(config.resolve.modules || []),
+    ];
+    return config;
   },
   experimental: {
     serverActions: { bodySizeLimit: '12mb' },

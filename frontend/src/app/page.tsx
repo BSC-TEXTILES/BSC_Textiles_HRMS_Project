@@ -45,15 +45,15 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#f8f9ff]">
+    <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA] dark:bg-[#111317]">
       <div className="flex flex-col items-center gap-3">
-        <div className="w-9 h-9 border-[3px] border-[#0058be] border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-          Redirecting to your workspace…
+        <div className="w-8 h-8 border-2 border-[#722F37] border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          Redirecting to workspace…
         </p>
         <a
           href="/login"
-          className="text-xs font-medium text-[#0058be] hover:underline mt-2 transition-colors"
+          className="text-xs font-medium text-[#722F37] hover:underline mt-2 transition-colors"
         >
           Click here if not redirected automatically →
         </a>

@@ -313,7 +313,7 @@ export default function PayslipsPage() {
             <div className="flex items-center gap-1.5 text-slate-400 text-[11px] uppercase tracking-wider font-bold">
               <span>Payroll Management</span>
               <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-              <span className="text-[#0058be]">
+              <span className="text-[#722F37]">
                 {isHrOrAdmin ? 'Employee Payslips Ledger' : 'My Personal Payslips'}
               </span>
             </div>
@@ -321,8 +321,8 @@ export default function PayslipsPage() {
               <h1 className="text-2xl font-bold text-[#0b1c30] tracking-tight">
                 {isHrOrAdmin ? 'Employee Payslips & Statutory Disbursals' : 'My Monthly Payslips & Earnings'}
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-[#0058be] text-[10px] font-bold uppercase tracking-wider border border-blue-200 flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#0058be]"></span>
+              <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-[#722F37] text-[10px] font-bold uppercase tracking-wider border border-blue-200 flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#722F37]"></span>
                 Karnataka Form T
               </span>
             </div>
@@ -357,7 +357,7 @@ export default function PayslipsPage() {
                 placeholder={isHrOrAdmin ? "Search by employee name or code..." : "Search..."}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0058be]"
+                className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#722F37]"
               />
             </div>
 
@@ -408,7 +408,7 @@ export default function PayslipsPage() {
           </div>
 
           <div className="text-xs font-semibold text-slate-500 whitespace-nowrap">
-            Showing <span className="text-[#0058be] font-bold">{payslips.length}</span> of {total} records
+            Showing <span className="text-[#722F37] font-bold">{payslips.length}</span> of {total} records
           </div>
         </div>
 
@@ -426,7 +426,7 @@ export default function PayslipsPage() {
               </div>
             ) : (
               <table className="w-full text-left text-xs">
-                <thead className="bg-[#eff4ff]/60 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-100 tracking-wider">
+                <thead className="bg-[#F8F4F1]/60 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-100 tracking-wider">
                   <tr>
                     <th className="py-3 px-4">Employee</th>
                     <th className="py-3 px-4">Pay Period</th>
@@ -502,7 +502,7 @@ export default function PayslipsPage() {
                         </td>
 
                         {/* Net Pay */}
-                        <td className="py-3 px-4 font-mono font-bold text-[#0058be] text-[13px]">
+                        <td className="py-3 px-4 font-mono font-bold text-[#722F37] text-[13px]">
                           ₹{Number(p.netPay).toLocaleString()}
                         </td>
 
@@ -569,7 +569,7 @@ export default function PayslipsPage() {
                             {isHrOrAdmin && (
                               <button
                                 onClick={() => handleOpenEdit(p)}
-                                className="px-2 py-1 text-xs font-semibold text-[#0058be] hover:bg-[#eff4ff] rounded border border-[#dce9ff] transition-colors"
+                                className="px-2 py-1 text-xs font-semibold text-[#722F37] hover:bg-[#F8F4F1] rounded border border-[#E5D5D7] transition-colors"
                                 title="Edit Payslip Amounts & Custom Sections"
                               >
                                 Edit
@@ -593,7 +593,7 @@ export default function PayslipsPage() {
                             <button
                               onClick={() => handleDownloadPdf(p)}
                               disabled={actionInProgress === `pdf-${p.id}`}
-                              className="p-1 text-slate-600 hover:text-[#0058be] hover:bg-[#eff4ff] rounded border border-slate-200 transition-colors"
+                              className="p-1 text-slate-600 hover:text-[#722F37] hover:bg-[#F8F4F1] rounded border border-slate-200 transition-colors"
                               title="Download Karnataka Form T PDF"
                             >
                               <span className="material-symbols-outlined text-[16px]">download</span>
@@ -629,7 +629,7 @@ export default function PayslipsPage() {
             <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2.5">
-                  <span className="material-symbols-outlined text-[#0058be] text-[24px]">receipt_long</span>
+                  <span className="material-symbols-outlined text-[#722F37] text-[24px]">receipt_long</span>
                   <div>
                     <h3 className="font-bold text-base text-[#0b1c30]">BSC Textiles • Form T Payslip</h3>
                     <p className="text-[11px] text-slate-500">
@@ -647,14 +647,14 @@ export default function PayslipsPage() {
               </div>
 
               {/* Employee Summary Card */}
-              <div className="bg-[#eff4ff] p-4 rounded-xl border border-[#dce9ff] flex flex-col sm:flex-row justify-between gap-3 text-xs">
+              <div className="bg-[#F8F4F1] p-4 rounded-xl border border-[#E5D5D7] flex flex-col sm:flex-row justify-between gap-3 text-xs">
                 <div>
                   <div className="font-bold text-sm text-[#0b1c30]">{viewingPayslip.employeeName}</div>
                   <div className="text-slate-500 font-mono text-[11px]">Emp Code: {viewingPayslip.employeeCode}</div>
                   <div className="text-slate-500 text-[11px]">Designation: {viewingPayslip.designation || 'Staff'}</div>
                 </div>
                 <div className="sm:text-right">
-                  <div className="font-bold text-[#0058be]">{viewingPayslip.locationName || 'Belagavi Flagship'}</div>
+                  <div className="font-bold text-[#722F37]">{viewingPayslip.locationName || 'Belagavi Flagship'}</div>
                   <div className="text-slate-500 text-[11px]">{viewingPayslip.departmentName || 'Retail Operations'}</div>
                   <div className="text-slate-500 text-[11px] font-mono">{viewingPayslip.employeeEmail}</div>
                 </div>
@@ -752,12 +752,12 @@ export default function PayslipsPage() {
               )}
 
               {/* Net Pay Callout */}
-              <div className="flex items-center justify-between p-3.5 bg-[#eff4ff] rounded-xl border border-[#dce9ff]">
+              <div className="flex items-center justify-between p-3.5 bg-[#F8F4F1] rounded-xl border border-[#E5D5D7]">
                 <div>
                   <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Net Take-Home Pay</div>
                   <div className="text-xs text-slate-500">Auto-calculated after statutory deductions</div>
                 </div>
-                <div className="text-xl font-mono font-bold text-[#0058be]">
+                <div className="text-xl font-mono font-bold text-[#722F37]">
                   ₹{Number(viewingPayslip.netPay).toLocaleString()}
                 </div>
               </div>
@@ -773,7 +773,7 @@ export default function PayslipsPage() {
                 </button>
                 <button
                   onClick={() => handleDownloadPdf(viewingPayslip)}
-                  className="px-4 py-1.5 rounded-lg bg-[#0058be] text-white font-bold hover:bg-[#2170e4] text-xs flex items-center gap-1.5 shadow-sm"
+                  className="px-4 py-1.5 rounded-lg bg-[#722F37] text-white font-bold hover:bg-[#5B232A] text-xs flex items-center gap-1.5 shadow-sm"
                 >
                   <span className="material-symbols-outlined text-[16px]">download</span>
                   <span>Download Form T PDF</span>
@@ -793,7 +793,7 @@ export default function PayslipsPage() {
                 <div>
                   <h3 className="font-bold text-lg text-[#0b1c30]">HR Payslip Editor & Custom Sections</h3>
                   <p className="text-xs text-slate-500">
-                    Editing payslip for <span className="font-bold text-[#0058be]">{editingPayslip.employeeName}</span> ({editingPayslip.employeeCode})
+                    Editing payslip for <span className="font-bold text-[#722F37]">{editingPayslip.employeeName}</span> ({editingPayslip.employeeCode})
                   </p>
                 </div>
                 <button
@@ -827,7 +827,7 @@ export default function PayslipsPage() {
                       type="number"
                       value={editForm.basicSalary}
                       onChange={(e) => setEditForm({ ...editForm, basicSalary: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#0058be] focus:outline-none"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#722F37] focus:outline-none"
                     />
                   </div>
                   <div>
@@ -836,7 +836,7 @@ export default function PayslipsPage() {
                       type="number"
                       value={editForm.hra}
                       onChange={(e) => setEditForm({ ...editForm, hra: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#0058be] focus:outline-none"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#722F37] focus:outline-none"
                     />
                   </div>
                   <div>
@@ -845,7 +845,7 @@ export default function PayslipsPage() {
                       type="number"
                       value={editForm.allowances}
                       onChange={(e) => setEditForm({ ...editForm, allowances: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#0058be] focus:outline-none"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#722F37] focus:outline-none"
                     />
                   </div>
                   <div>
@@ -854,7 +854,7 @@ export default function PayslipsPage() {
                       type="number"
                       value={editForm.bonus}
                       onChange={(e) => setEditForm({ ...editForm, bonus: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#0058be] focus:outline-none"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#722F37] focus:outline-none"
                     />
                   </div>
                   <div>
@@ -863,7 +863,7 @@ export default function PayslipsPage() {
                       type="number"
                       value={editForm.earlyIncentive}
                       onChange={(e) => setEditForm({ ...editForm, earlyIncentive: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#0058be] focus:outline-none"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#722F37] focus:outline-none"
                     />
                   </div>
                   <div>
@@ -872,7 +872,7 @@ export default function PayslipsPage() {
                       type="number"
                       value={editForm.overtime}
                       onChange={(e) => setEditForm({ ...editForm, overtime: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#0058be] focus:outline-none"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#722F37] focus:outline-none"
                     />
                   </div>
                 </div>
@@ -891,7 +891,7 @@ export default function PayslipsPage() {
                       type="number"
                       value={editForm.pfDeduction}
                       onChange={(e) => setEditForm({ ...editForm, pfDeduction: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#0058be] focus:outline-none"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#722F37] focus:outline-none"
                     />
                   </div>
                   <div>
@@ -900,7 +900,7 @@ export default function PayslipsPage() {
                       type="number"
                       value={editForm.taxDeduction}
                       onChange={(e) => setEditForm({ ...editForm, taxDeduction: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#0058be] focus:outline-none"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#722F37] focus:outline-none"
                     />
                   </div>
                   <div>
@@ -909,7 +909,7 @@ export default function PayslipsPage() {
                       type="number"
                       value={editForm.lopDeduction}
                       onChange={(e) => setEditForm({ ...editForm, lopDeduction: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#0058be] focus:outline-none"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#722F37] focus:outline-none"
                     />
                   </div>
                   <div>
@@ -918,7 +918,7 @@ export default function PayslipsPage() {
                       type="number"
                       value={editForm.penalties}
                       onChange={(e) => setEditForm({ ...editForm, penalties: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#0058be] focus:outline-none"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-mono focus:border-[#722F37] focus:outline-none"
                     />
                   </div>
                 </div>
@@ -928,7 +928,7 @@ export default function PayslipsPage() {
               <div className="space-y-3 pt-2 border-t border-slate-100">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#0058be] flex items-center gap-1.5">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#722F37] flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[16px]">library_add</span>
                       <span>Dynamic Custom Sections & Blocks</span>
                     </h4>
@@ -939,7 +939,7 @@ export default function PayslipsPage() {
                   <button
                     type="button"
                     onClick={handleAddCustomSection}
-                    className="px-2.5 py-1 text-xs font-bold text-[#0058be] bg-[#eff4ff] hover:bg-[#dce9ff] rounded-lg border border-[#dce9ff] flex items-center gap-1 transition-colors"
+                    className="px-2.5 py-1 text-xs font-bold text-[#722F37] bg-[#F8F4F1] hover:bg-[#E5D5D7] rounded-lg border border-[#E5D5D7] flex items-center gap-1 transition-colors"
                   >
                     <span className="material-symbols-outlined text-[16px]">add</span>
                     <span>+ Add Section</span>
@@ -1035,7 +1035,7 @@ export default function PayslipsPage() {
                       <button
                         type="button"
                         onClick={() => handleAddItemToSection(secIdx)}
-                        className="text-[11px] font-semibold text-[#0058be] hover:underline flex items-center gap-1 pt-1"
+                        className="text-[11px] font-semibold text-[#722F37] hover:underline flex items-center gap-1 pt-1"
                       >
                         <span className="material-symbols-outlined text-[14px]">add</span>
                         <span>Add item to this section</span>
@@ -1052,13 +1052,13 @@ export default function PayslipsPage() {
                   value={editForm.remarks}
                   onChange={(e) => setEditForm({ ...editForm, remarks: e.target.value })}
                   placeholder="e.g. Adjusted overtime pay as approved by floor manager..."
-                  className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:border-[#0058be] focus:outline-none"
+                  className="w-full p-2.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:border-[#722F37] focus:outline-none"
                   rows={2}
                 />
               </div>
 
               {/* Calculation Summary Footer */}
-              <div className="bg-[#eff4ff] p-4 rounded-xl border border-[#dce9ff] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <div className="bg-[#F8F4F1] p-4 rounded-xl border border-[#E5D5D7] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
                 <div>
                   <div className="font-bold text-[#0b1c30]">
                     Gross: ₹{computedGross.toLocaleString()} • Deductions: ₹{computedDeductions.toLocaleString()}
@@ -1067,7 +1067,7 @@ export default function PayslipsPage() {
                 </div>
                 <div className="text-right">
                   <div className="text-[10px] uppercase font-bold text-slate-500">New Net Pay</div>
-                  <div className={`text-xl font-mono font-bold ${computedNet >= 0 ? 'text-[#0058be]' : 'text-red-600'}`}>
+                  <div className={`text-xl font-mono font-bold ${computedNet >= 0 ? 'text-[#722F37]' : 'text-red-600'}`}>
                     ₹{computedNet.toLocaleString()}
                   </div>
                 </div>
@@ -1086,7 +1086,7 @@ export default function PayslipsPage() {
                   type="button"
                   onClick={handleSaveEdit}
                   disabled={savingEdit}
-                  className="px-5 py-2 rounded-lg bg-[#0058be] text-white text-xs font-bold hover:bg-[#2170e4] flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                  className="px-5 py-2 rounded-lg bg-[#722F37] text-white text-xs font-bold hover:bg-[#5B232A] flex items-center gap-1.5 shadow-sm disabled:opacity-50"
                 >
                   <span className="material-symbols-outlined text-[16px]">save</span>
                   <span>{savingEdit ? 'Saving...' : 'Save Payslip Changes'}</span>

@@ -131,14 +131,14 @@ export default function ShiftsRosterPage() {
             <div className="flex items-center gap-1.5 text-slate-400 text-[11px] uppercase tracking-wider font-bold">
               <span>Time & Attendance</span>
               <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-              <span className="text-[#0058be]">Staff Rostering & Shift Allocations</span>
+              <span className="text-[#722F37]">Staff Rostering & Shift Allocations</span>
             </div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-[#0b1c30] tracking-tight">
                 Floor Shifts & Workforce Rosters Dashboard
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-[#eff4ff] text-[#0058be] text-[10px] font-bold uppercase tracking-wider border border-[#dce9ff] flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#0058be]"></span> Roster Synced
+              <span className="px-2.5 py-0.5 rounded-full bg-[#F8F4F1] text-[#722F37] text-[10px] font-bold uppercase tracking-wider border border-[#E5D5D7] flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#722F37]"></span> Roster Synced
               </span>
             </div>
             <p className="text-xs text-slate-500 max-w-3xl">
@@ -149,7 +149,7 @@ export default function ShiftsRosterPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0058be] hover:bg-[#2170e4] text-white shadow-md shadow-[#0058be]/20 transition-all text-xs font-bold"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#722F37] hover:bg-[#5B232A] text-white shadow-md shadow-[#722F37]/20 transition-all text-xs font-bold"
             >
               <span className="material-symbols-outlined text-[18px]">add</span>
               <span>+ Create Floor Shift</span>
@@ -163,11 +163,11 @@ export default function ShiftsRosterPage() {
             type="button"
             onClick={() => openDrill('shift-configs', 'Active Shifts')}
             aria-label="View Floor Shift Regularization details: Active Shifts"
-            className="group bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+            className="group bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/40 hover:bg-[#F8F4F1]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
           >
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Shifts</span>
-              <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center text-[#0058be]">
+              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] flex items-center justify-center text-[#722F37]">
                 <span className="material-symbols-outlined text-[18px]">calendar_view_week</span>
               </div>
             </div>
@@ -175,10 +175,10 @@ export default function ShiftsRosterPage() {
               <div className="text-2xl font-bold text-[#0b1c30]">{shifts.length || 3}</div>
               <div className="text-[11px] text-slate-400">Store Windows Defined</div>
             </div>
-            <div className="pt-2 border-t border-slate-100 text-[11px] text-[#0058be] font-semibold">
+            <div className="pt-2 border-t border-slate-100 text-[11px] text-[#722F37] font-semibold">
               <span>All 4 Locations Active</span>
             </div>
-            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#0058be] transition-colors">
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#722F37] transition-colors">
               <span>View Details</span>
               <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
             </div>
@@ -188,11 +188,11 @@ export default function ShiftsRosterPage() {
             type="button"
             onClick={() => openDrill('shift-roster', 'Total Staff Rostered')}
             aria-label="View Floor Shift Regularization details: Total Staff Rostered"
-            className="group bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+            className="group bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/40 hover:bg-[#F8F4F1]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
           >
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Staff Rostered</span>
-              <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center text-[#0058be]">
+              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] flex items-center justify-center text-[#722F37]">
                 <span className="material-symbols-outlined text-[18px]">badge</span>
               </div>
             </div>
@@ -203,7 +203,7 @@ export default function ShiftsRosterPage() {
             <div className="pt-2 border-t border-slate-100 text-[11px] text-emerald-600 font-semibold">
               <span>No Unassigned Personnel</span>
             </div>
-            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#0058be] transition-colors">
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#722F37] transition-colors">
               <span>View Details</span>
               <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
             </div>
@@ -215,11 +215,11 @@ export default function ShiftsRosterPage() {
               openDrill('shift-roster', 'Shift A (Morning)', shiftByCode('MORNING')?.id, shiftByCode('MORNING')?.name)
             }
             aria-label="View Floor Shift Regularization details: Shift A (Morning)"
-            className="group bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+            className="group bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/40 hover:bg-[#F8F4F1]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
           >
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Shift A (Morning)</span>
-              <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center text-[#0058be]">
+              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] flex items-center justify-center text-[#722F37]">
                 <span className="material-symbols-outlined text-[18px]">wb_sunny</span>
               </div>
             </div>
@@ -230,7 +230,7 @@ export default function ShiftsRosterPage() {
             <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500">
               <span>Primary Floor Retail</span>
             </div>
-            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#0058be] transition-colors">
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#722F37] transition-colors">
               <span>View Details</span>
               <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
             </div>
@@ -242,11 +242,11 @@ export default function ShiftsRosterPage() {
               openDrill('shift-roster', 'Shift B (General)', shiftByCode('GENERAL')?.id, shiftByCode('GENERAL')?.name)
             }
             aria-label="View Floor Shift Regularization details: Shift B (General)"
-            className="group bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+            className="group bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/40 hover:bg-[#F8F4F1]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
           >
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Shift B (General)</span>
-              <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center text-[#0058be]">
+              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] flex items-center justify-center text-[#722F37]">
                 <span className="material-symbols-outlined text-[18px]">schedule</span>
               </div>
             </div>
@@ -257,7 +257,7 @@ export default function ShiftsRosterPage() {
             <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500">
               <span>Weaving & Management</span>
             </div>
-            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#0058be] transition-colors">
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#722F37] transition-colors">
               <span>View Details</span>
               <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
             </div>
@@ -267,7 +267,7 @@ export default function ShiftsRosterPage() {
             type="button"
             onClick={() => openDrill('shift-exceptions', 'Grace Period & Regularization')}
             aria-label="View Floor Shift Regularization details: Grace Period"
-            className="group bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+            className="group bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/40 hover:bg-[#F8F4F1]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
           >
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Grace Period</span>
@@ -282,7 +282,7 @@ export default function ShiftsRosterPage() {
             <div className="pt-2 border-t border-slate-100 text-[11px] text-emerald-600 font-semibold">
               <span>Statutory Rule Enforced</span>
             </div>
-            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#0058be] transition-colors">
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#722F37] transition-colors">
               <span>View Details</span>
               <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
             </div>
@@ -300,7 +300,7 @@ export default function ShiftsRosterPage() {
                   onClick={() => setSelectedLocation(loc.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     selectedLocation === loc.id
-                      ? 'bg-[#0058be] text-white shadow-xs'
+                      ? 'bg-[#722F37] text-white shadow-xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
@@ -320,7 +320,7 @@ export default function ShiftsRosterPage() {
               id="fsr-dept"
               value={selectedDept}
               onChange={(e) => setSelectedDept(e.target.value)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#0058be]/40 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#722F37]/40 cursor-pointer"
             >
               <option value="all">All Departments</option>
               {departments.map((d) => (
@@ -335,7 +335,7 @@ export default function ShiftsRosterPage() {
               id="fsr-shift"
               value={selectedShift}
               onChange={(e) => setSelectedShift(e.target.value)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#0058be]/40 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#722F37]/40 cursor-pointer"
             >
               <option value="all">All Shifts</option>
               {shifts.map((s) => (
@@ -350,7 +350,7 @@ export default function ShiftsRosterPage() {
               id="fsr-status"
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#0058be]/40 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#722F37]/40 cursor-pointer"
             >
               <option value="all">All Statuses</option>
               <option value="ACTIVE">Active</option>
@@ -368,7 +368,7 @@ export default function ShiftsRosterPage() {
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#0058be]/40 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-[#722F37]/40 cursor-pointer"
             />
           </div>
 
@@ -390,12 +390,12 @@ export default function ShiftsRosterPage() {
                   openDrill('shift-roster', `Shift: ${s.name}`, s.id, s.name);
                 }
               }}
-              className="group bg-white rounded-xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/30 transition-all flex flex-col justify-between cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+              className="group bg-white rounded-xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md hover:border-[#722F37]/40 hover:bg-[#F8F4F1]/30 transition-all flex flex-col justify-between cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
             >
               <div>
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="text-[10px] font-mono font-bold text-[#0058be] bg-[#eff4ff] px-2 py-0.5 rounded border border-[#dce9ff]">
+                    <span className="text-[10px] font-mono font-bold text-[#722F37] bg-[#F8F4F1] px-2 py-0.5 rounded border border-[#E5D5D7]">
                       {s.code || 'SHIFT-A'}
                     </span>
                     <h3 className="text-base font-bold text-[#0b1c30] mt-1.5">{s.name}</h3>
@@ -415,7 +415,7 @@ export default function ShiftsRosterPage() {
                   </div>
                   <div className="flex items-center justify-between text-slate-600 px-1">
                     <span>Grace Period:</span>
-                    <span className="font-bold text-[#0058be]">{s.gracePeriod || 5} Mins</span>
+                    <span className="font-bold text-[#722F37]">{s.gracePeriod || 5} Mins</span>
                   </div>
                   <div className="flex items-center justify-between text-slate-600 px-1">
                     <span>Late Threshold:</span>
@@ -431,13 +431,13 @@ export default function ShiftsRosterPage() {
                     e.stopPropagation();
                     toast.success(`Shift ${s.name} details verified`);
                   }}
-                  className="font-semibold text-[#0058be] hover:underline flex items-center gap-1"
+                  className="font-semibold text-[#722F37] hover:underline flex items-center gap-1"
                 >
                   <span>Edit Roster Rules</span>
                   <span className="material-symbols-outlined text-[14px]">chevron_right</span>
                 </button>
               </div>
-              <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#0058be] transition-colors">
+              <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-[#722F37] transition-colors">
                 <span>View Roster Details</span>
                 <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
               </div>
@@ -451,7 +451,7 @@ export default function ShiftsRosterPage() {
             <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-md w-full p-6 space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#0058be] text-[20px]">calendar_view_week</span>
+                  <span className="material-symbols-outlined text-[#722F37] text-[20px]">calendar_view_week</span>
                   <h3 className="font-bold text-base text-[#0b1c30]">Create New Floor Shift</h3>
                 </div>
                 <button
@@ -542,7 +542,7 @@ export default function ShiftsRosterPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-1.5 text-xs bg-[#0058be] hover:bg-[#2170e4] text-white rounded-lg font-bold shadow-sm"
+                    className="px-4 py-1.5 text-xs bg-[#722F37] hover:bg-[#5B232A] text-white rounded-lg font-bold shadow-sm"
                   >
                     Save Floor Shift
                   </button>

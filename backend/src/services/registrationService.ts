@@ -12,6 +12,14 @@ export interface RegistrationInput {
   employeeId?: string;
 }
 
+export interface RegistrationResult {
+  userId: string;
+  email: string;
+  fullName: string;
+  role: string;
+  locationId?: string;
+}
+
 export class RegistrationService {
   private static readonly TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -19,7 +27,7 @@ export class RegistrationService {
    * Submit registration for a new account.
    * Creates user in PENDING_EMAIL_VERIFICATION status and dispatches verification email.
    */
-  public static async registerUser(input: RegistrationInput): Promise<{ userId: string; email: string }> {
+  public static async registerUser(input: RegistrationInput): Promise<RegistrationResult> {
     const cleanEmail = (input.email || '').trim().toLowerCase();
 
     // 1. Check uniqueness
@@ -78,7 +86,13 @@ export class RegistrationService {
       token: rawToken,
     }).catch((err) => console.error('[RegistrationService] Failed to send verification email:', err));
 
-    return { userId: user.id, email: user.email };
+    return { 
+      userId: user.id, 
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+      locationId: user.locationId || undefined
+    };
   }
 
   /**

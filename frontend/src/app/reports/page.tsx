@@ -291,7 +291,7 @@ export default function ReportsPage() {
             type="button"
             onClick={() => openDrill('muster', 'Muster Attendance')}
             aria-label="View Monthly Report details: Muster Attendance"
-            className="group bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+            className="group bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/40 hover:bg-[#F8F4F1]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
           >
             <div className="flex items-center justify-between mb-space-sm">
               <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-bold">Muster Attendance</span>
@@ -311,7 +311,7 @@ export default function ReportsPage() {
             type="button"
             onClick={() => openDrill('face', 'Biometric Optical SLA')}
             aria-label="View Monthly Report details: Biometric Optical SLA"
-            className="group bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+            className="group bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/40 hover:bg-[#F8F4F1]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
           >
             <div className="flex items-center justify-between mb-space-sm">
               <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-bold">Biometric Optical SLA</span>
@@ -331,7 +331,7 @@ export default function ReportsPage() {
             type="button"
             onClick={() => openDrill('qr', 'Canteen QR Tokens')}
             aria-label="View Monthly Report details: Canteen QR Tokens"
-            className="group bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+            className="group bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/40 hover:bg-[#F8F4F1]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
           >
             <div className="flex items-center justify-between mb-space-sm">
               <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-bold">Canteen QR Tokens</span>
@@ -351,7 +351,7 @@ export default function ReportsPage() {
             type="button"
             onClick={() => openDrill('incentives', 'Festive Incentives')}
             aria-label="View Monthly Report details: Festive Incentives"
-            className="group bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+            className="group bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/40 hover:bg-[#F8F4F1]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
           >
             <div className="flex items-center justify-between mb-space-sm">
               <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-bold">Festive Incentives</span>
@@ -371,7 +371,7 @@ export default function ReportsPage() {
             type="button"
             onClick={() => openDrill('compliance', 'Statutory Form F/T')}
             aria-label="View Monthly Report details: Statutory Form F/T"
-            className="group bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#0058be]/40 hover:bg-[#eff4ff]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0058be] focus-visible:ring-offset-2"
+            className="group bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/40 hover:bg-[#F8F4F1]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
           >
             <div className="flex items-center justify-between mb-space-sm">
               <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-bold">Statutory Form F/T</span>
@@ -558,7 +558,7 @@ export default function ReportsPage() {
                         }}
                         className={`transition-colors ${
                           clickable
-                            ? 'cursor-pointer group hover:bg-[#eff4ff]/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#0058be]'
+                            ? 'cursor-pointer group hover:bg-[#F8F4F1]/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#722F37]'
                             : 'hover:bg-surface-container-low/50'
                         }`}
                       >

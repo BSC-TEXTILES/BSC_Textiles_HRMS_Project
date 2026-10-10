@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { Logo } from '@/components/ui/Logo';
+import { ShieldAlert, LayoutDashboard, User, LogOut } from 'lucide-react';
 
 function ForbiddenContent() {
   const searchParams = useSearchParams();
@@ -15,61 +16,61 @@ function ForbiddenContent() {
   const userName = session?.user?.name || 'Workspace User';
 
   return (
-    <div className="min-h-screen bg-[#f8f9ff] flex flex-col justify-between p-6">
+    <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#111317] flex flex-col justify-between p-6">
       {/* Top Navbar Header */}
       <header className="max-w-6xl w-full mx-auto flex items-center justify-between py-4">
         <div className="flex items-center gap-3">
           <Logo variant="icon" size="sm" />
           <div className="flex flex-col">
-            <span className="text-base font-bold tracking-tight text-[#0b1c30]">BSC Textiles Pvt Ltd</span>
-            <span className="text-[10px] font-bold tracking-wider uppercase text-slate-400">Enterprise HRMS & Security</span>
+            <span className="text-base font-bold tracking-tight text-[#18181B] dark:text-white">BSC Textiles Pvt Ltd</span>
+            <span className="text-[10px] font-bold tracking-wider uppercase text-slate-400">Enterprise Access Control</span>
           </div>
         </div>
-        <div className="text-xs font-semibold px-3 py-1.5 rounded-full bg-red-50 text-red-600 border border-red-200 flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          Security Boundary Enforced
+        <div className="text-xs font-semibold px-3 py-1.5 rounded-full bg-red-50 text-red-700 border border-red-200 flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-red-600" />
+          Access Restricted
         </div>
       </header>
 
       {/* Main 403 Card */}
-      <main className="max-w-xl w-full mx-auto my-auto bg-white rounded-2xl border border-slate-200/80 shadow-[0_20px_50px_rgba(11,28,48,0.06)] p-8 sm:p-10 text-center relative overflow-hidden">
+      <main className="max-w-xl w-full mx-auto my-auto bg-white dark:bg-[#161920] rounded-xl border border-slate-200 dark:border-[#272A30] shadow-xs p-8 sm:p-10 text-center relative overflow-hidden">
         {/* Decorative Top Accent Bar */}
-        <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-red-500 via-amber-500 to-[#0058be]" />
+        <div className="absolute top-0 left-0 right-0 h-1 bg-[#722F37]" />
 
         {/* Shield / Lock Icon */}
-        <div className="w-20 h-20 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center mx-auto mb-6 text-red-600 shadow-sm">
-          <span className="material-symbols-outlined text-[42px]">gpp_maybe</span>
+        <div className="w-16 h-16 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/40 flex items-center justify-center mx-auto mb-6 text-red-600 shadow-xs">
+          <ShieldAlert className="w-8 h-8" />
         </div>
 
-        <span className="inline-block px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-red-100 text-red-700 mb-3">
-          HTTP 403 • Access Forbidden
+        <span className="inline-block px-3 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-red-50 text-red-700 border border-red-200 mb-3">
+          HTTP 403 • Access Restricted
         </span>
 
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0b1c30] tracking-tight mb-3">
-          Role Privileges Insufficient
+        <h1 className="text-2xl font-bold text-[#18181B] dark:text-white tracking-tight mb-2">
+          Insufficient Role Permissions
         </h1>
 
-        <p className="text-sm text-slate-600 leading-relaxed mb-6">
+        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed mb-6">
           Your current account role does not have authorization to view or manipulate resources at this endpoint.
-          BSC Textiles enforces strict server-side and client-side <strong className="text-slate-800">Role-Based Access Control (RBAC)</strong>.
+          BSC Textiles enforces enterprise <strong className="text-slate-700 dark:text-slate-300">Role-Based Access Control (RBAC)</strong>.
         </p>
 
         {/* User Identity Context Card */}
-        <div className="bg-slate-50 rounded-xl p-4 text-left border border-slate-200/60 mb-6 space-y-2">
+        <div className="bg-slate-50 dark:bg-slate-900/40 rounded-lg p-4 text-left border border-slate-200 dark:border-slate-800 mb-6 space-y-2">
           <div className="flex justify-between items-center text-xs">
             <span className="text-slate-500 font-medium">Active Account:</span>
-            <span className="font-semibold text-slate-800">{userName}</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-200">{userName}</span>
           </div>
           <div className="flex justify-between items-center text-xs">
             <span className="text-slate-500 font-medium">Assigned Role:</span>
-            <span className="font-bold text-[#0058be] uppercase px-2 py-0.5 rounded bg-blue-50 border border-blue-100">
+            <span className="font-bold text-[#722F37] uppercase px-2 py-0.5 rounded bg-[#722F37]/10 border border-[#722F37]/20">
               {userRole}
             </span>
           </div>
           {attemptedPath && (
-            <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200/60">
+            <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-200 dark:border-slate-800">
               <span className="text-slate-500 font-medium">Target Path:</span>
-              <code className="text-red-600 bg-red-50 px-1.5 py-0.5 rounded font-mono text-[11px] truncate max-w-[240px]">
+              <code className="text-red-700 bg-red-50 px-1.5 py-0.5 rounded font-mono text-[11px] truncate max-w-[240px]">
                 {attemptedPath}
               </code>
             </div>
@@ -80,18 +81,18 @@ function ForbiddenContent() {
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             href="/dashboard"
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#0058be] text-white text-xs font-semibold hover:bg-[#00489c] transition-all shadow-md shadow-blue-500/20 active:scale-95"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#722F37] text-white text-xs font-semibold hover:bg-[#5B232A] transition-all shadow-xs"
           >
-            <span className="material-symbols-outlined text-[18px]">dashboard</span>
-            Return to Dashboard
+            <LayoutDashboard className="w-4 h-4" />
+            Dashboard
           </Link>
 
           <Link
             href="/my-desk"
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200 transition-all active:scale-95"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-all"
           >
-            <span className="material-symbols-outlined text-[18px]">person</span>
-            My Desk Self-Service
+            <User className="w-4 h-4" />
+            My Desk
           </Link>
 
           <button
@@ -105,10 +106,10 @@ function ForbiddenContent() {
               }
               signOut({ callbackUrl: '/login' });
             }}
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-slate-300 text-slate-600 text-xs font-semibold hover:bg-slate-50 transition-all active:scale-95"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg border border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold transition-all"
           >
-            <span className="material-symbols-outlined text-[18px]">logout</span>
-            Switch Account
+            <LogOut className="w-4 h-4" />
+            Sign Out
           </button>
         </div>
       </main>
@@ -124,8 +125,8 @@ function ForbiddenContent() {
 export default function ForbiddenPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#f8f9ff] flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-[#0058be] border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#111317] flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-[#722F37] border-t-transparent rounded-full animate-spin" />
       </div>
     }>
       <ForbiddenContent />

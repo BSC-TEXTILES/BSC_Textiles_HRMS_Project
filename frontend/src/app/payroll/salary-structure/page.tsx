@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import { ChevronRight, Plus, Wallet, X } from 'lucide-react';
 
 interface SalaryStructure {
   id: string;
@@ -83,17 +84,17 @@ export default function SalaryStructurePage() {
         {/* Top Header & Breadcrumb */}
         <div className="flex flex-col md:flex-row md:items-end justify-between pb-1 gap-4">
           <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1.5 text-slate-400 text-[11px] uppercase tracking-wider font-bold">
+            <div className="flex items-center gap-1.5 text-slate-400 text-[11px] uppercase tracking-wider font-semibold">
               <span>Payroll Management</span>
-              <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-              <span className="text-[#0058be]">Salary Cadres & Compensation Policy</span>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-[#722F37] font-bold">Salary Cadres & Compensation Policy</span>
             </div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-[#0b1c30] tracking-tight">
+              <h1 className="text-2xl font-bold text-[#18181B] tracking-tight">
                 Salary Structure & Grade Cadres
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-[#0058be] text-[10px] font-bold uppercase tracking-wider border border-blue-200 flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#0058be]"></span> Statutory Scales
+              <span className="px-2.5 py-0.5 rounded-full bg-[#722F37]/10 text-[#722F37] text-[10px] font-bold uppercase tracking-wider border border-[#722F37]/20 flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#722F37]"></span> Statutory Scales
               </span>
             </div>
             <p className="text-xs text-slate-500 max-w-3xl">
@@ -104,9 +105,9 @@ export default function SalaryStructurePage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setOpenModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0058be] hover:bg-[#2170e4] text-white shadow-md shadow-[#0058be]/20 transition-all text-xs font-bold"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#722F37] hover:bg-[#5B232A] text-white shadow-xs transition-all text-xs font-bold"
             >
-              <span className="material-symbols-outlined text-[18px]">add</span>
+              <Plus className="w-4 h-4" />
               <span>+ Create Salary Cadre</span>
             </button>
           </div>
@@ -126,18 +127,18 @@ export default function SalaryStructurePage() {
               return (
                 <div
                   key={s.id}
-                  className="bg-white rounded-xl border border-slate-200/80 shadow-xs hover:border-[#0058be]/40 transition-all p-5 flex flex-col justify-between space-y-4"
+                  className="bg-white rounded-xl border border-slate-200 shadow-xs hover:border-[#722F37]/40 transition-all p-5 flex flex-col justify-between space-y-4"
                 >
                   <div>
                     <div className="flex items-start justify-between">
                       <div>
-                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-blue-50 text-[#0058be] border border-blue-100">
+                        <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-[#722F37]/10 text-[#722F37] border border-[#722F37]/20">
                           {s.cadre || 'GRADE'}
                         </span>
-                        <h3 className="font-bold text-base text-[#0b1c30] mt-1.5">{s.name}</h3>
+                        <h3 className="font-bold text-base text-[#18181B] mt-1.5">{s.name}</h3>
                       </div>
-                      <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center text-[#0058be]">
-                        <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
+                      <div className="w-8 h-8 rounded-lg bg-[#722F37]/10 flex items-center justify-center text-[#722F37]">
+                        <Wallet className="w-4 h-4" />
                       </div>
                     </div>
                     {s.description && (
@@ -148,7 +149,7 @@ export default function SalaryStructurePage() {
                   <div className="space-y-2 border-t border-b border-slate-100 py-3 text-xs">
                     <div className="flex justify-between">
                       <span className="text-slate-500">Base Salary:</span>
-                      <span className="font-mono font-bold text-[#0b1c30]">₹{Number(s.basicSalary).toLocaleString()}</span>
+                      <span className="font-mono font-bold text-[#18181B]">₹{Number(s.basicSalary).toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">HRA ({s.hraPercent}%):</span>
@@ -158,7 +159,7 @@ export default function SalaryStructurePage() {
                       <span className="text-slate-500">Fixed Allowances:</span>
                       <span className="font-mono font-semibold text-slate-700">₹{Number(s.allowances).toLocaleString()}</span>
                     </div>
-                    <div className="flex justify-between text-red-600">
+                    <div className="flex justify-between text-red-700">
                       <span>PF Contribution ({s.pfPercent}%):</span>
                       <span className="font-mono font-semibold">-₹{pfAmount.toLocaleString()}</span>
                     </div>
@@ -167,7 +168,7 @@ export default function SalaryStructurePage() {
                   <div className="flex items-center justify-between pt-1">
                     <div>
                       <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Estimated Take-Home</div>
-                      <div className="text-lg font-mono font-bold text-[#0058be]">
+                      <div className="text-lg font-mono font-bold text-[#722F37]">
                         ₹{netEst.toLocaleString()}<span className="text-xs text-slate-400 font-normal">/mo</span>
                       </div>
                     </div>
@@ -184,14 +185,14 @@ export default function SalaryStructurePage() {
         {/* MODAL TO ADD NEW CADRE */}
         {openModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4">
+            <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#0058be] text-[22px]">add_circle</span>
-                  <h3 className="font-bold text-base text-[#0b1c30]">Create Salary Structure Cadre</h3>
+                  <Wallet className="w-5 h-5 text-[#722F37]" />
+                  <h3 className="font-bold text-base text-[#18181B]">Create Salary Structure Cadre</h3>
                 </div>
                 <button onClick={() => setOpenModal(false)} className="text-slate-400 hover:text-slate-600 p-1">
-                  <span className="material-symbols-outlined text-[18px]">close</span>
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
@@ -204,7 +205,7 @@ export default function SalaryStructurePage() {
                     placeholder="e.g. Senior Merchandiser Grade 2"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#0058be] focus:outline-none"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#722F37] focus:outline-none"
                   />
                 </div>
 
@@ -217,7 +218,7 @@ export default function SalaryStructurePage() {
                       placeholder="e.g. CADRE-MERCH-02"
                       value={formData.cadre}
                       onChange={(e) => setFormData({ ...formData, cadre: e.target.value })}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#0058be] focus:outline-none uppercase font-mono"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#722F37] focus:outline-none uppercase font-mono"
                     />
                   </div>
                   <div>
@@ -227,7 +228,7 @@ export default function SalaryStructurePage() {
                       required
                       value={formData.basicSalary}
                       onChange={(e) => setFormData({ ...formData, basicSalary: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#0058be] focus:outline-none font-mono"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#722F37] focus:outline-none font-mono"
                     />
                   </div>
                 </div>
@@ -240,7 +241,7 @@ export default function SalaryStructurePage() {
                       required
                       value={formData.hraPercent}
                       onChange={(e) => setFormData({ ...formData, hraPercent: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#0058be] focus:outline-none font-mono"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#722F37] focus:outline-none font-mono"
                     />
                   </div>
                   <div>
@@ -250,7 +251,7 @@ export default function SalaryStructurePage() {
                       required
                       value={formData.allowances}
                       onChange={(e) => setFormData({ ...formData, allowances: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#0058be] focus:outline-none font-mono"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#722F37] focus:outline-none font-mono"
                     />
                   </div>
                   <div>
@@ -260,7 +261,7 @@ export default function SalaryStructurePage() {
                       required
                       value={formData.pfPercent}
                       onChange={(e) => setFormData({ ...formData, pfPercent: Number(e.target.value) })}
-                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#0058be] focus:outline-none font-mono"
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#722F37] focus:outline-none font-mono"
                     />
                   </div>
                 </div>
@@ -272,7 +273,7 @@ export default function SalaryStructurePage() {
                     placeholder="Criteria, showroom roles, and minimum experience..."
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#0058be] focus:outline-none"
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg focus:border-[#722F37] focus:outline-none"
                   />
                 </div>
 
@@ -280,14 +281,14 @@ export default function SalaryStructurePage() {
                   <button
                     type="button"
                     onClick={() => setOpenModal(false)}
-                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50"
+                    className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={saving}
-                    className="px-4 py-1.5 rounded-lg bg-[#0058be] text-white font-bold hover:bg-[#2170e4] disabled:opacity-50"
+                    className="px-4 py-1.5 rounded-lg bg-[#722F37] text-white font-bold hover:bg-[#5B232A] disabled:opacity-50 transition-colors"
                   >
                     {saving ? 'Saving...' : 'Save Cadre'}
                   </button>

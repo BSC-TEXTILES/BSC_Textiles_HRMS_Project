@@ -54,10 +54,10 @@ export function Logo({ variant = 'full', size = 'md', className, showText = true
         </div>
         {showText && (
           <div className="flex flex-col leading-tight">
-            <span className={cn('font-display font-black tracking-tight text-[#0b1c30]', textSize)}>
+            <span className={cn('font-display font-black tracking-tight text-[#18181B] dark:text-slate-100', textSize)}>
               BSC Textiles
             </span>
-            <span className="text-[10px] font-bold tracking-wider uppercase text-[#0058be]">
+            <span className="text-[10px] font-bold tracking-wider uppercase text-[#722F37] dark:text-[#E8DCC6]">
               Since 1938
             </span>
           </div>
@@ -85,10 +85,10 @@ export function Logo({ variant = 'full', size = 'md', className, showText = true
 
   return (
     <div className={cn('flex flex-col leading-tight', className)}>
-      <span className={cn('font-display font-black tracking-tight text-[#0b1c30]', textSize)}>
+      <span className={cn('font-display font-black tracking-tight text-[#18181B] dark:text-slate-100', textSize)}>
         BSC Textiles
       </span>
-      <span className="text-[10px] font-bold tracking-wider uppercase text-[#0058be]">
+      <span className="text-[10px] font-bold tracking-wider uppercase text-[#722F37] dark:text-[#E8DCC6]">
         Since 1938
       </span>
     </div>

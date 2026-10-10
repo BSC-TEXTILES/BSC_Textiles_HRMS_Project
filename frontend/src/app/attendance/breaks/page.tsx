@@ -55,14 +55,14 @@ export default function AttendanceBreaksPage() {
             <div className="flex items-center gap-1.5 text-slate-400 text-[11px] uppercase tracking-wider font-bold">
               <span>Time & Attendance</span>
               <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-              <span className="text-[#0058be]">Floor Breaks Governance & Telemetry</span>
+              <span className="text-[#722F37]">Floor Breaks Governance & Telemetry</span>
             </div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-[#0b1c30] tracking-tight">
                 Lunch & Break Tracker Dashboard
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-[#eff4ff] text-[#0058be] text-[10px] font-bold uppercase tracking-wider border border-[#dce9ff] flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#0058be] animate-pulse"></span> Policy Compliant
+              <span className="px-2.5 py-0.5 rounded-full bg-[#F8F4F1] text-[#722F37] text-[10px] font-bold uppercase tracking-wider border border-[#E5D5D7] flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#722F37] animate-pulse"></span> Policy Compliant
               </span>
             </div>
             <p className="text-xs text-slate-500 max-w-3xl">
@@ -96,7 +96,7 @@ export default function AttendanceBreaksPage() {
           <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active On Break</span>
-              <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center text-[#0058be]">
+              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] flex items-center justify-center text-[#722F37]">
                 <span className="material-symbols-outlined text-[18px]">timelapse</span>
               </div>
             </div>
@@ -112,7 +112,7 @@ export default function AttendanceBreaksPage() {
           <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lunch Sessions</span>
-              <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center text-[#0058be]">
+              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] flex items-center justify-center text-[#722F37]">
                 <span className="material-symbols-outlined text-[18px]">restaurant</span>
               </div>
             </div>
@@ -122,7 +122,7 @@ export default function AttendanceBreaksPage() {
               </div>
               <div className="text-[11px] text-slate-400">45-Minute Window</div>
             </div>
-            <div className="pt-2 border-t border-slate-100 text-[11px] text-[#0058be] font-semibold">
+            <div className="pt-2 border-t border-slate-100 text-[11px] text-[#722F37] font-semibold">
               <span>100% Policy Adherence</span>
             </div>
           </div>
@@ -130,7 +130,7 @@ export default function AttendanceBreaksPage() {
           <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Tea Sessions</span>
-              <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center text-[#0058be]">
+              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] flex items-center justify-center text-[#722F37]">
                 <span className="material-symbols-outlined text-[18px]">coffee</span>
               </div>
             </div>
@@ -164,7 +164,7 @@ export default function AttendanceBreaksPage() {
           <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Break Time</span>
-              <div className="w-8 h-8 rounded-lg bg-[#eff4ff] flex items-center justify-center text-[#0058be]">
+              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] flex items-center justify-center text-[#722F37]">
                 <span className="material-symbols-outlined text-[18px]">timer</span>
               </div>
             </div>
@@ -184,7 +184,7 @@ export default function AttendanceBreaksPage() {
             <select
               value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#0058be]"
+              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#722F37]"
             >
               <option value="">All Break Types</option>
               <option value="LUNCH">Lunch Break (45 Mins)</option>
@@ -194,7 +194,7 @@ export default function AttendanceBreaksPage() {
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#0058be]"
+              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#722F37]"
             >
               <option value="">All Statuses</option>
               <option value="ACTIVE">Currently Active</option>
@@ -214,8 +214,8 @@ export default function AttendanceBreaksPage() {
             </button>
           </div>
 
-          <div className="inline-flex items-center gap-2 text-xs text-slate-500 bg-[#eff4ff] px-3 py-1.5 rounded-lg border border-[#dce9ff]">
-            <span className="material-symbols-outlined text-[16px] text-[#0058be]">policy</span>
+          <div className="inline-flex items-center gap-2 text-xs text-slate-500 bg-[#F8F4F1] px-3 py-1.5 rounded-lg border border-[#E5D5D7]">
+            <span className="material-symbols-outlined text-[16px] text-[#722F37]">policy</span>
             <span>Statutory Cap: Lunch 45m • Tea 20m • 3m Grace Buffer</span>
           </div>
         </div>
@@ -224,7 +224,7 @@ export default function AttendanceBreaksPage() {
         <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
           <div className="p-4 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#0058be] text-[20px]">coffee</span>
+              <span className="material-symbols-outlined text-[#722F37] text-[20px]">coffee</span>
               <h2 className="text-sm font-bold text-[#0b1c30]">Break Telemetry & Compliance Ledger</h2>
               <span className="text-xs text-slate-400">({breaks.length} Records)</span>
             </div>
@@ -238,7 +238,7 @@ export default function AttendanceBreaksPage() {
               <div className="p-12 text-center text-slate-400">No break records found.</div>
             ) : (
               <table className="w-full text-left text-xs">
-                <thead className="bg-[#eff4ff]/60 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-100 tracking-wider">
+                <thead className="bg-[#F8F4F1]/60 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-100 tracking-wider">
                   <tr>
                     <th className="py-3 px-4">Employee</th>
                     <th className="py-3 px-4">Break Type</th>
@@ -284,7 +284,7 @@ export default function AttendanceBreaksPage() {
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-600">
                           {b.endTime ? new Date(b.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (
-                            <span className="text-[#0058be] font-bold">Active Now</span>
+                            <span className="text-[#722F37] font-bold">Active Now</span>
                           )}
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-500">

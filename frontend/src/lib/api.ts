@@ -107,6 +107,9 @@ api.interceptors.response.use(
         const redirectTarget = `/login?callbackUrl=${encodeURIComponent(pathname + window.location.search)}`;
         window.location.href = redirectTarget;
       }
+
+      // Mark the error as auth-handled to allow callers to suppress noisy console logs
+      error.isHandled401 = true;
     }
     return Promise.reject(error);
   }
@@ -159,6 +162,13 @@ api.get = (function (url: string, config?: any): Promise<any> {
         });
       }
       return response;
+    })
+    .catch((err: any) => {
+      // If we are redirecting to /login due to 401, absorb the GET error gracefully
+      if (err?.response?.status === 401 && (isRedirecting || (typeof window !== 'undefined' && window.location.pathname.startsWith('/login')))) {
+        return { data: {}, status: 401, isHandled401: true };
+      }
+      return Promise.reject(err);
     })
     .finally(() => {
       inFlightRequests.delete(cacheKey);
