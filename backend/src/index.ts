@@ -48,6 +48,7 @@ import { staffOpsRouter, observationLevelsRouter } from './routes/workerOps.js';
 import { securityHeaders } from './middleware/securityHeaders.js';
 import { csrfProtection } from './middleware/csrfProtection.js';
 import { timingMiddleware } from './middleware/timing.js';
+import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -174,16 +175,8 @@ app.use('/api/exits', exitRoutes);
 app.use('/api/leaves', leaveRoutes);
 app.use('/api/mobile', mobileRoutes);
 
-// Safe Production Error Handler
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('[Error caught by global handler]:', err);
-
-  const isProd = process.env.NODE_ENV === 'production';
-  res.status(500).json({
-    error: 'Internal server error',
-    message: isProd ? 'An unexpected error occurred. Please contact system administrator.' : err.message,
-  });
-});
+// Centralized Enterprise Error Handler
+app.use(errorHandler);
 
 io.on('connection', (socket) => {
   const userId = socket.handshake.auth?.userId || socket.handshake.query?.userId;

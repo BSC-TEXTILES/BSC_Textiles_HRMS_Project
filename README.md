@@ -20,6 +20,15 @@ Weaving Dreams, Building Futures
 
 ---
 
+### 📚 Authoritative Architecture & Technical Documentation
+- 🏛️ **[System Architecture & Design (ARCHITECTURE.md)](ARCHITECTURE.md)**
+- ⚙️ **[Technical Stack & Specifications (TECHNICAL_REQUIREMENTS.md)](TECHNICAL_REQUIREMENTS.md)**
+- 🔌 **[API Documentation & Contracts (API_DOCUMENTATION.md)](API_DOCUMENTATION.md)**
+- 📋 **[Changelog & Release Notes (CHANGELOG.md)](CHANGELOG.md)**
+- 📝 **[Project Change Memory (docs/change-memory/)](docs/change-memory/)**
+
+---
+
 ## Table of Contents
 
 1. [Project Overview](#1-project-overview)
