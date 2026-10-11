@@ -342,27 +342,27 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#070c18] dark:bg-[#070c18] text-slate-100 font-sans antialiased">
+    <div className="min-h-screen bg-[#f4f6fa] dark:bg-[#070c18] text-[#0b1c30] dark:text-slate-100 font-sans antialiased transition-colors duration-200">
       {/* SIDEBAR (Desktop) */}
       <aside 
         className={`fixed left-0 top-0 h-full ${
           isCollapsed ? 'w-20' : 'w-64'
-        } bg-[#090f1d] border-r border-[#152038] text-slate-200 shadow-[0_1px_4px_rgba(0,0,0,0.3)] z-50 flex flex-col justify-between overflow-y-auto no-scrollbar hidden lg:flex transition-all duration-200 ease-in-out`}
+        } bg-white dark:bg-[#090f1d] border-r border-slate-200/90 dark:border-[#152038] text-slate-700 dark:text-slate-200 shadow-sm dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)] z-50 flex flex-col justify-between overflow-y-auto no-scrollbar hidden lg:flex transition-all duration-200 ease-in-out`}
       >
         <div className="flex flex-col">
           {/* Top Logo Brand Header */}
           <div className={`h-14 flex items-center ${
             isCollapsed ? 'justify-center px-2' : 'px-4'
-          } bg-[#090f1d] border-b border-[#152038] flex-shrink-0 transition-all`}>
+          } bg-white dark:bg-[#090f1d] border-b border-slate-200/80 dark:border-[#152038] flex-shrink-0 transition-all`}>
             <div className={`flex items-center overflow-hidden ${isCollapsed ? '' : 'gap-2.5'}`}>
-              <div className="w-8 h-8 rounded-full bg-white p-1 flex items-center justify-center shrink-0 shadow-sm overflow-hidden">
+              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-white p-1 flex items-center justify-center shrink-0 shadow-xs border border-slate-200/60 dark:border-transparent overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/images/bsc_logo.png" alt="BSC Textiles" className="w-full h-full object-contain" />
               </div>
               {!isCollapsed && (
                 <div className="flex flex-col leading-tight truncate">
-                  <span className="text-[14px] font-bold tracking-tight text-white truncate">BSC Textiles</span>
-                  <span className="text-[9px] font-bold tracking-wider uppercase text-[#3b82f6]">Since 1938</span>
+                  <span className="text-[14px] font-bold tracking-tight text-[#0b1c30] dark:text-white truncate">BSC Textiles</span>
+                  <span className="text-[9px] font-bold tracking-wider uppercase text-[#0058be] dark:text-[#3b82f6]">Since 1938</span>
                 </div>
               )}
             </div>
@@ -373,11 +373,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             {visibleNavigation.map((section) => (
               <div key={section.title} className="mb-2">
                 {!isCollapsed ? (
-                  <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 truncate">
+                  <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 truncate">
                     {section.title}
                   </div>
                 ) : (
-                  <div className="my-2 border-t border-[#152038] mx-1" title={section.title} />
+                  <div className="my-2 border-t border-slate-200 dark:border-[#152038] mx-1" title={section.title} />
                 )}
                 <div className="space-y-0.5">
                   {section.items.map((item) => {
@@ -394,13 +394,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                         } rounded-lg text-xs transition-all ${
                           isActive
                             ? 'bg-[#0058be] text-white font-semibold shadow-sm'
-                            : 'text-slate-300 hover:text-white hover:bg-slate-800/60 font-medium'
+                            : 'text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/60 font-medium'
                         }`}
                       >
-                        <IconComponent className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                        <IconComponent className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-400 dark:text-slate-400 group-hover:text-[#0058be] dark:group-hover:text-white'}`} />
                         {!isCollapsed && <span className="truncate flex-1">{item.title}</span>}
                         {!isCollapsed && item.badge && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-[#14264d] text-blue-300 border border-blue-700/50">
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-50 dark:bg-[#14264d] text-[#0058be] dark:text-blue-300 border border-blue-200 dark:border-blue-700/50">
                             {item.badge}
                           </span>
                         )}
@@ -414,10 +414,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Bottom Application Meta & Sign Out */}
-        <div className="p-3 border-t border-[#152038] bg-[#090f1d] space-y-2">
+        <div className="p-3 border-t border-slate-200 dark:border-[#152038] bg-white dark:bg-[#090f1d] space-y-2">
           {!isCollapsed ? (
-            <div className="px-3 py-2 bg-[#0e172a] rounded-lg border border-[#1e2d4d]">
-              <div className="text-[11px] font-semibold text-slate-200">BSC Textiles Pvt. Ltd.</div>
+            <div className="px-3 py-2 bg-slate-50 dark:bg-[#0e172a] rounded-lg border border-slate-200 dark:border-[#1e2d4d]">
+              <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">BSC Textiles Pvt. Ltd.</div>
               <div className="text-[10px] text-slate-400 font-mono">HRMS Enterprise v2.4</div>
             </div>
           ) : (
@@ -430,7 +430,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             onClick={handleSignOut}
             className={`w-full flex items-center justify-center ${
               isCollapsed ? 'p-2' : 'gap-2 px-3 py-1.5'
-            } rounded-lg text-xs font-semibold text-slate-400 hover:text-red-400 hover:bg-red-950/30 transition-colors`}
+            } rounded-lg text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors`}
             title={isCollapsed ? "Sign Out" : undefined}
           >
             <LogOut className="w-4 h-4" />
@@ -511,12 +511,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       {/* TOP HEADER (Fixed) */}
       <header className={`fixed top-0 left-0 ${
         isCollapsed ? 'lg:left-20' : 'lg:left-64'
-      } right-0 h-14 bg-[#090f1d]/95 backdrop-blur-md border-b border-[#152038] shadow-[0_1px_4px_rgba(0,0,0,0.2)] z-40 flex items-center justify-between px-4 lg:px-6 transition-all duration-200 ease-in-out`}>
+      } right-0 h-14 bg-white/95 dark:bg-[#090f1d]/95 backdrop-blur-md border-b border-slate-200/90 dark:border-[#152038] shadow-xs dark:shadow-[0_1px_4px_rgba(0,0,0,0.2)] z-40 flex items-center justify-between px-4 lg:px-6 transition-all duration-200 ease-in-out`}>
         <div className="flex items-center gap-3 flex-1 max-w-2xl">
           {/* Mobile Drawer Trigger */}
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/60 lg:hidden"
+            className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 lg:hidden"
             aria-label="Open navigation menu"
           >
             <Menu className="w-5 h-5" />
@@ -525,7 +525,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           {/* Desktop Toggle Button in Top Header */}
           <button
             onClick={toggleSidebar}
-            className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/60 hidden lg:flex items-center justify-center transition-colors"
+            className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 hidden lg:flex items-center justify-center transition-colors"
             title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
             aria-label={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           >
@@ -533,29 +533,29 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           </button>
 
           {/* Hub Location Dropdown */}
-          <div className="relative flex items-center bg-[#10192e] rounded-lg px-2.5 py-1 text-xs border border-[#1f2d4e] hidden sm:flex text-slate-200">
-            <MapPin className="w-3.5 h-3.5 text-[#3b82f6] mr-1.5" />
+          <div className="relative flex items-center bg-slate-100 dark:bg-[#10192e] rounded-lg px-2.5 py-1 text-xs border border-slate-200 dark:border-[#1f2d4e] hidden sm:flex text-slate-700 dark:text-slate-200">
+            <MapPin className="w-3.5 h-3.5 text-[#0058be] dark:text-[#3b82f6] mr-1.5" />
             <select
               value={selectedHub}
               onChange={(e) => setSelectedHub(e.target.value)}
-              className="bg-transparent font-semibold text-xs text-white focus:outline-none cursor-pointer pr-1"
+              className="bg-transparent font-semibold text-xs text-[#0b1c30] dark:text-white focus:outline-none cursor-pointer pr-1"
             >
-              <option value="all" className="bg-[#090f1d] text-white">All Hubs (Karnataka)</option>
-              <option value="bel" className="bg-[#090f1d] text-white">Belagavi Flagship (BEL-01)</option>
-              <option value="dav" className="bg-[#090f1d] text-white">Davanagere Hub (DAV-02)</option>
-              <option value="shi" className="bg-[#090f1d] text-white">Shivamogga Hub (SHI-03)</option>
+              <option value="all" className="bg-white dark:bg-[#090f1d] text-[#0b1c30] dark:text-white">All Hubs (Karnataka)</option>
+              <option value="bel" className="bg-white dark:bg-[#090f1d] text-[#0b1c30] dark:text-white">Belagavi Flagship (BEL-01)</option>
+              <option value="dav" className="bg-white dark:bg-[#090f1d] text-[#0b1c30] dark:text-white">Davanagere Hub (DAV-02)</option>
+              <option value="shi" className="bg-white dark:bg-[#090f1d] text-[#0b1c30] dark:text-white">Shivamogga Hub (SHI-03)</option>
             </select>
           </div>
 
           {/* Global Search Bar */}
-          <div className="relative flex-1 flex items-center bg-[#10192e] rounded-lg border border-[#1f2d4e] shadow-xs px-3 py-1">
+          <div className="relative flex-1 flex items-center bg-slate-100 dark:bg-[#10192e] rounded-lg border border-slate-200 dark:border-[#1f2d4e] shadow-xs px-3 py-1">
             <Search className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by ID (e.g. BSC-4029), Name, Dept..."
-              className="w-full bg-transparent text-xs text-white placeholder:text-slate-400 focus:outline-none"
+              className="w-full bg-transparent text-xs text-[#0b1c30] dark:text-white placeholder:text-slate-400 focus:outline-none"
             />
           </div>
         </div>
@@ -565,10 +565,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           {/* Real-time Clock */}
           <div className="hidden md:flex flex-col text-right pr-2">
             <div className="flex items-center gap-1.5 justify-end">
-              <Clock className="w-3.5 h-3.5 text-[#3b82f6]" />
-              <span className="text-xs font-semibold text-white font-mono">{currentTime || '19:16:52 IST'}</span>
+              <Clock className="w-3.5 h-3.5 text-[#0058be] dark:text-[#3b82f6]" />
+              <span className="text-xs font-semibold text-[#0b1c30] dark:text-white font-mono">{currentTime || '19:16:52 IST'}</span>
             </div>
-            <span className="text-[10px] text-slate-400 font-medium">Today • Shift A</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Today • Shift A</span>
           </div>
 
           {/* Dark / Bright Mode Toggle */}
@@ -584,11 +584,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   fetchNotifications({ limit: 10 });
                 }
               }}
-              className="relative flex items-center justify-center p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800/60 transition-colors cursor-pointer border border-transparent"
+              className="relative flex items-center justify-center p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer border border-transparent"
               title="Notifications & System Alerts"
               aria-label="Notifications"
             >
-              <Bell className="w-4 h-4 text-slate-300" />
+              <Bell className="w-4 h-4 text-slate-600 dark:text-slate-300" />
               {unreadCount > 0 && (
                 <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-bold shadow-xs">
                   {unreadCount > 99 ? '99+' : unreadCount}
@@ -598,7 +598,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
             {/* Notification Dropdown Popover */}
             {notificationsOpen && (
-              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-[#0e172a] rounded-xl shadow-xl border border-[#1e2d4d] z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150 text-slate-100">
+              <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white dark:bg-[#0e172a] rounded-xl shadow-xl border border-slate-200 dark:border-[#1e2d4d] z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150 text-slate-900 dark:text-slate-100">
                 <div className="p-3 bg-[#0058be] text-white flex items-center justify-between border-b border-blue-700">
                   <div className="flex items-center gap-2">
                     <Bell className="w-4 h-4 text-white" />
@@ -620,13 +620,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   )}
                 </div>
 
-                <div className="divide-y divide-slate-800 max-h-80 overflow-y-auto no-scrollbar">
+                <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-80 overflow-y-auto no-scrollbar">
                   {isLoading ? (
-                    <div className="p-4 text-center text-slate-400 text-xs">
+                    <div className="p-4 text-center text-slate-500 dark:text-slate-400 text-xs">
                       Loading notifications...
                     </div>
                   ) : notifications.length === 0 ? (
-                    <div className="p-4 text-center text-slate-400 text-xs">
+                    <div className="p-4 text-center text-slate-500 dark:text-slate-400 text-xs">
                       No notifications
                     </div>
                   ) : (
@@ -634,21 +634,21 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                       <button
                         key={notification.id}
                         onClick={() => handleNotificationClick(notification)}
-                        className={`w-full p-3 hover:bg-slate-800/50 transition-colors flex items-start gap-3 text-left ${
-                          !notification.isRead ? 'bg-slate-800/40' : ''
+                        className={`w-full p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-start gap-3 text-left ${
+                          !notification.isRead ? 'bg-blue-50/50 dark:bg-slate-800/40' : ''
                         }`}
                       >
-                        <div className="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center shrink-0 mt-0.5">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 mt-0.5">
                           {getSeverityIcon(notification.type)}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className={`text-xs font-semibold text-white ${!notification.isRead ? 'font-bold' : ''}`}>
+                          <p className={`text-xs font-semibold text-slate-900 dark:text-white ${!notification.isRead ? 'font-bold' : ''}`}>
                             {notification.title}
                           </p>
-                          <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">
                             {notification.message}
                           </p>
-                          <span className="text-[10px] text-slate-500 mt-1 block font-mono">
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 block font-mono">
                             {formatTimeAgo(notification.createdAt)} {notification.locationId ? `• ${notification.locationId}` : ''}
                           </span>
                         </div>
@@ -657,18 +657,18 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   )}
                 </div>
 
-                <div className="p-2.5 bg-[#0b1220] border-t border-[#1e2d4d] flex items-center justify-between text-[11px]">
+                <div className="p-2.5 bg-slate-50 dark:bg-[#0b1220] border-t border-slate-200 dark:border-[#1e2d4d] flex items-center justify-between text-[11px]">
                   <Link
                     href="/notifications"
                     onClick={() => setNotificationsOpen(false)}
-                    className="text-[#3b82f6] hover:underline font-semibold flex items-center gap-1"
+                    className="text-[#0058be] dark:text-[#3b82f6] hover:underline font-semibold flex items-center gap-1"
                   >
                     View All Notifications
                     <ExternalLink className="w-3 h-3" />
                   </Link>
                   <button
                     onClick={() => setNotificationsOpen(false)}
-                    className="text-slate-400 hover:text-white font-medium"
+                    className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white font-medium"
                   >
                     Dismiss
                   </button>
@@ -678,19 +678,19 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* User Profile Capsule with Interactive Dropdown */}
-          <div className="relative pl-2 border-l border-[#1f2d4e]">
+          <div className="relative pl-2 border-l border-slate-200 dark:border-[#1f2d4e]">
             <button
               onClick={() => {
                 setProfileMenuOpen(!profileMenuOpen);
                 setNotificationsOpen(false);
               }}
-              className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-800/60 transition-colors cursor-pointer text-left"
+              className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer text-left"
               title="User Account & Profile"
               aria-label="User Account"
             >
               <div className="hidden sm:flex flex-col text-right">
-                <span className="text-xs font-bold text-white leading-none">{userName}</span>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mt-0.5">{userRole}</span>
+                <span className="text-xs font-bold text-[#0b1c30] dark:text-white leading-none">{userName}</span>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400 mt-0.5">{userRole}</span>
               </div>
               <div className="w-8 h-8 rounded-full bg-[#0058be] text-white flex items-center justify-center font-bold text-xs shadow-xs">
                 {userName.split(' ').map((n: string) => n[0]).join('').slice(0, 2) || 'SA'}
@@ -700,11 +700,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
             {/* Profile Menu Dropdown */}
             {profileMenuOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-[#0e172a] rounded-xl shadow-xl border border-[#1e2d4d] z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150 text-slate-100">
-                <div className="p-3 bg-[#090f1d] border-b border-[#1e2d4d]">
-                  <p className="text-xs font-bold text-white truncate">{userName}</p>
-                  <p className="text-[11px] text-slate-400 truncate">{userEmail}</p>
-                  <span className="inline-block mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-950 text-blue-300 border border-blue-800">
+              <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-[#0e172a] rounded-xl shadow-xl border border-slate-200 dark:border-[#1e2d4d] z-50 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150 text-slate-900 dark:text-slate-100">
+                <div className="p-3 bg-slate-50 dark:bg-[#090f1d] border-b border-slate-200 dark:border-[#1e2d4d]">
+                  <p className="text-xs font-bold text-[#0b1c30] dark:text-white truncate">{userName}</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{userEmail}</p>
+                  <span className="inline-block mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-50 dark:bg-blue-950 text-[#0058be] dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                     {userRole}
                   </span>
                 </div>
@@ -713,7 +713,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   <Link
                     href="/employees/profile"
                     onClick={() => setProfileMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white font-medium transition-colors"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-[#0058be] dark:hover:text-white font-medium transition-colors"
                   >
                     <User className="w-4 h-4 text-slate-400" />
                     <span>My Profile & 360° Dossier</span>
@@ -722,7 +722,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   <Link
                     href="/my-desk"
                     onClick={() => setProfileMenuOpen(false)}
-                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white font-medium transition-colors"
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-[#0058be] dark:hover:text-white font-medium transition-colors"
                   >
                     <Clock className="w-4 h-4 text-slate-400" />
                     <span>My Desk Self-Service</span>
@@ -732,7 +732,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                     <Link
                       href="/admin"
                       onClick={() => setProfileMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white font-medium transition-colors"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-[#0058be] dark:hover:text-white font-medium transition-colors"
                     >
                       <ShieldCheck className="w-4 h-4 text-slate-400" />
                       <span>Security & User RBAC</span>
@@ -740,15 +740,15 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   )}
                 </div>
 
-                <div className="p-1.5 border-t border-[#1e2d4d]">
+                <div className="p-1.5 border-t border-slate-200 dark:border-[#1e2d4d]">
                   <button
                     onClick={() => {
                       setProfileMenuOpen(false);
                       handleSignOut();
                     }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-950/30 transition-colors text-left"
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors text-left"
                   >
-                    <LogOut className="w-4 h-4 text-red-400" />
+                    <LogOut className="w-4 h-4 text-red-500 dark:text-red-400" />
                     <span>Sign Out</span>
                   </button>
                 </div>
@@ -761,7 +761,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       {/* MAIN VIEWPORT CONTAINER */}
       <main className={`${
         isCollapsed ? 'lg:pl-20' : 'lg:pl-64'
-      } pt-14 min-h-screen bg-[#070c18] dark:bg-[#070c18] transition-all duration-200 ease-in-out`}>
+      } pt-14 min-h-screen bg-[#f4f6fa] dark:bg-[#070c18] transition-all duration-200 ease-in-out`}>
         <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-5 lg:p-6 space-y-5">
           {children}
         </div>

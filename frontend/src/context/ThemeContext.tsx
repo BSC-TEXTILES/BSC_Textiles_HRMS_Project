@@ -46,16 +46,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
     if (newTheme === 'dark') {
       root.classList.add('dark');
+      root.classList.remove('light');
+      root.setAttribute('data-theme', 'dark');
       root.style.colorScheme = 'dark';
     } else {
       root.classList.remove('dark');
+      root.classList.add('light');
+      root.setAttribute('data-theme', 'light');
       root.style.colorScheme = 'light';
     }
 
     if (animate) {
       window.setTimeout(() => {
         root.classList.remove('theme-transitioning');
-      }, 400);
+      }, 350);
     }
   };
 
@@ -64,6 +68,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     applyThemeClass(newTheme, true);
     try {
       localStorage.setItem('bsc_theme', newTheme);
+      localStorage.setItem('theme', newTheme);
     } catch (e) {
       console.error('Failed to persist theme:', e);
     }
