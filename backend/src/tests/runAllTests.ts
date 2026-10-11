@@ -9,6 +9,7 @@ import { runComprehensiveSecurityTests } from './comprehensiveSecurity.test.js';
 import { runKycTests } from './kyc.test.js';
 import { runPayrollTestSuite } from './payroll.test.js';
 import { runFnfAndLeaveTestSuite } from './fnfAndLeave.test.js';
+import { runFloorOperationsTests } from './floorOperations.test.js';
 
 const BASE_URL = (process.env.API_URL || 'http://localhost:4000').replace(/\/api\/?$/, '');
 
@@ -131,6 +132,11 @@ async function main() {
   console.log('▶ Executing Suite 10: Full & Final Settlement, Leaves & Mobile API...');
   const fnfResults = await runFnfAndLeaveTestSuite(BASE_URL, adminToken, salesToken);
   allResults.push(...fnfResults);
+
+  // 11. Floor Operations, Salesmen Tracking & Retail Hierarchy Suite
+  console.log('▶ Executing Suite 11: Floor Operations, Salesmen Tracking & Retail Hierarchy...');
+  const floorResults = await runFloorOperationsTests(adminToken, belagaviHrToken);
+  allResults.push(...floorResults);
 
   // Print Summary Table
   console.log('\n================================================================');
