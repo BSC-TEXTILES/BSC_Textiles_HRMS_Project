@@ -14,6 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Decoupled Real-Time Socket Architecture**:
   - Extracted isolated `socket.ts` module with `setSocketIO`, `getSocketIO`, and safe `SocketEmitter`.
   - Enabled headless server-side service execution without triggering premature Express port binding.
+- **Modular API Architecture & Versioning**:
+  - Implemented versioned router `backend/src/api/v1/index.ts` consolidating 34 domain routers.
+  - Mounted `/api/v1` for future-ready API consumer contracts while maintaining 100% backward compatibility via `/api` route alias.
+  - Added interactive OpenAPI 3.0 documentation and HTML Swagger explorer at `/api/docs`.
+  - Added deep health and readiness probes (`/ready`, `/api/ready`) with active MySQL pool validation and runtime telemetry.
+- **Dead Code & Redundant File Cleanup**:
+  - Removed unmounted duplicate router `backend/src/routes/staffOps.ts` (active logic cleanly maintained in `workerOps.ts`).
+  - Cleaned redundant sub-workspace lockfiles and build caches.
 - **Architectural & Technical Documentation**:
   - Added authoritative `ARCHITECTURE.md` with system design, 3-tier directory layouts, and data flows.
   - Added `TECHNICAL_REQUIREMENTS.md` detailing hardware specs, MySQL 8.0 configurations, and latency SLAs.

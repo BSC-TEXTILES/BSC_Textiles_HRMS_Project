@@ -10,41 +10,9 @@ import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { prisma } from './db.js';
-
-import authRoutes from './routes/auth.js';
-import userRoutes from './routes/users.js';
-import locationRoutes from './routes/locations.js';
-import floorRoutes from './routes/floors.js';
-import departmentRoutes from './routes/departments.js';
-import sectionRoutes from './routes/sections.js';
-import sellingPointRoutes from './routes/sellingPoints.js';
-import employeeRoutes from './routes/employees.js';
-import shiftRoutes from './routes/shifts.js';
-import attendanceRoutes from './routes/attendance.js';
-import breakRoutes from './routes/breaks.js';
-import faceVerificationRoutes from './routes/faceVerification.js';
-import qrCodeRoutes from './routes/qrCodes.js';
-import incentiveRoutes from './routes/incentives.js';
-import observationRoutes from './routes/observations.js';
-import liveStreamRoutes from './routes/liveStreams.js';
-import weeklyOffRoutes from './routes/weeklyOffs.js';
-import holidayRoutes from './routes/holidays.js';
-import reportRoutes from './routes/reports.js';
-import auditRoutes from './routes/audit.js';
-import payrollRoutes from './routes/payroll.js';
-import penaltyRoutes from './routes/penalties.js';
-import notificationRoutes from './routes/notifications.js';
-import roleRoutes from './routes/roles.js';
-import settingRoutes from './routes/settings.js';
-import deviceRoutes from './routes/devices.js';
-import kycRoutes from './routes/kyc.js';
-import exitRoutes from './routes/exits.js';
-import leaveRoutes from './routes/leaves.js';
-import mobileRoutes from './routes/mobile.js';
-import securityRoutes from './routes/security.js';
-import fileSecurityRoutes from './routes/fileSecurity.js';
-import { staffOpsRouter, observationLevelsRouter } from './routes/workerOps.js';
+import { prisma, pool } from './db.js';
+import { apiV1Router } from './api/v1/index.js';
+import { docsRouter } from './api/docs/index.js';
 import { securityHeaders } from './middleware/securityHeaders.js';
 import { csrfProtection } from './middleware/csrfProtection.js';
 import { timingMiddleware } from './middleware/timing.js';
@@ -140,41 +108,33 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Domain & Security Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/security', securityRoutes);
-app.use('/api/files', fileSecurityRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/locations', locationRoutes);
-app.use('/api/floors', floorRoutes);
-app.use('/api/departments', departmentRoutes);
-app.use('/api/sections', sectionRoutes);
-app.use('/api/selling-points', sellingPointRoutes);
-app.use('/api/employees', employeeRoutes);
-app.use('/api/shifts', shiftRoutes);
-app.use('/api/attendance', attendanceRoutes);
-app.use('/api/staff-ops', staffOpsRouter);
-app.use('/api/observation-levels', observationLevelsRouter);
-app.use('/api/breaks', breakRoutes);
-app.use('/api/face-verification', faceVerificationRoutes);
-app.use('/api/qr-codes', qrCodeRoutes);
-app.use('/api/incentives', incentiveRoutes);
-app.use('/api/observations', observationRoutes);
-app.use('/api/live-streams', liveStreamRoutes);
-app.use('/api/weekly-offs', weeklyOffRoutes);
-app.use('/api/holidays', holidayRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/audit', auditRoutes);
-app.use('/api/payroll', payrollRoutes);
-app.use('/api/penalties', penaltyRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/roles', roleRoutes);
-app.use('/api/settings', settingRoutes);
-app.use('/api/devices', deviceRoutes);
-app.use('/api/kyc', kycRoutes);
-app.use('/api/exits', exitRoutes);
-app.use('/api/leaves', leaveRoutes);
-app.use('/api/mobile', mobileRoutes);
+// Deep readiness probe for Kubernetes / load balancers
+app.get(['/ready', '/api/ready'], async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({
+      status: 'ready',
+      timestamp: new Date().toISOString(),
+      uptimeSeconds: Math.floor(process.uptime()),
+      database: 'connected',
+      memory: process.memoryUsage(),
+    });
+  } catch (err: any) {
+    res.status(503).json({
+      status: 'unready',
+      timestamp: new Date().toISOString(),
+      database: 'error',
+      message: err.message,
+    });
+  }
+});
+
+// Interactive OpenAPI 3.0 Documentation & Swagger Explorer
+app.use('/api/docs', docsRouter);
+
+// Domain & Security Routes (v1 API + backwards-compatible /api alias)
+app.use('/api/v1', apiV1Router);
+app.use('/api', apiV1Router);
 
 // Centralized Enterprise Error Handler
 app.use(errorHandler);
