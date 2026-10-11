@@ -56,10 +56,34 @@ export class AuditService {
     return cleaned;
   }
 
+  private static logQueue: Promise<any> = Promise.resolve();
+
   /**
    * Record a tamper-resistant audit log entry with SHA-256 hash chaining
    */
   public static async log(entry: AuditLogEntry): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+      this.logQueue = this.logQueue
+        .then(async () => {
+          try {
+            const id = await this.executeLog(entry);
+            resolve(id);
+          } catch (err) {
+            reject(err);
+          }
+        })
+        .catch(async () => {
+          try {
+            const id = await this.executeLog(entry);
+            resolve(id);
+          } catch (err) {
+            reject(err);
+          }
+        });
+    });
+  }
+
+  private static async executeLog(entry: AuditLogEntry): Promise<string> {
     const id = `aud_${crypto.randomUUID()}`;
     const now = new Date();
 
@@ -99,29 +123,33 @@ export class AuditService {
     const hash = crypto.createHash('sha256').update(payloadToHash).digest('hex');
 
     // 4. Insert into database
-    await prisma.auditLog.create({
-      data: {
-        id,
-        createdAt: now,
-        userId: entry.userId || null,
-        locationId: entry.locationId || null,
-        action: entry.action,
-        entityType: entry.entityType,
-        entityId,
-        oldValue: redactedBefore,
-        newValue: redactedAfter,
-        ipAddress,
-        userAgent: entry.userAgent || 'Internal System',
-        correlationId: correlationId || null,
-        sessionId: entry.sessionId || null,
-        deviceId: entry.deviceId || null,
-        riskScore: entry.riskScore || 0,
-        tags: entry.tags || [],
-        hash,
-        previousHash,
-        integrityVerified: 1,
-      },
-    });
+    try {
+      await prisma.auditLog.create({
+        data: {
+          id,
+          createdAt: now,
+          userId: entry.userId || null,
+          locationId: entry.locationId || null,
+          action: entry.action,
+          entityType: entry.entityType,
+          entityId,
+          oldValue: redactedBefore,
+          newValue: redactedAfter,
+          ipAddress,
+          userAgent: entry.userAgent || 'Internal System',
+          correlationId: correlationId || null,
+          sessionId: entry.sessionId || null,
+          deviceId: entry.deviceId || null,
+          riskScore: entry.riskScore || 0,
+          tags: entry.tags || [],
+          hash,
+          previousHash,
+          integrityVerified: 1,
+        },
+      });
+    } catch (auditErr) {
+      console.error('[AuditService] Failed to write audit log entry:', auditErr);
+    }
 
     return id;
   }
@@ -167,7 +195,7 @@ export class AuditService {
           action: row.action,
           entityType: row.entityType,
           entityId: row.entityId || 'SYS_RESOURCE',
-          ipAddress: row.ipAddress || '',
+          ipAddress: row.ipAddress || '127.0.0.1',
           correlationId: row.correlationId || '',
         });
 

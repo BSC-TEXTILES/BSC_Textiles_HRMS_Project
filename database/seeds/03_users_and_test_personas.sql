@@ -117,4 +117,6 @@ INSERT INTO `faceprofile` (`id`, `employeeId`, `faceData`, `enrolledAt`, `update
 INSERT INTO `faceprofile` (`id`, `employeeId`, `faceData`, `enrolledAt`, `updatedAt`, `isActive`) VALUES ('cmuzamanc00is4n4pvj76pgwb','cmuzamamo00io4n4p9aits7dy',0x6D6F636B2D666163652D70726F66696C652D544553542D454D502D303334,'2026-10-08 08:47:12.744','2026-10-08 08:47:12.744',1);
 INSERT INTO `faceprofile` (`id`, `employeeId`, `faceData`, `enrolledAt`, `updatedAt`, `isActive`) VALUES ('cmuzamaph00j24n4pljs8guf6','cmuzamaos00iy4n4pma3fa9rk',0x6D6F636B2D666163652D70726F66696C652D544553542D454D502D303335,'2026-10-08 08:47:12.821','2026-10-08 08:47:12.821',1);
 
+UPDATE `user` SET `status` = 'ACTIVE' WHERE `isActive` = 1;
+
 SET FOREIGN_KEY_CHECKS = 1;
