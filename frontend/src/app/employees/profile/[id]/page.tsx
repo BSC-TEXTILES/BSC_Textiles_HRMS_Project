@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -9,11 +9,24 @@ import toast from 'react-hot-toast';
 export default function EmployeeProfileDossierPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params?.id as string;
+  const tabParam = searchParams?.get('tab');
 
   const [activeTab, setActiveTab] = useState<
     'overview' | 'attendance' | 'breaks' | 'leaves' | 'payroll' | 'documents' | 'audit' | 'notes'
-  >('overview');
+  >(() => {
+    if (tabParam && ['overview', 'attendance', 'breaks', 'leaves', 'payroll', 'documents', 'audit', 'notes'].includes(tabParam)) {
+      return tabParam as any;
+    }
+    return 'overview';
+  });
+
+  useEffect(() => {
+    if (tabParam && ['overview', 'attendance', 'breaks', 'leaves', 'payroll', 'documents', 'audit', 'notes'].includes(tabParam)) {
+      setActiveTab(tabParam as any);
+    }
+  }, [tabParam]);
   const [employee, setEmployee] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);

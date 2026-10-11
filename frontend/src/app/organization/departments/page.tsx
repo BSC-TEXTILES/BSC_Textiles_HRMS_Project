@@ -77,20 +77,20 @@ export default function DepartmentsPage() {
         {/* Top Header & Breadcrumb */}
         <div className="flex flex-col md:flex-row md:items-end justify-between pb-1 gap-4">
           <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1.5 text-slate-400 text-[11px] uppercase tracking-wider font-bold">
+            <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 text-[11px] uppercase tracking-wider font-bold">
               <span>Workforce Directory</span>
               <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-              <span className="text-[#722F37]">Enterprise Hierarchy & Operational Units</span>
+              <span className="text-[#722F37] dark:text-[#E8DCC6]">Enterprise Hierarchy & Operational Units</span>
             </div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-[#0b1c30] tracking-tight">
+              <h1 className="text-2xl font-bold text-[#0b1c30] dark:text-white tracking-tight">
                 Departments & Organizational Units Dashboard
               </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-[#F8F4F1] text-[#722F37] text-[10px] font-bold uppercase tracking-wider border border-[#E5D5D7] flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#722F37]"></span> Org Structure Active
+              <span className="px-2.5 py-0.5 rounded-full bg-[#F8F4F1] dark:bg-slate-800 text-[#722F37] dark:text-[#E8DCC6] text-[10px] font-bold uppercase tracking-wider border border-[#E5D5D7] dark:border-slate-700 flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-[#722F37] dark:bg-[#E8DCC6]"></span> Org Structure Active
               </span>
             </div>
-            <p className="text-xs text-slate-500 max-w-3xl">
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-3xl">
               Structural divisions across Karnataka retail showrooms, weaving ateliers, inventory warehouses, and regional leadership.
             </p>
           </div>
@@ -108,91 +108,91 @@ export default function DepartmentsPage() {
 
         {/* 5 DEPARTMENT KPIS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div className="bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Divisions</span>
-              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] flex items-center justify-center text-[#722F37]">
+              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] dark:bg-slate-800 flex items-center justify-center text-[#722F37] dark:text-[#E8DCC6]">
                 <span className="material-symbols-outlined text-[18px]">corporate_fare</span>
               </div>
             </div>
             <div className="my-1">
-              <div className="text-2xl font-bold text-[#0b1c30]">{departments.length || 8}</div>
-              <div className="text-[11px] text-slate-400">Total Operational Units</div>
+              <div className="text-2xl font-bold text-[#0b1c30] dark:text-white">{departments.length || 8}</div>
+              <div className="text-[11px] text-slate-400 dark:text-slate-500">Total Operational Units</div>
             </div>
-            <div className="pt-2 border-t border-slate-100 text-[11px] text-[#722F37] font-semibold">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-[#722F37] dark:text-[#E8DCC6] font-semibold">
               <span>All Functional</span>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div className="bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Karnataka Hubs</span>
-              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] flex items-center justify-center text-[#722F37]">
+              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] dark:bg-slate-800 flex items-center justify-center text-[#722F37] dark:text-[#E8DCC6]">
                 <span className="material-symbols-outlined text-[18px]">domain</span>
               </div>
             </div>
             <div className="my-1">
-              <div className="text-2xl font-bold text-[#0b1c30]">4</div>
-              <div className="text-[11px] text-slate-400">Retail & Weaving Centers</div>
+              <div className="text-2xl font-bold text-[#0b1c30] dark:text-white">4</div>
+              <div className="text-[11px] text-slate-400 dark:text-slate-500">Retail & Weaving Centers</div>
             </div>
-            <div className="pt-2 border-t border-slate-100 text-[11px] text-emerald-600 font-semibold">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
               <span>BEL • DAV • SHI • HUB</span>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div className="bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Staff Allocated</span>
-              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] flex items-center justify-center text-[#722F37]">
+              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] dark:bg-slate-800 flex items-center justify-center text-[#722F37] dark:text-[#E8DCC6]">
                 <span className="material-symbols-outlined text-[18px]">badge</span>
               </div>
             </div>
             <div className="my-1">
-              <div className="text-2xl font-bold text-[#0b1c30]">35 / 35</div>
-              <div className="text-[11px] text-slate-400">100% Departmentalized</div>
+              <div className="text-2xl font-bold text-[#0b1c30] dark:text-white">35 / 35</div>
+              <div className="text-[11px] text-slate-400 dark:text-slate-500">100% Departmentalized</div>
             </div>
-            <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
               <span>No Unassigned Staff</span>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div className="bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Flagship Division</span>
-              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] flex items-center justify-center text-[#722F37]">
+              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] dark:bg-slate-800 flex items-center justify-center text-[#722F37] dark:text-[#E8DCC6]">
                 <span className="material-symbols-outlined text-[18px]">styler</span>
               </div>
             </div>
             <div className="my-1">
-              <div className="text-lg font-bold text-[#0b1c30] truncate">Bridal & Silk</div>
-              <div className="text-[11px] text-slate-400">Belagavi Atelier Apex</div>
+              <div className="text-lg font-bold text-[#0b1c30] dark:text-white truncate">Bridal & Silk</div>
+              <div className="text-[11px] text-slate-400 dark:text-slate-500">Belagavi Atelier Apex</div>
             </div>
-            <div className="pt-2 border-t border-slate-100 text-[11px] text-[#722F37] font-semibold">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-[#722F37] dark:text-[#E8DCC6] font-semibold">
               <span>Primary Revenue Unit</span>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
+          <div className="bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Structure Health</span>
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
                 <span className="material-symbols-outlined text-[18px]">verified</span>
               </div>
             </div>
             <div className="my-1">
-              <div className="text-2xl font-bold text-emerald-600">100%</div>
-              <div className="text-[11px] text-slate-400">Clean Hierarchy</div>
+              <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">100%</div>
+              <div className="text-[11px] text-slate-400 dark:text-slate-500">Clean Hierarchy</div>
             </div>
-            <div className="pt-2 border-t border-slate-100 text-[11px] text-emerald-600 font-semibold">
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
               <span>RBAC Linked</span>
             </div>
           </div>
         </div>
 
         {/* Location Filter & Department Cards */}
-        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-[#0b1c30]">Select Store Location:</span>
+        <div className="bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs font-bold text-[#0b1c30] dark:text-white">Select Store Location:</span>
             <div className="flex flex-wrap gap-2">
               {locations.map((loc) => (
                 <button
@@ -201,7 +201,7 @@ export default function DepartmentsPage() {
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     selectedLocation === loc.id
                       ? 'bg-[#722F37] text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                   }`}
                 >
                   {loc.name} ({loc.code})
@@ -209,47 +209,47 @@ export default function DepartmentsPage() {
               ))}
             </div>
           </div>
-          <span className="text-xs text-slate-400">{departments.length} Units in this branch</span>
+          <span className="text-xs text-slate-400 dark:text-slate-500">{departments.length} Units in this branch</span>
         </div>
 
         {/* DEPARTMENTS GRID */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {departments.map((d) => (
-            <div key={d.id} className="bg-white rounded-xl p-5 border border-slate-200/80 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
+            <div key={d.id} className="bg-white dark:bg-[#0e172a] rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md transition-all flex flex-col justify-between">
               <div>
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="text-[10px] font-mono font-bold text-[#722F37] bg-[#F8F4F1] px-2 py-0.5 rounded border border-[#E5D5D7]">
+                    <span className="text-[10px] font-mono font-bold text-[#722F37] dark:text-[#E8DCC6] bg-[#F8F4F1] dark:bg-slate-800 px-2 py-0.5 rounded border border-[#E5D5D7] dark:border-slate-700">
                       {d.code || 'DEPT-101'}
                     </span>
-                    <h3 className="text-base font-bold text-[#0b1c30] mt-1.5">{d.name}</h3>
+                    <h3 className="text-base font-bold text-[#0b1c30] dark:text-white mt-1.5">{d.name}</h3>
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
                     Active
                   </span>
                 </div>
 
                 <div className="mt-4 space-y-2 text-xs">
-                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50">
-                    <span className="text-slate-500">Branch Hub:</span>
-                    <span className="font-bold text-[#0b1c30]">{d.location?.name || 'Retail Flagship'}</span>
+                  <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60">
+                    <span className="text-slate-500 dark:text-slate-400">Branch Hub:</span>
+                    <span className="font-bold text-[#0b1c30] dark:text-white">{d.location?.name || 'Retail Flagship'}</span>
                   </div>
-                  <div className="flex items-center justify-between text-slate-600 px-1">
+                  <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 px-1">
                     <span>Floor Allocation:</span>
-                    <span className="font-bold text-[#722F37]">Ground & 1st Floor</span>
+                    <span className="font-bold text-[#722F37] dark:text-[#E8DCC6]">Ground & 1st Floor</span>
                   </div>
-                  <div className="flex items-center justify-between text-slate-600 px-1">
+                  <div className="flex items-center justify-between text-slate-600 dark:text-slate-400 px-1">
                     <span>Assigned Staff:</span>
-                    <span className="font-semibold text-slate-800">4-6 Consultants</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">4-6 Consultants</span>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-slate-400 font-medium">Operational</span>
+              <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                <span className="text-slate-400 dark:text-slate-500 font-medium">Operational</span>
                 <button
                   onClick={() => toast.success(`Department ${d.name} rules active`)}
-                  className="font-semibold text-[#722F37] hover:underline flex items-center gap-1"
+                  className="font-semibold text-[#722F37] dark:text-[#E8DCC6] hover:underline flex items-center gap-1"
                 >
                   <span>View Team Roster</span>
                   <span className="material-symbols-outlined text-[14px]">chevron_right</span>
@@ -261,16 +261,16 @@ export default function DepartmentsPage() {
 
         {/* CREATE DEPT MODAL */}
         {isAddModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-md w-full p-6 space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <div className="bg-white dark:bg-[#0e172a] rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 max-w-md w-full p-6 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#722F37] text-[20px]">corporate_fare</span>
-                  <h3 className="font-bold text-base text-[#0b1c30]">Create Department / Unit</h3>
+                  <span className="material-symbols-outlined text-[#722F37] dark:text-[#E8DCC6] text-[20px]">corporate_fare</span>
+                  <h3 className="font-bold text-base text-[#0b1c30] dark:text-white">Create Department / Unit</h3>
                 </div>
                 <button
                   onClick={() => setIsAddModalOpen(false)}
-                  className="text-slate-400 hover:text-slate-600 p-1"
+                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1"
                 >
                   <span className="material-symbols-outlined text-[18px]">close</span>
                 </button>
@@ -278,24 +278,24 @@ export default function DepartmentsPage() {
 
               <form onSubmit={handleCreateDept} className="space-y-3 text-xs">
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Department Name *</label>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Department Name *</label>
                   <input
                     type="text"
                     required
                     value={newDept.name}
                     onChange={(e) => setNewDept({ ...newDept, name: e.target.value })}
                     placeholder="e.g. Silk Weaving & QA"
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs"
+                    className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg text-xs"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Store Location Hub *</label>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Store Location Hub *</label>
                   <select
                     required
                     value={newDept.locationId}
                     onChange={(e) => setNewDept({ ...newDept, locationId: e.target.value })}
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white"
+                    className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg text-xs"
                   >
                     <option value="">Select Location</option>
                     {locations.map((l) => (
@@ -305,21 +305,21 @@ export default function DepartmentsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Department Code</label>
+                  <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">Department Code</label>
                   <input
                     type="text"
                     value={newDept.code}
                     onChange={(e) => setNewDept({ ...newDept, code: e.target.value })}
                     placeholder="e.g. DEPT-WEAVE-01"
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs"
+                    className="w-full px-3 py-1.5 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-lg text-xs"
                   />
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => setIsAddModalOpen(false)}
-                    className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg font-medium"
+                    className="px-3 py-1.5 text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg font-medium"
                   >
                     Cancel
                   </button>
