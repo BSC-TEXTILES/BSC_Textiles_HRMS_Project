@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../index.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { validate, schemas } from '../middleware/validation.js';
+import { UserUploadService } from '../services/userUploadService.js';
 
 const router = Router();
 
@@ -107,6 +108,55 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res) => {
   }
 });
 
+router.post('/', authorize('ADD'), validate(schemas.register), async (req: AuthRequest, res) => {
+  try {
+    const { email, password, fullName, role, permissions, locationId, employeeId } = req.body;
+    
+    if (req.user!.role !== 'SUPER_ADMIN' && locationId && locationId !== req.user!.locationId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      return res.status(400).json({ error: 'User with this email already exists' });
+    }
+
+    const bcrypt = await import('bcryptjs');
+    const passwordHash = await bcrypt.hash(password || 'password123', 12);
+
+    const user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash,
+        fullName,
+        role: role || 'EMPLOYEE',
+        permissions: permissions || ['VIEW'],
+        locationId: locationId || req.user!.locationId || null,
+        employeeId: employeeId || null,
+        isActive: 1,
+      },
+      select: {
+        id: true,
+        email: true,
+        fullName: true,
+        role: true,
+        permissions: true,
+        locationId: true,
+        employeeId: true,
+        isActive: true,
+      },
+    });
+
+    // Automatically create user directory in uploads
+    UserUploadService.ensureUserFolder(fullName);
+
+    res.status(201).json(user);
+  } catch (error) {
+    console.error('Create user error:', error);
+    res.status(500).json({ error: 'Failed to create user' });
+  }
+});
+
 router.put('/:id', authorize('EDIT'), validate(schemas.register), async (req: AuthRequest, res) => {
   try {
     const { email, fullName, role, permissions, locationId, employeeId, isActive } = req.body;
@@ -141,6 +191,10 @@ router.put('/:id', authorize('EDIT'), validate(schemas.register), async (req: Au
       },
     });
     
+    if (fullName) {
+      UserUploadService.ensureUserFolder(fullName);
+    }
+
     res.json(user);
   } catch (error) {
     console.error('Update user error:', error);

@@ -241,7 +241,7 @@ function LoginFormContent() {
           <form onSubmit={handleSubmit(onSubmit)} noValidate className="mt-5 space-y-4">
             {/* Email / Employee Code Field */}
             <div>
-              <label htmlFor="email" className="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1.5">
+              <label htmlFor="email" className="block text-xs font-semibold text-gray-700 dark:text-white mb-1.5">
                 Employee Code or Email Address
               </label>
               <div className="relative">
@@ -258,7 +258,7 @@ function LoginFormContent() {
                   aria-invalid={errors.email ? 'true' : 'false'}
                   aria-describedby={errors.email ? 'email-error' : undefined}
                   {...register('email')}
-                  className={`w-full h-10 rounded-lg border bg-white dark:bg-[#1A1D24] pl-9 pr-3 text-xs text-[#18181B] dark:text-slate-100 placeholder:text-slate-400 outline-none transition-all
+                  className={`w-full h-10 rounded-lg border bg-white dark:bg-[#1A1D24] pl-9 pr-3 text-xs text-[#18181B] dark:text-white placeholder:text-slate-400 outline-none transition-all
                     disabled:bg-slate-50 dark:disabled:bg-slate-800 disabled:text-slate-400
                     focus:ring-2 focus:ring-[#722F37]/20 focus:border-[#722F37]
                     ${errors.email ? 'border-red-400 focus:border-red-500' : 'border-gray-300 dark:border-slate-700 hover:border-gray-400'}`}
@@ -274,7 +274,7 @@ function LoginFormContent() {
             {/* Password Field */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="password" className="block text-xs font-semibold text-gray-700 dark:text-slate-300">
+                <label htmlFor="password" className="block text-xs font-semibold text-gray-700 dark:text-white">
                   Password
                 </label>
                 <button
@@ -298,7 +298,7 @@ function LoginFormContent() {
                   aria-invalid={errors.password ? 'true' : 'false'}
                   aria-describedby={errors.password ? 'password-error' : undefined}
                   {...register('password')}
-                  className={`w-full h-10 rounded-lg border bg-white dark:bg-[#1A1D24] pl-9 pr-10 text-xs text-[#18181B] dark:text-slate-100 placeholder:text-slate-400 outline-none transition-all
+                  className={`w-full h-10 rounded-lg border bg-white dark:bg-[#1A1D24] pl-9 pr-10 text-xs text-[#18181B] dark:text-white placeholder:text-slate-400 outline-none transition-all
                     disabled:bg-slate-50 dark:disabled:bg-slate-800 disabled:text-slate-400
                     focus:ring-2 focus:ring-[#722F37]/20 focus:border-[#722F37]
                     ${errors.password ? 'border-red-400 focus:border-red-500' : 'border-gray-300 dark:border-slate-700 hover:border-gray-400'}`}
@@ -322,7 +322,7 @@ function LoginFormContent() {
 
             {/* Remember Me Option */}
             <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400 cursor-pointer select-none">
+              <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer select-none">
                 <input
                   type="checkbox"
                   defaultChecked
@@ -356,7 +356,7 @@ function LoginFormContent() {
           {/* Quick Test Accounts Bar */}
           <div className="mt-6 border-t border-gray-200/80 dark:border-slate-800 pt-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300 flex items-center gap-1">
                 <Building2 className="w-3 h-3 text-[#722F37] dark:text-[#E8DCC6]" />
                 <span>Test Role Credentials</span>
               </span>
@@ -379,7 +379,7 @@ function LoginFormContent() {
                     }`}
                   >
                     <div className="flex items-center justify-between w-full">
-                      <span className="text-[11px] font-semibold text-[#18181B] dark:text-slate-100 truncate">{p.label}</span>
+                      <span className="text-[11px] font-semibold text-[#18181B] dark:text-white truncate">{p.label}</span>
                       {isSelected && <CheckCircle2 className="w-3 h-3 text-[#722F37] dark:text-[#E8DCC6]" />}
                     </div>
                     <span className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{p.desc}</span>

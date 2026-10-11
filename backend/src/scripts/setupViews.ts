@@ -1,12 +1,33 @@
 import { pool } from '../nativeDb.js';
 
 export async function setupViews() {
-  console.log('--- Creating Schema Compatibility Views ---');
+  console.log('--- Checking Schema Compatibility Views ---');
+
+  const [tables] = await pool.query('SHOW FULL TABLES') as any;
+  const baseTableNames = new Set(
+    tables
+      .filter((t: any) => t.Table_type === 'BASE TABLE')
+      .map((t: any) => Object.values(t)[0])
+  );
+
+  // Helper to create view only if a base table does not already exist with that name
+  const safeCreateView = async (viewName: string, query: string) => {
+    if (baseTableNames.has(viewName)) {
+      console.log(`✓ Base table already exists: ${viewName} (view creation skipped)`);
+      return;
+    }
+    try {
+      await pool.query(`CREATE OR REPLACE VIEW ${viewName} AS ${query}`);
+      console.log(`✓ Created/Updated view: ${viewName}`);
+    } catch (err: any) {
+      console.warn(`[setupViews warning] Could not create view ${viewName}:`, err.message);
+    }
+  };
 
   // 1. employees view
-  await pool.query(`
-    CREATE OR REPLACE VIEW employees AS
-    SELECT 
+  await safeCreateView(
+    'employees',
+    `SELECT 
       id,
       employeeCode,
       employeeCode AS employee_code,
@@ -45,35 +66,22 @@ export async function setupViews() {
       createdAt AS created_at,
       updatedAt,
       updatedAt AS updated_at
-    FROM employee;
-  `);
-  console.log('✓ Created/Updated view: employees');
+    FROM employee`
+  );
 
   // 2. locations view
-  await pool.query(`
-    CREATE OR REPLACE VIEW locations AS
-    SELECT * FROM location;
-  `);
-  console.log('✓ Created/Updated view: locations');
+  await safeCreateView('locations', 'SELECT * FROM location');
 
   // 3. departments view
-  await pool.query(`
-    CREATE OR REPLACE VIEW departments AS
-    SELECT * FROM department;
-  `);
-  console.log('✓ Created/Updated view: departments');
+  await safeCreateView('departments', 'SELECT * FROM department');
 
   // 4. shifts view
-  await pool.query(`
-    CREATE OR REPLACE VIEW shifts AS
-    SELECT * FROM shift;
-  `);
-  console.log('✓ Created/Updated view: shifts');
+  await safeCreateView('shifts', 'SELECT * FROM shift');
 
   // 5. payroll_items view
-  await pool.query(`
-    CREATE OR REPLACE VIEW payroll_items AS
-    SELECT
+  await safeCreateView(
+    'payroll_items',
+    `SELECT
       id,
       payrollRunId AS payroll_run_id,
       employeeId AS employee_id,
@@ -93,9 +101,8 @@ export async function setupViews() {
       status,
       createdAt AS created_at,
       updatedAt AS updated_at
-    FROM payrollitem;
-  `);
-  console.log('✓ Created/Updated view: payroll_items');
+    FROM payrollitem`
+  );
 
   console.log('--- Schema Compatibility Views Ready ---');
 }

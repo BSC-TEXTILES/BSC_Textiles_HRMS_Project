@@ -4,9 +4,12 @@ import { prisma } from '../index.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
 import { container } from '../core/container/ServiceContainer.js';
+import employeeDocumentRoutes from './employeeDocuments.js';
+import { UserUploadService } from '../services/userUploadService.js';
 
 const router = Router();
 
+router.use('/documents', employeeDocumentRoutes);
 router.use(authenticate);
 
 const employeeSchema = z.object({
@@ -175,6 +178,9 @@ router.post('/', authorize('ADD'), validate(employeeSchema), async (req: AuthReq
       },
     });
     
+    // Automatically create employee directory in uploads
+    UserUploadService.ensureUserFolder(fullName, employeeCode);
+
     // Generate QR codes
     const empQR = await prisma.qRCode.create({
       data: {

@@ -387,6 +387,27 @@ function buildWhereClause(
     }
 
     if (typeof val === 'object' && !(val instanceof Date)) {
+      // Prisma-style compound unique keys, e.g.
+      // { employeeId_attendanceDate: { employeeId, attendanceDate } }.
+      // The native engine has no metadata for these, so expand them into an
+      // AND of equality checks instead of silently dropping the condition.
+      const valKeys = Object.keys(val);
+      const isScalarObject =
+        valKeys.length > 0 &&
+        valKeys.every((k) => val[k] === null || typeof val[k] !== 'object' || val[k] instanceof Date);
+      const relsNow = RELATION_META[modelName] || {};
+      if (isScalarObject && key.includes('_') && !(key in relsNow) && valKeys.join('_') === key) {
+        for (const k of valKeys) {
+          if (val[k] === null) {
+            conditions.push(`\`${k}\` IS NULL`);
+          } else {
+            conditions.push(`\`${k}\` = ?`);
+            params.push(val[k]);
+          }
+        }
+        continue;
+      }
+
       // Operator conditions
       if ('equals' in val) {
         if (val.equals === null) {

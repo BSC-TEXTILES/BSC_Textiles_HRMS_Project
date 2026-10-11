@@ -20,7 +20,8 @@ import {
   QrCode,
   ScanFace,
   FilterX,
-  Contact
+  Contact,
+  FolderLock
 } from 'lucide-react';
 
 import { useSession } from 'next-auth/react';
@@ -163,6 +164,13 @@ export default function EmployeesPage() {
 
           {/* PRIMARY ACTION CLUSTER */}
           <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/employees/documents"
+              className="flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-3.5 py-2 rounded-lg text-xs font-semibold shadow-xs transition-all"
+            >
+              <FolderLock className="w-4 h-4 text-amber-600" />
+              <span>Employee Documents</span>
+            </Link>
             <button
               onClick={handleExportCSV}
               className="flex items-center gap-1.5 bg-white hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-lg text-xs font-semibold border border-slate-200 shadow-xs transition-all"

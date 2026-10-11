@@ -9,14 +9,19 @@ const router = Router();
 
 router.use(authenticate);
 
+/** 24-hour wall-clock time, e.g. "09:30" or "16:30:00". */
+const timeOfDay = z
+  .string()
+  .regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Time must be in HH:MM format (24-hour)');
+
 const shiftSchema = z.object({
   body: z.object({
     name: z.string().min(2).max(50),
     code: z.string().min(2).max(20).toUpperCase(),
     locationId: z.string().min(1),
     departmentId: z.string().optional(),
-    startTime: z.string(),
-    endTime: z.string(),
+    startTime: timeOfDay,
+    endTime: timeOfDay,
     gracePeriod: z.number().int().min(0).max(60).optional(),
     lateThreshold: z.number().int().min(0).max(120).optional(),
     earlyLoginIncentive: z.boolean().optional(),
