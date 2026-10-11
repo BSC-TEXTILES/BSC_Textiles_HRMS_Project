@@ -6,10 +6,196 @@ import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../mi
 import { socketIO } from '../socket.js';
 import { validate } from '../middleware/validation.js';
 import { container } from '../core/container/ServiceContainer.js';
+import { pool } from '../nativeDb.js';
+import {
+  computeDurations,
+  computeShiftWindow,
+  describeException,
+  deriveDisplayStatus,
+  isValidYmd,
+  statusMatchesFilter,
+  tallyRows,
+  todayYmd,
+  weekdayOf,
+  windowFromScheduled,
+  type DisplayStatus,
+  type ShiftWindow,
+} from '../core/services/AttendanceCalculationService.js';
+import lateFineRoutes from './lateFines.js';
 
 const router = Router();
 
+router.use('/late-fines', lateFineRoutes);
 router.use(authenticate);
+
+/**
+ * GET /api/attendance/corrections
+ * Fetch punch regularization requests
+ */
+router.get('/corrections', async (req: AuthRequest, res) => {
+  try {
+    const { employeeId, locationId, status, date } = req.query;
+    let query = `
+      SELECT c.*, 
+             e.fullName as employeeName, 
+             e.employeeCode, 
+             e.designation, 
+             l.name as locationName,
+             d.name as departmentName
+      FROM attendancecorrection c
+      JOIN employee e ON c.employeeId = e.id
+      LEFT JOIN location l ON c.locationId = l.id
+      LEFT JOIN department d ON e.departmentId = d.id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+    if (employeeId) {
+      query += ` AND c.employeeId = ?`;
+      params.push(employeeId);
+    } else if (req.user!.role === 'EMPLOYEE' || req.user!.role === 'SALES_EMPLOYEE') {
+      if (req.user!.employeeId) {
+        query += ` AND c.employeeId = ?`;
+        params.push(req.user!.employeeId);
+      }
+    }
+    if (locationId && locationId !== 'all') {
+      query += ` AND c.locationId = ?`;
+      params.push(locationId);
+    }
+    if (status && status !== 'ALL') {
+      query += ` AND c.status = ?`;
+      params.push(status);
+    }
+    if (date) {
+      query += ` AND c.attendanceDate = ?`;
+      params.push(date);
+    }
+    query += ` ORDER BY c.createdAt DESC LIMIT 100`;
+
+    const [rows]: any = await pool.query(query, params);
+    res.json({ corrections: rows, count: rows.length });
+  } catch (error: any) {
+    console.error('Get punch corrections error:', error);
+    res.status(500).json({ error: 'Failed to fetch punch corrections', message: error.message });
+  }
+});
+
+/**
+ * POST /api/attendance/corrections
+ * Submit punch regularization request
+ */
+router.post('/corrections', async (req: AuthRequest, res) => {
+  try {
+    const { employeeId, attendanceDate, requestedLogin, requestedLogout, reason } = req.body;
+    let targetEmpId = employeeId;
+    if (req.user!.role === 'EMPLOYEE' || req.user!.role === 'SALES_EMPLOYEE') {
+      targetEmpId = req.user!.employeeId || employeeId;
+    } else if (!targetEmpId) {
+      targetEmpId = req.user?.employeeId;
+    }
+    if (!targetEmpId) {
+      return res.status(400).json({ error: 'Employee ID is required' });
+    }
+    if (!reason?.trim()) {
+      return res.status(400).json({ error: 'Reason for punch correction is mandatory' });
+    }
+
+    const [empRows]: any = await pool.query('SELECT id, locationId FROM employee WHERE id = ?', [targetEmpId]);
+    if (!empRows.length) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    const emp = empRows[0];
+
+    const attDate = attendanceDate || new Date().toISOString().slice(0, 10);
+    const id = `corr_${crypto.randomUUID()}`;
+
+    await pool.query(
+      `INSERT INTO attendancecorrection 
+       (id, employeeId, locationId, attendanceDate, requestedLogin, requestedLogout, reason, status, requestedById, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, NOW(3), NOW(3))`,
+      [
+        id,
+        targetEmpId,
+        emp.locationId,
+        attDate,
+        requestedLogin ? new Date(requestedLogin) : null,
+        requestedLogout ? new Date(requestedLogout) : null,
+        reason.trim(),
+        req.user?.id || null,
+      ]
+    );
+
+    const [createdRows]: any = await pool.query('SELECT * FROM attendancecorrection WHERE id = ?', [id]);
+    res.status(201).json({ correction: createdRows[0], message: 'Punch correction request submitted successfully' });
+  } catch (error: any) {
+    console.error('Create punch correction error:', error);
+    res.status(500).json({ error: 'Failed to submit punch correction', message: error.message });
+  }
+});
+
+/**
+ * POST /api/attendance/corrections/:id/approve
+ */
+router.post('/corrections/:id/approve', authorize('EDIT'), async (req: AuthRequest, res) => {
+  try {
+    const { reviewNote } = req.body;
+    const [rows]: any = await pool.query('SELECT * FROM attendancecorrection WHERE id = ?', [req.params.id]);
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Correction request not found' });
+    }
+    const corr = rows[0];
+
+    await pool.query(
+      `UPDATE attendancecorrection 
+       SET status = 'APPROVED', reviewedById = ?, reviewNote = ?, appliedAt = NOW(3), updatedAt = NOW(3)
+       WHERE id = ?`,
+      [req.user?.id || 'admin', reviewNote || 'Approved by floor manager', req.params.id]
+    );
+
+    if (corr.requestedLogin || corr.requestedLogout) {
+      const dateStr = new Date(corr.attendanceDate).toISOString().slice(0, 10);
+      const [attRows]: any = await pool.query(
+        'SELECT id, actualLogin, actualLogout FROM attendance WHERE employeeId = ? AND DATE(attendanceDate) = ?',
+        [corr.employeeId, dateStr]
+      );
+      if (attRows.length) {
+        await pool.query(
+          `UPDATE attendance 
+           SET actualLogin = COALESCE(?, actualLogin), 
+               actualLogout = COALESCE(?, actualLogout),
+               status = 'PRESENT',
+               notes = CONCAT(COALESCE(notes, ''), ' [Regularized]')
+           WHERE id = ?`,
+          [corr.requestedLogin, corr.requestedLogout, attRows[0].id]
+        );
+      }
+    }
+
+    res.json({ message: 'Correction request approved and attendance synchronized' });
+  } catch (error: any) {
+    console.error('Approve punch correction error:', error);
+    res.status(500).json({ error: 'Failed to approve correction', message: error.message });
+  }
+});
+
+/**
+ * POST /api/attendance/corrections/:id/reject
+ */
+router.post('/corrections/:id/reject', authorize('EDIT'), async (req: AuthRequest, res) => {
+  try {
+    const { reviewNote } = req.body;
+    await pool.query(
+      `UPDATE attendancecorrection 
+       SET status = 'REJECTED', reviewedById = ?, reviewNote = ?, updatedAt = NOW(3)
+       WHERE id = ?`,
+      [req.user?.id || 'admin', reviewNote || 'Rejected per policy', req.params.id]
+    );
+    res.json({ message: 'Correction request rejected' });
+  } catch (error: any) {
+    console.error('Reject punch correction error:', error);
+    res.status(500).json({ error: 'Failed to reject correction', message: error.message });
+  }
+});
 
 const attendanceSchema = z.object({
   body: z.object({
@@ -47,16 +233,40 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
     if (departmentId && departmentId !== 'all') {
       where.employee = { ...(where.employee || {}), departmentId: String(departmentId) };
     }
+    // Date filters are normalised to strict yyyy-mm-dd strings so that
+    // DATE column comparisons never drift with server/client timezone.
+    const dayOf = (v: any): string | null => {
+      const s = String(v);
+      if (isValidYmd(s)) return s;
+      const short = s.slice(0, 10);
+      if (isValidYmd(short)) return short;
+      const parsed = new Date(s);
+      if (isNaN(parsed.getTime())) return null;
+      return dbDate(parsed).toISOString().slice(0, 10);
+    };
+
     if (date) {
-      const d = new Date(String(date));
-      d.setHours(0, 0, 0, 0);
-      const nextD = new Date(d);
-      nextD.setDate(nextD.getDate() + 1);
-      where.attendanceDate = { gte: d, lt: nextD };
+      const ymd = dayOf(date);
+      if (!ymd) {
+        return res.status(400).json({ error: 'INVALID_DATE', message: 'date must be a valid calendar date (YYYY-MM-DD).' });
+      }
+      where.attendanceDate = ymd;
     } else if (startDate || endDate) {
       where.attendanceDate = {};
-      if (startDate) where.attendanceDate.gte = new Date(String(startDate));
-      if (endDate) where.attendanceDate.lte = new Date(String(endDate));
+      if (startDate) {
+        const s = dayOf(startDate);
+        if (!s) {
+          return res.status(400).json({ error: 'INVALID_DATE', message: 'startDate must be a valid calendar date (YYYY-MM-DD).' });
+        }
+        where.attendanceDate.gte = s;
+      }
+      if (endDate) {
+        const e = dayOf(endDate);
+        if (!e) {
+          return res.status(400).json({ error: 'INVALID_DATE', message: 'endDate must be a valid calendar date (YYYY-MM-DD).' });
+        }
+        where.attendanceDate.lte = e;
+      }
     }
     
     const [attendances, total] = await Promise.all([
@@ -460,6 +670,552 @@ router.get('/today', authorize('VIEW'), async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('Get today attendance error:', error);
     res.status(500).json({ error: 'Failed to get today attendance' });
+  }
+});
+
+/* ------------------------------------------------------------------ */
+/* Shift Board — date-driven roster behind /attendance/shifts          */
+/* ------------------------------------------------------------------ */
+
+/** Employment statuses that form the current roster base. */
+const ROSTER_EMP_STATUSES = new Set(['ACTIVE', 'PROBATION', 'ON_LEAVE']);
+
+/** Attendance statuses selectable from the UI Status filter. */
+export const BOARD_STATUS_OPTIONS = [
+  'PRESENT',
+  'CHECKED_OUT',
+  'PUNCHED_IN',
+  'LATE',
+  'ON_BREAK',
+  'ABSENT',
+  'ON_LEAVE',
+  'WEEKLY_OFF',
+  'HOLIDAY',
+  'NOT_PUNCHED_IN',
+  'INCOMPLETE',
+  'SCHEDULED',
+] as const;
+
+const SORT_KEYS = new Set(['code', 'name', 'department', 'hub', 'shift', 'status', 'in', 'late']);
+
+function ymdOfDate(v: any): string | null {
+  if (!v) return null;
+  const d = v instanceof Date ? v : new Date(v);
+  if (isNaN(d.getTime())) return null;
+  return todayYmd(d);
+}
+
+function isoOrNull(v: any): string | null {
+  if (!v) return null;
+  const d = v instanceof Date ? v : new Date(v);
+  return isNaN(d.getTime()) ? null : d.toISOString();
+}
+
+/** Resolves the effective location scope for the board (RBAC enforced). */
+async function resolveBoardScope(user: AuthRequest['user'], requested: any): Promise<string | undefined> {
+  const scoped = getScopedLocationId(user, requested);
+  if (!scoped || scoped === 'all') return undefined;
+  const cleanCode = scoped.replace(/^loc_/, '').toUpperCase();
+  const locMatch = await prisma.location.findFirst({ where: { OR: [{ id: scoped }, { code: cleanCode }] } });
+  return locMatch ? locMatch.id : scoped;
+}
+
+interface BoardRow {
+  id: string;
+  employeeId: string;
+  employeeCode: string;
+  fullName: string;
+  departmentId: string | null;
+  department: string;
+  locationId: string | null;
+  hub: string;
+  designation: string;
+  employmentStatus: string;
+  shiftId: string | null;
+  shiftName: string;
+  shiftCode: string | null;
+  overnight: boolean;
+  scheduledLogin: string | null;
+  scheduledLogout: string | null;
+  actualLogin: string | null;
+  actualLogout: string | null;
+  status: DisplayStatus;
+  isLate: boolean;
+  lateMinutes: number;
+  earlyMinutes: number;
+  earlyExitMinutes: number;
+  overtimeMinutes: number;
+  workedSeconds: number;
+  breakMinutes: number;
+  attendanceRecordId: string | null;
+  attendanceDate: string;
+  hasRecord: boolean;
+  faceVerified: boolean | null;
+  notes: string | null;
+  correction: {
+    id: string;
+    status: string;
+    reason: string;
+    reviewNote: string | null;
+    requestedById: string | null;
+    reviewedById: string | null;
+  } | null;
+  exception: string;
+  exceptionTone: 'green' | 'blue' | 'amber' | 'red' | 'slate';
+  isException: boolean;
+}
+
+/**
+ * Builds the complete Shift Board dataset for one date: summary counters,
+ * per-shift cards and every employee row (before pagination). All filters
+ * (hub, department, shift, attendance status, search, exceptions-only) are
+ * applied against real database records — nothing is fabricated for empty
+ * dates.
+ */
+async function buildShiftBoard(req: AuthRequest) {
+  const dateParam = req.query.date || todayYmd();
+  if (!isValidYmd(String(dateParam))) {
+    return {
+      status: 400,
+      error: {
+        error: 'INVALID_DATE',
+        message: 'Query parameter "date" must be a valid calendar date in YYYY-MM-DD format.',
+      },
+    };
+  }
+  const date = String(dateParam);
+  const today = todayYmd();
+  const now = new Date();
+
+  const search = String(req.query.search || '').trim();
+  const statusFilter =
+    req.query.status && req.query.status !== 'all' ? String(req.query.status) : '';
+  const exceptionsOnly = req.query.exceptions === '1' || req.query.exceptions === 'true';
+  const sortKey = SORT_KEYS.has(String(req.query.sort)) ? String(req.query.sort) : 'code';
+  const departmentId =
+    req.query.departmentId && req.query.departmentId !== 'all' ? String(req.query.departmentId) : null;
+  const shiftId = req.query.shiftId && req.query.shiftId !== 'all' ? String(req.query.shiftId) : null;
+  const scopeLocId = await resolveBoardScope(req.user, req.query.locationId);
+
+  const [locations, shifts, employees, attendance, weeklyOffRules, holidays, breakRows, leaveRows, correctionRows] =
+    await Promise.all([
+      prisma.location.findMany({ select: { id: true, name: true, code: true } }).catch(() => []),
+      prisma.shift.findMany({
+        where: {
+          ...(scopeLocId ? { locationId: scopeLocId } : {}),
+          ...(shiftId ? { id: shiftId } : { status: 'ACTIVE' }),
+        },
+        orderBy: { startTime: 'asc' },
+      }) as Promise<any[]>,
+      prisma.employee.findMany({
+        where: scopeLocId ? { locationId: scopeLocId } : {},
+        include: { location: true, department: true, shift: true },
+      }) as Promise<any[]>,
+      prisma.attendance.findMany({
+        where: {
+          attendanceDate: date,
+          ...(scopeLocId ? { locationId: scopeLocId } : {}),
+          ...(shiftId ? { shiftId } : {}),
+        },
+        include: { shift: true, location: true },
+      }) as Promise<any[]>,
+      prisma.weeklyOffRule.findMany({
+        where: { ...(scopeLocId ? { locationId: scopeLocId } : {}), effectiveFrom: { lte: date } },
+      }).catch(() => []) as Promise<any[]>,
+      prisma.holiday.findMany({ where: { date } }).catch(() => []) as Promise<any[]>,
+      prisma.employeeBreak.findMany({ where: { breakDate: date } }).catch(() => []) as Promise<any[]>,
+      pool
+        .query(
+          `SELECT employee_id AS employeeId, leave_type_id AS leaveTypeId, is_half_day AS isHalfDay
+             FROM leave_applications
+            WHERE status = 'APPROVED' AND start_date <= ? AND end_date >= ?`,
+          [date, date]
+        )
+        .then(([rows]: any[]) => rows)
+        .catch(() => []),
+      pool
+        .query(
+          `SELECT * FROM attendancecorrection
+            WHERE attendanceDate = ?
+              ${scopeLocId ? 'AND locationId = ?' : ''}
+            ORDER BY createdAt DESC`,
+          scopeLocId ? [date, scopeLocId] : [date]
+        )
+        .then(([rows]: any[]) => rows)
+        .catch(() => []),
+    ]);
+
+  // Shifts referenced by roster/attendance rows but outside the loaded list.
+  const shiftById = new Map<string, any>(shifts.map((s: any) => [s.id, s]));
+  const referencedShiftIds = [
+    ...attendance.map((a: any) => a.shiftId),
+    ...employees.map((e: any) => e.shiftId),
+  ].filter((id: any) => id && !shiftById.has(id));
+  const missingShiftIds = [...new Set(referencedShiftIds)] as string[];
+  if (missingShiftIds.length > 0) {
+    const extra: any[] = await prisma.shift.findMany({ where: { id: { in: missingShiftIds } } }).catch(() => []);
+    for (const s of extra) shiftById.set(s.id, s);
+  }
+
+  const locationName = new Map<string, string>(locations.map((l: any) => [l.id, l.name]));
+  const empById = new Map<string, any>(employees.map((e: any) => [e.id, e]));
+  const attByEmp = new Map<string, any>(attendance.map((a: any) => [a.employeeId, a]));
+  const leaveSet = new Set<string>(leaveRows.map((l: any) => String(l.employeeId)));
+  const breakByEmp = new Map<string, { minutes: number; active: boolean }>();
+  for (const b of breakRows as any[]) {
+    const prev = breakByEmp.get(b.employeeId) || { minutes: 0, active: false };
+    prev.minutes += Math.max(0, Number(b.actualDuration || 0));
+    prev.active = prev.active || (b.status === 'ACTIVE' && !b.endTime);
+    breakByEmp.set(b.employeeId, prev);
+  }
+  const correctionByEmp = new Map<string, any>();
+  for (const c of correctionRows as any[]) {
+    if (!correctionByEmp.has(c.employeeId)) correctionByEmp.set(c.employeeId, c);
+  }
+  const activeWeeklyOffRules = (weeklyOffRules as any[]).filter((r) => {
+    const from = ymdOfDate(r.effectiveFrom);
+    const to = ymdOfDate(r.effectiveTo);
+    return (!from || from <= date) && (!to || to >= date);
+  });
+  const weekday = weekdayOf(date);
+
+  // Roster = filtered current employees ∪ employees with an attendance
+  // snapshot on this date (covers transfers and exits for historical dates).
+  const rosterIds = new Set<string>();
+  for (const e of employees) {
+    if (departmentId && e.departmentId !== departmentId) continue;
+    if (shiftId && e.shiftId !== shiftId) continue;
+    if (e.status && !ROSTER_EMP_STATUSES.has(e.status)) continue;
+    rosterIds.add(e.id);
+  }
+  for (const a of attendance) {
+    if (departmentId) {
+      const e = empById.get(a.employeeId);
+      if (!e || e.departmentId !== departmentId) continue;
+    }
+    rosterIds.add(a.employeeId);
+  }
+
+  const rows: BoardRow[] = [];
+  for (const empId of rosterIds) {
+    const e = empById.get(empId);
+    const a = attByEmp.get(empId) || null;
+    const locId = (a && a.locationId) || (e && e.locationId) || null;
+    const deptId = (e && e.departmentId) || null;
+    let effShiftId: string | null = (a && a.shiftId) || (e && e.shiftId) || null;
+    if (a?.shiftId && locId) {
+      const attShift = shiftById.get(a.shiftId);
+      if (attShift && attShift.locationId && attShift.locationId !== locId) {
+        // Attendance snapshot points at another hub's shift (legacy data) —
+        // trust the employee's current assignment for the roster view.
+        effShiftId = (e && e.shiftId) || null;
+      }
+    }
+    const shift = effShiftId ? shiftById.get(effShiftId) : null;
+
+    const window: ShiftWindow | null =
+      a && a.scheduledLogin && a.scheduledLogout
+        ? windowFromScheduled(a.scheduledLogin, a.scheduledLogout)
+        : computeShiftWindow(shift, date);
+
+    const lateThreshold = shift ? Number(shift.lateThreshold ?? 5) : 5;
+    const durations = computeDurations(window, a?.actualLogin, a?.actualLogout, lateThreshold);
+    const breaks = breakByEmp.get(empId) || { minutes: 0, active: false };
+
+    const isHoliday = (holidays as any[]).some(
+      (h) => (!h.locationId || h.locationId === locId) && (!h.departmentId || h.departmentId === deptId)
+    );
+    const isWeeklyOff = activeWeeklyOffRules.some(
+      (r) =>
+        r.locationId === locId &&
+        (!r.employeeId || r.employeeId === empId) &&
+        (!r.departmentId || r.departmentId === deptId) &&
+        (!r.shiftId || r.shiftId === effShiftId) &&
+        r.dayOfWeek === weekday
+    );
+
+    const derived = deriveDisplayStatus({
+      recordStatus: a?.status,
+      actualLogin: a?.actualLogin,
+      actualLogout: a?.actualLogout,
+      isLeave: leaveSet.has(empId),
+      isHoliday,
+      isWeeklyOff,
+      onBreak: breaks.active,
+      window,
+      durations,
+      workDate: date,
+      today,
+      now,
+      lateThresholdMinutes: lateThreshold,
+    });
+
+    const exc = describeException(derived.status, {
+      durations,
+      window,
+      graceMinutes: shift ? Number(shift.gracePeriod ?? 5) : 5,
+      hasLogin: !!a?.actualLogin,
+      hasLogout: !!a?.actualLogout,
+      isPastDate: date < today,
+      isLate: derived.isLate,
+    });
+
+    const corr = correctionByEmp.get(empId);
+
+    rows.push({
+      id: empId,
+      employeeId: empId,
+      employeeCode: e?.employeeCode || '—',
+      fullName: e?.fullName || '—',
+      departmentId: deptId,
+      department: e?.department?.name || '—',
+      locationId: locId,
+      hub: (a && a.location?.name) || e?.location?.name || locationName.get(locId || '') || '—',
+      designation: e?.designation || '—',
+      employmentStatus: e?.status || '—',
+      shiftId: effShiftId,
+      shiftName: shift?.name || '—',
+      shiftCode: shift?.code || null,
+      overnight: window?.overnight || false,
+      scheduledLogin: window ? window.start.toISOString() : null,
+      scheduledLogout: window ? window.end.toISOString() : null,
+      actualLogin: isoOrNull(a?.actualLogin),
+      actualLogout: isoOrNull(a?.actualLogout),
+      status: derived.status,
+      isLate: derived.isLate,
+      lateMinutes: derived.lateMinutes,
+      earlyMinutes: Math.round(durations.earlyLoginSeconds / 60),
+      earlyExitMinutes: Math.round(durations.earlyLogoutSeconds / 60),
+      overtimeMinutes: Math.round(durations.overtimeSeconds / 60),
+      workedSeconds: durations.totalWorkingSeconds || Number(a?.totalWorkingSeconds || 0),
+      breakMinutes: breaks.minutes,
+      attendanceRecordId: a?.id || null,
+      attendanceDate: date,
+      hasRecord: !!a,
+      faceVerified: a ? !!a.faceVerified : null,
+      notes: a?.notes || null,
+      correction: corr
+        ? {
+            id: corr.id,
+            status: corr.status,
+            reason: corr.reason,
+            reviewNote: corr.reviewNote || null,
+            requestedById: corr.requestedById || null,
+            reviewedById: corr.reviewedById || null,
+          }
+        : null,
+      exception: exc.text,
+      exceptionTone: exc.tone,
+      isException: exc.isException,
+    });
+  }
+
+  // Summary + per-shift cards are computed over the hub/dept/shift scope and
+  // deliberately ignore the status/search filters so the cards stay stable.
+  const summary = tallyRows(rows);
+  const shiftCards = (shifts as any[])
+    .filter((s) => !shiftId || s.id === shiftId)
+    .map((s) => {
+      const staff = tallyRows(rows.filter((r) => r.shiftId === s.id));
+      return {
+        id: s.id,
+        name: s.name,
+        code: s.code,
+        locationId: s.locationId,
+        locationName: locationName.get(s.locationId) || '—',
+        startTime: isoOrNull(s.startTime),
+        endTime: isoOrNull(s.endTime),
+        gracePeriod: Number(s.gracePeriod ?? 5),
+        lateThreshold: Number(s.lateThreshold ?? 15),
+        status: s.status,
+        overnight:
+          computeShiftWindow(s, date)?.overnight ||
+          false,
+        staff,
+      };
+    });
+
+  // Status / exceptions / search filters narrow the row list.
+  let filtered = rows;
+  if (statusFilter) filtered = filtered.filter((r) => statusMatchesFilter(r.status, r.isLate, statusFilter));
+  if (exceptionsOnly) filtered = filtered.filter((r) => r.isException);
+  if (search) {
+    const q = search.toLowerCase();
+    filtered = filtered.filter((r) =>
+      [r.employeeCode, r.fullName, r.department, r.hub, r.shiftName, r.designation, r.employmentStatus]
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
+    );
+  }
+
+  const dir = 1;
+  const sorted = [...filtered].sort((a, b) => {
+    let cmp = 0;
+    switch (sortKey) {
+      case 'name':
+        cmp = a.fullName.localeCompare(b.fullName);
+        break;
+      case 'department':
+        cmp = a.department.localeCompare(b.department);
+        break;
+      case 'hub':
+        cmp = a.hub.localeCompare(b.hub);
+        break;
+      case 'shift':
+        cmp = a.shiftName.localeCompare(b.shiftName);
+        break;
+      case 'status':
+        cmp = a.status.localeCompare(b.status);
+        break;
+      case 'in':
+        cmp = String(a.actualLogin || '').localeCompare(String(b.actualLogin || ''));
+        break;
+      case 'late':
+        cmp = a.lateMinutes - b.lateMinutes;
+        break;
+      default:
+        cmp = a.employeeCode.localeCompare(b.employeeCode);
+    }
+    return cmp !== 0 ? cmp * dir : a.fullName.localeCompare(b.fullName);
+  });
+
+  return {
+    status: 200,
+    data: {
+      date,
+      today,
+      isToday: date === today,
+      isFuture: date > today,
+      scope: {
+        locationId: scopeLocId || 'all',
+        departmentId,
+        shiftId,
+        status: statusFilter || 'all',
+        search,
+        exceptions: exceptionsOnly,
+        sort: sortKey,
+      },
+      summary,
+      shifts: shiftCards,
+      total: sorted.length,
+      rows: sorted,
+      statusOptions: BOARD_STATUS_OPTIONS,
+    },
+  };
+}
+
+router.get('/shift-board', authorize('VIEW'), async (req: AuthRequest, res) => {
+  try {
+    const result = await buildShiftBoard(req);
+    if (result.status !== 200 || !('data' in result)) {
+      return res.status(result.status).json((result as any).error);
+    }
+    const data: any = (result as any).data;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 15));
+    const start = (page - 1) * limit;
+    const rows = data.rows.slice(start, start + limit);
+    res.json({
+      ...data,
+      rows,
+      page,
+      limit,
+      pages: Math.max(1, Math.ceil(data.total / limit)),
+    });
+  } catch (error) {
+    console.error('Shift board error:', error);
+    res.status(500).json({ error: 'Failed to build shift board' });
+  }
+});
+
+/** Escapes one CSV cell and neutralises spreadsheet formula injection. */
+function csvCell(v: any): string {
+  let s = v === null || v === undefined ? '' : String(v);
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  if (/[",\n\r]/.test(s)) s = `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function csvStamp(v: any): string {
+  if (!v) return '';
+  const d = v instanceof Date ? v : new Date(v);
+  if (isNaN(d.getTime())) return '';
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+router.get('/shift-board/export', authorize('VIEW'), async (req: AuthRequest, res) => {
+  try {
+    const result = await buildShiftBoard(req);
+    if (result.status !== 200 || !('data' in result)) {
+      return res.status(result.status).json((result as any).error);
+    }
+    const data: any = (result as any).data;
+    const rows: BoardRow[] = data.rows;
+
+    const header = [
+      'Employee ID',
+      'Employee Name',
+      'Department',
+      'Hub',
+      'Designation',
+      'Employment Status',
+      'Scheduled Shift',
+      'Scheduled Login',
+      'Scheduled Logout',
+      'Actual Login',
+      'Actual Logout',
+      'Attendance Status',
+      'Late (min)',
+      'Early Arrival (min)',
+      'Early Exit (min)',
+      'Worked (h:mm)',
+      'Break (min)',
+      'Attendance Date',
+      'Regularization Status',
+      'Punch Exception',
+    ];
+    const workedHm = (sec: number) => `${Math.floor(sec / 3600)}:${String(Math.floor((sec % 3600) / 60)).padStart(2, '0')}`;
+
+    const lines = [header.map(csvCell).join(',')];
+    for (const r of rows) {
+      lines.push(
+        [
+          r.employeeCode,
+          r.fullName,
+          r.department,
+          r.hub,
+          r.designation,
+          r.employmentStatus,
+          r.shiftName,
+          csvStamp(r.scheduledLogin),
+          csvStamp(r.scheduledLogout),
+          csvStamp(r.actualLogin),
+          csvStamp(r.actualLogout),
+          r.status,
+          r.lateMinutes,
+          r.earlyMinutes,
+          r.earlyExitMinutes,
+          workedHm(r.workedSeconds),
+          r.breakMinutes,
+          r.attendanceDate,
+          r.correction ? r.correction.status : '',
+          r.exception,
+        ]
+          .map(csvCell)
+          .join(',')
+      );
+    }
+
+    const csv = `\uFEFF${lines.join('\r\n')}`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="BSC_Shift_Board_${data.date}.csv"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(csv);
+  } catch (error) {
+    console.error('Shift board export error:', error);
+    res.status(500).json({ error: 'Failed to export shift board' });
   }
 });
 

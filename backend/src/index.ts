@@ -18,6 +18,7 @@ import { csrfProtection } from './middleware/csrfProtection.js';
 import { timingMiddleware } from './middleware/timing.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { setupViews } from './scripts/setupViews.js';
+import { UserUploadService } from './services/userUploadService.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -162,6 +163,7 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 BSC Textiles HRMS Security-Hardened Server running on port ${PORT}`);
   console.log(`📡 WebSocket server ready`);
   setupViews().catch((err) => console.warn('[setupViews warning]:', err.message));
+  UserUploadService.syncAllUserFolders().catch((err) => console.warn('[UserUploadService warning]:', err.message));
 });
 
 process.on('SIGINT', async () => {

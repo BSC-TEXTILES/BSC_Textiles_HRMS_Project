@@ -33,10 +33,14 @@ import mobileRoutes from '../../routes/mobile.js';
 import securityRoutes from '../../routes/security.js';
 import fileSecurityRoutes from '../../routes/fileSecurity.js';
 import { staffOpsRouter, observationLevelsRouter } from '../../routes/workerOps.js';
+import lateFineRoutes from '../../routes/lateFines.js';
+import employeeDocumentRoutes from '../../routes/employeeDocuments.js';
+import myDeskRouter from '../../routes/myDesk.js';
 
 export const apiV1Router = Router();
 
 // Domain Route Mounting under /api/v1 (or /api for backwards compatibility)
+apiV1Router.use('/my-desk', myDeskRouter);
 apiV1Router.use('/auth', authRoutes);
 apiV1Router.use('/security', securityRoutes);
 apiV1Router.use('/files', fileSecurityRoutes);
@@ -46,9 +50,12 @@ apiV1Router.use('/floors', floorRoutes);
 apiV1Router.use('/departments', departmentRoutes);
 apiV1Router.use('/sections', sectionRoutes);
 apiV1Router.use('/selling-points', sellingPointRoutes);
+apiV1Router.use('/employees/documents', employeeDocumentRoutes);
+apiV1Router.use('/employee-documents', employeeDocumentRoutes);
 apiV1Router.use('/employees', employeeRoutes);
 apiV1Router.use('/shifts', shiftRoutes);
 apiV1Router.use('/attendance', attendanceRoutes);
+apiV1Router.use('/late-fines', lateFineRoutes);
 apiV1Router.use('/staff-ops', staffOpsRouter);
 apiV1Router.use('/observation-levels', observationLevelsRouter);
 apiV1Router.use('/breaks', breakRoutes);

@@ -1,12 +1,47 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { DetailDrillDownModal, type DetailMetric } from '@/components/dashboard/DetailDrillDownModal';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import { ADMIN_ROLES } from '@/lib/roles';
+
+/** Attendance statuses selectable from the Status filter (see shift-board API). */
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All Statuses' },
+  { value: 'PRESENT', label: 'Present (any)' },
+  { value: 'CHECKED_OUT', label: 'Checked Out' },
+  { value: 'PUNCHED_IN', label: 'Punched In' },
+  { value: 'LATE', label: 'Late' },
+  { value: 'ON_BREAK', label: 'On Break' },
+  { value: 'ABSENT', label: 'Absent' },
+  { value: 'ON_LEAVE', label: 'On Leave' },
+  { value: 'WEEKLY_OFF', label: 'Weekly Off' },
+  { value: 'HOLIDAY', label: 'Holiday' },
+  { value: 'NOT_PUNCHED_IN', label: 'Not Punched In' },
+  { value: 'INCOMPLETE', label: 'Missing Punch' },
+  { value: 'SCHEDULED', label: 'Scheduled' },
+];
+
+function ymdOf(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function hmOf(iso?: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
 
 export default function ShiftsRosterPage() {
+  const { data: session } = useSession();
+  const role = (session?.user as any)?.role as string | undefined;
+  const userLocationId = (session?.user as any)?.locationId as string | undefined;
+  const canViewAllHubs = (ADMIN_ROLES as readonly string[]).includes(role || '');
+
   const [shifts, setShifts] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
@@ -14,13 +49,10 @@ export default function ShiftsRosterPage() {
   const [selectedDept, setSelectedDept] = useState('all');
   const [selectedShift, setSelectedShift] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  });
+  const [selectedDate, setSelectedDate] = useState(() => ymdOf(new Date()));
   const [loading, setLoading] = useState(true);
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [board, setBoard] = useState<any>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [drill, setDrill] = useState<{ metric: DetailMetric; title: string; shiftId?: string; shiftName?: string } | null>(null);
   const [newShift, setNewShift] = useState({
@@ -33,64 +65,111 @@ export default function ShiftsRosterPage() {
     lateThreshold: 15,
   });
 
-  const fetchLocations = useCallback(async () => {
-    try {
-      const res = await api.get('/locations/all');
-      const list = res.data || [];
-      setLocations(list);
-      if (list.length > 0 && !selectedLocation) setSelectedLocation(list[0].id);
-    } catch (e) {
-      console.error(e);
-    }
-  }, [selectedLocation]);
+  const reqIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
-  const fetchDepartments = useCallback(async () => {
-    try {
-      const res = await api.get('/departments');
-      setDepartments(res.data?.departments || []);
-    } catch (e) {
-      console.error(e);
-    }
+  /* ---------------- reference data ---------------- */
+
+  useEffect(() => {
+    if (!session) return;
+    setSelectedLocation((cur) => {
+      if (cur) return cur;
+      if (canViewAllHubs || !userLocationId) return 'all';
+      return userLocationId;
+    });
+  }, [session, canViewAllHubs, userLocationId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get('/locations/all');
+        if (!cancelled) setLocations(res.data || []);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const fetchShifts = useCallback(async () => {
-    try {
-      setLoading(true);
-      const url = selectedLocation && selectedLocation !== 'all' ? `/shifts?locationId=${selectedLocation}` : '/shifts';
-      const res = await api.get(url);
-      setShifts(res.data?.shifts || []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const params: any = { limit: 100 };
+        if (selectedLocation && selectedLocation !== 'all') params.locationId = selectedLocation;
+        const res = await api.get('/departments', { params });
+        if (cancelled) return;
+        setDepartments(res.data?.departments || []);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [selectedLocation]);
 
-  const fetchWorkforceData = useCallback(async () => {
-    try {
-      const [empRes, attRes] = await Promise.all([
-        api.get('/employees?limit=250').catch(() => ({ data: { employees: [] } })),
-        api.get(`/attendance?date=${selectedDate}&limit=250`).catch(() => ({ data: { attendance: [] } })),
-      ]);
-      setEmployees(empRes.data?.employees || []);
-      setAttendanceRecords(attRes.data?.attendance || attRes.data || []);
-    } catch (e) {
-      console.error('Failed to load employee roster data:', e);
-    }
-  }, [selectedDate]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const params: any = { limit: 100 };
+        if (selectedLocation && selectedLocation !== 'all') params.locationId = selectedLocation;
+        const res = await api.get('/shifts', { params });
+        if (cancelled) return;
+        setShifts(res.data?.shifts || []);
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedLocation, isAddModalOpen]);
+
+  /* ---------------- board data ---------------- */
+
+  const fetchBoard = useCallback(
+    async (opts?: { bustCache?: boolean }) => {
+      if (!selectedDate) return;
+      const rid = ++reqIdRef.current;
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setLoading(true);
+      setError(null);
+      try {
+        const params: any = { date: selectedDate, limit: 1 };
+        if (selectedLocation && selectedLocation !== 'all') params.locationId = selectedLocation;
+        if (selectedDept !== 'all') params.departmentId = selectedDept;
+        if (selectedShift !== 'all') params.shiftId = selectedShift;
+        if (selectedStatus !== 'all') params.status = selectedStatus;
+        if (opts?.bustCache) params._ts = String(Date.now());
+        const res = await api.get('/attendance/shift-board', { params, signal: controller.signal });
+        if (rid !== reqIdRef.current) return;
+        setBoard(res.data);
+      } catch (err: any) {
+        if (rid !== reqIdRef.current) return;
+        if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || err?.message === 'canceled') return;
+        console.error('Shift board load failed:', err);
+        setError(err?.response?.data?.message || err?.response?.data?.error || 'Failed to load the shift board.');
+        setBoard(null);
+      } finally {
+        if (rid === reqIdRef.current) setLoading(false);
+      }
+    },
+    [selectedDate, selectedLocation, selectedDept, selectedShift, selectedStatus]
+  );
 
   useEffect(() => {
-    fetchLocations();
-    fetchDepartments();
-  }, [fetchLocations, fetchDepartments]);
+    fetchBoard();
+    return () => abortRef.current?.abort();
+  }, [fetchBoard]);
 
-  useEffect(() => {
-    fetchShifts();
-  }, [fetchShifts]);
-
-  useEffect(() => {
-    fetchWorkforceData();
-  }, [fetchWorkforceData]);
+  /* ---------------- actions ---------------- */
 
   const handleCreateShift = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,101 +178,73 @@ export default function ShiftsRosterPage() {
       return;
     }
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      // Backend expects 24-hour wall-clock times (HH:MM), not full datetimes.
       await api.post('/shifts', {
         name: newShift.name,
-        code: newShift.code || `SHIFT-${Math.floor(100 + Math.random() * 900)}`,
+        code: (newShift.code || `SHIFT-${Math.floor(100 + Math.random() * 900)}`).toUpperCase(),
         locationId: newShift.locationId,
-        startTime: `${today}T${newShift.startTime}:00.000Z`,
-        endTime: `${today}T${newShift.endTime}:00.000Z`,
+        startTime: newShift.startTime,
+        endTime: newShift.endTime,
         gracePeriod: Number(newShift.gracePeriod),
         lateThreshold: Number(newShift.lateThreshold),
       });
       toast.success('Shift created successfully!');
       setIsAddModalOpen(false);
-      fetchShifts();
+      fetchBoard({ bustCache: true });
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to create shift');
     }
   };
 
-  /** Calculate employee headcount & active floor strength for any shift */
-  const getShiftStaffing = (shift: any) => {
-    const code = String(shift.code || '').toUpperCase();
-    const dbCount = shift._count?.employees || 0;
-
-    // Standard enterprise staffing baseline across Karnataka store operations
-    // (General: 140, Morning: 100, Evening: 85, Night: 45)
-    const enterpriseDefaultByCode: Record<string, { total: number; onFloor: number }> = {
-      MORNING: { total: 100, onFloor: 92 },
-      GENERAL: { total: 140, onFloor: 132 },
-      EVENING: { total: 85, onFloor: 78 },
-      NIGHT: { total: 45, onFloor: 42 },
-    };
-
-    // Filter employees assigned to this shift
-    const matchingEmployees = employees.filter((e) => {
-      const matchShift = e.shiftId === shift.id || (e.shift?.code && String(e.shift.code).toUpperCase() === code);
-      const matchLoc = !selectedLocation || selectedLocation === 'all' || e.locationId === selectedLocation;
-      const matchDept = selectedDept === 'all' || e.departmentId === selectedDept;
-      const matchStatus = selectedStatus === 'all' || e.status === selectedStatus;
-      return matchShift && matchLoc && matchDept && matchStatus;
-    });
-
-    if (selectedDept !== 'all' || selectedStatus !== 'all') {
-      const total = matchingEmployees.length;
-      const onFloor = attendanceRecords.filter((a) => matchingEmployees.some((e) => e.id === a.employeeId)).length;
-      const off = Math.max(0, total - onFloor);
-      return {
-        total,
-        onFloor,
-        off,
-        adherence: total > 0 ? Math.round((onFloor / total) * 100) : 0,
-      };
-    }
-
-    const defaultBaseline = enterpriseDefaultByCode[code] || {
-      total: dbCount > 0 ? dbCount * 10 : 65,
-      onFloor: dbCount > 0 ? Math.round(dbCount * 9.2) : 60,
-    };
-
-    // Scale by selected location or show statewide total
-    const isSingleHub = selectedLocation && selectedLocation !== 'all';
-    const scaleFactor = isSingleHub ? 0.35 : 1.0;
-    const total = Math.max(matchingEmployees.length, Math.round(defaultBaseline.total * scaleFactor));
-    const onFloor = Math.max(
-      attendanceRecords.filter((a) => matchingEmployees.some((e) => e.id === a.employeeId)).length,
-      Math.round(defaultBaseline.onFloor * scaleFactor)
-    );
-    const off = Math.max(0, total - onFloor);
-    const adherence = total > 0 ? Math.round((onFloor / total) * 100) : 92;
-
-    return { total, onFloor, off, adherence };
+  const stepDate = (delta: number) => {
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const dt = new Date(y, m - 1, d + delta);
+    setSelectedDate(ymdOf(dt));
   };
-
-  /** Resolve a shift definition by its code (e.g. MORNING / GENERAL). */
-  const shiftByCode = (code: string) =>
-    shifts.find((s) => String(s.code || '').toUpperCase() === code) || null;
 
   const openDrill = (metric: DetailMetric, title: string, shiftId?: string, shiftName?: string) =>
     setDrill({ metric, title, shiftId, shiftName });
 
-  /** Filters + chips passed to the drill-down detail view. */
-  const activeShiftId = drill?.shiftId || (selectedShift !== 'all' ? selectedShift : undefined);
+  /* ---------------- derived ---------------- */
+
+  const summary = board?.summary || null;
+  const shiftCards: any[] = useMemo(() => board?.shifts || [], [board]);
+  const hubName = useCallback(
+    (id: string) => (id === 'all' ? 'All Hubs (Karnataka)' : locations.find((l) => l.id === id)?.name || 'All Hubs'),
+    [locations]
+  );
+
+  const graceMinutes = useMemo(() => {
+    const list = shiftCards.length > 0 ? shiftCards : shifts;
+    if (list.length === 0) return 5;
+    return Math.min(...list.map((s) => Number(s.gracePeriod ?? 5)));
+  }, [shiftCards, shifts]);
+
+  const lateCutoffMinutes = useMemo(() => {
+    const list = shiftCards.length > 0 ? shiftCards : shifts;
+    if (list.length === 0) return 15;
+    return Math.max(...list.map((s) => Number(s.lateThreshold ?? 15)));
+  }, [shiftCards, shifts]);
+
+  const activeShiftsShown = shiftCards.length || shifts.length;
+
   const drillFilters = {
     locationId: selectedLocation || 'all',
     departmentId: selectedDept,
-    shiftId: activeShiftId || 'all',
+    shiftId: drill?.shiftId || (selectedShift !== 'all' ? selectedShift : 'all'),
     status: selectedStatus,
     date: selectedDate,
   };
   const drillChips = [
-    { label: 'Hub', value: selectedLocation === 'all' ? 'All Hubs (Karnataka)' : locations.find((l) => l.id === selectedLocation)?.name || 'All Hubs' },
+    { label: 'Hub', value: hubName(selectedLocation || 'all') },
     { label: 'Dept', value: departments.find((d) => d.id === selectedDept)?.name || 'All Departments' },
-    { label: 'Shift', value: drill?.shiftName || shifts.find((s) => s.id === activeShiftId)?.name || 'All Shifts' },
-    { label: 'Status', value: selectedStatus === 'all' ? 'All Statuses' : selectedStatus },
+    { label: 'Shift', value: drill?.shiftName || shifts.find((s) => s.id === drillFilters.shiftId)?.name || 'All Shifts' },
+    { label: 'Status', value: STATUS_OPTIONS.find((o) => o.value === selectedStatus)?.label || selectedStatus },
     { label: 'Date', value: selectedDate },
   ];
+
+  const kpiCardClass =
+    'group bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/40 dark:hover:border-blue-500/40 hover:bg-[#F8F4F1]/40 dark:hover:bg-slate-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2';
 
   return (
     <DashboardLayout>
@@ -206,20 +257,30 @@ export default function ShiftsRosterPage() {
               <span className="material-symbols-outlined text-[14px]">chevron_right</span>
               <span className="text-[#722F37]">Staff Rostering & Shift Allocations</span>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold text-[#0b1c30] tracking-tight">
                 Floor Shifts & Workforce Rosters Dashboard
               </h1>
               <span className="px-2.5 py-0.5 rounded-full bg-[#F8F4F1] text-[#722F37] text-[10px] font-bold uppercase tracking-wider border border-[#E5D5D7] flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#722F37]"></span> Roster Synced
+                <span className="h-2 w-2 rounded-full bg-[#722F37]"></span>
+                {board?.isToday ? 'Live Roster' : board?.isFuture ? 'Future Schedule' : 'Historical Roster'}
               </span>
             </div>
             <p className="text-xs text-slate-500 max-w-3xl">
-              Active shift timing definitions, grace windows, Karnataka store rosters, and floor allocation oversight.
+              Active shift timing definitions, grace windows, store rosters, and floor allocation oversight — all
+              figures below are read live from the attendance records for the selected date.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => fetchBoard({ bustCache: true })}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all text-xs font-bold disabled:opacity-50"
+            >
+              <span className={`material-symbols-outlined text-[18px] ${loading ? 'animate-spin' : ''}`}>refresh</span>
+              Refresh
+            </button>
             <button
               onClick={() => setIsAddModalOpen(true)}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#722F37] hover:bg-[#5B232A] text-white shadow-md shadow-[#722F37]/20 transition-all text-xs font-bold"
@@ -232,12 +293,7 @@ export default function ShiftsRosterPage() {
 
         {/* 5 SHIFT KPIS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <button
-            type="button"
-            onClick={() => openDrill('shift-configs', 'Active Shifts')}
-            aria-label="View Floor Shift Regularization details: Active Shifts"
-            className="group bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/40 hover:bg-[#F8F4F1]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
-          >
+          <button type="button" onClick={() => openDrill('shift-configs', 'Active Shifts')} aria-label="View Active Shifts details" className={kpiCardClass}>
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Active Shifts</span>
               <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] dark:bg-slate-800 flex items-center justify-center text-[#722F37] dark:text-[#E8DCC6]">
@@ -245,24 +301,19 @@ export default function ShiftsRosterPage() {
               </div>
             </div>
             <div className="my-1">
-              <div className="text-2xl font-bold text-[#0b1c30] dark:text-white">{shifts.length || 4}</div>
-              <div className="text-[11px] text-slate-400 dark:text-slate-500">Store Windows Defined</div>
+              <div className="text-2xl font-bold text-[#0b1c30] dark:text-white">{activeShiftsShown}</div>
+              <div className="text-[11px] text-slate-400 dark:text-slate-500">{locations.length} Hub{locations.length === 1 ? '' : 's'} In Scope</div>
             </div>
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-[#722F37] dark:text-[#E8DCC6] font-semibold">
-              <span>All 4 Locations Active</span>
+              <span>Shift windows configured</span>
             </div>
-            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-[#722F37] dark:group-hover:text-blue-400 transition-colors">
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-[#722F37] transition-colors">
               <span>View Details</span>
               <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
             </div>
           </button>
 
-          <button
-            type="button"
-            onClick={() => openDrill('shift-roster', 'Total Staff Rostered')}
-            aria-label="View Floor Shift Regularization details: Total Staff Rostered"
-            className="group bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/40 dark:hover:border-blue-500/40 hover:bg-[#F8F4F1]/40 dark:hover:bg-slate-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
-          >
+          <button type="button" onClick={() => openDrill('shift-roster', 'Total Staff Rostered')} aria-label="View Total Staff Rostered details" className={kpiCardClass}>
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Staff Rostered</span>
               <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] dark:bg-slate-800 flex items-center justify-center text-[#722F37] dark:text-[#E8DCC6]">
@@ -270,84 +321,65 @@ export default function ShiftsRosterPage() {
               </div>
             </div>
             <div className="my-1">
-              <div className="text-2xl font-bold text-[#0b1c30] dark:text-white">
-                {selectedLocation && selectedLocation !== 'all' ? '130 Staff' : '370 Staff'}
-              </div>
-              <div className="text-[11px] text-slate-400 dark:text-slate-500">100% Floor Coverage</div>
+              <div className="text-2xl font-bold text-[#0b1c30] dark:text-white">{loading ? '—' : summary?.rostered ?? 0}</div>
+              <div className="text-[11px] text-slate-400 dark:text-slate-500">{summary?.withRecord ?? 0} with punch records</div>
             </div>
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-              <span>All Personnel Assigned</span>
+              <span>On the {selectedDate} roster</span>
             </div>
-            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-[#722F37] dark:group-hover:text-blue-400 transition-colors">
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-[#722F37] transition-colors">
               <span>View Details</span>
               <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
             </div>
           </button>
 
-          <button
-            type="button"
-            onClick={() =>
-              openDrill('shift-roster', 'Shift A (Morning)', shiftByCode('MORNING')?.id, shiftByCode('MORNING')?.name)
-            }
-            aria-label="View Floor Shift Regularization details: Shift A (Morning)"
-            className="group bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/40 dark:hover:border-blue-500/40 hover:bg-[#F8F4F1]/40 dark:hover:bg-slate-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
-          >
+          <button type="button" onClick={() => openDrill('shift-roster', 'Present On Floor')} aria-label="View Present On Floor details" className={kpiCardClass}>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Shift A (Morning)</span>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Present On Floor</span>
               <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] dark:bg-slate-800 flex items-center justify-center text-[#722F37] dark:text-[#E8DCC6]">
                 <span className="material-symbols-outlined text-[18px]">wb_sunny</span>
               </div>
             </div>
             <div className="my-1">
-              <div className="text-2xl font-bold text-[#0058be] dark:text-blue-300">
-                {selectedLocation && selectedLocation !== 'all' ? '35 Staff' : '100 Staff'}
+              <div className="text-2xl font-bold text-[#0058be] dark:text-blue-300">{loading ? '—' : summary?.present ?? 0}</div>
+              <div className="text-[11px] text-slate-400 dark:text-slate-500">
+                {summary?.checkedOut ?? 0} checked out • {summary?.onBreak ?? 0} on break
               </div>
-              <div className="text-[11px] text-slate-400 dark:text-slate-500">04:00 AM - 01:00 PM</div>
             </div>
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-              <span>92 Present On Floor</span>
+              <span>{summary?.late ?? 0} arrived late</span>
             </div>
-            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-[#722F37] dark:group-hover:text-blue-400 transition-colors">
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-[#722F37] transition-colors">
               <span>View Details</span>
               <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
             </div>
           </button>
 
-          <button
-            type="button"
-            onClick={() =>
-              openDrill('shift-roster', 'Shift B (General)', shiftByCode('GENERAL')?.id, shiftByCode('GENERAL')?.name)
-            }
-            aria-label="View Floor Shift Regularization details: Shift B (General)"
-            className="group bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/40 dark:hover:border-blue-500/40 hover:bg-[#F8F4F1]/40 dark:hover:bg-slate-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
-          >
+          <button type="button" onClick={() => openDrill('shift-roster', 'Absent & Not Punched')} aria-label="View Absent and Not Punched details" className={kpiCardClass}>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Shift B (General)</span>
-              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] dark:bg-slate-800 flex items-center justify-center text-[#722F37] dark:text-[#E8DCC6]">
-                <span className="material-symbols-outlined text-[18px]">schedule</span>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Absent / No Punch</span>
+              <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-950/40 flex items-center justify-center text-red-600 dark:text-red-400">
+                <span className="material-symbols-outlined text-[18px]">person_alert</span>
               </div>
             </div>
             <div className="my-1">
-              <div className="text-2xl font-bold text-[#0058be] dark:text-blue-300">
-                {selectedLocation && selectedLocation !== 'all' ? '49 Staff' : '140 Staff'}
+              <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                {loading ? '—' : (summary?.absent ?? 0) + (summary?.notPunchedIn ?? 0)}
               </div>
-              <div className="text-[11px] text-slate-400 dark:text-slate-500">09:30 AM - 06:30 PM</div>
+              <div className="text-[11px] text-slate-400 dark:text-slate-500">
+                {summary?.absent ?? 0} absent • {summary?.notPunchedIn ?? 0} awaiting punch
+              </div>
             </div>
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-              <span>132 Present On Floor</span>
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
+              <span>{summary?.incomplete ?? 0} missing OUT punch</span>
             </div>
-            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-[#722F37] dark:group-hover:text-blue-400 transition-colors">
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-[#722F37] transition-colors">
               <span>View Details</span>
               <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
             </div>
           </button>
 
-          <button
-            type="button"
-            onClick={() => openDrill('shift-exceptions', 'Grace Period & Regularization')}
-            aria-label="View Floor Shift Regularization details: Grace Period"
-            className="group bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/40 dark:hover:border-blue-500/40 hover:bg-[#F8F4F1]/40 dark:hover:bg-slate-800/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
-          >
+          <button type="button" onClick={() => openDrill('shift-exceptions', 'Grace Period & Regularization')} aria-label="View Grace Period and Regularization details" className={kpiCardClass}>
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Grace Period</span>
               <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
@@ -355,13 +387,13 @@ export default function ShiftsRosterPage() {
               </div>
             </div>
             <div className="my-1">
-              <div className="text-2xl font-bold text-[#0b1c30] dark:text-white">5 Mins</div>
-              <div className="text-[11px] text-slate-400 dark:text-slate-500">15m Late Cutoff</div>
+              <div className="text-2xl font-bold text-[#0b1c30] dark:text-white">{graceMinutes} Mins</div>
+              <div className="text-[11px] text-slate-400 dark:text-slate-500">{lateCutoffMinutes}m Late Cutoff</div>
             </div>
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-              <span>Statutory Rule Enforced</span>
+              <span>{summary?.late ?? 0} late arrivals today</span>
             </div>
-            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-[#722F37] dark:group-hover:text-blue-400 transition-colors">
+            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-[#722F37] transition-colors">
               <span>View Details</span>
               <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
             </div>
@@ -372,16 +404,18 @@ export default function ShiftsRosterPage() {
         <div className="bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold text-[#0b1c30] dark:text-white mr-1">Filter by Location Hub:</span>
-            <button
-              onClick={() => setSelectedLocation('all')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                selectedLocation === 'all'
-                  ? 'bg-[#722F37] text-white shadow-xs'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              All Hubs (Karnataka Combined)
-            </button>
+            {canViewAllHubs && (
+              <button
+                onClick={() => setSelectedLocation('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  selectedLocation === 'all'
+                    ? 'bg-[#722F37] text-white shadow-xs'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                All Hubs (Karnataka Combined)
+              </button>
+            )}
             {locations.map((loc) => (
               <button
                 key={loc.id}
@@ -396,7 +430,10 @@ export default function ShiftsRosterPage() {
               </button>
             ))}
           </div>
-          <span className="text-xs text-slate-400 dark:text-slate-500">{shifts.length} Shifts Configured</span>
+          <span className="text-xs text-slate-400 dark:text-slate-500">
+            {shifts.length} Shift{shifts.length === 1 ? '' : 's'} Configured
+            {summary ? ` • ${summary.rostered} Rostered` : ''}
+          </span>
         </div>
 
         {/* Detail Drill-down Filters (Department / Shift / Status / Date) */}
@@ -432,148 +469,228 @@ export default function ShiftsRosterPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label htmlFor="fsr-status" className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Employee Status</label>
+            <label htmlFor="fsr-status" className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Attendance Status</label>
             <select
               id="fsr-status"
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#0b1c30] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#722F37]/40 cursor-pointer"
             >
-              <option value="all">All Statuses</option>
-              <option value="ACTIVE">Active</option>
-              <option value="PROBATION">Probation</option>
-              <option value="ON_LEAVE">On Leave</option>
-              <option value="INACTIVE">Inactive</option>
-              <option value="TERMINATED">Terminated</option>
+              {STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
             </select>
           </div>
 
           <div className="flex flex-col gap-1">
             <label htmlFor="fsr-date" className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Date</label>
-            <input
-              id="fsr-date"
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#0b1c30] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#722F37]/40 cursor-pointer"
-            />
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => stepDate(-1)}
+                aria-label="Previous day"
+                className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
+              >
+                <span className="material-symbols-outlined text-[16px]">chevron_left</span>
+              </button>
+              <input
+                id="fsr-date"
+                type="date"
+                value={selectedDate}
+                onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#0b1c30] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#722F37]/40 cursor-pointer"
+              />
+              <button
+                type="button"
+                onClick={() => stepDate(1)}
+                aria-label="Next day"
+                className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
+              >
+                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedDate(ymdOf(new Date()))}
+                className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#eff4ff] border border-[#dce9ff] text-[#0058be] hover:bg-[#dce9ff]"
+              >
+                Today
+              </button>
+            </div>
           </div>
 
-          <span className="text-[11px] text-slate-400 dark:text-slate-500 ml-auto">Filters apply to every card drill-down detail view</span>
+          <div className="ml-auto text-right">
+            {error ? (
+              <button
+                type="button"
+                onClick={() => fetchBoard({ bustCache: true })}
+                className="text-xs font-semibold text-red-600 hover:underline"
+              >
+                Failed to load — Retry
+              </button>
+            ) : (
+              <span className="text-[11px] text-slate-400 dark:text-slate-500">
+                {loading ? 'Loading roster…' : `${board?.total ?? 0} record${(board?.total ?? 0) === 1 ? '' : 's'} match the filters`}
+              </span>
+            )}
+          </div>
         </div>
+
+        {/* Status meta strip */}
+        {summary && !loading && (
+          <div className="flex flex-wrap items-center gap-2 text-[11px]">
+            {[
+              { label: 'Checked out', value: summary.checkedOut, tone: 'text-emerald-600' },
+              { label: 'Punched in', value: summary.present - summary.checkedOut - summary.onBreak, tone: 'text-blue-600' },
+              { label: 'On break', value: summary.onBreak, tone: 'text-blue-600' },
+              { label: 'Late', value: summary.late, tone: 'text-amber-600' },
+              { label: 'On leave', value: summary.onLeave, tone: 'text-slate-600' },
+              { label: 'Weekly off', value: summary.weeklyOff, tone: 'text-slate-500' },
+              { label: 'Holiday', value: summary.holiday, tone: 'text-slate-500' },
+              { label: 'Scheduled', value: summary.scheduled, tone: 'text-slate-500' },
+            ].map((s) => (
+              <span key={s.label} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-[#0e172a] border border-slate-200/80 dark:border-slate-800 font-semibold text-slate-600 dark:text-slate-300">
+                <span className={`font-mono font-bold ${s.tone}`}>{s.value}</span>
+                {s.label}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* SHIFTS GRID */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {shifts.map((s) => {
-            const staffing = getShiftStaffing(s);
-            return (
-              <div
-                key={s.id}
-                role="button"
-                tabIndex={0}
-                aria-label={`View Floor Shift Regularization details: ${s.name}`}
-                onClick={() => openDrill('shift-roster', `Shift: ${s.name}`, s.id, s.name)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    openDrill('shift-roster', `Shift: ${s.name}`, s.id, s.name);
-                  }
-                }}
-                className="group bg-white dark:bg-[#0e172a] rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-[#722F37]/40 dark:hover:border-blue-500/40 hover:bg-[#F8F4F1]/30 dark:hover:bg-slate-800/40 transition-all flex flex-col justify-between cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
-              >
-                <div>
-                  {/* Card Header with Badges */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <span className="text-[10px] font-mono font-bold text-[#722F37] dark:text-[#E8DCC6] bg-[#F8F4F1] dark:bg-slate-800 px-2 py-0.5 rounded border border-[#E5D5D7] dark:border-slate-700">
-                        {s.code || 'SHIFT-A'}
-                      </span>
-                      <h3 className="text-base font-bold text-[#0b1c30] dark:text-white mt-1.5">{s.name}</h3>
-                    </div>
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                        Active
-                      </span>
-                      <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 border border-blue-200 dark:border-blue-800 flex items-center gap-1 shadow-xs">
-                        <span className="material-symbols-outlined text-[13px]">groups</span>
-                        <span>{staffing.total} Staff</span>
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* PROMINENT WORKFORCE HEADCOUNT BOX (Requested by user) */}
-                  <div className="mt-3.5 p-3 rounded-xl bg-gradient-to-r from-blue-50/90 via-sky-50/60 to-indigo-50/80 dark:from-blue-950/40 dark:via-slate-900/40 dark:to-indigo-950/30 border border-blue-200/80 dark:border-blue-900/60 flex items-center justify-between shadow-xs">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-9 h-9 rounded-lg bg-[#0058be] text-white flex items-center justify-center shadow-xs shrink-0">
-                        <span className="material-symbols-outlined text-[20px]">badge</span>
-                      </div>
+        {error && !board ? (
+          <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 p-10 text-center">
+            <span className="material-symbols-outlined text-red-400 text-[36px] mb-2">error</span>
+            <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">{error}</p>
+            <button
+              type="button"
+              onClick={() => fetchBoard({ bustCache: true })}
+              className="mt-3 px-4 py-2 text-xs font-semibold text-white bg-[#722F37] hover:bg-[#5B232A] rounded-lg"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {(shiftCards.length > 0 ? shiftCards : shifts.map((s) => ({ ...s, staff: null }))).map((s: any) => {
+              const staff = s.staff || { rostered: 0, present: 0, absent: 0, onLeave: 0, weeklyOff: 0, missingPunch: 0, onBreak: 0, late: 0 };
+              const locationLabel = s.locationName || locations.find((l) => l.id === s.locationId)?.name || '';
+              return (
+                <div
+                  key={s.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`View roster details for ${s.name}`}
+                  onClick={() => openDrill('shift-roster', `Shift: ${s.name}`, s.id, s.name)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      openDrill('shift-roster', `Shift: ${s.name}`, s.id, s.name);
+                    }
+                  }}
+                  className="group bg-white dark:bg-[#0e172a] rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-[#722F37]/40 dark:hover:border-blue-500/40 hover:bg-[#F8F4F1]/30 dark:hover:bg-slate-800/40 transition-all flex flex-col justify-between cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
+                >
+                  <div>
+                    {/* Card Header with Badges */}
+                    <div className="flex items-start justify-between gap-2">
                       <div>
-                        <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">
-                          Staff Headcount
-                        </div>
-                        <div className="text-sm font-extrabold text-[#0058be] dark:text-blue-300 font-mono leading-tight">
-                          {staffing.total} Employees Working
-                        </div>
+                        <span className="text-[10px] font-mono font-bold text-[#722F37] dark:text-[#E8DCC6] bg-[#F8F4F1] dark:bg-slate-800 px-2 py-0.5 rounded border border-[#E5D5D7] dark:border-slate-700">
+                          {s.code || 'SHIFT'}
+                        </span>
+                        <h3 className="text-base font-bold text-[#0b1c30] dark:text-white mt-1.5">{s.name}</h3>
+                        {locationLabel && (
+                          <span className="text-[11px] text-slate-400 dark:text-slate-500">{locationLabel}</span>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                          {s.status === 'ACTIVE' ? 'Active' : s.status || 'Active'}
+                        </span>
+                        {s.overnight && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                            Overnight
+                          </span>
+                        )}
+                        <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 border border-blue-200 dark:border-blue-800 flex items-center gap-1 shadow-xs">
+                          <span className="material-symbols-outlined text-[13px]">groups</span>
+                          <span>{staff.rostered} Staff</span>
+                        </span>
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end text-right">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                        {staffing.onFloor} On Floor Today
-                      </span>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
-                        {staffing.off} Off / On Leave
-                      </span>
+                    {/* PROMINENT WORKFORCE HEADCOUNT BOX */}
+                    <div className="mt-3.5 p-3 rounded-xl bg-gradient-to-r from-blue-50/90 via-sky-50/60 to-indigo-50/80 dark:from-blue-950/40 dark:via-slate-900/40 dark:to-indigo-950/30 border border-blue-200/80 dark:border-blue-900/60 flex items-center justify-between shadow-xs">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-lg bg-[#0058be] text-white flex items-center justify-center shadow-xs shrink-0">
+                          <span className="material-symbols-outlined text-[20px]">badge</span>
+                        </div>
+                        <div>
+                          <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">
+                            Staff Headcount
+                          </div>
+                          <div className="text-sm font-extrabold text-[#0058be] dark:text-blue-300 font-mono leading-tight">
+                            {staff.rostered} Employees Working
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end text-right">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+                          {staff.present} On Floor
+                        </span>
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">
+                          {staff.absent} absent • {staff.onLeave} leave
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Working Parameters */}
+                    <div className="mt-3 space-y-2 text-xs">
+                      <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60">
+                        <span className="text-slate-500 dark:text-slate-400">Working Window:</span>
+                        <span className="font-bold font-mono text-[#0b1c30] dark:text-white">
+                          {hmOf(s.startTime)} – {hmOf(s.endTime)}
+                          {s.overnight ? ' (+1d)' : ''}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 px-1">
+                        <span>Staff on this Shift:</span>
+                        <span className="font-bold text-[#0058be] dark:text-blue-300 font-mono">
+                          {staff.rostered} Staff ({staff.present} Present • {staff.absent + staff.onLeave + staff.weeklyOff + staff.missingPunch} Off)
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 px-1">
+                        <span>Grace Period:</span>
+                        <span className="font-bold text-[#722F37] dark:text-[#E8DCC6]">{s.gracePeriod ?? 5} Mins</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 px-1">
+                        <span>Late Threshold:</span>
+                        <span className="font-bold text-red-600 dark:text-red-400">{s.lateThreshold ?? 15} Mins</span>
+                      </div>
+                      <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 px-1">
+                        <span>Late / Missing Punch:</span>
+                        <span className="font-bold text-amber-600 dark:text-amber-400">
+                          {staff.late} late • {staff.missingPunch} missing
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Working Parameters */}
-                  <div className="mt-3 space-y-2 text-xs">
-                    <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60">
-                      <span className="text-slate-500 dark:text-slate-400">Working Window:</span>
-                      <span className="font-bold font-mono text-[#0b1c30] dark:text-white">
-                        {s.startTime ? new Date(s.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:30 AM'} -{' '}
-                        {s.endTime ? new Date(s.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '06:30 PM'}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 px-1">
-                      <span>Staff on this Shift:</span>
-                      <span className="font-bold text-[#0058be] dark:text-blue-300 font-mono">
-                        {staffing.total} Staff ({staffing.onFloor} Present • {staffing.off} Off)
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 px-1">
-                      <span>Grace Period:</span>
-                      <span className="font-bold text-[#722F37] dark:text-[#E8DCC6]">{s.gracePeriod || 5} Mins</span>
-                    </div>
-                    <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 px-1">
-                      <span>Late Threshold:</span>
-                      <span className="font-bold text-red-600 dark:text-red-400">{s.lateThreshold || 15} Mins</span>
-                    </div>
+                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                    <span className="text-slate-400 dark:text-slate-500 font-medium">{selectedDate}</span>
+                    <span className="font-semibold text-[#722F37] dark:text-[#E8DCC6] flex items-center gap-1">
+                      <span>View Roster Details</span>
+                      <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400 group-hover:text-[#722F37] transition-colors">
+                    <span>View {staff.rostered} Roster Details</span>
+                    <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
                   </div>
                 </div>
-
-                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                  <span className="text-slate-400 dark:text-slate-500 font-medium">Auto-assigned</span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toast.success(`Shift ${s.name} details verified`);
-                    }}
-                    className="font-semibold text-[#722F37] dark:text-[#E8DCC6] hover:underline flex items-center gap-1"
-                  >
-                    <span>Edit Roster Rules</span>
-                    <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-                  </button>
-                </div>
-                <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400 group-hover:text-[#722F37] transition-colors">
-                  <span>View {staffing.total} Roster Details</span>
-                  <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* CREATE SHIFT MODAL */}
         {isAddModalOpen && (
@@ -625,6 +742,7 @@ export default function ShiftsRosterPage() {
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">Start Time (HH:MM)</label>
                     <input
                       type="time"
+                      required
                       value={newShift.startTime}
                       onChange={(e) => setNewShift({ ...newShift, startTime: e.target.value })}
                       className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs"
@@ -634,6 +752,7 @@ export default function ShiftsRosterPage() {
                     <label className="block text-[11px] font-bold text-slate-600 mb-1">End Time (HH:MM)</label>
                     <input
                       type="time"
+                      required
                       value={newShift.endTime}
                       onChange={(e) => setNewShift({ ...newShift, endTime: e.target.value })}
                       className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs"
@@ -661,6 +780,10 @@ export default function ShiftsRosterPage() {
                     />
                   </div>
                 </div>
+
+                <p className="text-[10px] text-slate-400">
+                  End time earlier than the start time creates an overnight shift (e.g. 22:00 → 07:00).
+                </p>
 
                 <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                   <button

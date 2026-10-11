@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { prisma } from '../db.js';
 import { PasswordService } from './passwordService.js';
 import { EmailNotificationService } from './emailNotificationService.js';
+import { UserUploadService } from './userUploadService.js';
 
 export interface RegistrationInput {
   email: string;
@@ -75,6 +76,9 @@ export class RegistrationService {
         emailVerificationExpiresAt: expiresAt,
       },
     });
+
+    // Automatically create user directory in uploads
+    UserUploadService.ensureUserFolder(input.fullName);
 
     // 7. Record password in history
     await PasswordService.recordPasswordHistory(user.id, passwordHash);

@@ -91,12 +91,15 @@ export default function SellingPointsPage() {
       setHierarchyData(data);
 
       // Default expand all floors if not set
-      if (data?.floors && Object.keys(expandedFloors).length === 0) {
-        const initialExpanded: Record<string, boolean> = {};
-        data.floors.forEach((f: any) => {
-          initialExpanded[f.id] = true;
+      if (data?.floors) {
+        setExpandedFloors((prev) => {
+          if (Object.keys(prev).length > 0) return prev;
+          const initialExpanded: Record<string, boolean> = {};
+          data.floors.forEach((f: any) => {
+            initialExpanded[f.id] = true;
+          });
+          return initialExpanded;
         });
-        setExpandedFloors(initialExpanded);
       }
     } catch (e) {
       console.error('Fetch floor hierarchy error:', e);

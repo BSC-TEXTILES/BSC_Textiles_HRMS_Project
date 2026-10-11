@@ -10,6 +10,10 @@ import { runKycTests } from './kyc.test.js';
 import { runPayrollTestSuite } from './payroll.test.js';
 import { runFnfAndLeaveTestSuite } from './fnfAndLeave.test.js';
 import { runFloorOperationsTests } from './floorOperations.test.js';
+import { runLateFinesTests } from './lateFines.test.js';
+import { runEmployeeDocumentsTests } from './employeeDocuments.test.js';
+import { runAttendanceBoardTests } from './attendanceBoard.test.js';
+import { runMyDeskTests } from './myDesk.test.js';
 
 const BASE_URL = (process.env.API_URL || 'http://localhost:4000').replace(/\/api\/?$/, '');
 
@@ -33,6 +37,27 @@ async function main() {
   console.log('================================================================');
   console.log(`Target URL: ${BASE_URL}`);
   console.log(`Execution Time: ${new Date().toISOString()}`);
+
+  // Ensure target server is online before running tests
+  let serverOnline = false;
+  for (let i = 0; i < 6; i++) {
+    try {
+      const h = await fetch(`${BASE_URL}/health`);
+      if (h.ok) {
+        serverOnline = true;
+        break;
+      }
+    } catch {
+      await new Promise((r) => setTimeout(r, 600));
+    }
+  }
+
+  if (!serverOnline) {
+    console.error(`❌ Backend server is not running at ${BASE_URL}.`);
+    console.error(`   Please start the backend server with: 'npm run dev:backend' or 'npx tsx src/index.ts'`);
+    process.exit(1);
+  }
+
   console.log('Authenticating test personas...\n');
 
   let adminToken = '';
@@ -137,6 +162,26 @@ async function main() {
   console.log('▶ Executing Suite 11: Floor Operations, Salesmen Tracking & Retail Hierarchy...');
   const floorResults = await runFloorOperationsTests(adminToken, belagaviHrToken);
   allResults.push(...floorResults);
+
+  // 12. Late Attendance & Fine Management Suite
+  console.log('▶ Executing Suite 12: Late Attendance & Fine Management...');
+  const lateFineResults = await runLateFinesTests(adminToken, belagaviHrToken);
+  allResults.push(...lateFineResults);
+
+  // 13. Employee Document Management Suite
+  console.log('▶ Executing Suite 13: Employee Document Management...');
+  const docResults = await runEmployeeDocumentsTests(adminToken, belagaviHrToken, shivamoggaHrToken);
+  allResults.push(...docResults);
+
+  // 14. Attendance & Shifts Board Suite
+  console.log('▶ Executing Suite 14: Attendance & Shifts Board (filters, pagination, CSV)...');
+  const boardResults = await runAttendanceBoardTests(BASE_URL, adminToken, belagaviHrToken);
+  allResults.push(...boardResults);
+
+  // 15. My Desk Self-Service Suite
+  console.log('▶ Executing Suite 15: My Desk Self-Service & Punch Corrections...');
+  const deskResults = await runMyDeskTests(BASE_URL, adminToken, salesToken);
+  allResults.push(...deskResults.map((r) => ({ ...r, suite: 'my-desk' })));
 
   // Print Summary Table
   console.log('\n================================================================');

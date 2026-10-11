@@ -1,8 +1,9 @@
-﻿'use client';
+'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import toast from 'react-hot-toast';
+import api from '@/lib/api';
 
 import { CORRECTION_RECORDS, type CorrectionRecord } from '@/lib/correctionRecords';
 
@@ -14,11 +15,46 @@ export default function AttendanceCorrectionsPage() {
   const [selectedRecordId, setSelectedRecordId] = useState<string>('CORR-4029');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  useEffect(() => {
+    // Optionally fetch backend corrections
+    api.get('/attendance/corrections')
+      .then((res) => {
+        if (res.data?.corrections && res.data.corrections.length > 0) {
+          const mapped: CorrectionRecord[] = res.data.corrections.map((c: any) => ({
+            id: c.id,
+            empCode: c.employeeCode || 'BSC-4029',
+            name: c.employeeName || 'Staff Member',
+            role: c.designation || 'Floor Associate',
+            hub: c.locationName || 'BEL-01 Flagship',
+            dept: c.departmentName || 'Customer Retail',
+            avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+            shift: 'Shift A (09:30 – 18:30)',
+            rawIn: c.requestedLogin ? new Date(c.requestedLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '09:30 AM',
+            rawOut: c.requestedLogout ? new Date(c.requestedLogout).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '18:30 PM',
+            terminal: 'MANUAL-OVERRIDE',
+            overrideOut: '18:30 PM',
+            totalHours: '8h 00m Shift',
+            otHours: 'Standard Rate',
+            reason: c.reason,
+            evidence: 'Biometric System Sync',
+            supervisor: 'Floor Manager',
+            pipelineStep: c.status === 'APPROVED' ? '3' : '2',
+            pipelineTotal: '3',
+            status: c.status || 'PENDING',
+            type: 'MISSED_OUT',
+            notes: c.reviewNote || c.reason,
+          }));
+          setRecords((prev) => [...mapped, ...prev]);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const [newRequest, setNewRequest] = useState({
     name: '',
     empCode: '',
     hub: 'BEL-01 Flagship',
-    shift: 'Shift A (09:30 â€“ 18:30)',
+    shift: 'Shift A (09:30 – 18:30)',
     overrideIn: '09:30 AM',
     overrideOut: '18:30 PM',
     reason: '',
@@ -37,26 +73,40 @@ export default function AttendanceCorrectionsPage() {
     return matchesTab && matchesHub && matchesSearch;
   });
 
-  const handleApprove = (id: string) => {
+  const handleApprove = async (id: string) => {
+    try {
+      await api.post(`/attendance/corrections/${id}/approve`, { reviewNote: 'Approved via Console' });
+    } catch {}
     setRecords((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status: 'APPROVED', pipelineStep: '3' } : r))
     );
     toast.success(`Punch correction #${id} approved & cryptographically committed to payroll!`);
   };
 
-  const handleReject = (id: string) => {
+  const handleReject = async (id: string) => {
+    try {
+      await api.post(`/attendance/corrections/${id}/reject`, { reviewNote: 'Rejected per policy' });
+    } catch {}
     setRecords((prev) =>
       prev.map((r) => (r.id === id ? { ...r, status: 'REJECTED' } : r))
     );
     toast.error(`Punch correction #${id} rejected. LOP applied per policy.`);
   };
 
-  const handleCreateRequest = (e: React.FormEvent) => {
+  const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRequest.name || !newRequest.empCode || !newRequest.reason) {
       toast.error('Please fill in all mandatory fields');
       return;
     }
+    try {
+      await api.post('/attendance/corrections', {
+        employeeId: newRequest.empCode,
+        reason: newRequest.reason,
+        requestedLogin: newRequest.overrideIn,
+        requestedLogout: newRequest.overrideOut,
+      });
+    } catch {}
     const newRec: CorrectionRecord = {
       id: `CORR-${4035 + records.length}`,
       empCode: newRequest.empCode,

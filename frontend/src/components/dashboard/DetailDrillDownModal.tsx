@@ -227,6 +227,158 @@ function shiftExceptionCols(): DrillColumn[] {
   ];
 }
 
+/* ------------------------------------------------------------------ */
+/* Server-side board layouts (shift-roster / shift-exceptions)         */
+/* ------------------------------------------------------------------ */
+
+const BOARD_PAGE_SIZE = 15;
+
+const BOARD_STATUS_TONE: Record<string, Tone> = {
+  PRESENT: 'green',
+  CHECKED_OUT: 'green',
+  PUNCHED_IN: 'blue',
+  LATE: 'amber',
+  ON_BREAK: 'blue',
+  ABSENT: 'red',
+  ON_LEAVE: 'amber',
+  WEEKLY_OFF: 'slate',
+  HOLIDAY: 'blue',
+  NOT_PUNCHED_IN: 'amber',
+  INCOMPLETE: 'red',
+  SCHEDULED: 'slate',
+};
+
+function fmtWorked(seconds?: number | null): string {
+  const sec = Math.max(0, Number(seconds || 0));
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  return sec > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : '—';
+}
+
+/** Full 18-column roster layout fed by GET /attendance/shift-board. */
+function boardRosterCols(): DrillColumn[] {
+  return [
+    { key: 'code', header: 'Employee ID', render: (r) => <span className="font-mono text-[11px] text-slate-500 whitespace-nowrap">{r.code}</span> },
+    { key: 'emp', header: 'Employee', render: (r) => <EmpCell code={r.code} name={r.name} profileId={r.employeeId} /> },
+    { key: 'dept', header: 'Department', render: (r) => <span className="text-slate-600">{r.department}</span> },
+    { key: 'hub', header: 'Hub / Branch', render: (r) => <span className="text-slate-600">{r.hub}</span> },
+    { key: 'desig', header: 'Designation', render: (r) => <span className="text-slate-600">{r.designation}</span> },
+    {
+      key: 'empStatus',
+      header: 'Employment Status',
+      render: (r) => <Pill tone={EMP_STATUS_TONE[r.empStatusRaw] || 'slate'}>{r.empStatus}</Pill>,
+    },
+    {
+      key: 'shift',
+      header: 'Scheduled Shift',
+      render: (r) => (
+        <div className="min-w-[150px]">
+          <div className="text-slate-700 font-semibold">{r.shift}</div>
+          <div className="text-[10px] font-mono text-slate-400">
+            {r.schedIn} – {r.schedOut}
+            {r.overnight ? ' (+1d)' : ''}
+          </div>
+        </div>
+      ),
+    },
+    { key: 'schedIn', header: 'Sched. In', render: (r) => <span className="font-mono text-slate-600 whitespace-nowrap">{r.schedIn}</span> },
+    { key: 'schedOut', header: 'Sched. Out', render: (r) => <span className="font-mono text-slate-600 whitespace-nowrap">{r.schedOut}</span> },
+    { key: 'in', header: 'Actual In', render: (r) => <span className="font-mono font-bold text-[#0b1c30] whitespace-nowrap">{r.actualIn}</span> },
+    { key: 'out', header: 'Actual Out', render: (r) => <span className="font-mono font-bold text-[#0b1c30] whitespace-nowrap">{r.actualOut}</span> },
+    {
+      key: 'status',
+      header: 'Attendance Status',
+      render: (r) => <Pill tone={BOARD_STATUS_TONE[r.status] || 'slate'}>{prettyEnum(r.status)}</Pill>,
+    },
+    {
+      key: 'late',
+      header: 'Late (min)',
+      render: (r) => (
+        <span className={`font-mono font-semibold ${r.late > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{r.late}</span>
+      ),
+    },
+    { key: 'early', header: 'Early (min)', render: (r) => <span className="font-mono text-slate-600">{r.early}</span> },
+    { key: 'worked', header: 'Worked', render: (r) => <span className="font-mono font-semibold text-[#0b1c30]">{r.worked}</span> },
+    { key: 'break', header: 'Break (min)', render: (r) => <span className="font-mono text-slate-600">{r.breakMin}</span> },
+    { key: 'date', header: 'Record Date', render: (r) => <span className="text-slate-500 whitespace-nowrap">{r.date}</span> },
+    { key: 'reg', header: 'Regularization', render: (r) => <RegStatusCell status={r.reg} /> },
+  ];
+}
+
+function boardExceptionCols(): DrillColumn[] {
+  return [
+    { key: 'code', header: 'Employee ID', render: (r) => <span className="font-mono text-[11px] text-slate-500 whitespace-nowrap">{r.code}</span> },
+    { key: 'emp', header: 'Employee', render: (r) => <EmpCell code={r.code} name={r.name} profileId={r.employeeId} /> },
+    { key: 'dept', header: 'Department', render: (r) => <span className="text-slate-600">{r.department}</span> },
+    { key: 'hub', header: 'Hub / Branch', render: (r) => <span className="text-slate-600">{r.hub}</span> },
+    {
+      key: 'shift',
+      header: 'Scheduled Shift',
+      render: (r) => (
+        <div className="min-w-[130px]">
+          <div className="text-slate-700 font-semibold">{r.shift}</div>
+          <div className="text-[10px] font-mono text-slate-400">In: {r.schedIn}</div>
+        </div>
+      ),
+    },
+    { key: 'in', header: 'Actual Punch-in', render: (r) => <span className="font-mono font-bold text-[#0b1c30]">{r.actualIn}</span> },
+    { key: 'out', header: 'Actual Punch-out', render: (r) => <span className="font-mono font-bold text-[#0b1c30]">{r.actualOut}</span> },
+    {
+      key: 'status',
+      header: 'Attendance Status',
+      render: (r) => <Pill tone={BOARD_STATUS_TONE[r.status] || 'slate'}>{prettyEnum(r.status)}</Pill>,
+    },
+    { key: 'exc', header: 'Exception', render: (r) => <Pill tone={r.excTone}>{r.exception}</Pill> },
+    { key: 'reg', header: 'Regularization Status', render: (r) => <RegStatusCell status={r.reg} /> },
+    {
+      key: 'reason',
+      header: 'Reason for Regularization',
+      render: (r) => <span className="text-slate-500 block max-w-[220px] truncate" title={r.reason}>{r.reason || '—'}</span>,
+    },
+    { key: 'approval', header: 'Approval / Pending With', render: (r) => <span className="text-slate-600 whitespace-nowrap">{r.approval}</span> },
+    {
+      key: 'remarks',
+      header: 'Manager Remarks',
+      render: (r) => <span className="text-slate-500 block max-w-[220px] truncate" title={r.remarks}>{r.remarks || '—'}</span>,
+    },
+  ];
+}
+
+/** Maps a shift-board API row onto the modal row shape. */
+function mapBoardRow(r: any) {
+  return {
+    id: r.employeeId,
+    employeeId: r.employeeId,
+    code: r.employeeCode,
+    name: r.fullName,
+    department: r.department,
+    hub: r.hub,
+    designation: r.designation || '—',
+    empStatus: prettyEnum(r.employmentStatus),
+    empStatusRaw: r.employmentStatus,
+    shift: r.shiftName || '—',
+    overnight: !!r.overnight,
+    schedIn: r.scheduledLogin ? fmtTime(r.scheduledLogin) : '—',
+    schedOut: r.scheduledLogout ? fmtTime(r.scheduledLogout) : '—',
+    actualIn: r.actualLogin ? fmtTime(r.actualLogin) : '—',
+    actualOut: r.actualLogout ? fmtTime(r.actualLogout) : '—',
+    status: r.status,
+    late: Number(r.lateMinutes || 0),
+    early: Number(r.earlyMinutes || 0),
+    worked: fmtWorked(r.workedSeconds),
+    breakMin: Number(r.breakMinutes || 0),
+    date: r.attendanceDate,
+    reg: r.correction?.status || null,
+    exception: r.exception || '—',
+    excTone: (r.exceptionTone || 'slate') as Tone,
+    reason: r.correction?.reason || '—',
+    approval: r.correction
+      ? `${prettyEnum(r.correction.status)}${r.correction.reviewedById ? ' • reviewed' : ' • pending review'}`
+      : '—',
+    remarks: r.correction?.reviewNote || r.notes || '—',
+  };
+}
+
 function musterCols(): DrillColumn[] {
   return [
     { key: 'code', header: 'Employee ID', render: (r) => <span className="font-mono text-[11px] text-slate-500">{r.code}</span> },
@@ -347,6 +499,8 @@ export function DetailDrillDownModal({
   const [state, setState] = useState<DetailState>(EMPTY_STATE);
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
+  const [serverMeta, setServerMeta] = useState<{ total: number; pages: number } | null>(null);
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const reqIdRef = useRef(0);
 
   const { locationId, departmentId, shiftId, status } = filters;
@@ -354,6 +508,19 @@ export function DetailDrillDownModal({
   const month = filters.month || new Date().toISOString().slice(0, 7);
   const hubScoped = Boolean(locationId && locationId !== 'all');
   const isPastDate = date < new Date().toISOString().slice(0, 10);
+  const isBoardMetric = metric === 'shift-roster' || metric === 'shift-exceptions';
+
+  // Debounce the search term for board metrics (server-side filtering).
+  useEffect(() => {
+    if (!isBoardMetric) return;
+    const t = setTimeout(() => setDebouncedQuery(query.trim()), 300);
+    return () => clearTimeout(t);
+  }, [query, isBoardMetric]);
+
+  // Reset pagination when any filter changes.
+  useEffect(() => {
+    setPage(1);
+  }, [metric, locationId, departmentId, shiftId, status, date, month]);
 
   /** Resolve the location code (BEL/DAV/SHI…) used by client-side records. */
   const getLocationCode = useCallback(async (): Promise<string> => {
@@ -370,11 +537,63 @@ export function DetailDrillDownModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hubScoped, locationId]);
 
-  const load = useCallback(async () => {
+  /** Build query params for the shift-board endpoints. */
+  const boardParams = useCallback(
+    (opts?: { exportMode?: boolean }) => {
+      const p = new URLSearchParams();
+      p.set('date', date);
+      if (!opts?.exportMode) {
+        p.set('page', String(page));
+        p.set('limit', String(BOARD_PAGE_SIZE));
+      }
+      if (hubScoped) p.set('locationId', String(locationId));
+      if (departmentId && departmentId !== 'all') p.set('departmentId', String(departmentId));
+      if (shiftId && shiftId !== 'all') p.set('shiftId', String(shiftId));
+      if (status && status !== 'all') p.set('status', status);
+      if (metric === 'shift-exceptions') p.set('exceptions', '1');
+      const q = debouncedQuery;
+      if (q) p.set('search', q);
+      return p;
+    },
+    [date, page, hubScoped, locationId, departmentId, shiftId, status, metric, debouncedQuery]
+  );
+
+  /** Server-side loader for shift-roster / shift-exceptions. */
+  const loadBoard = useCallback(async () => {
     const rid = ++reqIdRef.current;
     setLoading(true);
     setError(null);
     setState(EMPTY_STATE);
+    setServerMeta(null);
+    try {
+      const res = await api.get(`/attendance/shift-board?${boardParams().toString()}`);
+      if (rid !== reqIdRef.current) return;
+      const data = res.data || {};
+      setState({
+        rows: (data.rows || []).map(mapBoardRow),
+        columns: metric === 'shift-exceptions' ? boardExceptionCols() : boardRosterCols(),
+        summaryChips: [],
+      });
+      setServerMeta({
+        total: Number(data.total || 0),
+        pages: Math.max(1, Number(data.pages || 1)),
+      });
+      setLoading(false);
+    } catch (err) {
+      if (rid !== reqIdRef.current) return;
+      console.error(`Shift board load failed (${metric}):`, err);
+      setError('Failed to load detailed records. Please try again.');
+      setLoading(false);
+    }
+  }, [metric, boardParams]);
+
+  /** Client-side loader for shift-configs / muster / face / qr / incentives / compliance. */
+  const loadClient = useCallback(async () => {
+    const rid = ++reqIdRef.current;
+    setLoading(true);
+    setError(null);
+    setState(EMPTY_STATE);
+    setServerMeta(null);
     setPage(1);
     setQuery('');
     try {
@@ -424,140 +643,6 @@ export function DetailDrillDownModal({
           status: s.status,
         }));
         cols = shiftConfigCols();
-      } else if (metric === 'shift-roster') {
-        const p = new URLSearchParams();
-        p.set('limit', String(ROSTER_LIMIT));
-        p.set('startDate', `${date}T00:00:00`);
-        p.set('endDate', `${date}T23:59:59`);
-        if (hubScoped) p.set('locationId', String(locationId));
-        if (shiftId && shiftId !== 'all') p.set('shiftId', String(shiftId));
-        const attRes = await api.get(`/attendance?${p.toString()}`).catch(() => ({ data: null }));
-        const attMap = new Map<string, any>();
-        for (const a of attRes.data?.attendances || []) {
-          if (scope.ready && !scope.inScope.has(a.employeeId)) continue;
-          attMap.set(a.employeeId, a);
-        }
-        rows = scope.employees.map((e: any) => {
-          const emp = empOf(scope, e.id, e);
-          const a = attMap.get(e.id);
-          const exc = classifyPunch(a, isPastDate);
-          const corr = corrByCode.get(e.employeeCode);
-          return {
-            id: e.id,
-            employeeId: e.id,
-            code: emp.code,
-            name: emp.name,
-            department: emp.department,
-            hub: emp.hub,
-            designation: e.designation || '—',
-            status: e.status,
-            shift: a?.shift?.name || emp.shift,
-            scheduled: a ? fmtTime(a.scheduledLogin) : '—',
-            actualIn: a ? fmtTime(a.actualLogin) : '—',
-            actualOut: a ? fmtTime(a.actualLogout) : '—',
-            exception: exc.text,
-            excTone: exc.tone,
-            reg: corr?.status || null,
-          };
-        });
-        cols = shiftRosterCols();
-      } else if (metric === 'shift-exceptions') {
-        const locCode = await getLocationCode();
-        const p = new URLSearchParams();
-        p.set('limit', String(ROSTER_LIMIT));
-        p.set('startDate', `${date}T00:00:00`);
-        p.set('endDate', `${date}T23:59:59`);
-        if (hubScoped) p.set('locationId', String(locationId));
-        if (shiftId && shiftId !== 'all') p.set('shiftId', String(shiftId));
-        const attRes = await api.get(`/attendance?${p.toString()}`).catch(() => ({ data: null }));
-        const attList: any[] = (attRes.data?.attendances || []).filter(
-          (a: any) => !scope.ready || scope.inScope.has(a.employeeId)
-        );
-        const attByEmp = new Map<string, any>();
-        for (const a of attList) attByEmp.set(a.employeeId, a);
-
-        // 1) Punch exceptions recorded against the selected date.
-        const seenCodes = new Set<string>();
-        for (const a of attList) {
-          const emp = empOf(scope, a.employeeId, a.employee);
-          const exc = classifyPunch(a, isPastDate);
-          if (!exc.isException) continue;
-          const corr = corrByCode.get(emp.code);
-          if (corr) seenCodes.add(emp.code);
-          rows.push({
-            id: `att-${a.id}`,
-            employeeId: a.employeeId,
-            code: emp.code,
-            name: emp.name,
-            department: emp.department,
-            hub: emp.hub,
-            shift: a.shift?.name || emp.shift,
-            scheduled: a.scheduledLogin ? fmtTime(a.scheduledLogin) : '—',
-            actualIn: a.actualLogin ? fmtTime(a.actualLogin) : '—',
-            actualOut: a.actualLogout ? fmtTime(a.actualLogout) : '—',
-            exception: exc.text,
-            excTone: exc.tone,
-            reg: corr?.status || null,
-            reason: corr?.reason || '—',
-            approval: corr ? `${corr.supervisor} • Step ${corr.pipelineStep}/${corr.pipelineTotal}` : '—',
-            remarks: corr?.notes || a.notes || '—',
-          });
-        }
-
-        // 2) Employees in scope with no attendance record at all on a past date.
-        if (attList.length > 0 && isPastDate) {
-          for (const e of scope.employees) {
-            if (attByEmp.has(e.id)) continue;
-            const emp = empOf(scope, e.id, e);
-            const corr = corrByCode.get(e.employeeCode);
-            if (corr) seenCodes.add(e.employeeCode);
-            rows.push({
-              id: `miss-${e.id}`,
-              employeeId: e.id,
-              code: emp.code,
-              name: emp.name,
-              department: emp.department,
-              hub: emp.hub,
-              shift: emp.shift,
-              scheduled: '—',
-              actualIn: '—',
-              actualOut: '—',
-              exception: 'No punch record',
-              excTone: 'red' as Tone,
-              reg: corr?.status || null,
-              reason: corr?.reason || '—',
-              approval: corr ? `${corr.supervisor} • Step ${corr.pipelineStep}/${corr.pipelineTotal}` : '—',
-              remarks: corr?.notes || '—',
-            });
-          }
-        }
-
-        // 3) Regularization requests (client-side correction queue), hub scoped.
-        for (const c of CORRECTION_RECORDS) {
-          if (seenCodes.has(c.empCode)) continue;
-          if (hubScoped && locCode && !c.hub.toUpperCase().startsWith(locCode.toUpperCase())) continue;
-          const exc = CORRECTION_EXC[c.type] || { text: prettyEnum(c.type), tone: 'slate' as Tone };
-          const scoped = codeToEmp.get(c.empCode);
-          rows.push({
-            id: `corr-${c.id}`,
-            employeeId: scoped?.id || null,
-            code: c.empCode,
-            name: c.name,
-            department: c.dept,
-            hub: c.hub,
-            shift: c.shift,
-            scheduled: '—',
-            actualIn: c.rawIn,
-            actualOut: c.rawOut,
-            exception: exc.text,
-            excTone: exc.tone,
-            reg: c.status,
-            reason: c.reason,
-            approval: `${c.supervisor} • Step ${c.pipelineStep}/${c.pipelineTotal}`,
-            remarks: c.notes,
-          });
-        }
-        cols = shiftExceptionCols();
       } else if (metric === 'muster' || metric === 'compliance') {
         const { start, end } = monthRange(month);
         const p = new URLSearchParams();
@@ -767,26 +852,32 @@ export function DetailDrillDownModal({
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [metric, locationId, departmentId, shiftId, status, date, month]);
+  }, [metric, locationId, departmentId, shiftId, status, date, month, preloaded, filters]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (isBoardMetric) {
+      loadBoard();
+    } else {
+      loadClient();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBoardMetric, loadBoard, loadClient]);
 
   const { rows, columns, summaryChips } = state;
   const q = query.trim().toLowerCase();
-  const filtered = q
+  const filtered = isBoardMetric ? rows : q
     ? rows.filter((r) =>
         Object.entries(r)
           .filter(([k]) => !k.endsWith('Tone'))
           .some(([, v]) => String(v ?? '').toLowerCase().includes(q))
       )
     : rows;
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = isBoardMetric ? (serverMeta?.pages || 1) : Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const pageRows = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-  const rangeStart = filtered.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE + 1;
-  const rangeEnd = Math.min(safePage * PAGE_SIZE, filtered.length);
+  const pageRows = isBoardMetric ? rows : filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const totalRecords = isBoardMetric ? (serverMeta?.total ?? rows.length) : filtered.length;
+  const rangeStart = totalRecords === 0 ? 0 : isBoardMetric ? (safePage - 1) * BOARD_PAGE_SIZE + 1 : (safePage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = isBoardMetric ? Math.min((safePage - 1) * BOARD_PAGE_SIZE + rows.length, totalRecords) : Math.min(safePage * PAGE_SIZE, filtered.length);
 
   const openProfile = (row: any) => {
     if (!row?.employeeId) return;
@@ -794,7 +885,35 @@ export function DetailDrillDownModal({
     router.push(`/employees/profile/${row.employeeId}`);
   };
 
-  const handleExportCSV = () => {
+  const refresh = () => {
+    if (isBoardMetric) loadBoard();
+    else loadClient();
+  };
+
+  const handleExportCSV = async () => {
+    if (isBoardMetric) {
+      if ((serverMeta?.total ?? 0) === 0) {
+        toast.error('No records to export');
+        return;
+      }
+      try {
+        const res = await api.get(`/attendance/shift-board/export?${boardParams({ exportMode: true }).toString()}`, {
+          responseType: 'blob',
+        });
+        const url = URL.createObjectURL(res.data);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `BSC_Shift_Board_${date}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        toast.success('Shift board exported to CSV!');
+      } catch {
+        toast.error('Failed to export CSV');
+      }
+      return;
+    }
     if (filtered.length === 0) {
       toast.error('No records to export');
       return;
@@ -802,7 +921,11 @@ export function DetailDrillDownModal({
     const keys = Object.keys(filtered[0]).filter(
       (k) => k !== 'id' && k !== 'employeeId' && !k.endsWith('Tone') && !k.startsWith('_')
     );
-    const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const escape = (v: any) => {
+      let s = String(v ?? '');
+      if (/^[=+\-@]/.test(s)) s = "'" + s;
+      return `"${s.replace(/"/g, '""')}"`;
+    };
     const csvContent =
       'data:text/csv;charset=utf-8,' +
       [keys.join(','), ...filtered.map((r) => keys.map((k) => escape(r[k])).join(','))].join('\n');
@@ -819,9 +942,13 @@ export function DetailDrillDownModal({
     ? 'Loading detailed records…'
     : error
       ? 'Error loading records'
-      : q
-        ? `${filtered.length} of ${rows.length} record${rows.length === 1 ? '' : 's'} match your search`
-        : `${rows.length} record${rows.length === 1 ? '' : 's'} found`;
+      : isBoardMetric
+        ? totalRecords === 0
+          ? 'No records match the current filters'
+          : `${q ? `${filtered.length} of ` : ''}${totalRecords} record${totalRecords === 1 ? '' : 's'} for ${date}`
+        : q
+          ? `${filtered.length} of ${rows.length} record${rows.length === 1 ? '' : 's'} match your search`
+          : `${rows.length} record${rows.length === 1 ? '' : 's'} found`;
 
   return (
     <Modal open onClose={onClose} title={title} className="max-w-6xl w-full">
@@ -880,7 +1007,7 @@ export function DetailDrillDownModal({
             <button
               type="button"
               onClick={handleExportCSV}
-              disabled={loading || filtered.length === 0}
+              disabled={loading || (isBoardMetric ? (serverMeta?.total ?? 0) === 0 : filtered.length === 0)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 bg-white hover:bg-slate-50 rounded-lg transition-colors border border-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="material-symbols-outlined text-[15px]">file_download</span>
@@ -888,7 +1015,7 @@ export function DetailDrillDownModal({
             </button>
             <button
               type="button"
-              onClick={load}
+              onClick={refresh}
               disabled={loading}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0058be] bg-[#eff4ff] hover:bg-[#dce9ff] rounded-lg transition-colors border border-[#dce9ff] disabled:opacity-50"
             >
@@ -905,7 +1032,7 @@ export function DetailDrillDownModal({
             <p className="text-sm font-semibold text-slate-600 mb-1">{error}</p>
             <button
               type="button"
-              onClick={load}
+              onClick={refresh}
               className="mt-2 px-4 py-2 text-xs font-semibold text-white bg-[#0058be] hover:bg-[#004a9e] rounded-lg transition-colors"
             >
               Retry
@@ -986,7 +1113,8 @@ export function DetailDrillDownModal({
             {/* Pagination */}
             <div className="flex items-center justify-between gap-3 pt-1">
               <span className="text-[11px] text-slate-500">
-                Showing {rangeStart}–{rangeEnd} of {filtered.length}
+                Showing {rangeStart}–{rangeEnd} of {totalRecords}
+                {isBoardMetric && q ? ` • ${filtered.length} match search` : ''}
               </span>
               <div className="flex items-center gap-2">
                 <button

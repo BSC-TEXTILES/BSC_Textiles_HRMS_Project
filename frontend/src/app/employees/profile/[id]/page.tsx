@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
@@ -1278,12 +1279,21 @@ export default function EmployeeProfileDossierPage() {
             {/* Document Ledger Cards Grid */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h4 className="font-bold text-sm text-slate-900">
-                  Registered Documents ({kycDocuments.length})
-                </h4>
-                <span className="text-xs text-slate-500">
-                  Certified audit copies stored in encrypted tenant storage
-                </span>
+                <div>
+                  <h4 className="font-bold text-sm text-slate-900">
+                    Registered Documents ({kycDocuments.length})
+                  </h4>
+                  <span className="text-xs text-slate-500">
+                    Certified audit copies stored in encrypted tenant storage
+                  </span>
+                </div>
+                <Link
+                  href={`/employees/documents`}
+                  className="px-3 py-1.5 rounded-lg bg-[#722F37] hover:bg-[#5B232A] text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">folder_shared</span>
+                  <span>Full Employee Document Vault</span>
+                </Link>
               </div>
 
               {kycDocuments.length === 0 ? (

@@ -17,6 +17,7 @@ import {
   Building2,
   ShieldCheck,
   Fingerprint,
+  FolderLock,
   Calendar,
   Coffee,
   FileEdit,
@@ -47,6 +48,7 @@ import {
   MapPin,
   Sparkles,
   AlertCircle,
+  AlertTriangle,
   CheckCircle,
   Info,
   XCircle
@@ -77,6 +79,7 @@ const enterpriseNavigation: NavSectionConfig[] = [
     items: [
       { title: 'All Employees', href: '/employees', icon: Users },
       { title: 'Profile 360 & Dossier', href: '/employees/profile', icon: Contact },
+      { title: 'Employee Documents', href: '/employees/documents', icon: FolderLock, badge: 'Dossier' },
       { title: 'Departments & Units', href: '/organization/departments', icon: Building2 },
       { title: 'Former Staff & F&F', href: '/employees/former', icon: UserMinus, badge: 'Settlement' },
     ],
@@ -93,6 +96,7 @@ const enterpriseNavigation: NavSectionConfig[] = [
     items: [
       { title: 'Biometric Punches', href: '/attendance/punches', icon: Fingerprint },
       { title: 'Floor Shifts & Rosters', href: '/attendance/shifts', icon: Calendar },
+      { title: 'Late & Fine Management', href: '/attendance/late-fines', icon: AlertTriangle, badge: 'Policy' },
       { title: 'Lunch & Break Tracker', href: '/attendance/breaks', icon: Coffee },
       { title: 'Punch Corrections', href: '/attendance/corrections', icon: FileEdit },
       { title: 'Attendance Register', href: '/attendance/register', icon: ClipboardCheck },
