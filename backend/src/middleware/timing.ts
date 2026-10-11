@@ -56,7 +56,8 @@ export function timingMiddleware(req: Request, res: Response, next: NextFunction
       ].filter(Boolean).join(', ');
       res.setHeader('Server-Timing', timingEntries);
 
-      if (roundedTotal > 100 && req.path !== '/api/auth/login') {
+      const slowThreshold = process.env.NODE_ENV === 'production' ? 250 : 500;
+      if (roundedTotal > slowThreshold && req.path !== '/api/auth/login') {
         console.warn(`[SLOW_API_ALERT] ${req.method} ${req.originalUrl || req.url} took ${roundedTotal}ms (DB: ${roundedDb}ms, ${metrics.dbQueries} queries) [ReqID: ${requestId}]`);
       }
     }
