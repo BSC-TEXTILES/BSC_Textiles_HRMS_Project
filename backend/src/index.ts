@@ -48,6 +48,7 @@ import { staffOpsRouter, observationLevelsRouter } from './routes/workerOps.js';
 import { securityHeaders } from './middleware/securityHeaders.js';
 import { csrfProtection } from './middleware/csrfProtection.js';
 import { timingMiddleware } from './middleware/timing.js';
+import { setupViews } from './scripts/setupViews.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -205,6 +206,7 @@ const PORT = Number(process.env.PORT) || 4000;
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 BSC Textiles HRMS Security-Hardened Server running on port ${PORT}`);
   console.log(`📡 WebSocket server ready`);
+  setupViews().catch((err) => console.warn('[setupViews warning]:', err.message));
 });
 console.log('Listen called, waiting for callback...');
 
