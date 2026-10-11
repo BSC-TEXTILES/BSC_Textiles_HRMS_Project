@@ -85,7 +85,7 @@
   }
   
   body {
-    @apply bg-[#F8F9FA] text-[#18181B] dark:bg-[#111317] dark:text-slate-100 antialiased;
+    @apply bg-[#F8F9FA] text-[#18181B] dark:bg-[#070c18] dark:text-white antialiased;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
   
@@ -96,6 +96,187 @@
   ::selection {
     @apply bg-[#E8DCC6] text-[#722F37] dark:bg-[#722F37]/40 dark:text-cream-100;
   }
+}
+
+/* ==========================================================================
+   GLOBAL DARK MODE HIGH-CONTRAST TYPOGRAPHY & CARD RULES
+   Guarantees that in dark mode all headings, titles, labels, card headers,
+   table content, and primary text render in clean, readable white (#ffffff),
+   while secondary elements render in crisp, high-visibility light slate.
+   ========================================================================== */
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #070c18 !important;
+  color: #ffffff !important;
+}
+
+/* All headings, titles, subheadings */
+html.dark h1,
+html.dark h2,
+html.dark h3,
+html.dark h4,
+html.dark h5,
+html.dark h6 {
+  color: #ffffff !important;
+}
+
+/* Force dark surface for cards and surfaces with pure white background */
+html.dark .bg-white {
+  background-color: #0e172a !important;
+  border-color: #1e2d4d !important;
+}
+
+/* Force subtle dark tint for light background utility classes */
+html.dark .bg-slate-50,
+html.dark .bg-gray-50,
+html.dark .bg-zinc-50,
+html.dark .bg-\[\#F8F4F1\],
+html.dark .bg-\[\#f8f9fa\],
+html.dark .bg-\[\#F8F9FA\],
+html.dark .bg-\[\#f4f6fa\],
+html.dark .bg-\[\#f8f9ff\],
+html.dark .bg-surface-container,
+html.dark .bg-surface-container-low,
+html.dark .bg-surface-container-lowest {
+  background-color: #111c33 !important;
+  border-color: #1e2d4d !important;
+}
+
+html.dark .bg-slate-100,
+html.dark .bg-gray-100,
+html.dark .bg-zinc-100 {
+  background-color: #162444 !important;
+  border-color: #22355c !important;
+}
+
+/* Force pure white text for all dark text utility classes */
+html.dark .text-\[\#0b1c30\],
+html.dark .text-\[\#18181B\],
+html.dark .text-\[\#18181b\],
+html.dark .text-\[\#111827\],
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-gray-900,
+html.dark .text-gray-800,
+html.dark .text-zinc-900,
+html.dark .text-zinc-800,
+html.dark .text-neutral-900,
+html.dark .text-neutral-800,
+html.dark .text-black,
+html.dark .text-on-surface {
+  color: #ffffff !important;
+}
+
+/* High-contrast crisp readable secondary text in dark mode */
+html.dark .text-slate-700,
+html.dark .text-gray-700,
+html.dark .text-zinc-700,
+html.dark .text-neutral-700 {
+  color: #f1f5f9 !important;
+}
+
+html.dark .text-slate-600,
+html.dark .text-gray-600,
+html.dark .text-zinc-600,
+html.dark .text-neutral-600,
+html.dark .text-on-surface-variant {
+  color: #cbd5e1 !important;
+}
+
+html.dark .text-slate-500,
+html.dark .text-gray-500,
+html.dark .text-zinc-500,
+html.dark .text-neutral-500 {
+  color: #94a3b8 !important;
+}
+
+/* Status pill & accent text brightness in dark mode */
+html.dark .text-emerald-700,
+html.dark .text-emerald-600 {
+  color: #34d399 !important;
+}
+html.dark .bg-emerald-50 {
+  background-color: rgba(6, 78, 59, 0.4) !important;
+  border-color: rgba(5, 150, 105, 0.4) !important;
+}
+
+html.dark .text-blue-700,
+html.dark .text-blue-600,
+html.dark .text-\[\#0058be\] {
+  color: #60a5fa !important;
+}
+html.dark .bg-blue-50,
+html.dark .bg-\[\#eff4ff\],
+html.dark .bg-\[\#eff4ff\]\/60 {
+  background-color: rgba(30, 58, 138, 0.4) !important;
+  border-color: rgba(37, 99, 235, 0.4) !important;
+}
+
+html.dark .text-red-700,
+html.dark .text-red-600 {
+  color: #f87171 !important;
+}
+html.dark .bg-red-50 {
+  background-color: rgba(127, 29, 29, 0.4) !important;
+  border-color: rgba(220, 38, 38, 0.4) !important;
+}
+
+html.dark .text-amber-700,
+html.dark .text-amber-600 {
+  color: #fbbf24 !important;
+}
+html.dark .bg-amber-50 {
+  background-color: rgba(120, 53, 15, 0.4) !important;
+  border-color: rgba(217, 119, 6, 0.4) !important;
+}
+
+/* Tables in dark mode */
+html.dark table thead th {
+  color: #94a3b8 !important;
+  background-color: #111c33 !important;
+  border-color: #1e2d4d !important;
+}
+
+html.dark table tbody td {
+  color: #ffffff !important;
+  border-color: #1a2744 !important;
+}
+
+html.dark table tbody tr:hover {
+  background-color: #15223e !important;
+}
+
+/* Inputs, selects, and textareas in dark mode */
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+html.dark select,
+html.dark textarea {
+  background-color: #101a30 !important;
+  color: #ffffff !important;
+  border-color: #24345d !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b !important;
+}
+
+/* Modals & Dialogs in dark mode */
+html.dark [role="dialog"],
+html.dark .modal-card {
+  background-color: #0e172a !important;
+  color: #ffffff !important;
+  border-color: #1e2d4d !important;
+}
+
+/* Global border contrast in dark mode */
+html.dark .border-slate-200,
+html.dark .border-gray-200,
+html.dark .border-slate-100,
+html.dark .border-gray-100 {
+  border-color: #1e2d4d !important;
 }
 
 /* Fluid Animated Transition across the entire UI during Theme Toggle */
