@@ -9,6 +9,7 @@ import { KpiDetailContainer } from '@/components/dashboard/KpiDetailContainer';
 import type { MetricDetailType } from '@/types/metricDetail';
 import { OperationsSummaryChart } from '@/components/dashboard/OperationsSummaryChart';
 import { BscHolidaysCalendar } from '@/components/dashboard/BscHolidaysCalendar';
+import { KarnatakaHubsCardSection } from '@/components/dashboard/KarnatakaHubsCardSection';
 import api from '@/lib/api';
 
 interface DashboardStats {
@@ -62,9 +63,11 @@ const HUB_LABELS: Record<string, string> = {
   loc_bel: 'Belagavi Flagship (BEL-01)',
   loc_dav: 'Davanagere Hub (DAV-02)',
   loc_shi: 'Shivamogga Hub (SHI-03)',
+  loc_bly: 'Bellary Silk Emporium (BLY-04)',
   BEL: 'Belagavi Flagship (BEL-01)',
   DAV: 'Davanagere Hub (DAV-02)',
   SHI: 'Shivamogga Hub (SHI-03)',
+  BLY: 'Bellary Silk Emporium (BLY-04)',
 };
 
 const DEFAULT_HUBS = [
@@ -72,6 +75,7 @@ const DEFAULT_HUBS = [
   { id: 'BEL', code: 'BEL', name: 'Belagavi Flagship (BEL-01)' },
   { id: 'DAV', code: 'DAV', name: 'Davanagere Hub (DAV-02)' },
   { id: 'SHI', code: 'SHI', name: 'Shivamogga Hub (SHI-03)' },
+  { id: 'BLY', code: 'BLY', name: 'Bellary Hub (BLY-04)' },
 ];
 
 const DEFAULT_DEPTS = [
@@ -227,6 +231,19 @@ export default function DashboardPage() {
             score: 99.1,
             status: 'ON_TIME',
           },
+          {
+            id: 'p-7',
+            employeeCode: 'TEST-EMP-025',
+            employeeName: 'Kavitha Patil',
+            locationName: 'Bellary Silk Emporium (BLY-04)',
+            terminal: 'Main Concourse Biometric Terminal B',
+            scheduledTime: '09:30 AM',
+            actualTime: '09:25 AM',
+            method: 'Biometric Face (95.8%)',
+            score: 95.8,
+            status: 'EARLY',
+            incentive: '+₹300',
+          },
         ];
 
         const filtered = allFallbacks.filter((item) => {
@@ -236,6 +253,7 @@ export default function DashboardPage() {
             if (h.includes('bel') && !loc.includes('belagavi')) return false;
             if (h.includes('dav') && !loc.includes('davanagere')) return false;
             if (h.includes('shi') && !loc.includes('shivamogga')) return false;
+            if (h.includes('bly') && !loc.includes('bellary')) return false;
           }
           if (selectedShift !== 'all') {
             const s = selectedShift.toLowerCase();
@@ -347,42 +365,6 @@ export default function DashboardPage() {
   const onBreakCount = (stats?.onLunch ?? 0) + (stats?.onTeaBreak ?? 0);
   const punchesToday = (stats?.qrScans ?? 52) + (stats?.faceVerified ?? 35);
   const totalIncentive = stats?.incentiveToday ?? 6900;
-
-  const hubs = [
-    {
-      code: 'BEL-01',
-      name: 'Belagavi Flagship Emporium',
-      type: 'Retail & Weaving Atelier',
-      headcount: 24,
-      present: 22,
-      rate: '91.7%',
-      terminals: '4/4 Active',
-      status: 'Optimal',
-      badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    },
-    {
-      code: 'DAV-02',
-      name: 'Davanagere Weaving Showroom',
-      type: 'Textile Distribution Hub',
-      headcount: 12,
-      present: 12,
-      rate: '100%',
-      terminals: '2/2 Active',
-      status: 'Full Adherence',
-      badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    },
-    {
-      code: 'SHI-03',
-      name: 'Shivamogga Retail Megastore',
-      type: 'Commercial Apparel Apex',
-      headcount: 14,
-      present: 13,
-      rate: '92.8%',
-      terminals: '2/2 Active',
-      status: 'Optimal',
-      badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    },
-  ];
 
   // Shared interactive styles for the 5 drill-down KPI cards.
   const cardActionClass =
@@ -672,78 +654,11 @@ export default function DashboardPage() {
 
           {/* RIGHT SIDE: STORE HUBS, LIVE BIOMETRICS & SHIFTS */}
           <div className="lg:col-span-8 xl:col-span-8 flex flex-col gap-5">
-            {/* SECTION 2: KARNATAKA STORE HUBS MONITOR */}
-            <div className="flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">domain</span>
-              <h2 className="text-base font-bold text-[#0b1c30] dark:text-slate-100">Karnataka Enterprise Hubs & Store Outlets</h2>
-              <span className="text-xs text-slate-400 dark:text-slate-500">• 3 Active Branches</span>
-            </div>
-            <Link href="/organization/locations" className="text-xs font-semibold text-[#0058be] dark:text-blue-400 hover:underline flex items-center gap-1">
-              <span>View All Branches</span>
-              <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {hubs.map((hub) => {
-              const isSelected = selectedHub === hub.code || (selectedHub !== 'all' && (
-                hub.name.toLowerCase().includes(selectedHub.toLowerCase()) ||
-                (selectedHub.includes('bel') && hub.code.includes('BEL')) ||
-                (selectedHub.includes('dav') && hub.code.includes('DAV')) ||
-                (selectedHub.includes('shi') && hub.code.includes('SHI'))
-              ));
-              return (
-                <div
-                  key={hub.code}
-                  onClick={() => setSelectedHub(isSelected ? 'all' : hub.code)}
-                  className={`bg-white dark:bg-[#0e172a] p-4 rounded-xl border transition-all cursor-pointer card-interactive ${
-                    isSelected
-                      ? 'border-[#0058be] dark:border-blue-500 ring-2 ring-[#0058be]/25 dark:ring-blue-500/25 shadow-md scale-[1.01]'
-                      : 'border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700'
-                  }`}
-                  title={isSelected ? 'Click to show all hubs' : `Click to filter by ${hub.name}`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">{hub.code}</span>
-                        {isSelected && (
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 animate-pop-in">
-                            Active Filter Target
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100 mt-0.5 leading-tight">{hub.name}</h3>
-                      <p className="text-[11px] text-slate-400 dark:text-slate-500">{hub.type}</p>
-                    </div>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${hub.badgeClass}`}>
-                      {hub.status}
-                    </span>
-                  </div>
-
-                  <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-500 dark:text-slate-400">Floor Staff:</span>
-                      <span className="font-bold text-[#0b1c30] dark:text-slate-100">{hub.present} / {hub.headcount}</span>
-                    </div>
-                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                      <div
-                        className="bg-[#0058be] h-1.5 rounded-full transition-all duration-500"
-                        style={{ width: `${(hub.present / hub.headcount) * 100}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
-                      <span>Terminals: {hub.terminals}</span>
-                      <span className="text-[#0058be] dark:text-blue-400 font-bold">{hub.rate} Attendance</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+            {/* SECTION 2: KARNATAKA STORE HUBS MONITOR & INTERACTIVE CARD CRUD */}
+            <KarnatakaHubsCardSection
+              selectedHub={selectedHub}
+              onSelectHub={setSelectedHub}
+            />
 
         {/* SECTION 3: RECENT BIOMETRIC TERMINAL PUNCHES LEDGER */}
         <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
