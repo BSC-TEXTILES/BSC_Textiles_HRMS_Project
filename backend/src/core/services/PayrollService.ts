@@ -57,7 +57,7 @@ export class PayrollService {
           version: 1,
           basic_salary: Number(item.basic_salary),
           allowances: Number(item.allowances),
-          incentives: Number(item.early_incentive || 0) + Number(item.sales_incentive || 0),
+          incentives: Number(item.early_incentive || 0) + Number(item.sales_incentive || 0) + Number(item.attendance_incentive || 0),
           overtime_pay: Number(item.overtime_pay || 0),
           penalties: Number(item.late_penalties || 0) + Number(item.break_penalties || 0),
           statutory_deductions: Number(item.statutory_deductions || 0),
