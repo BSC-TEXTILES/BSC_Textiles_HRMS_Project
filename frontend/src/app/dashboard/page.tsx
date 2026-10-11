@@ -7,7 +7,6 @@ import { MetricDrillDownModal, type MetricKey } from '@/components/dashboard/Met
 import { DashboardCards } from '@/components/dashboard/DashboardCards';
 import { KpiDetailContainer } from '@/components/dashboard/KpiDetailContainer';
 import type { MetricDetailType } from '@/types/metricDetail';
-import { OperationsSummaryChart } from '@/components/dashboard/OperationsSummaryChart';
 import { BscHolidaysCalendar } from '@/components/dashboard/BscHolidaysCalendar';
 import { KarnatakaHubsCardSection } from '@/components/dashboard/KarnatakaHubsCardSection';
 import api from '@/lib/api';
@@ -392,7 +391,7 @@ export default function DashboardPage() {
                 </span>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-[#eff4ff] dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-medium border border-slate-200 dark:border-slate-700">
                   <span className="material-symbols-outlined text-[13px] text-[#0058be] dark:text-blue-400">verified</span>
-                  Since 1938 • FY 2026-27 Q3
+                  Since 1938 • FY 2024-25 Q3
                 </span>
               </div>
               <div className="flex items-center gap-3 mt-0.5">
@@ -629,20 +628,8 @@ export default function DashboardPage() {
 
         {/* 5 KEY METRIC KPI CARDS (INTERACTIVE DETAIL DRILL-DOWN) */}
         <DashboardCards
-          onSelectMetric={(metric) => setSelectedKpiMetric(metric)}
+          onSelectMetric={(metric) => setActiveMetric(metric)}
           stats={stats}
-        />
-
-
-        {/* SECTION 1.5: OVERALL OPERATIONS SUMMARY (HORIZONTAL BAR CHART) */}
-        <OperationsSummaryChart
-          filters={{
-            locationId: selectedHub,
-            departmentId: selectedDept,
-            shiftId: selectedShift,
-            date: selectedDate,
-          }}
-          onSelectMetric={setActiveMetric}
         />
 
         {/* MAIN OPERATIONAL & STATUTORY CALENDAR GRID */}

@@ -51,17 +51,6 @@ export const INITIAL_HUBS: HubCard[] = [
     status: 'Optimal',
     badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800',
   },
-  {
-    code: 'BLY-04',
-    name: 'Bellary Silk & Cotton Emporium',
-    type: 'Heritage Weaving Centre',
-    headcount: 11,
-    present: 10,
-    rate: '90.9%',
-    terminals: '2/2 Active',
-    status: 'Optimal',
-    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-400 dark:border-emerald-800',
-  },
 ];
 
 interface KarnatakaHubsCardSectionProps {
@@ -180,11 +169,11 @@ export function KarnatakaHubsCardSection({ selectedHub, onSelectHub }: Karnataka
           <button
             type="button"
             onClick={handleOpenAdd}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#0058be] text-white hover:bg-[#00479b] transition-colors shadow-xs"
-            title="Add a new store outlet card to this section"
+            className="opacity-0 group-hover:opacity-100 hover:opacity-100 inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-[#eff4ff] text-[#0058be] hover:bg-[#dce9ff] transition-all border border-[#dce9ff]"
+            title="Add a new store outlet card"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Add Branch Card</span>
+            <span>Add</span>
           </button>
           <Link
             href="/organization/locations"
@@ -196,8 +185,8 @@ export function KarnatakaHubsCardSection({ selectedHub, onSelectHub }: Karnataka
         </div>
       </div>
 
-      {/* 4-COLUMN RESPONSIVE CARD GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 3-COLUMN RESPONSIVE CARD GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {hubs.map((hub) => {
           const isSelected =
             selectedHub === hub.code ||
