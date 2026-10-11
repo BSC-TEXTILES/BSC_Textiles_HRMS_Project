@@ -26,18 +26,94 @@ export interface EmployeeEntity {
 export class EmployeeRepository extends BaseRepository<EmployeeEntity> {
   protected readonly tableName = 'employees';
 
+  public override async findById(id: string): Promise<EmployeeEntity | null> {
+    const emp = await super.findById(id);
+    if (emp) return emp;
+    const row = await this.queryOne<any>(`SELECT * FROM employee WHERE id = ? LIMIT 1`, [id]);
+    if (row) {
+      return {
+        id: row.id,
+        employee_code: row.employeeCode || row.id,
+        full_name: row.fullName || `${row.firstName || ''} ${row.lastName || ''}`.trim(),
+        gender: row.gender || null,
+        phone: row.phone || null,
+        email: row.email || null,
+        location_id: row.locationId,
+        floor_id: row.floorId || null,
+        department_id: row.departmentId || null,
+        section_id: row.sectionId || null,
+        selling_point_id: null,
+        shift_id: row.shiftId || null,
+        base_salary: 25000,
+        status: (row.status || 'ACTIVE') as any,
+        date_of_joining: row.joiningDate || row.createdAt,
+        created_at: row.createdAt,
+        updated_at: row.updatedAt,
+      };
+    }
+    return null;
+  }
+
   public async findByCode(code: string): Promise<EmployeeEntity | null> {
-    return this.queryOne<EmployeeEntity>(
+    const emp = await this.queryOne<EmployeeEntity>(
       `SELECT * FROM ${this.tableName} WHERE employee_code = ? LIMIT 1`,
       [code]
     );
+    if (emp) return emp;
+    const row = await this.queryOne<any>(`SELECT * FROM employee WHERE employeeCode = ? LIMIT 1`, [code]);
+    if (row) {
+      return {
+        id: row.id,
+        employee_code: row.employeeCode || row.id,
+        full_name: row.fullName || `${row.firstName || ''} ${row.lastName || ''}`.trim(),
+        gender: row.gender || null,
+        phone: row.phone || null,
+        email: row.email || null,
+        location_id: row.locationId,
+        floor_id: row.floorId || null,
+        department_id: row.departmentId || null,
+        section_id: row.sectionId || null,
+        selling_point_id: null,
+        shift_id: row.shiftId || null,
+        base_salary: 25000,
+        status: (row.status || 'ACTIVE') as any,
+        date_of_joining: row.joiningDate || row.createdAt,
+        created_at: row.createdAt,
+        updated_at: row.updatedAt,
+      };
+    }
+    return null;
   }
 
   public async findByEmail(email: string): Promise<EmployeeEntity | null> {
-    return this.queryOne<EmployeeEntity>(
+    const emp = await this.queryOne<EmployeeEntity>(
       `SELECT * FROM ${this.tableName} WHERE email = ? LIMIT 1`,
       [email]
     );
+    if (emp) return emp;
+    const row = await this.queryOne<any>(`SELECT * FROM employee WHERE email = ? LIMIT 1`, [email]);
+    if (row) {
+      return {
+        id: row.id,
+        employee_code: row.employeeCode || row.id,
+        full_name: row.fullName || `${row.firstName || ''} ${row.lastName || ''}`.trim(),
+        gender: row.gender || null,
+        phone: row.phone || null,
+        email: row.email || null,
+        location_id: row.locationId,
+        floor_id: row.floorId || null,
+        department_id: row.departmentId || null,
+        section_id: row.sectionId || null,
+        selling_point_id: null,
+        shift_id: row.shiftId || null,
+        base_salary: 25000,
+        status: (row.status || 'ACTIVE') as any,
+        date_of_joining: row.joiningDate || row.createdAt,
+        created_at: row.createdAt,
+        updated_at: row.updatedAt,
+      };
+    }
+    return null;
   }
 
   public async listActive(locationId?: string): Promise<EmployeeEntity[]> {

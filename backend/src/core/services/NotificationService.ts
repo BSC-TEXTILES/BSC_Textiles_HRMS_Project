@@ -1,5 +1,5 @@
 import { NotificationRepository, NotificationEntity, NotificationFilter, PaginatedNotifications } from '../repositories/NotificationRepository.js';
-import { socketIO } from '../../index.js';
+import { socketIO } from '../../socket.js';
 import crypto from 'node:crypto';
 
 export interface NotificationEvent {

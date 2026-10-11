@@ -28,9 +28,11 @@ export class PayrollRepository extends BaseRepository<PayrollRunEntity> {
 
   public async getItemsForRun(runId: string): Promise<any[]> {
     const sql = `
-      SELECT pi.*, e.employee_code, e.full_name as employee_name, e.email,
+      SELECT pi.*, pr.period_start, pr.period_end, pr.status as run_status,
+             e.employee_code, e.full_name as employee_name, e.email,
              l.name as location_name, d.name as department_name
       FROM payroll_items pi
+      JOIN payroll_runs pr ON pi.payroll_run_id = pr.id
       JOIN employees e ON pi.employee_id = e.id
       LEFT JOIN locations l ON e.location_id = l.id
       LEFT JOIN departments d ON e.department_id = d.id

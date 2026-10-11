@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../index.js';
 import { dbDate } from '../utils/dates.js';
 import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
-import { socketIO } from '../index.js';
+import { socketIO } from '../socket.js';
 import { validate } from '../middleware/validation.js';
 import { container } from '../core/container/ServiceContainer.js';
 
