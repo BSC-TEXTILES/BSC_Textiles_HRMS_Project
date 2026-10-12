@@ -164,7 +164,7 @@ io.on('connection', (socket) => {
 });
 
 const PORT = Number(process.env.PORT) || 4000;
-httpServer.listen(PORT, '0.0.0.0', () => {
+httpServer.listen(PORT, () => {
   console.log(`🚀 BSC Textiles HRMS Security-Hardened Server running on port ${PORT}`);
   console.log(`📡 WebSocket server ready`);
   setupViews().catch((err) => console.warn('[setupViews warning]:', err.message));

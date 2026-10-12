@@ -10,7 +10,6 @@ export default function AuditLogsPage() {
   const [loading, setLoading] = useState(true);
   const [actionFilter, setActionFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedLog, setSelectedLog] = useState<any>(null);
 
   const fetchLogs = useCallback(async () => {
     try {
@@ -248,19 +247,18 @@ export default function AuditLogsPage() {
                   <th className="py-space-sm px-space-md">Entity / Module</th>
                   <th className="py-space-sm px-space-md">Operator User</th>
                   <th className="py-space-sm px-space-md">IP / Terminal</th>
-                  <th className="py-space-sm px-space-md text-right">Payload Details</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-on-surface-variant">
+                    <td colSpan={5} className="py-12 text-center text-on-surface-variant">
                       Ingesting cryptographic forensic records...
                     </td>
                   </tr>
                 ) : filteredLogs.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-on-surface-variant">
+                    <td colSpan={5} className="py-12 text-center text-on-surface-variant">
                       No matching audit records found.
                     </td>
                   </tr>
@@ -298,15 +296,6 @@ export default function AuditLogsPage() {
                       <td className="py-space-sm px-space-md font-mono text-xs text-on-surface-variant">
                         {log.ipAddress || '192.168.1.104'}
                       </td>
-                      <td className="py-space-sm px-space-md text-right">
-                        <button
-                          onClick={() => setSelectedLog(log)}
-                          className="px-2.5 py-1 rounded bg-surface-container text-secondary font-label-sm text-label-sm font-bold hover:bg-secondary hover:text-white transition-colors"
-                          type="button"
-                        >
-                          View Diff
-                        </button>
-                      </td>
                     </tr>
                   ))
                 )}
@@ -314,41 +303,6 @@ export default function AuditLogsPage() {
             </table>
           </div>
         </div>
-
-        {/* Modal Payload Inspector */}
-        {selectedLog && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-surface-container-lowest rounded-2xl max-w-lg w-full p-6 shadow-2xl relative border border-slate-200">
-              <div className="flex items-center justify-between border-b pb-3 border-slate-100">
-                <div>
-                  <h3 className="text-lg font-bold text-on-surface">Audit Record Forensic Payload</h3>
-                  <p className="text-xs text-on-surface-variant font-mono">Event ID: {selectedLog.id}</p>
-                </div>
-                <button onClick={() => setSelectedLog(null)} className="text-slate-400 hover:text-slate-700">
-                  <span className="material-symbols-outlined">close</span>
-                </button>
-              </div>
-
-              <div className="mt-4 space-y-3 text-xs">
-                <div>
-                  <span className="font-semibold text-slate-700 block mb-1">State Mutation &amp; Cryptographic Signature:</span>
-                  <pre className="p-3 bg-slate-900 text-emerald-400 rounded-lg overflow-x-auto text-[11px] font-mono leading-relaxed">
-                    {JSON.stringify(selectedLog.newValue || selectedLog, null, 2)}
-                  </pre>
-                </div>
-              </div>
-
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={() => setSelectedLog(null)}
-                  className="bg-primary hover:bg-slate-800 text-on-primary text-xs px-4 py-2 rounded-lg font-bold"
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </DashboardLayout>
   );

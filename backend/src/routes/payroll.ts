@@ -233,7 +233,7 @@ router.post('/runs', async (req: AuthRequest, res) => {
       const attendances = await prisma.attendance.findMany({
         where: {
           employeeId: emp.id,
-          date: {
+          attendanceDate: {
             gte: start,
             lte: end,
           },
@@ -315,6 +315,1045 @@ router.post('/runs', async (req: AuthRequest, res) => {
 });
 
 // -------------------------------------------------------------
+// 3.1 GET /api/payroll/employees (HR Employee list with statutory data)
+// -------------------------------------------------------------
+router.get('/employees', async (req: AuthRequest, res) => {
+  try {
+    if (!isHrOrAdmin(req.user?.role)) {
+      return res.status(403).json({ error: 'Forbidden: Insufficient privileges' });
+    }
+
+    const { search } = req.query;
+    const conditions = ["e.status != 'TERMINATED'"];
+    const params: any[] = [];
+
+    if (search && typeof search === 'string' && search.trim()) {
+      const q = `%${search.trim()}%`;
+      conditions.push('(e.fullName LIKE ? OR e.employeeCode LIKE ? OR l.name LIKE ? OR l.code LIKE ?)');
+      params.push(q, q, q, q);
+    }
+
+    const [rows]: any = await pool.query(`
+      SELECT 
+        e.id, e.employeeCode, e.fullName, e.designation, e.email, e.phone, e.gender,
+        COALESCE(e.pfNo, '') AS pfNo,
+        COALESCE(e.esiNo, '') AS esiNo,
+        COALESCE(e.uanNo, '') AS uanNo,
+        COALESCE(e.bankName, '') AS bankName,
+        COALESCE(e.bankAccount, '') AS bankAccount,
+        COALESCE(e.salesmanNo, e.employeeCode) AS salesmanNo,
+        COALESCE(e.batch, 'SHIFT II') AS batch,
+        COALESCE(e.pfPay, e.basicSalary, 12000.00) AS pfPay,
+        COALESCE(e.fixedGrossSalary, 16000.00) AS fixedGrossSalary,
+        COALESCE(e.perDaySalary, 516.13) AS perDaySalary,
+        COALESCE(e.daysPayable, 31.00) AS daysPayable,
+        COALESCE(e.basicSalary, 12000.00) AS basicSalary,
+        COALESCE(e.hra, 4000.00) AS hra,
+        l.id AS locationId, l.name AS locationName, l.code AS locationCode,
+        d.id AS departmentId, d.name AS departmentName,
+        sec.id AS sectionId, sec.name AS sectionName,
+        sh.id AS shiftId, sh.name AS shiftName
+      FROM employee e
+      LEFT JOIN location l ON e.locationId = l.id
+      LEFT JOIN department d ON e.departmentId = d.id
+      LEFT JOIN section sec ON e.sectionId = sec.id
+      LEFT JOIN shift sh ON e.shiftId = sh.id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY e.fullName ASC
+    `, params);
+
+    res.json({ employees: rows });
+  } catch (error: any) {
+    console.error('Get payroll employees error:', error);
+    res.status(500).json({ error: 'Failed to retrieve employee roster' });
+  }
+});
+
+// -------------------------------------------------------------
+// 3.2 GET /api/payroll/load-or-calculate (Load existing payslip or calculate draft)
+// -------------------------------------------------------------
+router.get('/load-or-calculate', async (req: AuthRequest, res) => {
+  try {
+    if (!isHrOrAdmin(req.user?.role)) {
+      return res.status(403).json({ error: 'Forbidden: Insufficient privileges' });
+    }
+
+    const { employeeId, employeeCode, month, year } = req.query;
+    const lookupParam = (employeeId || employeeCode) as string;
+    if (!lookupParam) {
+      return res.status(400).json({ error: 'Employee ID or Employee Code is required' });
+    }
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    let targetMonthStr = String(month || 'Aug');
+    let targetMonthNum = 8;
+    if (!isNaN(Number(targetMonthStr))) {
+      targetMonthNum = Number(targetMonthStr);
+      targetMonthStr = monthNames[targetMonthNum - 1] || 'Aug';
+    } else {
+      const idx = monthNames.findIndex(m => m.toLowerCase() === targetMonthStr.toLowerCase());
+      if (idx !== -1) targetMonthNum = idx + 1;
+    }
+    const targetYearNum = Number(year || 2026);
+
+    // Days in target month
+    const daysInMonth = new Date(targetYearNum, targetMonthNum, 0).getDate();
+
+    // Fetch employee particulars
+    const [empRows]: any = await pool.query(`
+      SELECT 
+        e.*,
+        l.name AS locationName, l.code AS locationCode,
+        d.name AS departmentName,
+        sec.name AS sectionName,
+        sh.name AS shiftName
+      FROM employee e
+      LEFT JOIN location l ON e.locationId = l.id
+      LEFT JOIN department d ON e.departmentId = d.id
+      LEFT JOIN section sec ON e.sectionId = sec.id
+      LEFT JOIN shift sh ON e.shiftId = sh.id
+      WHERE e.id = ? OR e.employeeCode = ?
+      LIMIT 1
+    `, [lookupParam, lookupParam]);
+
+    if (!empRows.length) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    const emp = empRows[0];
+    const resolvedEmpId = emp.id;
+
+    // Check if a payslip already exists for this employee for that month & year
+    const [itemRows]: any = await pool.query(`
+      SELECT 
+        pi.*,
+        pr.periodStart, pr.periodEnd, pr.status AS runStatus
+      FROM payrollitem pi
+      JOIN payrollrun pr ON pi.payrollRunId = pr.id
+      WHERE pi.employeeId = ? AND (
+        (pi.salaryMonth = ? AND pi.salaryYear = ?) OR
+        (MONTH(pr.periodEnd) = ? AND YEAR(pr.periodEnd) = ?)
+      )
+      LIMIT 1
+    `, [resolvedEmpId, targetMonthStr, targetYearNum, targetMonthNum, targetYearNum]);
+
+    if (itemRows.length > 0) {
+      const item = itemRows[0];
+      const parsedEarnings = safeJsonParse(item.earningsConfig, null);
+      const parsedDeductions = safeJsonParse(item.deductionsConfig, null);
+      const parsedCalc = safeJsonParse(item.calculationDetails, {});
+
+      const payslipObj = {
+          id: item.id,
+          employeeId: emp.id,
+          employeeCode: emp.employeeCode,
+          fullName: emp.fullName,
+          designation: emp.designation,
+          departmentName: emp.departmentName || 'Atelier',
+          section: item.section || emp.sectionName || 'KIDS',
+          shift: item.shiftName || emp.shiftName || 'SHIFT II',
+          batch: item.batch || emp.batch || 'SHIFT II',
+          locationName: emp.locationName,
+          locationCode: item.locationCode || emp.locationCode || 'BSCTEX',
+          pfNo: item.pfNo || emp.pfNo || '',
+          esiNo: item.esiNo || emp.esiNo || '',
+          uanNo: item.uanNo || emp.uanNo || '',
+          bankName: item.bankName || emp.bankName || 'HDFC',
+          bankAccount: item.bankAccount || emp.bankAccount || '',
+          salesmanNo: item.salesmanNo || emp.salesmanNo || emp.employeeCode,
+          salaryMonth: item.salaryMonth || targetMonthStr,
+          salaryYear: item.salaryYear || targetYearNum,
+          daysPayable: Number(item.daysPayable || daysInMonth),
+          perDaySalary: Number(item.perDaySalary || (Number(item.fixedGrossSalary || 16000) / daysInMonth)),
+          pfPay: Number(item.pfPay || item.basicSalary || 12000),
+          fixedGrossSalary: Number(item.fixedGrossSalary || (Number(item.basicSalary || 0) + Number(item.hra || 0))),
+          basicSalary: Number(item.basicSalary || 12000),
+          hra: Number(item.hra || 4000),
+          grossSalary: Number(item.grossSalary || item.totalEarnings || 20375.50),
+          totalEarnings: Number(item.totalEarnings || item.grossSalary || 20375.50),
+          totalDeductions: Number(item.totalDeductions || item.deductions || 1593.00),
+          totalPayable: Number(item.totalPayable || item.netPay || 18782.50),
+          netPayable: Number(item.netPay || item.totalPayable || 18782.50),
+          salaryAdvance: Number(item.salaryAdvance || 0),
+          loanAdvance: Number(item.loanAdvance || 0),
+          employerPf: Number(item.employerPf || Math.round(Number(item.basicSalary || 12000) * 0.12)),
+          employerEsi: Number(item.employerEsi || Math.round(Number(item.grossSalary || 20375.50) * 0.0325)),
+          ctc: Number(item.ctc || 22478.00),
+          earningsConfig: parsedEarnings || [
+            { id: 'basic', label: 'BASIC PAY', amount: Number(item.basicSalary || 12000), enabled: true },
+            { id: 'hra', label: 'HRA', amount: Number(item.hra || 4000), enabled: true },
+            { id: 'ot', label: 'OT', amount: Number(item.otPay || item.overtime || 0), enabled: true },
+            { id: 'govt_holiday', label: 'GOVT.HOLIDAY', amount: Number(item.govtHolidayPay || 0), enabled: true },
+          ],
+          deductionsConfig: parsedDeductions || [
+            { id: 'pf', label: 'EMPLOYEE PF', amount: Number(item.employeePf || item.pfDeduction || 1440), enabled: true },
+            { id: 'esi', label: 'EMPLOYEE ESI', amount: Number(item.employeeEsi || 153), enabled: true },
+            { id: 'pt', label: 'PROF TAX', amount: Number(item.profTax || 0), enabled: true },
+            { id: 'sal_adv', label: 'SALARY ADVANCE', amount: Number(item.salaryAdvance || 0), enabled: true },
+            { id: 'loan_adv', label: 'LOAN ADVANCE', amount: Number(item.loanAdvance || 0), enabled: true },
+            { id: 'late_fine', label: 'LATE FINE DEDUCTION (₹1.0/SEC)', amount: Number(item.penalties || item.lateFineDeduction || 0), enabled: Number(item.penalties || item.lateFineDeduction || 0) > 0 },
+          ],
+          remarks: item.remarks || '',
+          status: item.status || 'APPROVED',
+          customSections: safeJsonParse(item.customSections, []),
+          calculationDetails: parsedCalc,
+      };
+      return res.json({
+        mode: 'EXISTING',
+        payslip: payslipObj,
+        data: payslipObj,
+      });
+    }
+
+    // Default calculations for fresh payslip
+    const defaultFixedGross = Number(emp.fixedGrossSalary || 16000);
+    const defaultBasic = Number(emp.basicSalary || (defaultFixedGross * 0.75) || 12000);
+    const defaultHra = Number(emp.hra || (defaultFixedGross - defaultBasic) || 4000);
+    const defaultPfPay = Number(emp.pfPay || defaultBasic);
+    const defaultDaysPayable = Number(emp.daysPayable || daysInMonth);
+    const defaultPerDay = Math.round((defaultFixedGross / defaultDaysPayable) * 100) / 100;
+
+    // Check attendance for overtime / bonuses
+    const startDateStr = `${targetYearNum}-${String(targetMonthNum).padStart(2, '0')}-01`;
+    const endDateStr = `${targetYearNum}-${String(targetMonthNum).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
+    const [attRows]: any = await pool.query(`
+      SELECT 
+        COALESCE(SUM(earlyLoginIncentive), 0) AS earlyTotal,
+        COALESCE(SUM(lateLoginPenalty), 0) AS latePenaltyTotal,
+        COALESCE(SUM(lateLoginSeconds), 0) AS lateSecondsTotal,
+        COUNT(id) AS presentDays
+      FROM attendance
+      WHERE employeeId = ? AND attendanceDate >= ? AND attendanceDate <= ?
+    `, [emp.id, startDateStr, endDateStr]);
+
+    const attIncentive = Number(attRows[0]?.earlyTotal || 0);
+
+    // Query Late Attendance Records (Permanent ₹1.0/sec policy: 1s chargeable late beyond grace = ₹1.00 deduction)
+    let lateFineAmount = 0;
+    let lateChargeableSeconds = 0;
+    try {
+      const [lateRows]: any = await pool.query(`
+        SELECT 
+          COALESCE(SUM(chargeableLateSeconds), 0) AS totalChargeableSeconds,
+          COALESCE(SUM(CASE WHEN approvalStatus = 'APPROVED' OR payrollStatus = 'APPLIED_TO_PAYROLL' THEN finalFine ELSE calculatedFine END), 0) AS totalFine
+        FROM late_attendance_record
+        WHERE employeeId = ? 
+          AND recordDate >= ? AND recordDate <= ?
+          AND approvalStatus != 'WAIVED'
+      `, [emp.id, startDateStr, endDateStr]);
+
+      if (lateRows && lateRows.length > 0 && Number(lateRows[0].totalChargeableSeconds) > 0) {
+        lateChargeableSeconds = Number(lateRows[0].totalChargeableSeconds || 0);
+        // Permanent ₹1.0/sec statutory rate
+        lateFineAmount = Math.round(lateChargeableSeconds * 1.0);
+      } else if (Number(attRows[0]?.lateSecondsTotal || 0) > 0) {
+        lateChargeableSeconds = Number(attRows[0].lateSecondsTotal);
+        lateFineAmount = Math.round(lateChargeableSeconds * 1.0);
+      }
+    } catch (e) {
+      if (Number(attRows[0]?.lateSecondsTotal || 0) > 0) {
+        lateChargeableSeconds = Number(attRows[0].lateSecondsTotal);
+        lateFineAmount = Math.round(lateChargeableSeconds * 1.0);
+      }
+    }
+
+    // Default statutory deductions
+    const defaultEmpPf = Math.round(defaultPfPay * 0.12);
+    const defaultEmpEsi = defaultFixedGross <= 21000 ? Math.round(defaultFixedGross * 0.0075) : 0;
+    const defaultPt = defaultFixedGross >= 15000 ? 200 : 0;
+
+    const initialEarnings = [
+      { id: 'basic', label: 'BASIC PAY', amount: defaultBasic, enabled: true },
+      { id: 'hra', label: 'HRA', amount: defaultHra, enabled: true },
+      { id: 'ot', label: 'OT', amount: 0, enabled: true },
+      { id: 'govt_holiday', label: 'GOVT.HOLIDAY', amount: 0, enabled: true },
+      { id: 'attendance_inc', label: 'ATTENDANCE INCENTIVE', amount: attIncentive, enabled: attIncentive > 0 },
+      { id: 'special_allow', label: 'SPECIAL ALLOWANCE', amount: 0, enabled: false },
+      { id: 'bonus', label: 'BONUS', amount: 0, enabled: false },
+      { id: 'other_earn', label: 'OTHER EARNINGS', amount: 0, enabled: false },
+    ];
+
+    const initialDeductions = [
+      { id: 'pf', label: 'EMPLOYEE PF', amount: defaultEmpPf, enabled: true },
+      { id: 'esi', label: 'EMPLOYEE ESI', amount: defaultEmpEsi, enabled: true },
+      { id: 'pt', label: 'PROF TAX', amount: defaultPt, enabled: defaultPt > 0 },
+      { id: 'sal_adv', label: 'SALARY ADVANCE', amount: 0, enabled: true },
+      { id: 'loan_adv', label: 'LOAN ADVANCE', amount: 0, enabled: true },
+      { 
+        id: 'late_fine', 
+        label: 'LATE FINE DEDUCTION (₹1.0/SEC)', 
+        amount: lateFineAmount, 
+        enabled: lateFineAmount > 0 
+      },
+      { id: 'lop_ded', label: 'LEAVE/ATTENDANCE DEDUCTION', amount: 0, enabled: false },
+      { id: 'other_ded', label: 'OTHER DEDUCTIONS', amount: 0, enabled: false },
+    ];
+
+    const totalEarn = initialEarnings.filter(e => e.enabled).reduce((sum, e) => sum + e.amount, 0);
+    const totalDed = initialDeductions.filter(d => d.enabled).reduce((sum, d) => sum + d.amount, 0);
+    const totalPay = Math.max(0, totalEarn - totalDed);
+    const empPfContrib = Math.round(defaultPfPay * 0.12);
+    const empEsiContrib = totalEarn <= 21000 ? Math.round(totalEarn * 0.0325) : 0;
+    const ctcEst = totalEarn + empPfContrib + empEsiContrib;
+
+    const draftObj = {
+      id: `draft_${emp.id}_${targetMonthStr}_${targetYearNum}`,
+      employeeId: emp.id,
+      employeeCode: emp.employeeCode,
+      fullName: emp.fullName,
+      designation: emp.designation,
+      departmentName: emp.departmentName || 'Atelier',
+      section: emp.sectionName || 'KIDS',
+      shift: emp.shiftName || 'SHIFT II',
+      batch: emp.batch || 'SHIFT II',
+      locationName: emp.locationName,
+      locationCode: emp.locationCode || 'BSCTEX',
+      pfNo: emp.pfNo || '',
+      esiNo: emp.esiNo || '',
+      uanNo: emp.uanNo || '',
+      bankName: emp.bankName || 'HDFC',
+      bankAccount: emp.bankAccount || '',
+      salesmanNo: emp.salesmanNo || emp.employeeCode,
+      salaryMonth: targetMonthStr,
+      salaryYear: targetYearNum,
+      daysPayable: defaultDaysPayable,
+      perDaySalary: defaultPerDay,
+      pfPay: defaultPfPay,
+      fixedGrossSalary: defaultFixedGross,
+      basicSalary: defaultBasic,
+      hra: defaultHra,
+      grossSalary: totalEarn,
+      totalEarnings: totalEarn,
+      totalDeductions: totalDed,
+      totalPayable: totalPay,
+      netPayable: totalPay,
+      salaryAdvance: 0,
+      loanAdvance: 0,
+      employerPf: empPfContrib,
+      employerEsi: empEsiContrib,
+      ctc: ctcEst,
+      earningsConfig: initialEarnings,
+      deductionsConfig: initialDeductions,
+      remarks: '',
+      status: 'DRAFT',
+      customSections: [],
+    };
+
+    res.json({
+      mode: 'NEW_CALCULATED',
+      payslip: draftObj,
+      data: draftObj,
+    });
+  } catch (error: any) {
+    console.error('Load or calculate payslip error:', error);
+    res.status(500).json({ error: 'Failed to compute payslip details', details: error.message });
+  }
+});
+
+// -------------------------------------------------------------
+// 3.3 POST /api/payroll/save-payslip (HR Save / Update Payslip)
+// -------------------------------------------------------------
+router.post('/save-payslip', async (req: AuthRequest, res) => {
+  try {
+    if (!isHrOrAdmin(req.user?.role)) {
+      return res.status(403).json({ error: 'Forbidden: Insufficient privileges' });
+    }
+
+    const {
+      employeeId,
+      salaryMonth,
+      salaryYear,
+      daysPayable,
+      perDaySalary,
+      pfPay,
+      fixedGrossSalary,
+      earningsConfig,
+      deductionsConfig,
+      remarks,
+      status = 'APPROVED',
+      salesmanNo,
+      batch,
+      section,
+      shift,
+      locationCode,
+      pfNo,
+      esiNo,
+      uanNo,
+      bankName,
+      bankAccount,
+      customSections = [],
+    } = req.body;
+
+    if (!employeeId || !salaryMonth || !salaryYear) {
+      return res.status(400).json({ error: 'Employee ID, salary month, and year are required' });
+    }
+
+    // Verify employee
+    const [empRows]: any = await pool.query('SELECT * FROM employee WHERE id = ? LIMIT 1', [employeeId]);
+    if (!empRows.length) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    const emp = empRows[0];
+
+    // Compute totals from configs
+    let totalGross = 0;
+    const basicItem = Array.isArray(earningsConfig) ? earningsConfig.find((e: any) => e.id === 'basic' || e.label?.includes('BASIC')) : null;
+    const hraItem = Array.isArray(earningsConfig) ? earningsConfig.find((e: any) => e.id === 'hra' || e.label?.includes('HRA')) : null;
+    const otItem = Array.isArray(earningsConfig) ? earningsConfig.find((e: any) => e.id === 'ot' || e.label?.includes('OT')) : null;
+    const govtHolidayItem = Array.isArray(earningsConfig) ? earningsConfig.find((e: any) => e.id === 'govt_holiday' || e.label?.includes('HOLIDAY')) : null;
+
+    if (Array.isArray(earningsConfig)) {
+      earningsConfig.forEach((item: any) => {
+        if (item.enabled !== false) {
+          totalGross += Number(item.amount || 0);
+        }
+      });
+    }
+
+    let totalDeductions = 0;
+    const pfItem = Array.isArray(deductionsConfig) ? deductionsConfig.find((d: any) => d.id === 'pf' || d.label?.includes('PF')) : null;
+    const esiItem = Array.isArray(deductionsConfig) ? deductionsConfig.find((d: any) => d.id === 'esi' || d.label?.includes('ESI')) : null;
+    const ptItem = Array.isArray(deductionsConfig) ? deductionsConfig.find((d: any) => d.id === 'pt' || d.label?.includes('PROF')) : null;
+    const salAdvItem = Array.isArray(deductionsConfig) ? deductionsConfig.find((d: any) => d.id === 'sal_adv' || d.label?.includes('SALARY ADVANCE')) : null;
+    const loanAdvItem = Array.isArray(deductionsConfig) ? deductionsConfig.find((d: any) => d.id === 'loan_adv' || d.label?.includes('LOAN ADVANCE')) : null;
+
+    if (Array.isArray(deductionsConfig)) {
+      deductionsConfig.forEach((item: any) => {
+        if (item.enabled !== false) {
+          totalDeductions += Number(item.amount || 0);
+        }
+      });
+    }
+
+    const netPayable = Math.max(0, totalGross - totalDeductions);
+    const basicVal = Number(basicItem?.amount ?? emp.basicSalary ?? 12000);
+    const hraVal = Number(hraItem?.amount ?? emp.hra ?? 4000);
+    const otVal = Number(otItem?.amount ?? 0);
+    const govtHolidayVal = Number(govtHolidayItem?.amount ?? 0);
+    const pfDeductVal = Number(pfItem?.amount ?? Math.round(basicVal * 0.12));
+    const esiDeductVal = Number(esiItem?.amount ?? Math.round(totalGross * 0.0075));
+    const profTaxVal = Number(ptItem?.amount ?? 0);
+    const salAdvVal = Number(salAdvItem?.amount ?? 0);
+    const loanAdvVal = Number(loanAdvItem?.amount ?? 0);
+
+    const employerPfVal = Math.round(Number(pfPay || basicVal) * 0.12);
+    const employerEsiVal = totalGross <= 21000 ? Math.round(totalGross * 0.0325) : 0;
+    const ctcVal = Math.round(totalGross + employerPfVal + employerEsiVal);
+
+    // Find or create payrollrun for this month/year
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    let monthNum = 8;
+    if (!isNaN(Number(salaryMonth))) {
+      monthNum = Number(salaryMonth);
+    } else {
+      const idx = monthNames.findIndex(m => m.toLowerCase() === String(salaryMonth).toLowerCase());
+      if (idx !== -1) monthNum = idx + 1;
+    }
+    const yearNum = Number(salaryYear);
+    const lastDay = new Date(yearNum, monthNum, 0).getDate();
+    const periodStart = `${yearNum}-${String(monthNum).padStart(2, '0')}-01`;
+    const periodEnd = `${yearNum}-${String(monthNum).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    const [runRows]: any = await pool.query(`
+      SELECT id FROM payrollrun 
+      WHERE (MONTH(periodEnd) = ? AND YEAR(periodEnd) = ?)
+      LIMIT 1
+    `, [monthNum, yearNum]);
+
+    let runId: string;
+    if (runRows.length > 0) {
+      runId = runRows[0].id;
+    } else {
+      runId = `run_${salaryMonth}_${yearNum}_${Date.now()}`;
+      await pool.query(`
+        INSERT INTO payrollrun (id, periodStart, periodEnd, status, processedBy, processedAt, createdAt, updatedAt)
+        VALUES (?, ?, ?, 'APPROVED', ?, NOW(), NOW(), NOW())
+      `, [runId, periodStart, periodEnd, req.user?.fullName || 'HR Manager']);
+    }
+
+    // Check if payrollitem already exists
+    const [existingItemRows]: any = await pool.query(`
+      SELECT id FROM payrollitem
+      WHERE employeeId = ? AND (
+        (salaryMonth = ? AND salaryYear = ?) OR
+        payrollRunId = ?
+      )
+      LIMIT 1
+    `, [employeeId, salaryMonth, yearNum, runId]);
+
+    const calcDetails = {
+      pfNo: pfNo || emp.pfNo || '',
+      esiNo: esiNo || emp.esiNo || '',
+      uanNo: uanNo || emp.uanNo || '',
+      bankName: bankName || emp.bankName || 'HDFC',
+      bankAccount: bankAccount || emp.bankAccount || '',
+      salesmanNo: salesmanNo || emp.salesmanNo || emp.employeeCode,
+      section: section || emp.sectionName || 'KIDS',
+      shift: shift || emp.shiftName || 'SHIFT II',
+      batch: batch || emp.batch || 'SHIFT II',
+      locationCode: locationCode || 'BSCTEX',
+      pfPay: Number(pfPay || basicVal),
+      hra: hraVal,
+      grossSalary: Number(fixedGrossSalary || (basicVal + hraVal)),
+      perDaySalary: Number(perDaySalary || (Number(fixedGrossSalary || 16000) / (Number(daysPayable) || 31))),
+      daysPayable: Number(daysPayable || 31),
+      earningsTotal: totalGross,
+      deductionsTotal: totalDeductions,
+      totalPayable: netPayable,
+      netPayable: netPayable,
+      employerPf: employerPfVal,
+      employerEsi: employerEsiVal,
+      ctc: ctcVal,
+      earningsConfig,
+      deductionsConfig,
+      remarks,
+    };
+
+    let itemId: string;
+
+    if (existingItemRows.length > 0) {
+      itemId = existingItemRows[0].id;
+      await pool.query(`
+        UPDATE payrollitem SET
+          basicSalary = ?,
+          hra = ?,
+          overtime = ?,
+          deductions = ?,
+          netPay = ?,
+          pfNo = ?,
+          esiNo = ?,
+          uanNo = ?,
+          bankName = ?,
+          bankAccount = ?,
+          salesmanNo = ?,
+          section = ?,
+          shiftName = ?,
+          batch = ?,
+          locationCode = ?,
+          pfPay = ?,
+          fixedGrossSalary = ?,
+          perDaySalary = ?,
+          daysPayable = ?,
+          govtHolidayPay = ?,
+          otPay = ?,
+          employeePf = ?,
+          employeeEsi = ?,
+          profTax = ?,
+          salaryAdvance = ?,
+          loanAdvance = ?,
+          employerPf = ?,
+          employerEsi = ?,
+          ctc = ?,
+          grossSalary = ?,
+          totalEarnings = ?,
+          totalDeductions = ?,
+          totalPayable = ?,
+          salaryMonth = ?,
+          salaryYear = ?,
+          earningsConfig = ?,
+          deductionsConfig = ?,
+          calculationDetails = ?,
+          customSections = ?,
+          remarks = ?,
+          status = ?,
+          updatedAt = NOW()
+        WHERE id = ?
+      `, [
+        basicVal, hraVal, otVal, totalDeductions, netPayable,
+        pfNo || emp.pfNo, esiNo || emp.esiNo, uanNo || emp.uanNo, bankName || emp.bankName, bankAccount || emp.bankAccount,
+        salesmanNo || emp.salesmanNo || emp.employeeCode, section || 'KIDS', shift || 'SHIFT II', batch || 'SHIFT II', locationCode || 'BSCTEX',
+        Number(pfPay || basicVal), Number(fixedGrossSalary || 16000), Number(perDaySalary || 516.13), Number(daysPayable || 31),
+        govtHolidayVal, otVal, pfDeductVal, esiDeductVal, profTaxVal, salAdvVal, loanAdvVal,
+        employerPfVal, employerEsiVal, ctcVal, totalGross, totalGross, totalDeductions, netPayable,
+        salaryMonth, yearNum, JSON.stringify(earningsConfig), JSON.stringify(deductionsConfig),
+        JSON.stringify(calcDetails), JSON.stringify(customSections), remarks || '', status, itemId
+      ]);
+    } else {
+      itemId = `pi_${emp.employeeCode}_${salaryMonth}_${yearNum}_${Date.now()}`;
+      await pool.query(`
+        INSERT INTO payrollitem (
+          id, payrollRunId, employeeId, basicSalary, hra, allowances, overtime,
+          earlyIncentive, attendanceIncentive, performanceIncentive, salesIncentive, bonus,
+          deductions, penalties, pfDeduction, taxDeduction, lopDeduction, netPay,
+          pfNo, esiNo, uanNo, bankName, bankAccount, salesmanNo, section, shiftName, batch, locationCode,
+          pfPay, fixedGrossSalary, perDaySalary, daysPayable, govtHolidayPay, otPay,
+          employeePf, employeeEsi, profTax, salaryAdvance, loanAdvance, employerPf, employerEsi, ctc,
+          grossSalary, totalEarnings, totalDeductions, totalPayable, salaryMonth, salaryYear,
+          earningsConfig, deductionsConfig, calculationDetails, customSections, remarks, status,
+          createdAt, updatedAt
+        ) VALUES (
+          ?, ?, ?, ?, ?, 0.00, ?,
+          0.00, 0.00, 0.00, 0.00, 0.00,
+          ?, 0.00, ?, 0.00, 0.00, ?,
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?,
+          NOW(), NOW()
+        )
+      `, [
+        itemId, runId, employeeId, basicVal, hraVal, otVal,
+        totalDeductions, pfDeductVal, netPayable,
+        pfNo || emp.pfNo, esiNo || emp.esiNo, uanNo || emp.uanNo, bankName || emp.bankName, bankAccount || emp.bankAccount,
+        salesmanNo || emp.salesmanNo || emp.employeeCode, section || 'KIDS', shift || 'SHIFT II', batch || 'SHIFT II', locationCode || 'BSCTEX',
+        Number(pfPay || basicVal), Number(fixedGrossSalary || 16000), Number(perDaySalary || 516.13), Number(daysPayable || 31), govtHolidayVal, otVal,
+        pfDeductVal, esiDeductVal, profTaxVal, salAdvVal, loanAdvVal, employerPfVal, employerEsiVal, ctcVal,
+        totalGross, totalGross, totalDeductions, netPayable, salaryMonth, yearNum,
+        JSON.stringify(earningsConfig), JSON.stringify(deductionsConfig), JSON.stringify(calcDetails), JSON.stringify(customSections), remarks || '', status
+      ]);
+    }
+
+    // Update employee master record with any modified statutory info
+    await pool.query(`
+      UPDATE employee SET
+        pfNo = COALESCE(?, pfNo),
+        esiNo = COALESCE(?, esiNo),
+        uanNo = COALESCE(?, uanNo),
+        bankName = COALESCE(?, bankName),
+        bankAccount = COALESCE(?, bankAccount),
+        salesmanNo = COALESCE(?, salesmanNo),
+        batch = COALESCE(?, batch),
+        pfPay = COALESCE(?, pfPay),
+        fixedGrossSalary = COALESCE(?, fixedGrossSalary),
+        perDaySalary = COALESCE(?, perDaySalary),
+        daysPayable = COALESCE(?, daysPayable)
+      WHERE id = ?
+    `, [
+      pfNo || null, esiNo || null, uanNo || null, bankName || null, bankAccount || null,
+      salesmanNo || null, batch || null, pfPay ? Number(pfPay) : null,
+      fixedGrossSalary ? Number(fixedGrossSalary) : null,
+      perDaySalary ? Number(perDaySalary) : null,
+      daysPayable ? Number(daysPayable) : null,
+      employeeId
+    ]);
+
+    // Insert version record
+    try {
+      await pool.query(`
+        INSERT INTO payslip_versions (
+          id, payroll_item_id, payroll_run_id, employee_id, version, is_superseded,
+          basic_salary, allowances, statutory_deductions, gross_earnings, total_deductions, net_pay,
+          edited_by, edit_reason
+        ) VALUES (?, ?, ?, ?, 1, FALSE, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        `pv_${itemId}_${Date.now()}`, itemId, runId, employeeId,
+        basicVal, hraVal, pfDeductVal + esiDeductVal, totalGross, totalDeductions, netPayable,
+        req.user?.fullName || req.user?.id || 'HR Manager', remarks || 'HR Payslip update and adjustment'
+      ]);
+    } catch (verErr: any) {
+      console.warn('Payslip version log warning:', verErr.message);
+    }
+
+    res.json({
+      success: true,
+      message: 'Payslip saved and updated successfully!',
+      payslipId: itemId,
+      totalEarnings: totalGross,
+      totalDeductions,
+      netPayable,
+      ctc: ctcVal,
+    });
+  } catch (error: any) {
+    console.error('Save payslip error:', error);
+    res.status(500).json({ error: 'Failed to save payslip', details: error.message });
+  }
+});
+
+// -------------------------------------------------------------
+// 3.4 GET /api/payroll/floor-salary-overview (Floor-Wise Salary Overview with RBAC)
+// -------------------------------------------------------------
+router.get('/floor-salary-overview', async (req: AuthRequest, res) => {
+  try {
+    // Access restriction: Only authorized HR and Admin roles can access the Floor-Wise Salary Overview
+    if (!isHrOrAdmin(req.user?.role)) {
+      return res.status(403).json({
+        error: 'Access Denied: Only authorized HR and Admin roles can access the Floor-Wise Salary Overview. Floor Managers and general employees are restricted.',
+      });
+    }
+
+    const {
+      locationCode,
+      locationId,
+      floorId,
+      sectionId,
+      month = 'Aug',
+      year = '2026',
+    } = req.query;
+
+    const targetMonthStr = String(month || 'Aug');
+    const targetYearNum = Number(year || 2026);
+
+    // 1. Fetch available locations, floors, sections for filter dropdowns
+    const [allLocations]: any = await pool.query('SELECT id, code, name, city FROM location ORDER BY code');
+    const [allFloors]: any = await pool.query(`
+      SELECT f.id, f.name, f.floorNumber, f.locationId, l.code AS locationCode
+      FROM floor f
+      JOIN location l ON f.locationId = l.id
+      ORDER BY l.code, f.floorNumber
+    `);
+    const [allSections]: any = await pool.query(`
+      SELECT s.id, s.name, s.code, s.floorId, s.locationId, l.code AS locationCode
+      FROM section s
+      JOIN location l ON s.locationId = l.id
+      ORDER BY s.name
+    `);
+
+    // 2. Query floors with their assigned Floor Manager particulars
+    const floorConditions: string[] = [];
+    const floorParams: any[] = [];
+
+    if (locationCode && locationCode !== 'ALL') {
+      floorConditions.push('l.code = ?');
+      floorParams.push(locationCode);
+    } else if (locationId && locationId !== 'ALL') {
+      floorConditions.push('l.id = ?');
+      floorParams.push(locationId);
+    }
+
+    if (floorId && floorId !== 'ALL') {
+      floorConditions.push('f.id = ?');
+      floorParams.push(floorId);
+    }
+
+    const floorWhere = floorConditions.length > 0 ? `WHERE ${floorConditions.join(' AND ')}` : '';
+
+    const [floorRows]: any = await pool.query(`
+      SELECT 
+        f.id AS floorId,
+        f.name AS floorName,
+        f.floorNumber,
+        l.id AS locationId,
+        l.code AS locationCode,
+        l.name AS locationName,
+        l.city AS locationCity,
+        u.id AS managerUserId,
+        u.fullName AS managerName,
+        u.email AS managerEmail,
+        COALESCE(mgrEmp.employeeCode, u.employeeId, 'N/A') AS managerEmployeeCode
+      FROM floor f
+      JOIN location l ON f.locationId = l.id
+      LEFT JOIN user u ON f.floorManagerId = u.id
+      LEFT JOIN employee mgrEmp ON u.employeeId = mgrEmp.id
+      ${floorWhere}
+      ORDER BY l.code, f.floorNumber
+    `, floorParams);
+
+    // 3. Query all active employees and their payroll items for target month
+    const empConditions: string[] = ["e.status = 'ACTIVE'"];
+    const empParams: any[] = [targetMonthStr, targetYearNum];
+
+    if (locationCode && locationCode !== 'ALL') {
+      empConditions.push('l.code = ?');
+      empParams.push(locationCode);
+    } else if (locationId && locationId !== 'ALL') {
+      empConditions.push('l.id = ?');
+      empParams.push(locationId);
+    }
+
+    if (floorId && floorId !== 'ALL') {
+      empConditions.push('e.floorId = ?');
+      empParams.push(floorId);
+    }
+
+    if (sectionId && sectionId !== 'ALL') {
+      empConditions.push('e.sectionId = ?');
+      empParams.push(sectionId);
+    }
+
+    const [empPayrollRows]: any = await pool.query(`
+      SELECT 
+        e.id AS employeeId,
+        e.employeeCode,
+        e.fullName,
+        e.designation,
+        e.locationId,
+        e.floorId,
+        e.sectionId,
+        l.code AS locationCode,
+        l.name AS locationName,
+        f.name AS floorName,
+        f.floorNumber,
+        sec.id AS secId,
+        COALESCE(sec.name, 'General') AS sectionName,
+        COALESCE(sec.code, 'GEN') AS sectionCode,
+        sh.name AS shiftName,
+        pi.id AS payrollItemId,
+        COALESCE(pi.basicSalary, e.basicSalary, 12000) AS basicSalary,
+        COALESCE(pi.grossSalary, pi.basicSalary + COALESCE(pi.earlyIncentive,0) + COALESCE(pi.attendanceIncentive,0) + COALESCE(pi.overtime,0), e.fixedGrossSalary, 16000) AS grossSalary,
+        COALESCE(pi.totalDeductions, pi.deductions, 0) AS totalDeductions,
+        COALESCE(pi.totalPayable, pi.netPay, 0) AS netPayable,
+        COALESCE(pi.employerPf, ROUND(COALESCE(pi.basicSalary, 12000) * 0.12), 0) AS employerPf,
+        COALESCE(pi.employerEsi, ROUND(COALESCE(pi.grossSalary, 16000) * 0.0325), 0) AS employerEsi,
+        COALESCE(pi.ctc, 0) AS ctc,
+        COALESCE(pi.daysPayable, 31) AS daysPayable,
+        COALESCE(pi.status, 'APPROVED') AS status
+      FROM employee e
+      JOIN location l ON e.locationId = l.id
+      LEFT JOIN floor f ON e.floorId = f.id
+      LEFT JOIN section sec ON e.sectionId = sec.id
+      LEFT JOIN shift sh ON e.shiftId = sh.id
+      LEFT JOIN payrollitem pi ON pi.employeeId = e.id AND (
+        (pi.salaryMonth = ? AND pi.salaryYear = ?) OR 
+        (pi.salaryMonth IS NULL AND pi.salaryYear IS NULL)
+      )
+      WHERE ${empConditions.join(' AND ')}
+      ORDER BY l.code, f.floorNumber, sec.name, e.fullName
+    `, empParams);
+
+    // 4. Structure aggregation by Location and Floor
+    interface FloorAgg {
+      id: string;
+      name: string;
+      floorNumber: number;
+      locationId: string;
+      locationCode: string;
+      locationName: string;
+      floorManager: {
+        id: string;
+        fullName: string;
+        employeeId: string;
+        employeeCode: string;
+        email: string;
+      } | null;
+      summary: {
+        totalEmployees: number;
+        totalGrossSalary: number;
+        totalDeductions: number;
+        totalNetPayable: number;
+        totalEmployerPf: number;
+        totalEmployerEsi: number;
+        totalEmployerContrib: number;
+        totalCtc: number;
+      };
+      sections: Array<{
+        id: string;
+        name: string;
+        code: string;
+        employeeCount: number;
+        grossSalary: number;
+        netPayable: number;
+      }>;
+      employees: any[];
+    }
+
+    interface LocationAgg {
+      id: string;
+      code: string;
+      name: string;
+      city: string;
+      summary: {
+        totalEmployees: number;
+        totalGrossSalary: number;
+        totalDeductions: number;
+        totalNetPayable: number;
+        totalEmployerPf: number;
+        totalEmployerEsi: number;
+        totalEmployerContrib: number;
+        totalCtc: number;
+      };
+      floors: FloorAgg[];
+    }
+
+    const locationMap = new Map<string, LocationAgg>();
+    const floorMap = new Map<string, FloorAgg>();
+
+    // Initialize floors from floorRows
+    for (const fl of floorRows) {
+      if (!locationMap.has(fl.locationId)) {
+        locationMap.set(fl.locationId, {
+          id: fl.locationId,
+          code: fl.locationCode,
+          name: fl.locationName,
+          city: fl.locationCity,
+          summary: {
+            totalEmployees: 0,
+            totalGrossSalary: 0,
+            totalDeductions: 0,
+            totalNetPayable: 0,
+            totalEmployerPf: 0,
+            totalEmployerEsi: 0,
+            totalEmployerContrib: 0,
+            totalCtc: 0,
+          },
+          floors: [],
+        });
+      }
+
+      const floorObj: FloorAgg = {
+        id: fl.floorId,
+        name: fl.floorName,
+        floorNumber: fl.floorNumber,
+        locationId: fl.locationId,
+        locationCode: fl.locationCode,
+        locationName: fl.locationName,
+        floorManager: fl.managerUserId
+          ? {
+              id: fl.managerUserId,
+              fullName: fl.managerName,
+              employeeId: fl.managerEmployeeCode,
+              employeeCode: fl.managerEmployeeCode,
+              email: fl.managerEmail,
+            }
+          : null,
+        summary: {
+          totalEmployees: 0,
+          totalGrossSalary: 0,
+          totalDeductions: 0,
+          totalNetPayable: 0,
+          totalEmployerPf: 0,
+          totalEmployerEsi: 0,
+          totalEmployerContrib: 0,
+          totalCtc: 0,
+        },
+        sections: [],
+        employees: [],
+      };
+
+      floorMap.set(fl.floorId, floorObj);
+      locationMap.get(fl.locationId)!.floors.push(floorObj);
+    }
+
+    // Populate employees and calculate floor/location metrics
+    const sectionMapByFloor = new Map<string, Map<string, any>>();
+
+    for (const emp of empPayrollRows) {
+      const fId = emp.floorId;
+      if (!fId || !floorMap.has(fId)) {
+        continue;
+      }
+
+      const fl = floorMap.get(fId)!;
+      const loc = locationMap.get(fl.locationId)!;
+
+      const gross = Number(emp.grossSalary);
+      const deductions = Number(emp.totalDeductions);
+      const netPay = Number(emp.netPayable);
+      const empPf = Number(emp.employerPf);
+      const empEsi = Number(emp.employerEsi);
+      const empContrib = empPf + empEsi;
+      const ctcVal = Number(emp.ctc || (gross + empContrib));
+
+      // Update floor summary
+      fl.summary.totalEmployees += 1;
+      fl.summary.totalGrossSalary += gross;
+      fl.summary.totalDeductions += deductions;
+      fl.summary.totalNetPayable += netPay;
+      fl.summary.totalEmployerPf += empPf;
+      fl.summary.totalEmployerEsi += empEsi;
+      fl.summary.totalEmployerContrib += empContrib;
+      fl.summary.totalCtc += ctcVal;
+
+      // Update location summary
+      loc.summary.totalEmployees += 1;
+      loc.summary.totalGrossSalary += gross;
+      loc.summary.totalDeductions += deductions;
+      loc.summary.totalNetPayable += netPay;
+      loc.summary.totalEmployerPf += empPf;
+      loc.summary.totalEmployerEsi += empEsi;
+      loc.summary.totalEmployerContrib += empContrib;
+      loc.summary.totalCtc += ctcVal;
+
+      // Track section metrics inside this floor
+      if (!sectionMapByFloor.has(fId)) {
+        sectionMapByFloor.set(fId, new Map());
+      }
+      const floorSecMap = sectionMapByFloor.get(fId)!;
+      const secKey = emp.sectionName || 'General';
+      if (!floorSecMap.has(secKey)) {
+        floorSecMap.set(secKey, {
+          id: emp.secId || `sec_${secKey}`,
+          name: emp.sectionName || 'General',
+          code: emp.sectionCode || 'GEN',
+          employeeCount: 0,
+          grossSalary: 0,
+          netPayable: 0,
+        });
+      }
+      const secEntry = floorSecMap.get(secKey)!;
+      secEntry.employeeCount += 1;
+      secEntry.grossSalary += gross;
+      secEntry.netPayable += netPay;
+
+      fl.employees.push({
+        payrollItemId: emp.payrollItemId || `draft_${emp.employeeId}`,
+        employeeId: emp.employeeId,
+        employeeCode: emp.employeeCode,
+        fullName: emp.fullName,
+        designation: emp.designation,
+        sectionName: emp.sectionName,
+        shiftName: emp.shiftName,
+        daysPayable: Number(emp.daysPayable),
+        basicSalary: Number(emp.basicSalary),
+        grossSalary: gross,
+        totalDeductions: deductions,
+        netPayable: netPay,
+        employerPf: empPf,
+        employerEsi: empEsi,
+        employerContrib: empContrib,
+        ctc: ctcVal,
+        status: emp.status,
+      });
+    }
+
+    // Attach section summaries to each floor
+    for (const [fId, secMap] of sectionMapByFloor.entries()) {
+      if (floorMap.has(fId)) {
+        floorMap.get(fId)!.sections = Array.from(secMap.values());
+      }
+    }
+
+    // Overall summary across all locations
+    const overallSummary = {
+      totalLocations: locationMap.size,
+      totalFloors: floorMap.size,
+      totalEmployees: 0,
+      totalGrossSalary: 0,
+      totalDeductions: 0,
+      totalNetPayable: 0,
+      totalEmployerPf: 0,
+      totalEmployerEsi: 0,
+      totalEmployerContrib: 0,
+      totalCtc: 0,
+    };
+
+    for (const loc of locationMap.values()) {
+      overallSummary.totalEmployees += loc.summary.totalEmployees;
+      overallSummary.totalGrossSalary += loc.summary.totalGrossSalary;
+      overallSummary.totalDeductions += loc.summary.totalDeductions;
+      overallSummary.totalNetPayable += loc.summary.totalNetPayable;
+      overallSummary.totalEmployerPf += loc.summary.totalEmployerPf;
+      overallSummary.totalEmployerEsi += loc.summary.totalEmployerEsi;
+      overallSummary.totalEmployerContrib += loc.summary.totalEmployerContrib;
+      overallSummary.totalCtc += loc.summary.totalCtc;
+    }
+
+    // Return structured payload
+    res.json({
+      success: true,
+      filters: {
+        locationCode: locationCode || 'ALL',
+        floorId: floorId || 'ALL',
+        sectionId: sectionId || 'ALL',
+        month: targetMonthStr,
+        year: targetYearNum,
+      },
+      availableFilters: {
+        locations: allLocations,
+        floors: allFloors,
+        sections: allSections,
+        months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        years: [2025, 2026, 2027],
+      },
+      overallSummary,
+      locations: Array.from(locationMap.values()),
+    });
+  } catch (error: any) {
+    console.error('Floor salary overview error:', error);
+    res.status(500).json({ error: 'Failed to compute floor-wise salary overview', details: error.message });
+  }
+});
+
+// -------------------------------------------------------------
 // 4. GET /api/payroll/payslips (Full Payslip ledger with RBAC)
 // -------------------------------------------------------------
 router.get('/payslips', async (req: AuthRequest, res) => {
@@ -358,12 +1397,31 @@ router.get('/payslips', async (req: AuthRequest, res) => {
       params.push(term, term);
     }
 
-    if (month && year) {
-      conditions.push('MONTH(pr.periodEnd) = ? AND YEAR(pr.periodEnd) = ?');
-      params.push(Number(month), Number(year));
-    } else if (year) {
-      conditions.push('YEAR(pr.periodEnd) = ?');
-      params.push(Number(year));
+    const yearNum = Number(year);
+    const safeYear = Number.isFinite(yearNum) && yearNum > 1970 ? yearNum : null;
+
+    if (month && safeYear) {
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const rawMonth = String(month).trim();
+      let monthNum = Number(rawMonth);
+      let monthName = rawMonth;
+
+      if (Number.isFinite(monthNum) && monthNum >= 1 && monthNum <= 12) {
+        monthName = monthNames[monthNum - 1];
+      } else {
+        const idx = monthNames.findIndex((m) => m.toLowerCase() === rawMonth.toLowerCase());
+        monthNum = idx + 1;
+        monthName = idx !== -1 ? monthNames[idx] : rawMonth;
+      }
+
+      conditions.push('((pi.salaryMonth = ? AND pi.salaryYear = ?) OR (MONTH(pr.periodEnd) = ? AND YEAR(pr.periodEnd) = ?))');
+      params.push(monthName, safeYear, monthNum, safeYear);
+    } else if (safeYear) {
+      conditions.push('(pi.salaryYear = ? OR YEAR(pr.periodEnd) = ?)');
+      params.push(safeYear, safeYear);
+    } else if (month) {
+      conditions.push('pi.salaryMonth = ?');
+      params.push(String(month).trim());
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -374,6 +1432,20 @@ router.get('/payslips', async (req: AuthRequest, res) => {
         pi.*,
         pr.periodStart, pr.periodEnd, pr.status AS runStatus,
         e.employeeCode, e.fullName AS employeeName, e.designation, e.email AS employeeEmail,
+        COALESCE(pi.pfNo, e.pfNo, '') AS pfNo,
+        COALESCE(pi.esiNo, e.esiNo, '') AS esiNo,
+        COALESCE(pi.uanNo, e.uanNo, '') AS uanNo,
+        COALESCE(pi.bankName, e.bankName, 'HDFC') AS bankName,
+        COALESCE(pi.bankAccount, e.bankAccount, '') AS bankAccount,
+        COALESCE(pi.salesmanNo, e.salesmanNo, e.employeeCode) AS salesmanNo,
+        COALESCE(pi.section, sec.name, d.name, 'KIDS') AS section,
+        COALESCE(pi.shiftName, sh.name, 'SHIFT II') AS shift,
+        COALESCE(pi.batch, e.batch, 'SHIFT II') AS batch,
+        COALESCE(pi.locationCode, l.code, 'BSCTEX') AS locationCode,
+        COALESCE(pi.pfPay, e.pfPay, pi.basicSalary, 12000.00) AS pfPay,
+        COALESCE(pi.fixedGrossSalary, e.fixedGrossSalary, 16000.00) AS fixedGrossSalary,
+        COALESCE(pi.perDaySalary, e.perDaySalary, 516.13) AS perDaySalary,
+        COALESCE(pi.daysPayable, e.daysPayable, 31.00) AS daysPayable,
         l.name AS locationName, l.code AS locationCode,
         d.name AS departmentName
       FROM payrollitem pi
@@ -381,6 +1453,8 @@ router.get('/payslips', async (req: AuthRequest, res) => {
       JOIN employee e ON pi.employeeId = e.id
       JOIN location l ON e.locationId = l.id
       LEFT JOIN department d ON e.departmentId = d.id
+      LEFT JOIN section sec ON e.sectionId = sec.id
+      LEFT JOIN shift sh ON e.shiftId = sh.id
       ${whereClause}
       ORDER BY pr.periodEnd DESC, e.fullName ASC
       LIMIT ? OFFSET ?
@@ -395,8 +1469,16 @@ router.get('/payslips', async (req: AuthRequest, res) => {
       ${whereClause}
     `, params);
 
+    const formattedRows = rows.map((r: any) => ({
+      ...r,
+      earningsConfig: safeJsonParse(r.earningsConfig, null),
+      deductionsConfig: safeJsonParse(r.deductionsConfig, null),
+      calculationDetails: safeJsonParse(r.calculationDetails, {}),
+      customSections: safeJsonParse(r.customSections, []),
+    }));
+
     res.json({
-      payslips: rows,
+      payslips: formattedRows,
       total: Number(countRows[0]?.total || 0),
       page: Number(page),
       limit: Number(limit),
@@ -419,7 +1501,20 @@ router.get('/payslip/:itemId', async (req: AuthRequest, res) => {
         pi.*,
         pr.periodStart, pr.periodEnd, pr.status AS runStatus,
         e.employeeCode, e.fullName, e.designation, e.email, e.phone,
-        NULL AS pan, NULL AS uan, NULL AS bankAccount, NULL AS bankName, NULL AS bankIfsc,
+        COALESCE(pi.pfNo, e.pfNo, '') AS pfNo,
+        COALESCE(pi.esiNo, e.esiNo, '') AS esiNo,
+        COALESCE(pi.uanNo, e.uanNo, '') AS uanNo,
+        COALESCE(pi.bankName, e.bankName, 'HDFC') AS bankName,
+        COALESCE(pi.bankAccount, e.bankAccount, '') AS bankAccount,
+        COALESCE(pi.salesmanNo, e.salesmanNo, e.employeeCode) AS salesmanNo,
+        COALESCE(pi.section, sec.name, d.name, 'KIDS') AS section,
+        COALESCE(pi.shiftName, sh.name, 'SHIFT II') AS shift,
+        COALESCE(pi.batch, e.batch, 'SHIFT II') AS batch,
+        COALESCE(pi.locationCode, l.code, 'BSCTEX') AS locationCode,
+        COALESCE(pi.pfPay, e.pfPay, pi.basicSalary, 12000.00) AS pfPay,
+        COALESCE(pi.fixedGrossSalary, e.fixedGrossSalary, 16000.00) AS fixedGrossSalary,
+        COALESCE(pi.perDaySalary, e.perDaySalary, 516.13) AS perDaySalary,
+        COALESCE(pi.daysPayable, e.daysPayable, 31.00) AS daysPayable,
         l.id AS locationId, l.name AS locationName, l.code AS locationCode,
         d.name AS departmentName
       FROM payrollitem pi
@@ -427,6 +1522,8 @@ router.get('/payslip/:itemId', async (req: AuthRequest, res) => {
       JOIN employee e ON pi.employeeId = e.id
       JOIN location l ON e.locationId = l.id
       LEFT JOIN department d ON e.departmentId = d.id
+      LEFT JOIN section sec ON e.sectionId = sec.id
+      LEFT JOIN shift sh ON e.shiftId = sh.id
       WHERE pi.id = ?
     `, [itemId]);
 
@@ -447,13 +1544,11 @@ router.get('/payslip/:itemId', async (req: AuthRequest, res) => {
       }
     }
 
-    // Parse JSON calculationDetails & customSections if string
-    if (typeof payslip.calculationDetails === 'string') {
-      try { payslip.calculationDetails = JSON.parse(payslip.calculationDetails); } catch {}
-    }
-    if (typeof payslip.customSections === 'string') {
-      try { payslip.customSections = JSON.parse(payslip.customSections); } catch {}
-    }
+    // Parse JSON
+    payslip.calculationDetails = safeJsonParse(payslip.calculationDetails, {});
+    payslip.customSections = safeJsonParse(payslip.customSections, []);
+    payslip.earningsConfig = safeJsonParse(payslip.earningsConfig, null);
+    payslip.deductionsConfig = safeJsonParse(payslip.deductionsConfig, null);
 
     res.json(payslip);
   } catch (error) {
@@ -777,7 +1872,20 @@ router.get('/payslip/:itemId/pdf', async (req: AuthRequest, res) => {
         pi.*,
         pr.periodStart, pr.periodEnd,
         e.employeeCode, e.fullName, e.designation, e.email,
-        NULL AS pan, NULL AS uan, NULL AS bankAccount,
+        COALESCE(pi.pfNo, e.pfNo, '') AS pfNo,
+        COALESCE(pi.esiNo, e.esiNo, '') AS esiNo,
+        COALESCE(pi.uanNo, e.uanNo, '') AS uanNo,
+        COALESCE(pi.bankName, e.bankName, 'HDFC') AS bankName,
+        COALESCE(pi.bankAccount, e.bankAccount, '') AS bankAccount,
+        COALESCE(pi.salesmanNo, e.salesmanNo, e.employeeCode) AS salesmanNo,
+        COALESCE(pi.section, sec.name, d.name, 'KIDS') AS section,
+        COALESCE(pi.shiftName, sh.name, 'SHIFT II') AS shift,
+        COALESCE(pi.batch, e.batch, 'SHIFT II') AS batch,
+        COALESCE(pi.locationCode, l.code, 'BSCTEX') AS locationCode,
+        COALESCE(pi.pfPay, e.pfPay, pi.basicSalary, 12000.00) AS pfPay,
+        COALESCE(pi.fixedGrossSalary, e.fixedGrossSalary, 16000.00) AS fixedGrossSalary,
+        COALESCE(pi.perDaySalary, e.perDaySalary, 516.13) AS perDaySalary,
+        COALESCE(pi.daysPayable, e.daysPayable, 31.00) AS daysPayable,
         l.name AS locationName,
         d.name AS departmentName
       FROM payrollitem pi
@@ -785,6 +1893,8 @@ router.get('/payslip/:itemId/pdf', async (req: AuthRequest, res) => {
       JOIN employee e ON pi.employeeId = e.id
       JOIN location l ON e.locationId = l.id
       LEFT JOIN department d ON e.departmentId = d.id
+      LEFT JOIN section sec ON e.sectionId = sec.id
+      LEFT JOIN shift sh ON e.shiftId = sh.id
       WHERE pi.id = ?
     `, [itemId]);
 
@@ -801,6 +1911,30 @@ router.get('/payslip/:itemId/pdf', async (req: AuthRequest, res) => {
     const [settingsRows]: any = await pool.query(`SELECT * FROM payroll_settings LIMIT 1`);
     const settings = settingsRows[0] || {};
 
+    const parsedEarnings = safeJsonParse<any[]>(p.earningsConfig, []);
+    const parsedDeductions = safeJsonParse<any[]>(p.deductionsConfig, []);
+
+    const earningsList = Array.isArray(parsedEarnings) && parsedEarnings.length > 0 ? parsedEarnings.filter((e: any) => e.enabled !== false).map((e: any) => ({
+      label: e.label,
+      amount: Number(e.amount || 0),
+    })) : [
+      { label: 'BASIC PAY', amount: Number(p.basicSalary || 12000) },
+      { label: 'HRA', amount: Number(p.hra || 4000) },
+      ...(Number(p.otPay || p.overtime || 0) > 0 ? [{ label: 'OT', amount: Number(p.otPay || p.overtime) }] : []),
+      ...(Number(p.govtHolidayPay || 0) > 0 ? [{ label: 'GOVT.HOLIDAY', amount: Number(p.govtHolidayPay) }] : []),
+    ];
+
+    const deductionsList = Array.isArray(parsedDeductions) && parsedDeductions.length > 0 ? parsedDeductions.filter((d: any) => d.enabled !== false).map((d: any) => ({
+      label: d.label,
+      amount: Number(d.amount || 0),
+    })) : [
+      { label: 'EMPLOYEE PF', amount: Number(p.employeePf || p.pfDeduction || 1440) },
+      { label: 'EMPLOYEE ESI', amount: Number(p.employeeEsi || 153) },
+      { label: 'PROF TAX', amount: Number(p.profTax || 0) },
+    ];
+
+    const mask = req.query.mask !== 'false';
+
     const pdfData: PayslipPdfData = {
       id: p.id,
       employeeCode: p.employeeCode,
@@ -808,38 +1942,53 @@ router.get('/payslip/:itemId/pdf', async (req: AuthRequest, res) => {
       designation: p.designation,
       departmentName: p.departmentName,
       locationName: p.locationName,
-      pan: p.pan,
-      uan: p.uan,
+      pfNo: p.pfNo,
+      esiNo: p.esiNo,
+      uanNo: p.uanNo || p.uan,
+      bankName: p.bankName,
       bankAccount: p.bankAccount,
+      maskBankAccount: mask,
+      salesmanNo: p.salesmanNo,
+      section: p.section,
+      shift: p.shift,
+      batch: p.batch,
+      locationCode: p.locationCode,
       periodStart: p.periodStart,
       periodEnd: p.periodEnd,
-      basicSalary: Number(p.basicSalary),
-      hra: Number(p.hra || p.basicSalary * 0.4),
-      allowances: Number(p.allowances || 2500),
-      earlyIncentive: Number(p.earlyIncentive || 0),
-      attendanceIncentive: Number(p.attendanceIncentive || 0),
-      salesIncentive: Number(p.salesIncentive || 0),
-      overtime: Number(p.overtime || 0),
-      bonus: Number(p.bonus || 0),
-      deductions: Number(p.deductions),
-      pfDeduction: Number(p.pfDeduction || p.basicSalary * 0.12),
-      taxDeduction: Number(p.taxDeduction || 0),
-      lopDeduction: Number(p.lopDeduction || 0),
-      penalties: Number(p.penalties || 0),
-      netPay: Number(p.netPay),
-      status: p.status,
+      salaryMonth: p.salaryMonth,
+      salaryYear: p.salaryYear,
+      pfPay: Number(p.pfPay || p.basicSalary),
+      hra: Number(p.hra || 0),
+      fixedGrossSalary: Number(p.fixedGrossSalary || (Number(p.basicSalary || 0) + Number(p.hra || 0))),
+      perDaySalary: Number(p.perDaySalary || 0),
+      daysPayable: Number(p.daysPayable || 31),
+      basicSalary: Number(p.basicSalary || 0),
+      overtime: Number(p.otPay || p.overtime || 0),
+      grossSalary: Number(p.grossSalary || p.totalEarnings || p.basicSalary),
+      grossDeductions: Number(p.grossDeductions || p.totalDeductions || p.deductions),
+      totalPayable: Number(p.totalPayable || p.netPay),
+      salaryAdvance: Number(p.salaryAdvance || 0),
+      loanAdvance: Number(p.loanAdvance || 0),
+      netPayable: Number(p.netPayable || p.netPay),
+      netPay: Number(p.netPayable || p.netPay),
+      employerPf: Number(p.employerPf || Math.round(Number(p.basicSalary || 0) * 0.12)),
+      employerEsi: Number(p.employerEsi || Math.round(Number(p.grossSalary || 0) * 0.0325)),
+      ctc: Number(p.ctc || 0),
+      earningsList,
+      deductionsList,
+      status: p.status || 'APPROVED',
       customSections: safeJsonParse<any[]>(p.customSections, []),
       remarks: p.remarks,
     };
 
     const pdfBuffer = await generatePayslipPdf(pdfData, {
-      companyName: settings.companyName,
-      companyAddress: settings.companyAddress,
+      companyName: settings.companyName || 'BSC TEXTILES PVT LTD.,',
+      companyAddress: settings.companyAddress || 'DENTAL COLLEGE ROAD,, DAVANGERE - 577004',
       signatoryName: settings.signatoryName,
       signatoryDesignation: settings.signatoryDesignation,
     });
 
-    const fileName = `Payslip_${p.employeeCode}_${new Date(p.periodEnd).toISOString().slice(0, 7)}.pdf`;
+    const fileName = `BSC_Payslip_${p.employeeCode}_${p.salaryMonth || 'Slip'}_${p.salaryYear || 2026}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.send(pdfBuffer);
@@ -1056,60 +2205,147 @@ router.get('/payslips/my-slips', async (req: AuthRequest, res) => {
 router.get('/payslips/:id/pdf', async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const [rows]: any = await pool.query(`
-      SELECT pi.*, pr.period_start, pr.period_end,
-             e.employee_code, e.full_name as employee_name,
-             l.name as location_name, d.name as department_name
-      FROM payroll_items pi
-      JOIN payroll_runs pr ON pi.payroll_run_id = pr.id
-      JOIN employees e ON pi.employee_id = e.id
-      LEFT JOIN locations l ON e.location_id = l.id
-      LEFT JOIN departments d ON e.department_id = d.id
+
+    // Check payrollitem first
+    let [rows]: any = await pool.query(`
+      SELECT 
+        pi.*,
+        pr.periodStart, pr.periodEnd,
+        e.employeeCode, e.fullName, e.designation, e.email,
+        COALESCE(pi.pfNo, e.pfNo, '') AS pfNo,
+        COALESCE(pi.esiNo, e.esiNo, '') AS esiNo,
+        COALESCE(pi.uanNo, e.uanNo, '') AS uanNo,
+        COALESCE(pi.bankName, e.bankName, 'HDFC') AS bankName,
+        COALESCE(pi.bankAccount, e.bankAccount, '') AS bankAccount,
+        COALESCE(pi.salesmanNo, e.salesmanNo, e.employeeCode) AS salesmanNo,
+        COALESCE(pi.section, sec.name, d.name, 'KIDS') AS section,
+        COALESCE(pi.shiftName, sh.name, 'SHIFT II') AS shift,
+        COALESCE(pi.batch, e.batch, 'SHIFT II') AS batch,
+        COALESCE(pi.locationCode, l.code, 'BSCTEX') AS locationCode,
+        COALESCE(pi.pfPay, e.pfPay, pi.basicSalary, 12000.00) AS pfPay,
+        COALESCE(pi.fixedGrossSalary, e.fixedGrossSalary, 16000.00) AS fixedGrossSalary,
+        COALESCE(pi.perDaySalary, e.perDaySalary, 516.13) AS perDaySalary,
+        COALESCE(pi.daysPayable, e.daysPayable, 31.00) AS daysPayable,
+        l.name AS locationName,
+        d.name AS departmentName
+      FROM payrollitem pi
+      JOIN payrollrun pr ON pi.payrollRunId = pr.id
+      JOIN employee e ON pi.employeeId = e.id
+      JOIN location l ON e.locationId = l.id
+      LEFT JOIN department d ON e.departmentId = d.id
+      LEFT JOIN section sec ON e.sectionId = sec.id
+      LEFT JOIN shift sh ON e.shiftId = sh.id
       WHERE pi.id = ?
-      LIMIT 1
     `, [id]);
+
+    if (!rows || rows.length === 0) {
+      // Fallback to legacy payroll_items
+      [rows] = await pool.query(`
+        SELECT pi.*, pr.period_start, pr.period_end,
+               e.employee_code, e.full_name as fullName,
+               l.name as locationName, d.name as departmentName
+        FROM payroll_items pi
+        JOIN payroll_runs pr ON pi.payroll_run_id = pr.id
+        JOIN employees e ON pi.employee_id = e.id
+        LEFT JOIN locations l ON e.location_id = l.id
+        LEFT JOIN departments d ON e.department_id = d.id
+        WHERE pi.id = ?
+        LIMIT 1
+      `, [id]);
+    }
 
     if (!rows || rows.length === 0) {
       return res.status(404).json({ error: 'Payslip not found' });
     }
 
-    const item = rows[0];
+    const p = rows[0];
 
-    // IDOR verification: Employees may only stream their own payslip
+    // IDOR verification
     if (req.user?.role === 'EMPLOYEE' || req.user?.role === 'SALES_EMPLOYEE') {
-      if (item.employee_id !== req.user?.employeeId) {
+      const empId = p.employeeId || p.employee_id;
+      if (empId !== req.user?.employeeId) {
         return res.status(403).json({ error: 'Forbidden: You are not authorized to view another employee payslip' });
       }
     }
 
+    const [settingsRows]: any = await pool.query(`SELECT * FROM payroll_settings LIMIT 1`);
+    const settings = settingsRows[0] || {};
+
+    const parsedEarnings = safeJsonParse<any[]>(p.earningsConfig, []);
+    const parsedDeductions = safeJsonParse<any[]>(p.deductionsConfig, []);
+
+    const earningsList = Array.isArray(parsedEarnings) && parsedEarnings.length > 0 ? parsedEarnings.filter((e: any) => e.enabled !== false).map((e: any) => ({
+      label: e.label,
+      amount: Number(e.amount || 0),
+    })) : [
+      { label: 'BASIC PAY', amount: Number(p.basicSalary || p.basic_salary || 12000) },
+      { label: 'HRA', amount: Number(p.hra || 4000) },
+      ...(Number(p.otPay || p.overtime || p.overtime_pay || 0) > 0 ? [{ label: 'OT', amount: Number(p.otPay || p.overtime || p.overtime_pay) }] : []),
+      ...(Number(p.govtHolidayPay || 0) > 0 ? [{ label: 'GOVT.HOLIDAY', amount: Number(p.govtHolidayPay) }] : []),
+    ];
+
+    const deductionsList = Array.isArray(parsedDeductions) && parsedDeductions.length > 0 ? parsedDeductions.filter((d: any) => d.enabled !== false).map((d: any) => ({
+      label: d.label,
+      amount: Number(d.amount || 0),
+    })) : [
+      { label: 'EMPLOYEE PF', amount: Number(p.employeePf || p.pfDeduction || 1440) },
+      { label: 'EMPLOYEE ESI', amount: Number(p.employeeEsi || 153) },
+      { label: 'PROF TAX', amount: Number(p.profTax || 0) },
+    ];
+
+    const mask = req.query.mask !== 'false';
+
     const pdfBuffer = await generatePayslipPdf({
-      id: item.id,
-      employeeCode: item.employee_code || 'EMP',
-      fullName: item.employee_name || 'Staff Member',
-      designation: 'Sales Specialist',
-      departmentName: item.department_name || 'Showroom Sales',
-      locationName: item.location_name || 'BSC Belagavi Flagship',
-      periodStart: item.period_start || new Date().toISOString(),
-      periodEnd: item.period_end || new Date().toISOString(),
-      basicSalary: Number(item.basic_salary || 0),
-      hra: Number(item.allowances || 0) * 0.4,
-      allowances: Number(item.allowances || 0),
-      earlyIncentive: Number(item.early_incentive || 0),
-      attendanceIncentive: Number(item.attendance_incentive || 0),
-      salesIncentive: Number(item.sales_incentive || 0),
-      overtime: Number(item.overtime_pay || 0),
-      bonus: 0,
-      deductions: Number(item.total_deductions || 0),
-      pfDeduction: Number(item.statutory_deductions || 0) * 0.75,
-      taxDeduction: Number(item.statutory_deductions || 0) * 0.25,
-      lopDeduction: 0,
-      penalties: Number(item.late_penalties || 0) + Number(item.break_penalties || 0),
-      netPay: Number(item.net_pay || 0),
-      status: item.run_status || 'FINALIZED',
+      id: p.id,
+      employeeCode: p.employeeCode || p.employee_code || 'EMP',
+      fullName: p.fullName || p.employee_name || 'Staff Member',
+      designation: p.designation || 'Specialist',
+      departmentName: p.departmentName || p.department_name || 'Showroom Sales',
+      locationName: p.locationName || p.location_name || 'BSC Davangere Store',
+      pfNo: p.pfNo,
+      esiNo: p.esiNo,
+      uanNo: p.uanNo || p.uan,
+      bankName: p.bankName || 'HDFC',
+      bankAccount: p.bankAccount,
+      maskBankAccount: mask,
+      salesmanNo: p.salesmanNo || p.employeeCode,
+      section: p.section || 'KIDS',
+      shift: p.shift || 'SHIFT II',
+      batch: p.batch || 'SHIFT II',
+      locationCode: p.locationCode || 'BSCTEX',
+      periodStart: p.periodStart || p.period_start || new Date().toISOString(),
+      periodEnd: p.periodEnd || p.period_end || new Date().toISOString(),
+      salaryMonth: p.salaryMonth,
+      salaryYear: p.salaryYear,
+      pfPay: Number(p.pfPay || p.basicSalary || p.basic_salary || 12000),
+      hra: Number(p.hra || 4000),
+      fixedGrossSalary: Number(p.fixedGrossSalary || 16000),
+      perDaySalary: Number(p.perDaySalary || 516.13),
+      daysPayable: Number(p.daysPayable || 31),
+      basicSalary: Number(p.basicSalary || p.basic_salary || 12000),
+      overtime: Number(p.otPay || p.overtime || p.overtime_pay || 0),
+      grossSalary: Number(p.grossSalary || p.totalEarnings || p.gross_earnings || 20375.50),
+      grossDeductions: Number(p.grossDeductions || p.totalDeductions || p.total_deductions || 1593.00),
+      totalPayable: Number(p.totalPayable || p.netPay || p.net_pay || 18782.50),
+      salaryAdvance: Number(p.salaryAdvance || 0),
+      loanAdvance: Number(p.loanAdvance || 0),
+      netPayable: Number(p.netPayable || p.netPay || p.net_pay || 18782.50),
+      netPay: Number(p.netPayable || p.netPay || p.net_pay || 18782.50),
+      employerPf: Number(p.employerPf || Math.round(Number(p.basicSalary || 12000) * 0.12)),
+      employerEsi: Number(p.employerEsi || Math.round(Number(p.grossSalary || 20375.50) * 0.0325)),
+      ctc: Number(p.ctc || 22478.00),
+      earningsList,
+      deductionsList,
+      status: p.status || p.run_status || 'FINALIZED',
+    }, {
+      companyName: settings.companyName || 'BSC TEXTILES PVT LTD.,',
+      companyAddress: settings.companyAddress || 'DENTAL COLLEGE ROAD,, DAVANGERE - 577004',
+      signatoryName: settings.signatoryName,
+      signatoryDesignation: settings.signatoryDesignation,
     });
 
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="payslip_${item.employee_code}_${item.id}.pdf"`);
+    res.setHeader('Content-Disposition', `inline; filename="BSC_Payslip_${p.employeeCode || p.employee_code}_${p.salaryMonth || 'Slip'}.pdf"`);
     res.send(pdfBuffer);
   } catch (error: any) {
     console.error('Stream payslip PDF error:', error);

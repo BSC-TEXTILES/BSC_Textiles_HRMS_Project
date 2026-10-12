@@ -18,7 +18,8 @@ import {
   Calendar,
   Printer,
   X,
-  CreditCard
+  CreditCard,
+  Building2
 } from 'lucide-react';
 
 export default function PayrollPage() {
@@ -133,6 +134,13 @@ export default function PayrollPage() {
             >
               <Receipt className="w-4 h-4 text-[#722F37]" />
               <span>Manage Payslips</span>
+            </Link>
+            <Link
+              href="/payroll/floor-overview"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 transition-all text-xs font-semibold"
+            >
+              <Building2 className="w-4 h-4 text-[#722F37]" />
+              <span>Floor-Wise Salary</span>
             </Link>
             <Link
               href="/payroll/salary-structure"
