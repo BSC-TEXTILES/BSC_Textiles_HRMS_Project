@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
+// Recharts visualization components & tooltip typing
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, type TooltipProps } from 'recharts';
 import { 
   ArrowLeft, 
   Download, 
@@ -86,6 +87,11 @@ export function TotalPunchesDetail({
   const [page, setPage] = useState(1);
   const pageSize = 10;
   const [lastRefreshedSec, setLastRefreshedSec] = useState(0);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const fetchData = useCallback(async (force = false) => {
     const now = Date.now();
@@ -436,34 +442,36 @@ export function TotalPunchesDetail({
               </div>
 
               <div className="h-36 w-full pt-2">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={data?.hourlyVelocity || []} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="punchGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#0058be" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#0058be" stopOpacity={0.0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="hour" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (active && payload && payload.length) {
-                          const item = payload[0].payload;
-                          return (
-                            <div className="bg-[#0b1c30] text-white p-2.5 rounded-lg shadow-xl text-xs space-y-0.5">
-                              <div className="font-bold">{item.hour}</div>
-                              <div className="text-blue-300">{item.punches} Employee Punches</div>
-                              <div className="text-[10px] text-slate-400">Pace: {item.velocity}</div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      }}
-                    />
-                    <Area type="monotone" dataKey="punches" stroke="#0058be" strokeWidth={2.5} fillOpacity={1} fill="url(#punchGradient)" />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {isMounted && (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={data?.hourlyVelocity || []} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="punchGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0058be" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#0058be" stopOpacity={0.0} />
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="hour" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                      <Tooltip
+                        content={({ active, payload }: TooltipProps<number, string>) => {
+                          if (active && payload && payload.length) {
+                            const item = payload[0].payload;
+                            return (
+                              <div className="bg-[#0b1c30] text-white p-2.5 rounded-lg shadow-xl text-xs space-y-0.5">
+                                <div className="font-bold">{item.hour}</div>
+                                <div className="text-blue-300">{item.punches} Employee Punches</div>
+                                <div className="text-[10px] text-slate-400">Pace: {item.velocity}</div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Area type="monotone" dataKey="punches" stroke="#0058be" strokeWidth={2.5} fillOpacity={1} fill="url(#punchGradient)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </div>
 

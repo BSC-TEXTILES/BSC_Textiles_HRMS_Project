@@ -70,6 +70,11 @@ export function TerminalsDetail({
   const [selectedCameraTerminal, setSelectedCameraTerminal] = useState<TerminalDevice | null>(null);
   const [maintenanceStates, setMaintenanceStates] = useState<Record<string, boolean>>({});
   const [lastRefreshedSec, setLastRefreshedSec] = useState(0);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const fetchData = useCallback(async (force = false) => {
     const now = Date.now();
@@ -241,20 +246,22 @@ export function TerminalsDetail({
                 </div>
 
                 <div className="h-36 w-full pt-3">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={data?.networkMetrics?.packetLossGraph || []} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="latencyGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
-                        </linearGradient>
-                      </defs>
-                      <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <YAxis domain={[0, 5]} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" />
-                      <Tooltip />
-                      <Area type="monotone" dataKey="lossPct" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#latencyGradient)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                  {isMounted && (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={data?.networkMetrics?.packetLossGraph || []} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="latencyGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                          </linearGradient>
+                        </defs>
+                        <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                        <YAxis domain={[0, 5]} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" />
+                        <Tooltip />
+                        <Area type="monotone" dataKey="lossPct" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#latencyGradient)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </div>
 
@@ -274,14 +281,16 @@ export function TerminalsDetail({
                 </div>
 
                 <div className="h-36 w-full pt-3">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data?.networkMetrics?.latencyDistribution || []} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
-                      <XAxis dataKey="bucket" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <Tooltip />
-                      <Bar dataKey="count" fill="#0058be" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {isMounted && (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={data?.networkMetrics?.latencyDistribution || []} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+                        <XAxis dataKey="bucket" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="#0058be" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </div>
             </div>

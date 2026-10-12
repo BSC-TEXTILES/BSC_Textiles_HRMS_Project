@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, Area } from 'recharts';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { ResponsiveContainer, Line, XAxis, YAxis, Tooltip, type TooltipProps, CartesianGrid, AreaChart, Area } from 'recharts';
 import { 
   ArrowLeft, 
   Users, 
@@ -249,9 +249,16 @@ const ZONE_FALLBACKS: Record<string, {
 
 type ActiveViewType = 'roster' | 'zones' | 'missing' | 'weekly';
 
-// 30-second in-memory cache
+const CACHE_TTL_MS = 15000;
 let presenceCache: { data: PresenceData; timestamp: number } | null = null;
-const CACHE_TTL_MS = 30000;
+
+function getInitials(name?: string): string {
+  if (!name) return 'ST';
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'ST';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 export function FloorPresenceDetail({
   open,
@@ -263,6 +270,12 @@ export function FloorPresenceDetail({
 }) {
   const [data, setData] = useState<PresenceData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
+  const dataRef = useRef<PresenceData | null>(null);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // The 4 Interactive Filter Cards State
   const [activeView, setActiveView] = useState<ActiveViewType>('roster');
@@ -278,18 +291,20 @@ export function FloorPresenceDetail({
   const fetchData = useCallback(async (force = false) => {
     const now = Date.now();
     if (!force && presenceCache && now - presenceCache.timestamp < CACHE_TTL_MS) {
+      dataRef.current = presenceCache.data;
       setData(presenceCache.data);
       setLoading(false);
       return;
     }
 
     try {
-      if (!data) setLoading(true);
+      if (!dataRef.current) setLoading(true);
       const res = await fetch('/api/presence/live-floor', { credentials: 'include' });
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.data) {
           presenceCache = { data: json.data, timestamp: now };
+          dataRef.current = json.data;
           setData(json.data);
           setLastRefreshedSec(0);
         }
@@ -299,7 +314,7 @@ export function FloorPresenceDetail({
     } finally {
       setLoading(false);
     }
-  }, [data]);
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -308,7 +323,7 @@ export function FloorPresenceDetail({
         fetchData(true);
       }, 10000);
       const timer = setInterval(() => {
-        setLastRefreshedSec(prev => prev + 1);
+        setLastRefreshedSec((prev) => prev + 1);
       }, 1000);
 
       return () => {
@@ -369,6 +384,7 @@ export function FloorPresenceDetail({
     const fallback = ZONE_FALLBACKS[rawZone.id];
     return {
       ...rawZone,
+      staff: Array.isArray(rawZone.staff) ? rawZone.staff : [],
       capacityUtilization: rawZone.capacityUtilization || fallback?.capacityUtilization,
       sensorFeed: (rawZone.sensorFeed && rawZone.sensorFeed.length > 0) ? rawZone.sensorFeed : (fallback?.sensorFeed || []),
       hourlyTrend: (rawZone.hourlyTrend && rawZone.hourlyTrend.length > 0) ? rawZone.hourlyTrend : (fallback?.hourlyTrend || []),
@@ -403,7 +419,7 @@ export function FloorPresenceDetail({
 
         <div className="flex items-center gap-3">
           <div className="hidden sm:flex items-center gap-2 text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200">
-            <RefreshCw className="w-3.5 h-3.5 text-emerald-600 animate-spin" />
+            <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${loading ? 'animate-spin' : ''}`} />
             <span>Refreshed {lastRefreshedSec}s ago</span>
           </div>
           <button
@@ -463,8 +479,8 @@ export function FloorPresenceDetail({
                   )}
                 </div>
                 <div className="text-2xl font-bold text-[#0b1c30] mt-1">
-                  {data?.summary.presentCount || 12}{' '}
-                  <span className="text-xs font-normal text-slate-400">/ {data?.summary.expectedTotal || 35}</span>
+                  {data?.summary?.presentCount ?? 12}{' '}
+                  <span className="text-xs font-normal text-slate-400">/ {data?.summary?.expectedTotal ?? 35}</span>
                 </div>
                 <div className="text-[11px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
@@ -502,10 +518,10 @@ export function FloorPresenceDetail({
                   )}
                 </div>
                 <div className="text-2xl font-bold text-[#0058be] mt-1">
-                  {data?.summary.floorOccupancyRate || 92.5}%
+                  {data?.summary?.floorOccupancyRate ?? 92.5}%
                 </div>
                 <div className="text-[11px] text-emerald-600 font-semibold mt-1">
-                  {data?.summary.occupancyDelta || '+1.8% vs Expected Shift A'}
+                  {data?.summary?.occupancyDelta ?? '+1.8% vs Expected Shift A'}
                 </div>
               </div>
 
@@ -539,7 +555,7 @@ export function FloorPresenceDetail({
                   )}
                 </div>
                 <div className="text-2xl font-bold text-slate-800 mt-1">
-                  {data?.summary.missingCount || 23} Staff
+                  {data?.summary?.missingCount ?? 23} Staff
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1 truncate">
                   14 On Leave • 7 Remote/Field
@@ -576,7 +592,7 @@ export function FloorPresenceDetail({
                   )}
                 </div>
                 <div className="text-2xl font-bold text-emerald-600 mt-1">
-                  {data?.summary.lastWeekAverage || 90.7}%
+                  {data?.summary?.lastWeekAverage ?? 90.7}%
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1">
                   +1.8% efficiency improvement today
@@ -716,7 +732,7 @@ export function FloorPresenceDetail({
                               <td className="py-3 px-4">
                                 <div className="flex items-center gap-2.5">
                                   <div className="w-7 h-7 rounded-full bg-[#eff4ff] text-[#0058be] font-bold text-[10px] flex items-center justify-center border border-blue-200 shrink-0">
-                                    {staff.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                    {getInitials(staff.name)}
                                   </div>
                                   <div>
                                     <div className="font-bold text-[#0b1c30]">{staff.name}</div>
@@ -850,7 +866,7 @@ export function FloorPresenceDetail({
 
                         <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
                           <span className="text-slate-500">
-                            {zone.staff.length} Active Personnel
+                            {zone.staff?.length ?? 0} Active Personnel
                           </span>
                           <span
                             className={`font-semibold flex items-center gap-1 ${
@@ -935,47 +951,55 @@ export function FloorPresenceDetail({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {activeZone.staff.map((staff) => (
-                              <tr key={staff.id} className="hover:bg-slate-50/80 transition-colors">
-                                <td className="py-3 px-4">
-                                  <div className="flex items-center gap-2.5">
-                                    <div className="w-7 h-7 rounded-full bg-[#eff4ff] text-[#0058be] font-bold text-[10px] flex items-center justify-center border border-blue-200 shrink-0">
-                                      {staff.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                            {activeZone.staff && activeZone.staff.length > 0 ? (
+                              activeZone.staff.map((staff) => (
+                                <tr key={staff.id} className="hover:bg-slate-50/80 transition-colors">
+                                  <td className="py-3 px-4">
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="w-7 h-7 rounded-full bg-[#eff4ff] text-[#0058be] font-bold text-[10px] flex items-center justify-center border border-blue-200 shrink-0">
+                                        {getInitials(staff.name)}
+                                      </div>
+                                      <div>
+                                        <div className="font-bold text-[#0b1c30]">{staff.name}</div>
+                                        <div className="text-[10px] text-slate-400 font-mono">{staff.code}</div>
+                                      </div>
                                     </div>
-                                    <div>
-                                      <div className="font-bold text-[#0b1c30]">{staff.name}</div>
-                                      <div className="text-[10px] text-slate-400 font-mono">{staff.code}</div>
-                                    </div>
-                                  </div>
-                                </td>
+                                  </td>
 
-                                <td className="py-3 px-4 font-semibold text-slate-700">
-                                  {staff.role}
-                                </td>
+                                  <td className="py-3 px-4 font-semibold text-slate-700">
+                                    {staff.role}
+                                  </td>
 
-                                <td className="py-3 px-4 text-slate-600">
-                                  {staff.dept}
-                                </td>
+                                  <td className="py-3 px-4 text-slate-600">
+                                    {staff.dept}
+                                  </td>
 
-                                <td className="py-3 px-4">
-                                  <span className="font-medium text-slate-800 flex items-center gap-1">
-                                    <MapPin className="w-3 h-3 text-[#0058be]" />
-                                    {staff.terminal || `${activeZone.name} Sensor`}
-                                  </span>
-                                </td>
+                                  <td className="py-3 px-4">
+                                    <span className="font-medium text-slate-800 flex items-center gap-1">
+                                      <MapPin className="w-3 h-3 text-[#0058be]" />
+                                      {staff.terminal || `${activeZone.name} Sensor`}
+                                    </span>
+                                  </td>
 
-                                <td className="py-3 px-4 font-mono font-semibold text-slate-700">
-                                  {staff.punchIn}
-                                </td>
+                                  <td className="py-3 px-4 font-mono font-semibold text-slate-700">
+                                    {staff.punchIn}
+                                  </td>
 
-                                <td className="py-3 px-4">
-                                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                    <span>ON-FLOOR</span>
-                                  </span>
+                                  <td className="py-3 px-4">
+                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                      <span>ON-FLOOR</span>
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={6} className="py-8 text-center text-slate-400">
+                                  No active personnel currently recorded in this zone
                                 </td>
                               </tr>
-                            ))}
+                            )}
                           </tbody>
                         </table>
                       </div>
@@ -1170,56 +1194,59 @@ export function FloorPresenceDetail({
                       </div>
 
                       <div className="h-48 w-full pt-2">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart
-                            data={activeZone.hourlyTrend}
-                            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                          >
-                            <defs>
-                              <linearGradient id={`zoneGrad-${activeZone.id}`} x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#0058be" stopOpacity={0.3} />
-                                <stop offset="95%" stopColor="#0058be" stopOpacity={0.0} />
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                            <XAxis
-                              dataKey="hour"
-                              tickLine={false}
-                              axisLine={{ stroke: '#cbd5e1' }}
-                              tick={{ fontSize: 11, fill: '#64748b' }}
-                            />
-                            <YAxis
-                              domain={[0, 100]}
-                              tickLine={false}
-                              axisLine={false}
-                              tick={{ fontSize: 11, fill: '#64748b' }}
-                              tickFormatter={(v) => `${v}%`}
-                            />
-                            <Tooltip
-                              content={({ active, payload, label }) => {
-                                if (active && payload && payload.length) {
-                                  return (
-                                    <div className="bg-[#0b1c30] text-white p-2.5 rounded-lg shadow-lg text-xs space-y-1">
-                                      <div className="font-bold text-slate-300">{label} Window</div>
-                                      <div className="text-emerald-400 font-mono font-bold">
-                                        Occupancy: {payload[0].value}%
+                        {isMounted && (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart
+                              data={activeZone.hourlyTrend}
+                              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                            >
+                              <defs>
+                                <linearGradient id={`zoneGrad-${activeZone.id}`} x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#0058be" stopOpacity={0.3} />
+                                  <stop offset="95%" stopColor="#0058be" stopOpacity={0.0} />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                              <XAxis
+                                dataKey="hour"
+                                tickLine={false}
+                                axisLine={{ stroke: '#cbd5e1' }}
+                                tick={{ fontSize: 11, fill: '#64748b' }}
+                              />
+                              <YAxis
+                                domain={[0, 100]}
+                                tickLine={false}
+                                axisLine={false}
+                                tick={{ fontSize: 11, fill: '#64748b' }}
+                                tickFormatter={(v: number | string) => `${v}%`}
+                              />
+                              <Tooltip
+                                content={({ active, payload, label }: TooltipProps<number, string>) => {
+                                  if (active && payload && payload.length) {
+                                    const val = payload[0]?.value ?? 0;
+                                    return (
+                                      <div className="bg-[#0b1c30] text-white p-2.5 rounded-lg shadow-lg text-xs space-y-1">
+                                        <div className="font-bold text-slate-300">{label} Window</div>
+                                        <div className="text-emerald-400 font-mono font-bold">
+                                          Occupancy: {val}%
+                                        </div>
                                       </div>
-                                    </div>
-                                  );
-                                }
-                                return null;
-                              }}
-                            />
-                            <Area
-                              type="monotone"
-                              dataKey="occupancy"
-                              stroke="#0058be"
-                              strokeWidth={2.5}
-                              fillOpacity={1}
-                              fill={`url(#zoneGrad-${activeZone.id})`}
-                            />
-                          </AreaChart>
-                        </ResponsiveContainer>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Area
+                                type="monotone"
+                                dataKey="occupancy"
+                                stroke="#0058be"
+                                strokeWidth={2.5}
+                                fillOpacity={1}
+                                fill={`url(#zoneGrad-${activeZone.id})`}
+                              />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1249,31 +1276,36 @@ export function FloorPresenceDetail({
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-                        {data?.departmentSplit.map((dept) => (
-                          <div key={dept.name} className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
-                            <div className="flex items-center justify-between text-xs">
-                              <span className="font-bold text-[#0b1c30]">{dept.name}</span>
-                              <span className="font-bold text-slate-700 font-mono">
-                                {dept.present} / {dept.expected}
-                              </span>
+                        {(data?.departmentSplit || []).map((dept) => {
+                          const safeExpected = Math.max(0, dept.expected || 0);
+                          const safePresent = Math.max(0, dept.present || 0);
+                          const pct = safeExpected > 0 ? Math.min(100, Math.round((safePresent / safeExpected) * 100)) : 0;
+                          return (
+                            <div key={dept.name} className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="font-bold text-[#0b1c30]">{dept.name}</span>
+                                <span className="font-bold text-slate-700 font-mono">
+                                  {safePresent} / {safeExpected}
+                                </span>
+                              </div>
+                              <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+                                <div
+                                  className="h-full rounded-full transition-all duration-500"
+                                  style={{
+                                    width: `${pct}%`,
+                                    backgroundColor: dept.color || '#0058be',
+                                  }}
+                                />
+                              </div>
+                              <div className="flex items-center justify-between text-[10px] text-slate-500">
+                                <span>{dept.status || 'Active'}</span>
+                                <span className="font-bold text-slate-700 font-mono">
+                                  {pct}%
+                                </span>
+                              </div>
                             </div>
-                            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-                              <div
-                                className="h-full rounded-full transition-all duration-500"
-                                style={{
-                                  width: `${(dept.present / dept.expected) * 100}%`,
-                                  backgroundColor: dept.color,
-                                }}
-                              />
-                            </div>
-                            <div className="flex items-center justify-between text-[10px] text-slate-500">
-                              <span>{dept.status}</span>
-                              <span className="font-bold text-slate-700 font-mono">
-                                {Math.round((dept.present / dept.expected) * 100)}%
-                              </span>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -1295,7 +1327,7 @@ export function FloorPresenceDetail({
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {data?.floorZones.map((zone) => (
+                            {(data?.floorZones || []).map((zone) => (
                               <tr key={zone.id} className="hover:bg-slate-50/80">
                                 <td className="py-3 px-4 font-bold text-[#0b1c30]">{zone.id.toUpperCase()}</td>
                                 <td className="py-3 px-4 font-semibold text-slate-700">{zone.name}</td>
@@ -1345,7 +1377,7 @@ export function FloorPresenceDetail({
                           : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
                       }`}
                     >
-                      Approved Leave (14 Staff)
+                      Approved Leave ({data?.missingReasonsSummary?.onApprovedLeave ?? 14} Staff)
                     </button>
 
                     <button
@@ -1356,7 +1388,7 @@ export function FloorPresenceDetail({
                           : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200'
                       }`}
                     >
-                      Remote / Field Duty (7 Staff)
+                      Remote / Field Duty ({data?.missingReasonsSummary?.remoteOrFieldDuty ?? 7} Staff)
                     </button>
 
                     <button
@@ -1367,7 +1399,7 @@ export function FloorPresenceDetail({
                           : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
                       }`}
                     >
-                      Roster Off / Later Shifts (2 Staff)
+                      Roster Off / Later Shifts ({(data?.missingReasonsSummary?.shiftPendingOrLater ?? 0) + (data?.missingReasonsSummary?.unauthorizedLate ?? 0) || 2} Staff)
                     </button>
                   </div>
 
@@ -1511,40 +1543,45 @@ export function FloorPresenceDetail({
                   </div>
 
                   <div className="h-48 w-full pt-3">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={data?.historicalTrend || []} margin={{ top: 5, right: 20, left: -20, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="presenceThisWeek" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#0058be" stopOpacity={0.25} />
-                            <stop offset="95%" stopColor="#0058be" stopOpacity={0.0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                        <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                        <YAxis domain={[85, 95]} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" />
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                              const item = payload[0].payload;
-                              const delta = (item.today - item.lastWeek).toFixed(1);
-                              return (
-                                <div className="bg-[#0b1c30] text-white p-3 rounded-lg shadow-xl text-xs space-y-1">
-                                  <div className="font-bold">{item.day}</div>
-                                  <div className="text-blue-300">This Week: {item.today}%</div>
-                                  <div className="text-slate-400">Last Week: {item.lastWeek}%</div>
-                                  <div className="text-emerald-400 font-semibold pt-1 border-t border-slate-700">
-                                    Adherence Gain: +{delta}%
+                    {isMounted && (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={data?.historicalTrend || []} margin={{ top: 5, right: 20, left: -20, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="presenceThisWeek" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#0058be" stopOpacity={0.25} />
+                              <stop offset="95%" stopColor="#0058be" stopOpacity={0.0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                          <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                          <YAxis domain={[85, 95]} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" />
+                          <Tooltip
+                            content={({ active, payload }: TooltipProps<number, string>) => {
+                              if (active && payload && payload.length) {
+                                const item = payload[0]?.payload;
+                                if (!item) return null;
+                                const today = typeof item.today === 'number' ? item.today : Number(item.today) || 0;
+                                const lastWeek = typeof item.lastWeek === 'number' ? item.lastWeek : Number(item.lastWeek) || 0;
+                                const delta = (today - lastWeek).toFixed(1);
+                                return (
+                                  <div className="bg-[#0b1c30] text-white p-3 rounded-lg shadow-xl text-xs space-y-1">
+                                    <div className="font-bold">{item.day}</div>
+                                    <div className="text-blue-300">This Week: {today}%</div>
+                                    <div className="text-slate-400">Last Week: {lastWeek}%</div>
+                                    <div className="text-emerald-400 font-semibold pt-1 border-t border-slate-700">
+                                      Adherence Gain: +{delta}%
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                        />
-                        <Area type="monotone" dataKey="today" stroke="#0058be" strokeWidth={3} fillOpacity={1} fill="url(#presenceThisWeek)" />
-                        <Line type="monotone" dataKey="lastWeek" stroke="#94a3b8" strokeWidth={2} strokeDasharray="4 4" dot={{ r: 3, fill: '#94a3b8' }} />
-                      </AreaChart>
-                    </ResponsiveContainer>
+                                );
+                              }
+                              return null;
+                            }}
+                          />
+                          <Area type="monotone" dataKey="today" stroke="#0058be" strokeWidth={3} fillOpacity={1} fill="url(#presenceThisWeek)" />
+                          <Line type="monotone" dataKey="lastWeek" stroke="#94a3b8" strokeWidth={2} strokeDasharray="4 4" dot={{ r: 3, fill: '#94a3b8' }} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    )}
                   </div>
                 </div>
 
