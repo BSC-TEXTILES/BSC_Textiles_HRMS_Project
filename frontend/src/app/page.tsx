@@ -13,8 +13,7 @@ import {
   Menu,
   X,
   Lock,
-  Check,
-  Sparkles
+  Check
 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { getRoleHomePath } from '@/lib/roles';
@@ -28,13 +27,13 @@ export default function LandingPage() {
     : '/dashboard';
 
   return (
-    <div className="min-h-screen bg-[#FDFCFB] dark:bg-[#0B1120] text-[#1E293B] dark:text-[#E2E8F0] selection:bg-[#722F37] selection:text-white transition-colors duration-200">
+    <div className="min-h-screen bg-[#FDFCFB] dark:bg-[#0B1120] text-[#1E293B] dark:text-[#E2E8F0] selection:bg-[#0058be] selection:text-white transition-colors duration-200">
       
       {/* 1. TOP UTILITY BAR — Sleek modern micro-header */}
       <div className="border-b border-slate-200/70 dark:border-slate-800 bg-white/70 dark:bg-[#070C18]/80 backdrop-blur-md text-xs text-slate-500 dark:text-slate-400 py-2.5 px-4 sm:px-8">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-1 text-center sm:text-left">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-[#722F37] dark:text-rose-400 uppercase tracking-widest text-[11px]">
+            <span className="font-semibold text-[#0058be] dark:text-blue-400 uppercase tracking-widest text-[11px]">
               BSC Textiles Pvt. Ltd.
             </span>
             <span className="text-slate-300 dark:text-slate-700 hidden sm:inline">|</span>
@@ -63,7 +62,7 @@ export default function LandingPage() {
               />
             </div>
             <div className="flex flex-col">
-              <span className="font-serif font-bold text-xl sm:text-2xl tracking-tight text-[#722F37] dark:text-rose-400 leading-none">
+              <span className="font-serif font-bold text-xl sm:text-2xl tracking-tight text-[#0058be] dark:text-blue-400 leading-none">
                 BSC TEXTILES
               </span>
               <span className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 mt-1 font-semibold">
@@ -74,19 +73,19 @@ export default function LandingPage() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-8 text-[13px] font-medium text-slate-700 dark:text-slate-300">
-            <a href="#about" className="hover:text-[#722F37] dark:hover:text-rose-400 transition-colors">
+            <a href="#about" className="hover:text-[#0058be] dark:hover:text-blue-400 transition-colors">
               Our Story
             </a>
-            <a href="#operations" className="hover:text-[#722F37] dark:hover:text-rose-400 transition-colors">
+            <a href="#operations" className="hover:text-[#0058be] dark:hover:text-blue-400 transition-colors">
               Business Divisions
             </a>
-            <a href="#locations" className="hover:text-[#722F37] dark:hover:text-rose-400 transition-colors">
+            <a href="#locations" className="hover:text-[#0058be] dark:hover:text-blue-400 transition-colors">
               Showrooms
             </a>
-            <a href="#governance" className="hover:text-[#722F37] dark:hover:text-rose-400 transition-colors">
+            <a href="#governance" className="hover:text-[#0058be] dark:hover:text-blue-400 transition-colors">
               Workforce Portal
             </a>
-            <a href="#contact" className="hover:text-[#722F37] dark:hover:text-rose-400 transition-colors">
+            <a href="#contact" className="hover:text-[#0058be] dark:hover:text-blue-400 transition-colors">
               Contact
             </a>
           </nav>
@@ -98,7 +97,7 @@ export default function LandingPage() {
             {status === 'authenticated' && session?.user ? (
               <Link
                 href={dashboardPath}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-[#722F37] text-white hover:bg-[#5A232A] shadow-xs transition-all active:scale-95"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold bg-[#0058be] text-white hover:bg-[#0047a0] shadow-xs transition-all active:scale-95"
               >
                 <span>Dashboard ({session.user.name?.split(' ')[0] || 'User'})</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -106,7 +105,7 @@ export default function LandingPage() {
             ) : (
               <Link
                 href="/login"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold border border-slate-300 dark:border-slate-700 text-[#722F37] dark:text-rose-300 hover:bg-[#722F37] hover:text-white dark:hover:bg-rose-950/60 shadow-2xs transition-all active:scale-95"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold border border-slate-300 dark:border-slate-700 text-[#0058be] dark:text-blue-300 hover:bg-[#0058be] hover:text-white dark:hover:bg-blue-950/60 shadow-2xs transition-all active:scale-95"
               >
                 <Lock className="w-3.5 h-3.5" />
                 <span>Staff Portal</span>
@@ -167,7 +166,7 @@ export default function LandingPage() {
               <Link
                 href="/login"
                 onClick={() => setMobileMenuOpen(false)}
-                className="w-full block text-center py-2.5 rounded-lg text-xs font-semibold bg-[#722F37] text-white"
+                className="w-full block text-center py-2.5 rounded-lg text-xs font-semibold bg-[#0058be] text-white"
               >
                 Sign In to Staff Portal
               </Link>
@@ -184,8 +183,8 @@ export default function LandingPage() {
               
               {/* Left Column: Modern Hero Narrative */}
               <div className="lg:col-span-7 space-y-6">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-rose-50 dark:bg-rose-950/40 text-[#722F37] dark:text-rose-300 border border-rose-200/80 dark:border-rose-900/40">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#722F37] dark:bg-rose-400" />
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium bg-blue-50 dark:bg-blue-950/40 text-[#0058be] dark:text-blue-300 border border-blue-200/80 dark:border-blue-900/40">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#0058be] dark:bg-blue-400" />
                   <span>Karnataka’s Modern Textile Enterprise Since 1938</span>
                 </div>
 
@@ -203,7 +202,7 @@ export default function LandingPage() {
                 <div className="pt-2 flex flex-wrap items-center gap-4">
                   <a
                     href="#locations"
-                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold bg-[#722F37] hover:bg-[#5A232A] text-white shadow-xs transition-all active:scale-95"
+                    className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold bg-[#0058be] hover:bg-[#0047a0] text-white shadow-xs transition-all active:scale-95"
                   >
                     <span>Visit Our Showrooms</span>
                     <ArrowRight className="w-4 h-4" />
@@ -221,15 +220,15 @@ export default function LandingPage() {
                 {/* Key Facts Strip */}
                 <div className="pt-6 border-t border-slate-200/70 dark:border-slate-800 flex flex-wrap gap-8 text-xs text-slate-600 dark:text-slate-400 font-medium">
                   <div>
-                    <span className="block text-xl font-serif font-bold text-[#722F37] dark:text-rose-400">1938</span>
+                    <span className="block text-xl font-serif font-bold text-[#0058be] dark:text-blue-400">1938</span>
                     <span>Founded in Belagavi</span>
                   </div>
                   <div>
-                    <span className="block text-xl font-serif font-bold text-[#722F37] dark:text-rose-400">3 Hubs</span>
+                    <span className="block text-xl font-serif font-bold text-[#0058be] dark:text-blue-400">3 Hubs</span>
                     <span>Belagavi, Davanagere, Shivamogga</span>
                   </div>
                   <div>
-                    <span className="block text-xl font-serif font-bold text-[#722F37] dark:text-rose-400">Form T</span>
+                    <span className="block text-xl font-serif font-bold text-[#0058be] dark:text-blue-400">Form T</span>
                     <span>Karnataka Statutory Compliant</span>
                   </div>
                 </div>
@@ -248,7 +247,7 @@ export default function LandingPage() {
                     />
                   </div>
                   <div className="p-4 bg-white/95 dark:bg-[#121A2E]/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 text-xs">
-                    <span className="font-semibold block text-[#722F37] dark:text-rose-400">
+                    <span className="font-semibold block text-[#0058be] dark:text-blue-400">
                       Belagavi Flagship Showroom • Modern Interior
                     </span>
                     <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block">
@@ -279,7 +278,7 @@ export default function LandingPage() {
                     />
                   </div>
                   <div className="p-4 bg-white/95 dark:bg-[#121A2E]/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 text-xs">
-                    <span className="font-semibold block text-[#722F37] dark:text-rose-400">
+                    <span className="font-semibold block text-[#0058be] dark:text-blue-400">
                       Contemporary Weaving Atelier
                     </span>
                     <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block">
@@ -291,7 +290,7 @@ export default function LandingPage() {
 
               {/* Right Column: Editorial Heritage Story */}
               <div className="lg:col-span-7 order-1 lg:order-2 space-y-5">
-                <span className="text-xs font-semibold uppercase tracking-widest text-[#722F37] dark:text-rose-400">
+                <span className="text-xs font-semibold uppercase tracking-widest text-[#0058be] dark:text-blue-400">
                   Our Story &amp; Heritage
                 </span>
                 <h2 className="font-serif text-2xl sm:text-3xl text-slate-900 dark:text-white leading-snug">
@@ -343,7 +342,7 @@ export default function LandingPage() {
           <div className="max-w-6xl mx-auto px-4 sm:px-8">
             
             <div className="max-w-2xl mb-12">
-              <span className="text-xs font-semibold uppercase tracking-widest text-[#722F37] dark:text-rose-400">
+              <span className="text-xs font-semibold uppercase tracking-widest text-[#0058be] dark:text-blue-400">
                 Business Divisions
               </span>
               <h2 className="font-serif text-2xl sm:text-3xl text-slate-900 dark:text-white mt-2">
@@ -368,7 +367,7 @@ export default function LandingPage() {
                     />
                   </div>
                   <div className="p-3.5 bg-white/95 dark:bg-[#121A2E]/95 backdrop-blur-md border-t border-slate-200/80 dark:border-slate-800 text-xs">
-                    <span className="font-semibold block text-[#722F37] dark:text-rose-400">
+                    <span className="font-semibold block text-[#0058be] dark:text-blue-400">
                       Davanagere Modern Wholesale Hub
                     </span>
                     <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 block">
@@ -381,7 +380,7 @@ export default function LandingPage() {
               <div className="lg:col-span-7 divide-y divide-slate-200/70 dark:divide-slate-800 border-t border-b border-slate-200/70 dark:border-slate-800">
                 
                 <div className="py-5">
-                  <div className="text-xs font-bold uppercase tracking-wider text-[#722F37] dark:text-rose-400">
+                  <div className="text-xs font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">
                     01. Retail Showrooms
                   </div>
                   <h3 className="font-serif text-base text-slate-900 dark:text-white font-medium mt-1">
@@ -394,7 +393,7 @@ export default function LandingPage() {
                 </div>
 
                 <div className="py-5">
-                  <div className="text-xs font-bold uppercase tracking-wider text-[#722F37] dark:text-rose-400">
+                  <div className="text-xs font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">
                     02. Wholesale Trade
                   </div>
                   <h3 className="font-serif text-base text-slate-900 dark:text-white font-medium mt-1">
@@ -407,7 +406,7 @@ export default function LandingPage() {
                 </div>
 
                 <div className="py-5">
-                  <div className="text-xs font-bold uppercase tracking-wider text-[#722F37] dark:text-rose-400">
+                  <div className="text-xs font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">
                     03. Institutional Supply
                   </div>
                   <h3 className="font-serif text-base text-slate-900 dark:text-white font-medium mt-1">
@@ -420,7 +419,7 @@ export default function LandingPage() {
                 </div>
 
                 <div className="py-5">
-                  <div className="text-xs font-bold uppercase tracking-wider text-[#722F37] dark:text-rose-400">
+                  <div className="text-xs font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">
                     04. Workforce Portal
                   </div>
                   <h3 className="font-serif text-base text-slate-900 dark:text-white font-medium mt-1">
@@ -444,7 +443,7 @@ export default function LandingPage() {
           <div className="max-w-6xl mx-auto px-4 sm:px-8">
             
             <div className="max-w-2xl mb-12">
-              <span className="text-xs font-semibold uppercase tracking-widest text-[#722F37] dark:text-rose-400">
+              <span className="text-xs font-semibold uppercase tracking-widest text-[#0058be] dark:text-blue-400">
                 Showroom Directory
               </span>
               <h2 className="font-serif text-2xl sm:text-3xl text-slate-900 dark:text-white mt-2">
@@ -460,7 +459,7 @@ export default function LandingPage() {
               
               {/* Belagavi Flagship */}
               <div className="border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-[#121A2E] p-6 rounded-2xl shadow-xs">
-                <div className="text-xs font-bold uppercase tracking-widest text-[#722F37] dark:text-rose-400">
+                <div className="text-xs font-bold uppercase tracking-widest text-[#0058be] dark:text-blue-400">
                   BEL-01 • Flagship Store
                 </div>
                 <h3 className="font-serif text-xl text-slate-900 dark:text-white mt-2">
@@ -468,7 +467,7 @@ export default function LandingPage() {
                 </h3>
                 <div className="mt-4 space-y-2.5 text-xs text-slate-600 dark:text-slate-300">
                   <div className="flex items-start gap-2.5">
-                    <MapPin className="w-4 h-4 text-[#722F37] dark:text-rose-400 shrink-0 mt-0.5" />
+                    <MapPin className="w-4 h-4 text-[#0058be] dark:text-blue-400 shrink-0 mt-0.5" />
                     <span>Khade Bazar, Main Market Area, Belagavi, Karnataka — 590001</span>
                   </div>
                   <div className="flex items-center gap-2.5">
@@ -487,7 +486,7 @@ export default function LandingPage() {
 
               {/* Davanagere Hub */}
               <div className="border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-[#121A2E] p-6 rounded-2xl shadow-xs">
-                <div className="text-xs font-bold uppercase tracking-widest text-[#722F37] dark:text-rose-400">
+                <div className="text-xs font-bold uppercase tracking-widest text-[#0058be] dark:text-blue-400">
                   DAV-02 • Wholesale Hub
                 </div>
                 <h3 className="font-serif text-xl text-slate-900 dark:text-white mt-2">
@@ -495,7 +494,7 @@ export default function LandingPage() {
                 </h3>
                 <div className="mt-4 space-y-2.5 text-xs text-slate-600 dark:text-slate-300">
                   <div className="flex items-start gap-2.5">
-                    <MapPin className="w-4 h-4 text-[#722F37] dark:text-rose-400 shrink-0 mt-0.5" />
+                    <MapPin className="w-4 h-4 text-[#0058be] dark:text-blue-400 shrink-0 mt-0.5" />
                     <span>Mandipet Commercial Complex, Davanagere, Karnataka — 577001</span>
                   </div>
                   <div className="flex items-center gap-2.5">
@@ -514,7 +513,7 @@ export default function LandingPage() {
 
               {/* Shivamogga Store */}
               <div className="border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-[#121A2E] p-6 rounded-2xl shadow-xs">
-                <div className="text-xs font-bold uppercase tracking-widest text-[#722F37] dark:text-rose-400">
+                <div className="text-xs font-bold uppercase tracking-widest text-[#0058be] dark:text-blue-400">
                   SHI-03 • Silk Showroom
                 </div>
                 <h3 className="font-serif text-xl text-slate-900 dark:text-white mt-2">
@@ -522,7 +521,7 @@ export default function LandingPage() {
                 </h3>
                 <div className="mt-4 space-y-2.5 text-xs text-slate-600 dark:text-slate-300">
                   <div className="flex items-start gap-2.5">
-                    <MapPin className="w-4 h-4 text-[#722F37] dark:text-rose-400 shrink-0 mt-0.5" />
+                    <MapPin className="w-4 h-4 text-[#0058be] dark:text-blue-400 shrink-0 mt-0.5" />
                     <span>Gandhi Bazar Heritage Circle, Shivamogga, Karnataka — 577201</span>
                   </div>
                   <div className="flex items-center gap-2.5">
@@ -550,7 +549,7 @@ export default function LandingPage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
               
               <div className="lg:col-span-6 space-y-4">
-                <span className="text-xs font-semibold uppercase tracking-widest text-[#722F37] dark:text-rose-400">
+                <span className="text-xs font-semibold uppercase tracking-widest text-[#0058be] dark:text-blue-400">
                   Workforce Governance
                 </span>
                 <h2 className="font-serif text-2xl sm:text-3xl text-slate-900 dark:text-white leading-snug">
@@ -563,19 +562,19 @@ export default function LandingPage() {
 
                 <ul className="space-y-3 pt-2 text-xs text-slate-700 dark:text-slate-300">
                   <li className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-[#722F37] dark:text-rose-400 shrink-0 mt-0.5" />
+                    <Check className="w-4 h-4 text-[#0058be] dark:text-blue-400 shrink-0 mt-0.5" />
                     <span><strong>Biometric Attendance:</strong> Daily arrival and departure punches synced with showroom edge terminals.</span>
                   </li>
                   <li className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-[#722F37] dark:text-rose-400 shrink-0 mt-0.5" />
+                    <Check className="w-4 h-4 text-[#0058be] dark:text-blue-400 shrink-0 mt-0.5" />
                     <span><strong>Transparent Leave Records:</strong> Real-time quota tracking (Casual, Sick, Earned) with manager approvals.</span>
                   </li>
                   <li className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-[#722F37] dark:text-rose-400 shrink-0 mt-0.5" />
+                    <Check className="w-4 h-4 text-[#0058be] dark:text-blue-400 shrink-0 mt-0.5" />
                     <span><strong>Itemized Monthly Payslips in INR:</strong> Transparent compensation with provident fund and statutory records.</span>
                   </li>
                   <li className="flex items-start gap-2.5">
-                    <Check className="w-4 h-4 text-[#722F37] dark:text-rose-400 shrink-0 mt-0.5" />
+                    <Check className="w-4 h-4 text-[#0058be] dark:text-blue-400 shrink-0 mt-0.5" />
                     <span><strong>Karnataka Form T Compliant:</strong> Maintained strictly in compliance with Karnataka labor standards.</span>
                   </li>
                 </ul>
@@ -585,7 +584,7 @@ export default function LandingPage() {
               <div className="lg:col-span-6">
                 <div className="border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-[#121A2E] p-8 rounded-2xl shadow-[0_12px_36px_rgba(0,0,0,0.06)] space-y-5">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-[#722F37] text-white flex items-center justify-center shadow-xs">
+                    <div className="w-10 h-10 rounded-xl bg-[#0058be] text-white flex items-center justify-center shadow-xs">
                       <Lock className="w-5 h-5" />
                     </div>
                     <div>
@@ -606,7 +605,7 @@ export default function LandingPage() {
                   <div className="pt-2">
                     <Link
                       href={status === 'authenticated' ? dashboardPath : '/login'}
-                      className="inline-flex items-center justify-center gap-2 w-full px-5 py-3.5 rounded-xl text-sm font-semibold bg-[#722F37] hover:bg-[#5A232A] text-white shadow-xs transition-all active:scale-95"
+                      className="inline-flex items-center justify-center gap-2 w-full px-5 py-3.5 rounded-xl text-sm font-semibold bg-[#0058be] hover:bg-[#0047a0] text-white shadow-xs transition-all active:scale-95"
                     >
                       <span>{status === 'authenticated' ? 'Open Staff Workspace' : 'Sign In to Portal'}</span>
                       <ArrowRight className="w-4 h-4" />
@@ -644,7 +643,7 @@ export default function LandingPage() {
                   />
                 </div>
                 <div>
-                  <span className="font-serif font-bold text-base text-[#722F37] dark:text-rose-400 block leading-tight">
+                  <span className="font-serif font-bold text-base text-[#0058be] dark:text-blue-400 block leading-tight">
                     BSC TEXTILES
                   </span>
                   <span className="text-[10px] uppercase tracking-wider text-slate-500">
@@ -663,11 +662,11 @@ export default function LandingPage() {
                 Navigation
               </span>
               <ul className="space-y-1.5">
-                <li><a href="#about" className="hover:text-[#722F37] dark:hover:text-white transition-colors">Our Story</a></li>
-                <li><a href="#operations" className="hover:text-[#722F37] dark:hover:text-white transition-colors">Business Divisions</a></li>
-                <li><a href="#locations" className="hover:text-[#722F37] dark:hover:text-white transition-colors">Showrooms</a></li>
-                <li><a href="#governance" className="hover:text-[#722F37] dark:hover:text-white transition-colors">Workforce &amp; Form T</a></li>
-                <li><Link href="/login" className="hover:text-[#722F37] dark:hover:text-white transition-colors">Staff Login</Link></li>
+                <li><a href="#about" className="hover:text-[#0058be] dark:hover:text-white transition-colors">Our Story</a></li>
+                <li><a href="#operations" className="hover:text-[#0058be] dark:hover:text-white transition-colors">Business Divisions</a></li>
+                <li><a href="#locations" className="hover:text-[#0058be] dark:hover:text-white transition-colors">Showrooms</a></li>
+                <li><a href="#governance" className="hover:text-[#0058be] dark:hover:text-white transition-colors">Workforce &amp; Form T</a></li>
+                <li><Link href="/login" className="hover:text-[#0058be] dark:hover:text-white transition-colors">Staff Login</Link></li>
               </ul>
             </div>
 
