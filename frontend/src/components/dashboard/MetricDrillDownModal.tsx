@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 import { Modal } from '@/components/ui/Modal';
 import { fetchScope, empOf, ROSTER_LIMIT, type DrillFilters } from '@/lib/dashboardScope';
+import { EmployeeQrModal } from '@/components/dashboard/EmployeeQrModal';
 import {
   Pill,
   EmpCell,
@@ -101,24 +102,29 @@ function adherenceCols(): DrillColumn[] {
   ];
 }
 
-function punchCols(): DrillColumn[] {
+function punchCols(onOpenQr?: (row: any) => void): DrillColumn[] {
   return [
     { key: 'emp', header: 'Employee', render: (r) => <EmpCell code={r.code} name={r.name} /> },
-    { key: 'time', header: 'Punch Time', render: (r) => <span className="font-mono font-bold text-[#0b1c30]">{fmtTime(r.time)}</span> },
+    { key: 'time', header: 'Punch Time', render: (r) => <span className="font-mono font-bold text-[#0b1c30] dark:text-slate-100">{fmtTime(r.time)}</span> },
     { key: 'type', header: 'Type', render: (r) => <Pill tone={r.type === 'Out' ? 'amber' : 'green'}>{r.type}</Pill> },
     {
       key: 'method',
       header: 'Verification',
       render: (r) => (
-        <span className="inline-flex items-center gap-1 text-[11px] text-[#0058be] font-medium bg-[#eff4ff] px-2 py-0.5 rounded border border-[#dce9ff] whitespace-nowrap">
+        <button
+          type="button"
+          onClick={() => onOpenQr?.(r)}
+          className="inline-flex items-center gap-1.5 text-[11px] text-[#0058be] dark:text-blue-400 font-semibold bg-[#eff4ff] dark:bg-blue-950/60 hover:bg-[#dce9ff] dark:hover:bg-blue-900/60 px-2 py-0.5 rounded border border-[#dce9ff] dark:border-blue-900/60 whitespace-nowrap cursor-pointer transition-all active:scale-95 shadow-xs"
+          title={`Click to open 1-time daily QR pass for ${r.name || r.code}`}
+        >
           <span className="material-symbols-outlined text-[13px]">{r.methodIcon}</span>
-          {r.method}
-        </span>
+          <span>{r.method}</span>
+        </button>
       ),
     },
-    { key: 'device', header: 'Terminal / Device', render: (r) => <span className="text-slate-600">{r.device}</span> },
+    { key: 'device', header: 'Terminal / Device', render: (r) => <span className="text-slate-600 dark:text-slate-300">{r.device}</span> },
     { key: 'result', header: 'Result', render: (r) => <Pill tone={r.ok ? 'green' : 'red'}>{r.ok ? 'Success' : 'Failed'}</Pill> },
-    { key: 'hub', header: 'Location / Hub', render: (r) => <span className="text-slate-600">{r.hub}</span> },
+    { key: 'hub', header: 'Location / Hub', render: (r) => <span className="text-slate-600 dark:text-slate-300">{r.hub}</span> },
   ];
 }
 
@@ -178,6 +184,7 @@ export function MetricDrillDownModal({
   const [rows, setRows] = useState<any[]>([]);
   const [columns, setColumns] = useState<DrillColumn[]>([]);
   const [page, setPage] = useState(1);
+  const [selectedQrRow, setSelectedQrRow] = useState<any | null>(null);
   const reqIdRef = useRef(0);
 
   const { locationId, departmentId, shiftId } = filters;
@@ -368,7 +375,7 @@ export function MetricDrillDownModal({
         data = [...fvRows, ...qrRows, ...attRows]
           .filter((r) => !scope.ready || scope.inScope.has(r.employeeId))
           .sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime());
-        cols = punchCols();
+        cols = punchCols((row) => setSelectedQrRow(row));
       } else if (metric === 'breaks') {
         const p = new URLSearchParams();
         p.set('limit', String(METRIC_LIMIT));
@@ -576,6 +583,22 @@ export function MetricDrillDownModal({
           </>
         )}
       </div>
+
+      {selectedQrRow && (
+        <EmployeeQrModal
+          open={!!selectedQrRow}
+          onClose={() => setSelectedQrRow(null)}
+          employee={{
+            id: selectedQrRow.employeeId,
+            code: selectedQrRow.code,
+            name: selectedQrRow.name,
+            hub: selectedQrRow.hub,
+            punchTime: selectedQrRow.time ? fmtTime(selectedQrRow.time) : undefined,
+          }}
+          initialScanTime={selectedQrRow.time ? fmtTime(selectedQrRow.time) : undefined}
+          isConsumed={true}
+        />
+      )}
     </Modal>
   );
 }
