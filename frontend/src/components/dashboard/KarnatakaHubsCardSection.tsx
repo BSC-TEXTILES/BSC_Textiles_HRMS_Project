@@ -56,9 +56,10 @@ export const INITIAL_HUBS: HubCard[] = [
 interface KarnatakaHubsCardSectionProps {
   selectedHub: string;
   onSelectHub: (hubCode: string) => void;
+  selectedShiftLabel?: string;
 }
 
-export function KarnatakaHubsCardSection({ selectedHub, onSelectHub }: KarnatakaHubsCardSectionProps) {
+export function KarnatakaHubsCardSection({ selectedHub, onSelectHub, selectedShiftLabel }: KarnatakaHubsCardSectionProps) {
   const [hubs, setHubs] = useState<HubCard[]>(INITIAL_HUBS);
   const [showModal, setShowModal] = useState(false);
   const [editingHub, setEditingHub] = useState<HubCard | null>(null);
@@ -164,6 +165,11 @@ export function KarnatakaHubsCardSection({ selectedHub, onSelectHub }: Karnataka
           <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">domain</span>
           <h2 className="text-base font-bold text-[#0b1c30] dark:text-slate-100">Karnataka Enterprise Hubs & Store Outlets</h2>
           <span className="text-xs text-slate-400 dark:text-slate-500">• {hubs.length} Active Branches</span>
+          {selectedShiftLabel && (
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 border border-blue-200 dark:border-blue-900 animate-in fade-in">
+              Shift: {selectedShiftLabel}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <button

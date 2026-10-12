@@ -61,10 +61,25 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
       return res.json(cached.data);
     }
 
+    let resolvedLocId = scopedLocId;
+    if (resolvedLocId && resolvedLocId !== 'all') {
+      const locMatch = await prisma.location.findFirst({
+        where: {
+          OR: [
+            { id: resolvedLocId },
+            { code: String(locationId || '').toUpperCase() },
+            { code: resolvedLocId.toUpperCase() },
+          ],
+        },
+        select: { id: true },
+      });
+      if (locMatch) resolvedLocId = locMatch.id;
+    }
+
     const skip = (Number(page) - 1) * Number(limit);
     const where: any = {};
-    if (scopedLocId) where.locationId = scopedLocId;
-    if (departmentId) where.departmentId = departmentId;
+    if (resolvedLocId && resolvedLocId !== 'all') where.locationId = resolvedLocId;
+    if (departmentId && departmentId !== 'all') where.departmentId = departmentId;
     if (status) where.status = status;
     
     const [shifts, total] = await Promise.all([
@@ -89,6 +104,130 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('Get shifts error:', error);
     res.status(500).json({ error: 'Failed to get shifts' });
+  }
+});
+
+router.post('/custom-batch', authorize('ADD'), async (req: AuthRequest, res) => {
+  try {
+    const { name, locationId, startTime, endTime, capacity, employeeIds = [], isOvernight = false } = req.body;
+
+    const trimmedName = typeof name === 'string' ? name.trim() : '';
+    if (!trimmedName || trimmedName.length < 3 || trimmedName.length > 50) {
+      return res.status(400).json({ error: 'Batch name is required and must be between 3 and 50 characters' });
+    }
+
+    if (!locationId) {
+      return res.status(400).json({ error: 'Hub / branch is required' });
+    }
+
+    if (!startTime || !/^\d{2}:\d{2}(:\d{2})?$/.test(startTime)) {
+      return res.status(400).json({ error: 'Valid shift start time is required (HH:MM)' });
+    }
+
+    if (!endTime || !/^\d{2}:\d{2}(:\d{2})?$/.test(endTime)) {
+      return res.status(400).json({ error: 'Valid shift end time is required (HH:MM)' });
+    }
+
+    // Resolve location ID if passed as code (e.g. 'BEL') or UUID
+    const locMatch = await prisma.location.findFirst({
+      where: {
+        OR: [
+          { id: locationId },
+          { code: String(locationId).toUpperCase() },
+        ],
+      },
+      select: { id: true, code: true, name: true },
+    });
+    if (!locMatch) {
+      return res.status(400).json({ error: 'Specified hub / location not found' });
+    }
+    const realLocId = locMatch.id;
+
+    if (req.user!.role !== 'SUPER_ADMIN' && realLocId !== req.user!.locationId) {
+      return res.status(403).json({ error: 'Access denied to this location' });
+    }
+
+    // Check unique batch name within the selected hub
+    const existingName = await prisma.shift.findFirst({
+      where: {
+        locationId: realLocId,
+        name: trimmedName,
+      },
+    });
+    if (existingName) {
+      return res.status(400).json({ error: `A shift or batch named "${trimmedName}" already exists for this hub` });
+    }
+
+    const parsedCapacity = Number(capacity);
+    if (!Number.isInteger(parsedCapacity) || parsedCapacity < 1) {
+      return res.status(400).json({ error: 'Batch capacity must be a positive integer (minimum 1)' });
+    }
+
+    const empIdList: string[] = Array.isArray(employeeIds) ? employeeIds : [];
+    if (empIdList.length === 0) {
+      return res.status(400).json({ error: 'Please select at least 1 employee for this shift batch' });
+    }
+
+    if (empIdList.length > parsedCapacity) {
+      return res.status(400).json({
+        error: `Selected employees (${empIdList.length}) exceed batch capacity (${parsedCapacity})`,
+      });
+    }
+
+    // Validate that overnight shifts or regular end > start
+    const [startH, startM] = startTime.split(':').map(Number);
+    const [endH, endM] = endTime.split(':').map(Number);
+    const startMins = startH * 60 + startM;
+    const endMins = endH * 60 + endM;
+    const actualOvernight = Boolean(isOvernight) || endMins <= startMins;
+
+    const cleanCode =
+      'BATCH_' +
+      trimmedName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase() +
+      '_' +
+      Date.now().toString(36).toUpperCase();
+
+    const startD = new Date(`2024-01-01T${startTime.slice(0, 5)}:00`);
+    const endD = new Date(`${actualOvernight ? '2024-01-02' : '2024-01-01'}T${endTime.slice(0, 5)}:00`);
+
+    const shift = await prisma.shift.create({
+      data: {
+        name: trimmedName,
+        code: cleanCode,
+        locationId: realLocId,
+        startTime: startD,
+        endTime: endD,
+        scannerRoles: {
+          isCustomBatch: true,
+          capacity: parsedCapacity,
+          overnight: actualOvernight,
+        },
+        status: 'ACTIVE',
+      },
+    });
+
+    // Reassign selected employees to this newly created batch
+    for (const empId of empIdList) {
+      await prisma.employee.update({
+        where: { id: empId },
+        data: { shiftId: shift.id },
+      });
+    }
+
+    cacheService.invalidateShifts();
+
+    res.status(201).json({
+      shift: {
+        ...shift,
+        _count: { employees: empIdList.length },
+      },
+      assignedCount: empIdList.length,
+      capacity: parsedCapacity,
+      message: `Custom shift batch "${trimmedName}" created with ${empIdList.length} employees assigned`,
+    });
+  } catch (error) {
+    console.error('Create custom shift batch error:', error);
+    res.status(500).json({ error: 'Failed to create custom shift batch' });
   }
 });
 

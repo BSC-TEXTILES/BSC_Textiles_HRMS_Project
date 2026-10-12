@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { MetricDrillDownModal, type MetricKey } from '@/components/dashboard/MetricDrillDownModal';
@@ -9,6 +9,8 @@ import { KpiDetailContainer } from '@/components/dashboard/KpiDetailContainer';
 import type { MetricDetailType } from '@/types/metricDetail';
 import { BscHolidaysCalendar } from '@/components/dashboard/BscHolidaysCalendar';
 import { KarnatakaHubsCardSection } from '@/components/dashboard/KarnatakaHubsCardSection';
+import { ExecutiveShiftFilter, type ShiftOptionItem } from '@/components/dashboard/ExecutiveShiftFilter';
+import { CreateCustomShiftModal, type CreatedBatchResult } from '@/components/dashboard/CreateCustomShiftModal';
 import api from '@/lib/api';
 
 interface DashboardStats {
@@ -86,11 +88,145 @@ const DEFAULT_DEPTS = [
   { id: 'CS', name: 'Customer Service & Billing' },
 ];
 
-const DEFAULT_SHIFTS = [
-  { id: 'GENERAL', name: 'General Shift (09:30 - 18:30)' },
-  { id: 'MORNING', name: 'Morning Shift (09:00 - 18:00)' },
-  { id: 'EVENING', name: 'Evening Shift (12:00 - 21:00)' },
+const DEFAULT_SHIFTS: ShiftOptionItem[] = [
+  { id: 'MORNING', name: 'Morning Shift', timeRange: '09:00 – 18:00', staffCount: 24 },
+  { id: 'GENERAL', name: 'General Shift', timeRange: '09:30 – 18:30', staffCount: 8 },
+  { id: 'EVENING', name: 'Evening Shift', timeRange: '12:00 – 21:00', staffCount: 3 },
 ];
+
+function parseShiftTime(timeVal: any): string {
+  if (!timeVal) return '';
+  if (typeof timeVal === 'string' && /^\d{2}:\d{2}/.test(timeVal) && !timeVal.includes('T')) {
+    return timeVal.slice(0, 5);
+  }
+  try {
+    const d = new Date(timeVal);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    }
+  } catch {}
+  return String(timeVal).slice(0, 5);
+}
+
+function normalizeTimeRange(shift: any): string {
+  const nameLower = (shift.name || '').toLowerCase();
+  if (nameLower.includes('morning')) return '09:00 – 18:00';
+  if (nameLower.includes('general')) return '09:30 – 18:30';
+  if (nameLower.includes('evening')) return '12:00 – 21:00';
+  const start = parseShiftTime(shift.startTime) || '09:30';
+  const end = parseShiftTime(shift.endTime) || '18:30';
+  return `${start} – ${end}`;
+}
+
+function processShifts(rawShifts: any[], isAllHubs: boolean): ShiftOptionItem[] {
+  if (!Array.isArray(rawShifts) || rawShifts.length === 0) return [];
+
+  if (!isAllHubs) {
+    const items: ShiftOptionItem[] = rawShifts.map((s: any) => {
+      const isBatch = Boolean(s.scannerRoles?.isCustomBatch || s.code?.startsWith('BATCH_'));
+      return {
+        id: s.id,
+        name: s.name,
+        timeRange: normalizeTimeRange(s),
+        staffCount: s._count?.employees ?? undefined,
+        capacity: s.scannerRoles?.capacity ?? undefined,
+        isCustomBatch: isBatch,
+      };
+    });
+
+    return items.sort((a, b) => {
+      const getPriority = (name: string) => {
+        const n = name.toLowerCase();
+        if (n.includes('morning')) return 1;
+        if (n.includes('general')) return 2;
+        if (n.includes('evening')) return 3;
+        return 4;
+      };
+      const pA = getPriority(a.name);
+      const pB = getPriority(b.name);
+      if (pA !== pB) return pA - pB;
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  const standardMorning: any[] = [];
+  const standardGeneral: any[] = [];
+  const standardEvening: any[] = [];
+  const customBatches: any[] = [];
+
+  rawShifts.forEach((s: any) => {
+    const isBatch = Boolean(s.scannerRoles?.isCustomBatch || s.code?.startsWith('BATCH_'));
+    if (isBatch) {
+      customBatches.push(s);
+      return;
+    }
+    const nameLower = (s.name || '').toLowerCase();
+    if (nameLower.includes('morning') || s.code === 'MORNING') {
+      standardMorning.push(s);
+    } else if (nameLower.includes('general') || s.code === 'GENERAL') {
+      standardGeneral.push(s);
+    } else if (nameLower.includes('evening') || s.code === 'EVENING') {
+      standardEvening.push(s);
+    } else {
+      customBatches.push(s);
+    }
+  });
+
+  const result: ShiftOptionItem[] = [];
+
+  if (standardMorning.length > 0) {
+    const totalStaff = standardMorning.reduce((sum, s) => sum + (s._count?.employees || 0), 0);
+    result.push({
+      id: standardMorning.map((s) => s.id).join(','),
+      name: 'Morning Shift',
+      timeRange: '09:00 – 18:00',
+      staffCount: totalStaff > 0 ? totalStaff : 24,
+      isCustomBatch: false,
+    });
+  }
+
+  if (standardGeneral.length > 0) {
+    const totalStaff = standardGeneral.reduce((sum, s) => sum + (s._count?.employees || 0), 0);
+    result.push({
+      id: standardGeneral.map((s) => s.id).join(','),
+      name: 'General Shift',
+      timeRange: '09:30 – 18:30',
+      staffCount: totalStaff > 0 ? totalStaff : 8,
+      isCustomBatch: false,
+    });
+  }
+
+  if (standardEvening.length > 0) {
+    const totalStaff = standardEvening.reduce((sum, s) => sum + (s._count?.employees || 0), 0);
+    result.push({
+      id: standardEvening.map((s) => s.id).join(','),
+      name: 'Evening Shift',
+      timeRange: '12:00 – 21:00',
+      staffCount: totalStaff > 0 ? totalStaff : 3,
+      isCustomBatch: false,
+    });
+  }
+
+  const batchByName = new Map<string, ShiftOptionItem>();
+  customBatches.forEach((b: any) => {
+    if (!batchByName.has(b.name)) {
+      batchByName.set(b.name, {
+        id: b.id,
+        name: b.name,
+        timeRange: normalizeTimeRange(b),
+        staffCount: b._count?.employees,
+        capacity: b.scannerRoles?.capacity,
+        isCustomBatch: true,
+      });
+    }
+  });
+
+  Array.from(batchByName.values())
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((batch) => result.push(batch));
+
+  return result;
+}
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -100,7 +236,12 @@ export default function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [selectedShift, setSelectedShift] = useState('all');
   const [hubOptions, setHubOptions] = useState(DEFAULT_HUBS);
-  const [shiftOptions, setShiftOptions] = useState<Array<{ id: string; name: string }>>(DEFAULT_SHIFTS);
+  const [shiftOptions, setShiftOptions] = useState<ShiftOptionItem[]>(DEFAULT_SHIFTS);
+  const [shiftsLoading, setShiftsLoading] = useState(false);
+  const [shiftsError, setShiftsError] = useState<string | null>(null);
+  const [shiftNotice, setShiftNotice] = useState<string | null>(null);
+  const [createBatchModalOpen, setCreateBatchModalOpen] = useState(false);
+  const shiftCacheRef = useRef<Record<string, ShiftOptionItem[]>>({});
   const [deptOptions, setDeptOptions] = useState<Array<{ id: string; name: string }>>(DEFAULT_DEPTS);
   const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null);
   const [selectedKpiMetric, setSelectedKpiMetric] = useState<MetricDetailType>(null);
@@ -255,8 +396,10 @@ export default function DashboardPage() {
             if (h.includes('bly') && !loc.includes('bellary')) return false;
           }
           if (selectedShift !== 'all') {
-            const s = selectedShift.toLowerCase();
+            const activeOpt = shiftOptions.find((o) => o.id === selectedShift);
+            const s = (activeOpt?.name || selectedShift).toLowerCase();
             if (s.includes('morning') && !item.scheduledTime.includes('09:00')) return false;
+            if (s.includes('general') && !item.scheduledTime.includes('09:30') && !item.scheduledTime.includes('10:30')) return false;
             if (s.includes('evening') && !item.scheduledTime.includes('12:00')) return false;
           }
           return true;
@@ -270,33 +413,85 @@ export default function DashboardPage() {
       setLoading(false);
       setFilterAnimationKey((prev) => prev + 1);
     }
-  }, [selectedHub, selectedDept, selectedDate, selectedShift]);
+  }, [selectedHub, selectedDept, selectedDate, selectedShift, shiftOptions]);
 
   // Execute reactive refresh whenever any filter changes
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  // Load shift, department, and location options dynamically from backend
+  // Auto-dismiss short notice
+  useEffect(() => {
+    if (!shiftNotice) return;
+    const timer = setTimeout(() => setShiftNotice(null), 4500);
+    return () => clearTimeout(timer);
+  }, [shiftNotice]);
+
+  // Load shift options dynamically with caching and duplicate removal
+  const loadShiftOptions = useCallback(
+    async (hub: string, force = false) => {
+      if (!force && shiftCacheRef.current[hub]) {
+        setShiftOptions(shiftCacheRef.current[hub]);
+        return;
+      }
+
+      try {
+        setShiftsLoading(true);
+        setShiftsError(null);
+        const loc = hub !== 'all' ? `&locationId=${hub}` : '';
+        const shiftRes = await api.get(`/shifts?limit=100${loc}`).catch(() => ({ data: null }));
+        const sList = shiftRes.data?.shifts || shiftRes.data || [];
+        const processed = processShifts(sList, hub === 'all');
+        const finalList = processed.length > 0 ? processed : DEFAULT_SHIFTS;
+
+        shiftCacheRef.current[hub] = finalList;
+        setShiftOptions(finalList);
+
+        // Verify that current selected shift still exists
+        setSelectedShift((prevShift) => {
+          if (prevShift === 'all') return 'all';
+          const match = finalList.find((s) => s.id === prevShift);
+          if (match) return prevShift;
+
+          // If exact ID not found, check if a shift with matching name exists
+          const prevObj = shiftOptions.find((o) => o.id === prevShift);
+          const nameMatch = finalList.find(
+            (s) => prevObj && s.name.toLowerCase() === prevObj.name.toLowerCase()
+          );
+          if (nameMatch) return nameMatch.id;
+
+          // Reset to all and notify
+          setShiftNotice("Shift selection reset to 'All Shifts' for the selected hub.");
+          return 'all';
+        });
+      } catch {
+        setShiftsError('Could not load shifts');
+        if (!shiftCacheRef.current[hub]) {
+          setShiftOptions(DEFAULT_SHIFTS);
+        }
+      } finally {
+        setShiftsLoading(false);
+      }
+    },
+    [shiftOptions]
+  );
+
+  // Load shifts whenever selectedHub changes (cached in memory)
+  useEffect(() => {
+    loadShiftOptions(selectedHub);
+  }, [selectedHub, loadShiftOptions]);
+
+  // Load department and location options dynamically from backend
   useEffect(() => {
     let ignore = false;
-    const loadOptions = async () => {
+    const loadDeptsAndLocs = async () => {
       try {
         const loc = selectedHub !== 'all' ? `&locationId=${selectedHub}` : '';
-        const [shiftRes, deptRes, locRes] = await Promise.all([
-          api.get(`/shifts?limit=100${loc}`).catch(() => ({ data: null })),
+        const [deptRes, locRes] = await Promise.all([
           api.get(`/departments?limit=100${loc}`).catch(() => ({ data: null })),
           api.get('/locations/all').catch(() => ({ data: null })),
         ]);
         if (!ignore) {
-          const sList = shiftRes.data?.shifts || shiftRes.data || [];
-          if (Array.isArray(sList) && sList.length > 0) {
-            setShiftOptions(sList.map((s: any) => ({
-              id: s.id,
-              name: `${s.name} (${s.startTime ? s.startTime.slice(0, 5) : '09:30'} - ${s.endTime ? s.endTime.slice(0, 5) : '18:30'})`,
-            })));
-          }
-
           const dList = deptRes.data?.departments || deptRes.data || [];
           if (Array.isArray(dList) && dList.length > 0) {
             setDeptOptions(dList.map((d: any) => ({ id: d.id, name: d.name })));
@@ -316,16 +511,34 @@ export default function DashboardPage() {
         }
       } catch {
         if (!ignore) {
-          setShiftOptions(DEFAULT_SHIFTS);
           setDeptOptions(DEFAULT_DEPTS);
         }
       }
     };
-    loadOptions();
+    loadDeptsAndLocs();
     return () => {
       ignore = true;
     };
   }, [selectedHub]);
+
+  const handleBatchCreated = (newBatch: CreatedBatchResult) => {
+    // Invalidate shift caches
+    delete shiftCacheRef.current[newBatch.locationId];
+    delete shiftCacheRef.current['all'];
+
+    const newOption: ShiftOptionItem = {
+      id: newBatch.id,
+      name: newBatch.name,
+      timeRange: `${newBatch.startTime} – ${newBatch.endTime}`,
+      staffCount: newBatch.assignedCount,
+      capacity: newBatch.capacity,
+      isCustomBatch: true,
+    };
+
+    setShiftOptions((prev) => [newOption, ...prev.filter((p) => p.id !== newBatch.id)]);
+    setSelectedShift(newBatch.id);
+    setShiftNotice(`Custom shift batch "${newBatch.name}" created and set as active filter.`);
+  };
 
   const handleManualSync = async () => {
     setSyncing(true);
@@ -377,8 +590,21 @@ export default function DashboardPage() {
     </span>
   );
 
+  const activeShiftItem = useMemo(
+    () => (selectedShift === 'all' ? null : shiftOptions.find((s) => s.id === selectedShift)),
+    [selectedShift, shiftOptions]
+  );
+  const activeShiftName = activeShiftItem ? activeShiftItem.name : 'All Shifts';
+  const activeShiftHeaderLabel = selectedShift !== 'all' && activeShiftItem
+    ? `${activeShiftItem.name} (${activeShiftItem.timeRange})`
+    : undefined;
+
+  const morningShift = shiftOptions.find((s) => s.name.toLowerCase().includes('morning'));
+  const generalShift = shiftOptions.find((s) => s.name.toLowerCase().includes('general'));
+  const eveningShift = shiftOptions.find((s) => s.name.toLowerCase().includes('evening'));
+
   return (
-    <DashboardLayout>
+    <DashboardLayout activeShiftLabel={activeShiftHeaderLabel}>
       <div className="flex flex-col w-full gap-5">
         {/* TOP HEADER & CONTROLS BANNER */}
         <div className="flex flex-col gap-4 bg-white dark:bg-[#0e172a] p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
@@ -434,8 +660,32 @@ export default function DashboardPage() {
             </div>
           </div>
 
+<<<<<<< Updated upstream
           {/* Clean Connected Horizontal Line Divider */}
           <div className="w-full border-t border-slate-200/80 dark:border-slate-800 my-0.5" />
+=======
+          {/* Shift Reset / Creation Notice */}
+          {shiftNotice && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-xs text-[#0058be] dark:text-blue-300 animate-pop-in"
+            >
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px]">info</span>
+                <span>{shiftNotice}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShiftNotice(null)}
+                className="p-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors"
+                aria-label="Dismiss notice"
+              >
+                <span className="material-symbols-outlined text-[14px]">close</span>
+              </button>
+            </div>
+          )}
+>>>>>>> Stashed changes
 
           {/* Filter & Terminal Connectivity Bar */}
           <div className="flex flex-col gap-3 pt-3 bg-[#eff4ff]/60 dark:bg-[#131f38]/60 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800 transition-all">
@@ -510,23 +760,16 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Shift Filter */}
-                <div className="flex items-center gap-1.5 bg-white dark:bg-[#0c1424] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs text-xs group hover:border-[#0058be] dark:hover:border-blue-500 transition-colors">
-                  <span className="material-symbols-outlined text-slate-400 text-[16px] group-hover:scale-110 transition-transform">schedule</span>
-                  <span className="text-[10px] uppercase text-slate-400 font-bold">Shift:</span>
-                  <select
-                    value={selectedShift}
-                    onChange={(e) => setSelectedShift(e.target.value)}
-                    className="bg-transparent font-semibold text-xs text-[#0b1c30] dark:text-slate-100 focus:outline-none cursor-pointer pr-1"
-                  >
-                    <option value="all" className="dark:bg-[#0c1424]">All Shifts</option>
-                    {shiftOptions.map((s) => (
-                      <option key={s.id} value={s.id} className="dark:bg-[#0c1424]">
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {/* Shift Filter with Create Custom Shift */}
+                <ExecutiveShiftFilter
+                  selectedShiftId={selectedShift}
+                  onSelectShift={(id) => setSelectedShift(id)}
+                  shiftOptions={shiftOptions}
+                  loading={shiftsLoading}
+                  error={shiftsError}
+                  onRetry={() => loadShiftOptions(selectedHub, true)}
+                  onOpenCreateModal={() => setCreateBatchModalOpen(true)}
+                />
               </div>
 
               {/* Live Sync Beacon & Refresh */}
@@ -590,7 +833,7 @@ export default function DashboardPage() {
 
                 {selectedShift !== 'all' && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white dark:bg-slate-800 text-[#0058be] dark:text-blue-400 border border-blue-200 dark:border-blue-900 shadow-xs animate-pop-in">
-                    <span>Shift: {shiftOptions.find(s => s.id === selectedShift)?.name || selectedShift}</span>
+                    <span>Shift: {activeShiftName}</span>
                     <button
                       type="button"
                       onClick={() => setSelectedShift('all')}
@@ -648,6 +891,7 @@ export default function DashboardPage() {
             <KarnatakaHubsCardSection
               selectedHub={selectedHub}
               onSelectHub={setSelectedHub}
+              selectedShiftLabel={selectedShift !== 'all' ? activeShiftName : undefined}
             />
 
         {/* SECTION 3: RECENT BIOMETRIC TERMINAL PUNCHES LEDGER */}
@@ -767,9 +1011,13 @@ export default function DashboardPage() {
               </div>
               <div className="space-y-3">
                 <div
-                  onClick={() => setSelectedShift(selectedShift === 'MORNING' ? 'all' : 'MORNING')}
+                  onClick={() => {
+                    if (morningShift) {
+                      setSelectedShift(selectedShift === morningShift.id ? 'all' : morningShift.id);
+                    }
+                  }}
                   className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                    selectedShift.toLowerCase().includes('morning')
+                    selectedShift !== 'all' && (selectedShift === morningShift?.id || activeShiftName.toLowerCase().includes('morning'))
                       ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 ring-1 ring-blue-400'
                       : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
                   }`}
@@ -784,9 +1032,13 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div
-                  onClick={() => setSelectedShift(selectedShift === 'GENERAL' ? 'all' : 'GENERAL')}
+                  onClick={() => {
+                    if (generalShift) {
+                      setSelectedShift(selectedShift === generalShift.id ? 'all' : generalShift.id);
+                    }
+                  }}
                   className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                    selectedShift.toLowerCase().includes('general')
+                    selectedShift !== 'all' && (selectedShift === generalShift?.id || activeShiftName.toLowerCase().includes('general'))
                       ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 ring-1 ring-emerald-400'
                       : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
                   }`}
@@ -801,9 +1053,13 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div
-                  onClick={() => setSelectedShift(selectedShift === 'EVENING' ? 'all' : 'EVENING')}
+                  onClick={() => {
+                    if (eveningShift) {
+                      setSelectedShift(selectedShift === eveningShift.id ? 'all' : eveningShift.id);
+                    }
+                  }}
                   className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                    selectedShift.toLowerCase().includes('evening')
+                    selectedShift !== 'all' && (selectedShift === eveningShift?.id || activeShiftName.toLowerCase().includes('evening'))
                       ? 'bg-amber-50/70 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 ring-1 ring-amber-400'
                       : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
                   }`}
@@ -924,7 +1180,7 @@ export default function DashboardPage() {
             shift:
               selectedShift === 'all'
                 ? 'All Shifts'
-                : shiftOptions.find((s) => s.id === selectedShift)?.name || 'All Shifts',
+                : activeShiftName,
             date: selectedDate,
           }}
           onClose={() => setActiveMetric(null)}
@@ -936,6 +1192,16 @@ export default function DashboardPage() {
         activeMetric={selectedKpiMetric}
         onClose={() => setSelectedKpiMetric(null)}
         locationId={selectedHub}
+      />
+
+      {/* Create Custom Shift Batch Modal */}
+      <CreateCustomShiftModal
+        open={createBatchModalOpen}
+        onClose={() => setCreateBatchModalOpen(false)}
+        hubs={hubOptions}
+        initialHubId={selectedHub}
+        existingShiftNames={shiftOptions.map((s) => s.name)}
+        onSuccess={handleBatchCreated}
       />
     </DashboardLayout>
   );

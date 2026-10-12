@@ -228,7 +228,13 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
     const where: any = {};
     if (scopedLocId) where.locationId = scopedLocId;
     if (employeeId) where.employeeId = employeeId;
-    if (shiftId && shiftId !== 'all') where.shiftId = shiftId;
+    if (shiftId && shiftId !== 'all') {
+      if (String(shiftId).includes(',')) {
+        where.shiftId = { in: String(shiftId).split(',').map((s: string) => s.trim()).filter(Boolean) };
+      } else {
+        where.shiftId = shiftId;
+      }
+    }
     if (status && status !== 'all') where.status = status;
     if (departmentId && departmentId !== 'all') {
       where.employee = { ...(where.employee || {}), departmentId: String(departmentId) };
