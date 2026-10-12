@@ -434,6 +434,9 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* Clean Connected Horizontal Line Divider */}
+          <div className="w-full border-t border-slate-200/80 dark:border-slate-800 my-0.5" />
+
           {/* Filter & Terminal Connectivity Bar */}
           <div className="flex flex-col gap-3 pt-3 bg-[#eff4ff]/60 dark:bg-[#131f38]/60 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800 transition-all">
             <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">

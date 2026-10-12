@@ -310,9 +310,10 @@ export function MetricDrillDownModal({
           p.set('endDate', dayEnd);
           return p.toString();
         };
-        const [fvRes, qrRes] = await Promise.all([
+        const [fvRes, qrRes, attRes] = await Promise.all([
           api.get(`/face-verification?${mk()}`).catch(() => ({ data: null })),
           api.get(`/qr-codes/scans?${mk()}`).catch(() => ({ data: null })),
+          api.get(`/attendance?limit=50`).catch(() => ({ data: null })),
         ]);
         const fvRows: any[] = (fvRes.data?.verifications || fvRes.data?.rows || []).map((v: any) => {
           const emp = empOf(scope, v.employeeId, v);
@@ -346,7 +347,25 @@ export function MetricDrillDownModal({
             hub: emp.hub,
           };
         });
-        data = [...fvRows, ...qrRows]
+        const attRows: any[] = (attRes.data?.attendances || attRes.data?.attendance || [])
+          .filter((a: any) => a.actualLogin)
+          .map((a: any) => {
+            const emp = empOf(scope, a.employeeId, a.employee);
+            return {
+              id: `att-${a.id}`,
+              employeeId: a.employeeId,
+              code: a.employee?.employeeCode || emp.code,
+              name: a.employee?.fullName || emp.name,
+              time: a.actualLogin,
+              type: 'In',
+              method: a.faceVerified ? 'Face' : 'QR / RFID',
+              methodIcon: a.faceVerified ? 'face' : 'qr_code_scanner',
+              device: 'Entrance Biometric Tablet A',
+              ok: a.status !== 'ABSENT',
+              hub: a.location?.name || emp.hub,
+            };
+          });
+        data = [...fvRows, ...qrRows, ...attRows]
           .filter((r) => !scope.ready || scope.inScope.has(r.employeeId))
           .sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime());
         cols = punchCols();
@@ -445,13 +464,13 @@ export function MetricDrillDownModal({
       <div className="flex flex-col gap-4">
         {/* Filter context */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Filters:</span>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Filters:</span>
           {chips.map((c) => (
             <span
               key={c.label}
-              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#0b1c30] bg-[#eff4ff] border border-[#dce9ff] px-2.5 py-1 rounded-lg"
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#0b1c30] dark:text-blue-300 bg-[#eff4ff] dark:bg-blue-950/60 border border-[#dce9ff] dark:border-blue-900/60 px-2.5 py-1 rounded-lg"
             >
-              <span className="text-[10px] uppercase text-slate-400 font-bold">{c.label}:</span>
+              <span className="text-[10px] uppercase text-slate-400 dark:text-slate-500 font-bold">{c.label}:</span>
               {c.value}
             </span>
           ))}
@@ -459,14 +478,14 @@ export function MetricDrillDownModal({
 
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-3">
-          <p className="text-xs text-slate-500" aria-live="polite">
+          <p className="text-xs text-slate-500 dark:text-slate-400" aria-live="polite">
             {loading ? 'Loading detailed records…' : error ? 'Error loading records' : `${rows.length} record${rows.length === 1 ? '' : 's'} found`}
           </p>
           <button
             type="button"
             onClick={load}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0058be] bg-[#eff4ff] hover:bg-[#dce9ff] rounded-lg transition-colors border border-[#dce9ff] disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0058be] dark:text-blue-400 bg-[#eff4ff] dark:bg-blue-950/60 hover:bg-[#dce9ff] dark:hover:bg-blue-900/60 rounded-lg transition-colors border border-[#dce9ff] dark:border-blue-900/60 disabled:opacity-50"
           >
             <span className={`material-symbols-outlined text-[15px] ${loading ? 'animate-spin' : ''}`}>refresh</span>
             Refresh
@@ -477,7 +496,7 @@ export function MetricDrillDownModal({
         {error ? (
           <div className="flex flex-col items-center justify-center py-14 text-center">
             <span className="material-symbols-outlined text-red-400 text-[36px] mb-2">error</span>
-            <p className="text-sm font-semibold text-slate-600 mb-1">{error}</p>
+            <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1">{error}</p>
             <button
               type="button"
               onClick={load}
@@ -489,20 +508,20 @@ export function MetricDrillDownModal({
         ) : loading ? (
           <div className="flex flex-col gap-2 py-2">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="h-10 bg-slate-100 animate-pulse rounded-lg" />
+              <div key={i} className="h-10 bg-slate-100 dark:bg-slate-800 animate-pulse rounded-lg" />
             ))}
           </div>
         ) : rows.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-14 text-center">
-            <span className="material-symbols-outlined text-slate-300 text-[40px] mb-2">inbox</span>
-            <p className="text-sm font-semibold text-slate-500">No records available</p>
-            <p className="text-xs text-slate-400 mt-1">Try adjusting the Hub, Department, Shift or Date filters.</p>
+            <span className="material-symbols-outlined text-slate-300 dark:text-slate-600 text-[40px] mb-2">inbox</span>
+            <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">No records available</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Try adjusting the Hub, Department, Shift or Date filters.</p>
           </div>
         ) : (
           <>
-            <div className="overflow-x-auto border border-slate-200/80 rounded-lg">
+            <div className="overflow-x-auto border border-slate-200/80 dark:border-slate-800 rounded-lg">
               <table className="w-full text-left text-xs">
-                <thead className="bg-[#eff4ff]/60 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-100 tracking-wider">
+                <thead className="bg-[#eff4ff]/60 dark:bg-slate-900/80 text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200/80 dark:border-slate-800 tracking-wider">
                   <tr>
                     {columns.map((col) => (
                       <th key={col.key} className="py-2.5 px-3 whitespace-nowrap">
@@ -511,9 +530,9 @@ export function MetricDrillDownModal({
                     ))}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-700">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
                   {pageRows.map((row) => (
-                    <tr key={row.id} className="hover:bg-slate-50/70 transition-colors align-middle">
+                    <tr key={row.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors align-middle">
                       {columns.map((col) => (
                         <td key={col.key} className="py-2.5 px-3">
                           {col.render(row)}
@@ -527,7 +546,7 @@ export function MetricDrillDownModal({
 
             {/* Pagination */}
             <div className="flex items-center justify-between gap-3 pt-1">
-              <span className="text-[11px] text-slate-500">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
                 Showing {rangeStart}–{rangeEnd} of {rows.length}
               </span>
               <div className="flex items-center gap-2">
@@ -536,11 +555,11 @@ export function MetricDrillDownModal({
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={safePage <= 1}
                   aria-label="Previous page"
-                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Prev
                 </button>
-                <span className="text-[11px] font-semibold text-slate-600">
+                <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
                   Page {safePage} of {totalPages}
                 </span>
                 <button
@@ -548,7 +567,7 @@ export function MetricDrillDownModal({
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={safePage >= totalPages}
                   aria-label="Next page"
-                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Next
                 </button>

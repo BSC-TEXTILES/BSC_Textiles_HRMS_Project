@@ -359,7 +359,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             isCollapsed ? 'justify-center px-2' : 'px-4'
           } bg-white dark:bg-[#090f1d] border-b border-slate-200/80 dark:border-[#152038] flex-shrink-0 transition-all`}>
             <div className={`flex items-center overflow-hidden ${isCollapsed ? '' : 'gap-2.5'}`}>
-              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-white p-1 flex items-center justify-center shrink-0 shadow-xs border border-slate-200/60 dark:border-transparent overflow-hidden">
+              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 p-1 flex items-center justify-center shrink-0 shadow-xs border border-slate-200/60 dark:border-slate-700/60 overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/images/bsc_logo.png" alt="BSC Textiles" className="w-full h-full object-contain" />
               </div>
@@ -515,7 +515,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       {/* TOP HEADER (Fixed) */}
       <header className={`fixed top-0 left-0 ${
         isCollapsed ? 'lg:left-20' : 'lg:left-64'
-      } right-0 h-14 bg-white/95 dark:bg-[#090f1d]/95 backdrop-blur-md border-b border-slate-200/90 dark:border-[#152038] shadow-xs dark:shadow-[0_1px_4px_rgba(0,0,0,0.2)] z-40 flex items-center justify-between px-4 lg:px-6 transition-all duration-200 ease-in-out`}>
+      } right-0 h-14 bg-white dark:bg-[#090f1d] border-b border-slate-200/80 dark:border-[#152038] shadow-xs dark:shadow-[0_1px_4px_rgba(0,0,0,0.2)] z-40 flex items-center justify-between px-4 lg:px-6 transition-all duration-200 ease-in-out`}>
         <div className="flex items-center gap-3 flex-1 max-w-2xl">
           {/* Mobile Drawer Trigger */}
           <button

@@ -33,7 +33,9 @@ import {
   Activity,
   Layers,
   Terminal,
-  Radio
+  Radio,
+  ScanFace,
+  Coins
 } from 'lucide-react';
 
 const METRIC_TITLES: Record<MetricKey, string> = {
@@ -153,62 +155,192 @@ export default function BiometricPunchesPage() {
   return (
     <DashboardLayout>
       <div className="flex flex-col w-full gap-5 max-w-7xl mx-auto">
-        {/* Top Header & Breadcrumb */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between pb-1 gap-4 border-b border-slate-200/80 dark:border-slate-800 pb-4">
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 text-[11px] uppercase tracking-wider font-bold">
-              <span>Time & Attendance</span>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-[#0058be] dark:text-blue-400">Live Biometric Punches & IoT Terminal Network</span>
+        {/* TOP HEADER & BIOMETRIC TELEMETRY BANNER (White Section with Connected Horizontal Line) */}
+        <div className="flex flex-col gap-4 bg-white dark:bg-[#0e172a] p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+          {/* Top Header & Breadcrumb */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500 text-[11px] uppercase tracking-wider font-bold">
+                <span>Time & Attendance</span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-[#0058be] dark:text-blue-400">Live Biometric Punches & IoT Terminal Network</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-xl sm:text-2xl font-bold text-[#0b1c30] dark:text-slate-100 tracking-tight flex items-center gap-2">
+                  <Fingerprint className="w-6 h-6 text-[#0058be] dark:text-blue-400" />
+                  Biometric Attendance & Terminal Punch Ledger
+                </h1>
+                <span className="px-2.5 py-0.5 rounded-full bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 text-[10px] font-bold uppercase tracking-wider border border-[#dce9ff] dark:border-blue-900 flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-[#0058be] dark:bg-blue-400 animate-pulse" /> Live Socket
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-3xl">
+                Real-time telemetry, AI facial recognition & RFID biometric punch streams across 8 edge-connected terminals in Karnataka retail & weaving hubs (BEL-01, DAV-02, SHI-03).
+              </p>
             </div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl sm:text-2xl font-bold text-[#0b1c30] dark:text-slate-100 tracking-tight flex items-center gap-2">
-                <Fingerprint className="w-6 h-6 text-[#0058be] dark:text-blue-400" />
-                Biometric Attendance & Terminal Punch Ledger
-              </h1>
-              <span className="px-2.5 py-0.5 rounded-full bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 text-[10px] font-bold uppercase tracking-wider border border-[#dce9ff] dark:border-blue-900 flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-[#0058be] dark:bg-blue-400 animate-pulse" /> Live Socket
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={handleExportCSV}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-all text-xs font-semibold"
+                title="Download CSV export of biometric events"
+              >
+                <Download className="w-4 h-4 text-slate-400" />
+                <span>Export Raw Logs (CSV)</span>
+              </button>
+              <button
+                onClick={() => setActiveKpiMetric('terminals')}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#eff4ff] dark:bg-blue-950/50 text-[#0058be] dark:text-blue-300 border border-[#dce9ff] dark:border-blue-900 shadow-xs hover:bg-[#dce9ff] dark:hover:bg-blue-900/60 transition-all text-xs font-bold"
+                title="View all edge biometric terminals and network status"
+              >
+                <Radio className="w-4 h-4" />
+                <span>Ping All Terminals (8/8 Online)</span>
+              </button>
+              <button
+                onClick={() => setIsManualModalOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0b1c30] dark:bg-[#0058be] text-white shadow-xs hover:bg-slate-800 dark:hover:bg-[#0047a0] transition-all text-xs font-bold"
+              >
+                <Plus className="w-4 h-4" />
+                <span>+ Manual Punch Override</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Clean Connected Horizontal Line Divider */}
+          <div className="w-full border-t border-slate-200/80 dark:border-slate-800 my-0.5" />
+
+          {/* Top 5 Biometric Specific KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+            {/* 1. Biometric Punches Today */}
+            <button
+              type="button"
+              onClick={() => setActiveDrillMetric('punches')}
+              className="group flex flex-col justify-between text-left p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#090f1d] border border-slate-200/70 dark:border-slate-800/80 hover:border-[#0058be]/40 dark:hover:border-blue-500/40 hover:shadow-xs transition-all"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Punches Today</span>
+                <span className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-400">
+                  <Fingerprint className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="mt-2">
+                <div className="text-2xl font-black text-[#0b1c30] dark:text-white tracking-tight">
+                  {(stats?.qrScans ?? 52) + (stats?.faceVerified ?? 35)}
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">100% Synced</span> • 4 Hubs
+                </div>
+              </div>
+              <span className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">
+                <span>View Ledger</span>
+                <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
               </span>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-3xl">
-              Real-time telemetry, AI facial recognition & RFID biometric punch streams across 8 edge-connected terminals in Karnataka retail & weaving hubs (BEL-01, DAV-02, SHI-03).
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={handleExportCSV}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-all text-xs font-semibold"
-              title="Download CSV export of biometric events"
-            >
-              <Download className="w-4 h-4 text-slate-400" />
-              <span>Export Raw Logs (CSV)</span>
             </button>
+
+            {/* 2. AI Facial Recognition */}
             <button
+              type="button"
+              onClick={() => setActiveDrillMetric('punches')}
+              className="group flex flex-col justify-between text-left p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#090f1d] border border-slate-200/70 dark:border-slate-800/80 hover:border-[#0058be]/40 dark:hover:border-blue-500/40 hover:shadow-xs transition-all"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">AI Face Verification</span>
+                <span className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                  <ScanFace className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="mt-2">
+                <div className="text-2xl font-black text-[#0b1c30] dark:text-white tracking-tight">
+                  {stats?.avgFaceMatch ? `${stats.avgFaceMatch}%` : '96.4%'}
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">{stats?.faceVerified ?? 35} Verified</span> • 0 Spoof
+                </div>
+              </div>
+              <span className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">
+                <span>View Accuracy</span>
+                <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </span>
+            </button>
+
+            {/* 3. Encrypted QR & RFID Scans */}
+            <button
+              type="button"
+              onClick={() => setActiveDrillMetric('punches')}
+              className="group flex flex-col justify-between text-left p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#090f1d] border border-slate-200/70 dark:border-slate-800/80 hover:border-[#0058be]/40 dark:hover:border-blue-500/40 hover:shadow-xs transition-all"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Encrypted QR Scans</span>
+                <span className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-400">
+                  <Activity className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="mt-2">
+                <div className="text-2xl font-black text-[#0b1c30] dark:text-white tracking-tight">
+                  {stats?.qrScans ?? 52}
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Instant SHA-256 Auth
+                </div>
+              </div>
+              <span className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">
+                <span>Audit Scans</span>
+                <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </span>
+            </button>
+
+            {/* 4. IoT Terminals */}
+            <button
+              type="button"
               onClick={() => setActiveKpiMetric('terminals')}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#eff4ff] dark:bg-blue-950/50 text-[#0058be] dark:text-blue-300 border border-[#dce9ff] dark:border-blue-900 shadow-xs hover:bg-[#dce9ff] dark:hover:bg-blue-900/60 transition-all text-xs font-bold"
-              title="View all edge biometric terminals and network status"
+              className="group flex flex-col justify-between text-left p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#090f1d] border border-slate-200/70 dark:border-slate-800/80 hover:border-[#0058be]/40 dark:hover:border-blue-500/40 hover:shadow-xs transition-all"
             >
-              <Radio className="w-4 h-4" />
-              <span>Ping All Terminals (8/8 Online)</span>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">IoT Edge Terminals</span>
+                <span className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
+                  <Terminal className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="mt-2">
+                <div className="text-2xl font-black text-[#0b1c30] dark:text-white tracking-tight">
+                  8 / 8 Online
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">99.8% Sync</span> • 12ms latency
+                </div>
+              </div>
+              <span className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">
+                <span>Network Status</span>
+                <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </span>
             </button>
+
+            {/* 5. Early Login Incentives */}
             <button
-              onClick={() => setIsManualModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0b1c30] dark:bg-[#0058be] text-white shadow-xs hover:bg-slate-800 dark:hover:bg-[#0047a0] transition-all text-xs font-bold"
+              type="button"
+              onClick={() => setActiveDrillMetric('incentives')}
+              className="group flex flex-col justify-between text-left p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#090f1d] border border-slate-200/70 dark:border-slate-800/80 hover:border-[#0058be]/40 dark:hover:border-blue-500/40 hover:shadow-xs transition-all"
             >
-              <Plus className="w-4 h-4" />
-              <span>+ Manual Punch Override</span>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Early Check-in Bonus</span>
+                <span className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                  <Coins className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="mt-2">
+                <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
+                  ₹2,300
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  ₹1/sec store prep incentive
+                </div>
+              </div>
+              <span className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">
+                <span>Disbursal Ledger</span>
+                <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </span>
             </button>
           </div>
-        </div>
-
-        {/* Top Metric KPI Row (5 Interactive Clickable Cards) */}
-        {/* CLICKING ANY OF THESE 5 CARDS OPENS THE DETAILED VIEW AS REQUESTED */}
-        <div>
-          <DashboardCards
-            onSelectMetric={(metric: MetricKey) => setActiveDrillMetric(metric)}
-            stats={stats}
-          />
         </div>
 
         {/* Filter and Search Bar */}
