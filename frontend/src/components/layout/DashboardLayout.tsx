@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Fingerprint,
   FolderLock,
+  Database,
   Calendar,
   Coffee,
   FileEdit,
@@ -135,6 +136,7 @@ const enterpriseNavigation: NavSectionConfig[] = [
       { title: 'Selling Points & Audits', href: '/operations/selling-points', icon: Store },
       { title: 'Observation Module', href: '/operations/observations', icon: Eye },
       { title: 'Governance Reports', href: '/reports', icon: FileText },
+      { title: 'Local Database & Backups', href: '/admin/local-database', icon: Database, badge: 'SQLite' },
       { title: 'Audit Logs & Security', href: '/admin/audit-logs', icon: ShieldAlert },
       { title: 'System Settings', href: '/admin/settings', icon: Settings },
     ],
@@ -367,7 +369,7 @@ export function DashboardLayout({
       <aside 
         className={`fixed left-0 top-0 h-full ${
           isCollapsed ? 'w-20' : 'w-64'
-        } bg-white dark:bg-[#090f1d] border-r border-slate-200/90 dark:border-[#152038] text-slate-700 dark:text-slate-200 shadow-sm dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)] z-50 flex flex-col justify-between overflow-y-auto no-scrollbar hidden lg:flex transition-all duration-200 ease-in-out`}
+        } bg-white dark:bg-[#090f1d] border-r border-slate-200/90 dark:border-[#152038] text-slate-700 dark:text-slate-200 shadow-sm z-50 flex flex-col justify-between overflow-y-auto no-scrollbar hidden lg:flex transition-all duration-200 ease-in-out`}
       >
         <div className="flex flex-col">
           {/* Top Logo Brand Header */}
@@ -375,14 +377,14 @@ export function DashboardLayout({
             isCollapsed ? 'justify-center px-2' : 'px-4'
           } bg-white dark:bg-[#090f1d] border-b border-slate-200/80 dark:border-[#152038] flex-shrink-0 transition-all`}>
             <div className={`flex items-center overflow-hidden ${isCollapsed ? '' : 'gap-2.5'}`}>
-              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 p-1 flex items-center justify-center shrink-0 shadow-xs border border-slate-200/60 dark:border-slate-700/60 overflow-hidden">
+              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 p-1 flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-700 overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/images/bsc_logo.png" alt="BSC Textiles" className="w-full h-full object-contain" />
               </div>
               {!isCollapsed && (
                 <div className="flex flex-col leading-tight truncate">
                   <span className="text-[14px] font-bold tracking-tight text-[#0b1c30] dark:text-white truncate">BSC Textiles</span>
-                  <span className="text-[9px] font-bold tracking-wider uppercase text-[#0058be] dark:text-[#3b82f6]">Since 1938</span>
+                  <span className="text-[9px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400">Since 1938</span>
                 </div>
               )}
             </div>
@@ -397,19 +399,22 @@ export function DashboardLayout({
                     {section.title}
                   </div>
                 ) : (
-                  <div className="my-2 border-t border-slate-200 dark:border-[#152038] mx-1" title={section.title} />
+                  <div className="my-1.5 flex justify-center items-center" title={section.title}>
+                    <span className="w-1.5 h-0.5 rounded-full bg-slate-300 dark:bg-slate-700" />
+                  </div>
                 )}
                 <div className="space-y-0.5">
                   {section.items.map((item) => {
                     const itemPath = item.href.split('?')[0];
                     const isActive = pathname === item.href || (item.href !== '/dashboard' && !item.href.includes('?') && pathname.startsWith(itemPath));
                     const IconComponent = item.icon;
+
                     return (
                       <Link
                         key={item.href}
                         href={item.href}
                         title={isCollapsed ? `${item.title} • ${section.title}` : undefined}
-                        className={`flex items-center ${
+                        className={`group flex items-center ${
                           isCollapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2'
                         } rounded-lg text-xs transition-all ${
                           isActive
@@ -417,10 +422,16 @@ export function DashboardLayout({
                             : 'text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/60 font-medium'
                         }`}
                       >
-                        <IconComponent className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-400 dark:text-slate-400 group-hover:text-[#0058be] dark:group-hover:text-white'}`} />
+                        <IconComponent className={`w-4 h-4 flex-shrink-0 transition-colors ${
+                          isActive ? 'text-white' : 'text-slate-400 dark:text-slate-400 group-hover:text-[#0058be] dark:group-hover:text-white'
+                        }`} />
                         {!isCollapsed && <span className="truncate flex-1">{item.title}</span>}
                         {!isCollapsed && item.badge && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-50 dark:bg-[#14264d] text-[#0058be] dark:text-blue-300 border border-blue-200 dark:border-blue-700/50">
+                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                            isActive 
+                              ? 'bg-white/20 text-white' 
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                          }`}>
                             {item.badge}
                           </span>
                         )}
@@ -434,11 +445,11 @@ export function DashboardLayout({
         </div>
 
         {/* Bottom Application Meta & Sign Out */}
-        <div className="p-3 border-t border-slate-200 dark:border-[#152038] bg-white dark:bg-[#090f1d] space-y-2">
+        <div className="p-3 border-t border-slate-200 dark:border-[#152038] bg-slate-50/50 dark:bg-[#070d18] space-y-2">
           {!isCollapsed ? (
-            <div className="px-3 py-2 bg-slate-50 dark:bg-[#0e172a] rounded-lg border border-slate-200 dark:border-[#1e2d4d]">
+            <div className="px-3 py-2 bg-slate-100/80 dark:bg-[#0e172a] rounded-lg border border-slate-200 dark:border-[#1e2d4d]">
               <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">BSC Textiles Pvt. Ltd.</div>
-              <div className="text-[10px] text-slate-400 font-mono">HRMS Enterprise v2.4</div>
+              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">HRMS Enterprise v2.4</div>
             </div>
           ) : (
             <div className="text-center py-1 text-[9px] font-bold text-slate-400 font-mono" title="BSC HRMS v2.4">
@@ -453,7 +464,7 @@ export function DashboardLayout({
             } rounded-lg text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors`}
             title={isCollapsed ? "Sign Out" : undefined}
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-4 h-4 text-slate-400 group-hover:text-red-500" />
             {!isCollapsed && <span>Sign Out</span>}
           </button>
         </div>
@@ -463,23 +474,23 @@ export function DashboardLayout({
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
-          <div className="relative w-64 bg-white dark:bg-[#15181E] h-full shadow-2xl flex flex-col justify-between overflow-y-auto no-scrollbar z-10 border-r border-gray-200 dark:border-slate-800">
+          <div className="relative w-64 bg-white dark:bg-[#090f1d] h-full shadow-2xl flex flex-col justify-between overflow-y-auto no-scrollbar z-10 border-r border-slate-200 dark:border-[#152038] text-slate-700 dark:text-slate-200">
             <div>
-              <div className="h-14 flex items-center justify-between px-4 border-b border-gray-200 dark:border-slate-800">
+              <div className="h-14 flex items-center justify-between px-4 bg-white dark:bg-[#090f1d] border-b border-slate-200 dark:border-[#152038]">
                 <div className="flex items-center gap-2">
                   <Logo variant="icon" size="sm" />
                   <div className="flex flex-col leading-none">
-                    <span className="font-black text-sm text-[#18181B] dark:text-slate-100">BSC Textiles</span>
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#722F37] dark:text-[#E8DCC6]">Since 1938</span>
+                    <span className="font-bold text-sm text-[#0b1c30] dark:text-white">BSC Textiles</span>
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Since 1938</span>
                   </div>
                 </div>
-                <button onClick={() => setMobileMenuOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <button onClick={() => setMobileMenuOpen(false)} className="p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Mobile Theme Toggle */}
-              <div className="p-2.5 mx-3 my-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
+              <div className="p-2.5 mx-3 my-2 rounded-lg bg-slate-50 dark:bg-[#0e172a] border border-slate-200 dark:border-[#1e2d4d] flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Theme</span>
                 <ThemeToggle showLabel={true} size="sm" />
               </div>
@@ -487,7 +498,7 @@ export function DashboardLayout({
               <nav className="p-3 space-y-2">
                 {visibleNavigation.map((sec) => (
                   <div key={sec.title}>
-                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 truncate">
                       {sec.title}
                     </div>
                     {sec.items.map((i) => {
@@ -499,14 +510,23 @@ export function DashboardLayout({
                           key={i.href}
                           href={i.href}
                           onClick={() => setMobileMenuOpen(false)}
-                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs ${
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-all ${
                             isItemActive 
-                              ? 'bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 font-semibold' 
-                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                              ? 'bg-[#0058be] text-white font-semibold shadow-sm' 
+                              : 'text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/60'
                           }`}
                         >
-                          <IconComp className="w-4 h-4" />
-                          <span>{i.title}</span>
+                          <IconComp className={`w-4 h-4 ${isItemActive ? 'text-white' : 'text-slate-400 dark:text-slate-400'}`} />
+                          <span className="flex-1 truncate">{i.title}</span>
+                          {i.badge && (
+                            <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                              isItemActive
+                                ? 'bg-white/20 text-white'
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                            }`}>
+                              {i.badge}
+                            </span>
+                          )}
                         </Link>
                       );
                     })}
@@ -515,12 +535,12 @@ export function DashboardLayout({
               </nav>
             </div>
 
-            <div className="p-3 border-t border-gray-200 dark:border-slate-800">
+            <div className="p-3 border-t border-slate-200 dark:border-[#152038] bg-slate-50/50 dark:bg-[#070d18]">
               <button
                 onClick={handleSignOut}
-                className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors text-left"
+                className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
               >
-                <LogOut className="w-4 h-4 text-red-500 dark:text-red-400" />
+                <LogOut className="w-4 h-4 text-slate-400 hover:text-red-500" />
                 <span>Sign Out</span>
               </button>
             </div>
@@ -531,12 +551,12 @@ export function DashboardLayout({
       {/* TOP HEADER (Fixed) */}
       <header className={`fixed top-0 left-0 ${
         isCollapsed ? 'lg:left-20' : 'lg:left-64'
-      } right-0 h-14 bg-white dark:bg-[#090f1d] border-b border-slate-200/80 dark:border-[#152038] shadow-xs dark:shadow-[0_1px_4px_rgba(0,0,0,0.2)] z-40 flex items-center justify-between px-4 lg:px-6 transition-all duration-200 ease-in-out`}>
+      } right-0 h-14 bg-gradient-to-r from-[#003882] via-[#004ca3] to-[#0058be] dark:from-[#002860] dark:via-[#003b82] dark:to-[#004ca3] border-b border-[#002f6c] dark:border-[#001f4d] shadow-sm z-40 flex items-center justify-between px-4 lg:px-6 transition-all duration-200 ease-in-out text-white`}>
         <div className="flex items-center gap-3 flex-1 max-w-2xl">
           {/* Mobile Drawer Trigger */}
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 lg:hidden"
+            className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 lg:hidden"
             aria-label="Open navigation menu"
           >
             <Menu className="w-5 h-5" />
@@ -545,7 +565,7 @@ export function DashboardLayout({
           {/* Desktop Toggle Button in Top Header */}
           <button
             onClick={toggleSidebar}
-            className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 hidden lg:flex items-center justify-center transition-colors"
+            className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 hidden lg:flex items-center justify-center transition-colors"
             title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
             aria-label={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           >
@@ -553,29 +573,29 @@ export function DashboardLayout({
           </button>
 
           {/* Hub Location Dropdown */}
-          <div className="relative flex items-center bg-slate-100 dark:bg-[#10192e] rounded-lg px-2.5 py-1 text-xs border border-slate-200 dark:border-[#1f2d4e] hidden sm:flex text-slate-700 dark:text-slate-200">
-            <MapPin className="w-3.5 h-3.5 text-[#0058be] dark:text-[#3b82f6] mr-1.5" />
+          <div className="relative flex items-center bg-white/15 hover:bg-white/20 rounded-lg px-2.5 py-1 text-xs border border-white/25 hidden sm:flex text-white backdrop-blur-xs transition-colors">
+            <MapPin className="w-3.5 h-3.5 text-sky-200 mr-1.5" />
             <select
               value={selectedHub}
               onChange={(e) => setSelectedHub(e.target.value)}
-              className="bg-transparent font-semibold text-xs text-[#0b1c30] dark:text-white focus:outline-none cursor-pointer pr-1"
+              className="bg-transparent font-semibold text-xs text-white focus:outline-none cursor-pointer pr-1"
             >
-              <option value="all" className="bg-white dark:bg-[#090f1d] text-[#0b1c30] dark:text-white">All Hubs (Karnataka)</option>
-              <option value="bel" className="bg-white dark:bg-[#090f1d] text-[#0b1c30] dark:text-white">Belagavi Flagship (BEL-01)</option>
-              <option value="dav" className="bg-white dark:bg-[#090f1d] text-[#0b1c30] dark:text-white">Davanagere Hub (DAV-02)</option>
-              <option value="shi" className="bg-white dark:bg-[#090f1d] text-[#0b1c30] dark:text-white">Shivamogga Hub (SHI-03)</option>
+              <option value="all" className="bg-[#09152b] text-white">All Hubs (Karnataka)</option>
+              <option value="bel" className="bg-[#09152b] text-white">Belagavi Flagship (BEL-01)</option>
+              <option value="dav" className="bg-[#09152b] text-white">Davanagere Hub (DAV-02)</option>
+              <option value="shi" className="bg-[#09152b] text-white">Shivamogga Hub (SHI-03)</option>
             </select>
           </div>
 
           {/* Global Search Bar */}
-          <div className="relative flex-1 flex items-center bg-slate-100 dark:bg-[#10192e] rounded-lg border border-slate-200 dark:border-[#1f2d4e] shadow-xs px-3 py-1">
-            <Search className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" />
+          <div className="relative flex-1 flex items-center bg-white/15 focus-within:bg-white/25 focus-within:border-white/40 rounded-lg border border-white/25 shadow-inner px-3 py-1 transition-all">
+            <Search className="w-3.5 h-3.5 text-sky-200 mr-2 shrink-0" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by ID (e.g. BSC-4029), Name, Dept..."
-              className="w-full bg-transparent text-xs text-[#0b1c30] dark:text-white placeholder:text-slate-400 focus:outline-none"
+              className="w-full bg-transparent text-xs text-white placeholder:text-white/65 focus:outline-none"
             />
           </div>
         </div>
@@ -585,10 +605,10 @@ export function DashboardLayout({
           {/* Real-time Clock */}
           <div className="hidden md:flex flex-col text-right pr-2">
             <div className="flex items-center gap-1.5 justify-end">
-              <Clock className="w-3.5 h-3.5 text-[#0058be] dark:text-[#3b82f6]" />
-              <span className="text-xs font-semibold text-[#0b1c30] dark:text-white font-mono">{currentTime || '19:16:52 IST'}</span>
+              <Clock className="w-3.5 h-3.5 text-sky-200" />
+              <span className="text-xs font-semibold text-white font-mono">{currentTime || '19:16:52 IST'}</span>
             </div>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+            <span className="text-[10px] text-sky-200 font-medium">
               Today • {activeShiftLabel || 'Shift A'}
             </span>
           </div>
@@ -606,13 +626,13 @@ export function DashboardLayout({
                   fetchNotifications({ limit: 10 });
                 }
               }}
-              className="relative flex items-center justify-center p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer border border-transparent"
+              className="relative flex items-center justify-center p-2 rounded-lg text-white/85 hover:text-white hover:bg-white/10 transition-colors cursor-pointer border border-transparent"
               title="Notifications & System Alerts"
               aria-label="Notifications"
             >
-              <Bell className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+              <Bell className="w-4 h-4 text-white" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-bold shadow-xs">
+                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold shadow-xs ring-2 ring-[#004ca3]">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
@@ -700,24 +720,24 @@ export function DashboardLayout({
           </div>
 
           {/* User Profile Capsule with Interactive Dropdown */}
-          <div className="relative pl-2 border-l border-slate-200 dark:border-[#1f2d4e]">
+          <div className="relative pl-2 border-l border-white/20">
             <button
               onClick={() => {
                 setProfileMenuOpen(!profileMenuOpen);
                 setNotificationsOpen(false);
               }}
-              className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer text-left"
+              className="flex items-center gap-2 p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer text-left"
               title="User Account & Profile"
               aria-label="User Account"
             >
               <div className="hidden sm:flex flex-col text-right">
-                <span className="text-xs font-bold text-[#0b1c30] dark:text-white leading-none">{userName}</span>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400 mt-0.5">{userRole}</span>
+                <span className="text-xs font-bold text-white leading-none">{userName}</span>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-sky-200 mt-0.5">{userRole}</span>
               </div>
-              <div className="w-8 h-8 rounded-full bg-[#0058be] text-white flex items-center justify-center font-bold text-xs shadow-xs">
+              <div className="w-8 h-8 rounded-full bg-white text-[#004ca3] flex items-center justify-center font-bold text-xs shadow-xs ring-1 ring-white/30">
                 {userName.split(' ').map((n: string) => n[0]).join('').slice(0, 2) || 'SA'}
               </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
+              <ChevronDown className="w-3.5 h-3.5 text-white/70 hidden sm:block" />
             </button>
 
             {/* Profile Menu Dropdown */}

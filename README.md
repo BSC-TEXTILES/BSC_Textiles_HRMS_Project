@@ -21,13 +21,42 @@ Weaving Dreams, Building Futures
 ---
 
 ### 📚 Authoritative Architecture & Technical Documentation
-- 🏛️ **[System Architecture & Design (ARCHITECTURE.md)](ARCHITECTURE.md)**
-- ⚙️ **[Technical Stack & Specifications (TECHNICAL_REQUIREMENTS.md)](TECHNICAL_REQUIREMENTS.md)**
-- 🔌 **[API Documentation & Contracts (API_DOCUMENTATION.md)](API_DOCUMENTATION.md)**
-- 📋 **[Changelog & Release Notes (CHANGELOG.md)](CHANGELOG.md)**
-- 📝 **[Project Change Memory (docs/change-memory/)](docs/change-memory/)**
+- 🖥️ **[Standalone Desktop Architecture (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md)**
+- 💽 **[Local SQLite Database Guide (docs/LOCAL_DATABASE.md)](docs/LOCAL_DATABASE.md)**
+- 📦 **[Windows Installation & Setup Guide (docs/INSTALLATION.md)](docs/INSTALLATION.md)**
+- ✈️ **[Complete Offline Mode Guide (docs/OFFLINE_MODE.md)](docs/OFFLINE_MODE.md)**
+- 🔄 **[Backup, Restore & Migration Guide (docs/BACKUP_RESTORE.md)](docs/BACKUP_RESTORE.md)**
+- 🛡️ **[Desktop Security Architecture (docs/SECURITY.md)](docs/SECURITY.md)**
+- 🧪 **[QA & Offline Test Report (docs/TESTING.md)](docs/TESTING.md)**
+- 📋 **[Release Changelog (docs/CHANGELOG.md)](docs/CHANGELOG.md)**
+- 🧠 **[Project Memory & Architectural Ledger (docs/PROJECT_MEMORY.md)](docs/PROJECT_MEMORY.md)**
 
 ---
+
+## 🖥️ Single-Computer Standalone Desktop Edition
+
+BSC Textiles HRMS is packaged as a **100% offline, standalone Windows desktop application** running on a single computer or laptop without requiring internet connectivity, cloud servers, or an external database.
+
+* **Target OS:** Windows 10 / Windows 11 (64-bit)
+* **Installer Executable:** `release/BSC-Textiles-Setup-1.0.0.exe`
+* **Local Database:** Embedded **SQLite 3 (WAL mode)** stored persistently at `%APPDATA%\BSCTextiles\data\bsc_textiles.db`
+* **Desktop Shell:** Electron with context isolation, native window frames, Start Menu & Desktop shortcuts
+* **Zero Post-Install Dependencies:** Runs directly upon installation with zero command line, VS Code, or dev tools required.
+
+### Desktop Commands
+```powershell
+# Run desktop app in development
+npm run dev:desktop
+
+# Package unpacked desktop executable
+npm run build:desktop
+
+# Compile distributable Windows NSIS installer
+npm run package:installer
+
+# One-click data migration from MySQL to SQLite
+npm run db:migrate-to-sqlite
+```
 
 ## Table of Contents
 

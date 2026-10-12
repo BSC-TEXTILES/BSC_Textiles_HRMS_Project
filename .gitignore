@@ -5,9 +5,14 @@ node_modules/
 
 # Build outputs
 dist/
+dist-*/
 build/
+release/
 .next/
 out/
+database/sqlite/*.db
+database/sqlite/backups/
+*.pdf
 
 # Environment files
 .env

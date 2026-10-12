@@ -7,26 +7,45 @@ import mysql, { Pool, PoolConnection } from 'mysql2/promise';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { sqlitePool } from './sqliteDb.js';
 
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 dotenv.config();
 
 const connectionUri = process.env.DATABASE_URL || 'mysql://root@localhost:3306/bsc_textiles_hrms';
+const dbType = (process.env.DB_TYPE || '').trim().toLowerCase();
 
-export const pool: Pool = mysql.createPool({
-  uri: connectionUri,
-  waitForConnections: true,
-  connectionLimit: 25,
-  maxIdle: 10,
-  idleTimeout: 60000,
-  queueLimit: 0,
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 10000,
-  decimalNumbers: true,
-  dateStrings: false,
-  timezone: '+05:30',
-  multipleStatements: true,
-});
+// MySQL is the primary datastore. SQLite is opt-in for the offline/desktop build
+// (DB_TYPE=sqlite or a file-based DATABASE_URL) — never an accidental fallback.
+const isMysql =
+  dbType === 'mysql'
+    ? true
+    : dbType === 'sqlite'
+      ? false
+      : !(/^file:/i.test(connectionUri) || /\.db$/i.test(connectionUri));
+
+console.log(
+  `[Database] Engine: ${isMysql ? 'MySQL' : 'SQLite'} (DB_TYPE=${dbType || '<unset>'}, DATABASE_URL=${isMysql ? connectionUri.replace(/\/\/[^@]*@/, '//***@') : 'file-based'})`
+);
+
+export const mysqlPool: Pool = isMysql
+  ? mysql.createPool({
+      uri: connectionUri,
+      waitForConnections: true,
+      connectionLimit: 25,
+      maxIdle: 10,
+      idleTimeout: 60000,
+      queueLimit: 0,
+      enableKeepAlive: true,
+      keepAliveInitialDelay: 10000,
+      decimalNumbers: true,
+      dateStrings: false,
+      timezone: '+05:30',
+      multipleStatements: true,
+    })
+  : (null as unknown as Pool);
+
+export const pool: Pool = isMysql ? mysqlPool : (sqlitePool as unknown as Pool);
 
 export class Decimal {
   private value: number;
@@ -689,6 +708,14 @@ async function getTableColumns(tableName: string, client: any): Promise<Set<stri
     return tableColumnsCache.get(tableName)!;
   }
   try {
+    if (!isMysql) {
+      const [cols]: any = await client.query(`PRAGMA table_info(\`${tableName}\`)`);
+      const set = new Set<string>((cols || []).map((c: any) => String(c.name)));
+      if (set.size > 0) {
+        tableColumnsCache.set(tableName, set);
+      }
+      return set;
+    }
     const [cols]: any = await client.query(
       `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?`,
       [tableName]

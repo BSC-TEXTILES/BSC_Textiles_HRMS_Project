@@ -1,0 +1,21 @@
+{
+  "name": "bsc-textiles-hrms-desktop",
+  "version": "1.0.0",
+  "description": "BSC Textiles HRMS — Standalone Single-Computer Offline Desktop Application",
+  "main": "dist/main.js",
+  "author": "BSC Textiles Pvt Ltd",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p .",
+    "dev": "tsc -p . && electron dist/main.js",
+    "start": "electron dist/main.js",
+    "dist": "tsc -p . && electron-builder --win nsis",
+    "pack": "tsc -p . && electron-builder --dir"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "electron": "44.7.0",
+    "electron-builder": "^26.17.0",
+    "typescript": "^5.3.3"
+  }
+}

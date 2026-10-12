@@ -1,44 +1,81 @@
 import PDFDocument from 'pdfkit';
 
+export interface PayslipItemDetail {
+  label: string;
+  amount: number;
+}
+
 export interface PayslipPdfData {
   id: string;
   employeeCode: string;
   fullName: string;
-  designation: string;
-  departmentName: string;
-  locationName: string;
+  designation?: string;
+  departmentName?: string;
+  locationName?: string;
   pan?: string;
   uan?: string;
-  bankAccount?: string;
+  pfNo?: string;
+  esiNo?: string;
+  uanNo?: string;
   bankName?: string;
-  bankIfsc?: string;
+  bankAccount?: string;
+  maskBankAccount?: boolean;
+  salesmanNo?: string;
+  section?: string;
+  shift?: string;
+  batch?: string;
+  locationCode?: string;
   periodStart: string | Date;
   periodEnd: string | Date;
+  salaryMonth?: string;
+  salaryYear?: number | string;
+  pfPay?: number;
+  hra?: number;
+  fixedGrossSalary?: number;
+  perDaySalary?: number;
+  daysPayable?: number;
+  paidHolidays?: number;
+  paidLeaves?: number;
   basicSalary: number;
-  hra: number;
-  allowances: number;
-  earlyIncentive: number;
-  attendanceIncentive: number;
-  salesIncentive: number;
-  overtime: number;
-  bonus: number;
-  deductions: number;
-  pfDeduction: number;
-  taxDeduction: number;
-  lopDeduction: number;
-  penalties: number;
+  allowances?: number;
+  earlyIncentive?: number;
+  attendanceIncentive?: number;
+  salesIncentive?: number;
+  overtime?: number;
+  bonus?: number;
+  deductions?: number;
+  pfDeduction?: number;
+  taxDeduction?: number;
+  lopDeduction?: number;
+  penalties?: number;
   netPay: number;
   status: string;
+  // Specific line items
+  earningsList?: PayslipItemDetail[];
+  deductionsList?: PayslipItemDetail[];
+  grossSalary?: number;
+  grossDeductions?: number;
+  totalPayable?: number;
+  salaryAdvance?: number;
+  loanAdvance?: number;
+  netPayable?: number;
+  employeePf?: number;
+  employeeEsi?: number;
+  employerPf?: number;
+  employerEsi?: number;
+  ctc?: number;
   customSections?: Array<{
     title: string;
     items: Array<{ label: string; amount: number; type: 'earning' | 'deduction' | 'info' }>;
   }>;
   remarks?: string;
+  templateStyle?: 'AUTHENTIC_BSC' | 'MODERN_EXECUTIVE';
 }
 
 export interface PayrollSettingsData {
   companyName?: string;
   companyAddress?: string;
+  branchAddress?: string;
   signatoryName?: string;
   signatoryDesignation?: string;
   currencySymbol?: string;
@@ -80,185 +117,342 @@ function numberToWordsINR(amount: number): string {
   return words.trim() + ' Rupees Only';
 }
 
+function maskAcc(acc?: string, mask: boolean = true): string {
+  if (!acc) return 'N/A';
+  if (!mask) return acc;
+  if (acc.length <= 4) return acc;
+  const last4 = acc.slice(-4);
+  return 'X'.repeat(Math.max(4, acc.length - 4)) + last4;
+}
+
+function fmtVal(val: number | undefined | null): string {
+  if (val === undefined || val === null || isNaN(Number(val))) return '.00';
+  const num = Number(val);
+  return num.toFixed(2);
+}
+
 export async function generatePayslipPdf(data: PayslipPdfData, settings?: PayrollSettingsData): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     try {
-      const doc = new PDFDocument({ margin: 36, size: 'A4' });
+      // Standard A4 portrait: 595.28 x 841.89 pt
+      const doc = new PDFDocument({ margin: 30, size: 'A4' });
       const buffers: Buffer[] = [];
 
       doc.on('data', (chunk) => buffers.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(buffers)));
       doc.on('error', (err) => reject(err));
 
-      const companyName = settings?.companyName || 'BSC Textiles Private Limited';
-      const companyAddress = settings?.companyAddress || '#104 Silk Mill Road, Industrial Area, Belagavi, Karnataka – 590014\nGSTIN: 29AAACB1234F1Z5 | TAN: BLRB12345C';
-      const signatory = settings?.signatoryName || 'Sunita Deshmukh';
-      const signatoryRole = settings?.signatoryDesignation || 'Head of Human Resources & Statutory Labor Compliance';
+      const companyName = settings?.companyName || 'BSC TEXTILES PVT LTD.,';
+      const companyAddress = settings?.companyAddress || 'DENTAL COLLEGE ROAD,, DAVANGERE - 577004';
+      
+      const pEndDate = new Date(data.periodEnd);
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthStr = data.salaryMonth || (isNaN(pEndDate.getTime()) ? 'Aug' : monthNames[pEndDate.getMonth()]);
+      const yearStr = data.salaryYear || (isNaN(pEndDate.getTime()) ? 2026 : pEndDate.getFullYear());
+      const periodTitle = `salary for the Month of ${monthStr}-${yearStr}`;
 
-      const formatCurrency = (val: number) => `INR ${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const leftX = 35;
+      const rightX = 560;
+      const boxWidth = rightX - leftX; // 525 pt
 
-      const pStart = new Date(data.periodStart).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-      const pEnd = new Date(data.periodEnd).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-      const payMonth = new Date(data.periodEnd).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+      // Function to draw dashed border box
+      const drawDashedBox = (yTop: number, height: number) => {
+        doc.save();
+        doc.lineWidth(0.7);
+        doc.dash(3, { space: 2 });
+        doc.strokeColor('#222222');
+        doc.rect(leftX, yTop, boxWidth, height).stroke();
+        doc.restore();
+      };
 
-      // --- HEADER ---
-      doc.rect(36, 36, 523, 70).fill('#0b1c30');
-      doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold').text(companyName, 48, 48);
-      doc.fillColor('#94a3b8').fontSize(8).font('Helvetica').text(companyAddress, 48, 68, { width: 340, lineGap: 2 });
+      // Function to draw dashed horizontal line
+      const drawDashedHLine = (yPos: number, xStart = leftX, xEnd = rightX) => {
+        doc.save();
+        doc.lineWidth(0.7);
+        doc.dash(3, { space: 2 });
+        doc.strokeColor('#222222');
+        doc.moveTo(xStart, yPos).lineTo(xEnd, yPos).stroke();
+        doc.restore();
+      };
 
-      doc.fillColor('#60a5fa').fontSize(11).font('Helvetica-Bold').text('PAYSLIP / FORM T', 420, 48, { align: 'right', width: 125 });
-      doc.fillColor('#ffffff').fontSize(9).font('Helvetica').text(payMonth, 420, 64, { align: 'right', width: 125 });
-      doc.fillColor(data.status === 'APPROVED' || data.status === 'FINALIZED' ? '#34d399' : '#fbbf24')
-        .fontSize(8)
-        .font('Helvetica-Bold')
-        .text(`[ STATUS: ${data.status} ]`, 420, 80, { align: 'right', width: 125 });
+      // Function to draw dashed vertical line
+      const drawDashedVLine = (xPos: number, yStart: number, yEnd: number) => {
+        doc.save();
+        doc.lineWidth(0.7);
+        doc.dash(3, { space: 2 });
+        doc.strokeColor('#222222');
+        doc.moveTo(xPos, yStart).lineTo(xPos, yEnd).stroke();
+        doc.restore();
+      };
 
-      doc.y = 118;
+      // Set monospaced font
+      doc.font('Courier');
+      doc.fontSize(9.5);
+      doc.fillColor('#000000');
 
-      // --- EMPLOYEE PARTICULARS BOX ---
-      doc.rect(36, doc.y, 523, 76).strokeColor('#cbd5e1').lineWidth(1).stroke();
-      const metaY = doc.y + 8;
+      let curY = 40;
 
-      // Col 1
-      doc.fillColor('#64748b').fontSize(8).font('Helvetica').text('Employee Code:', 48, metaY);
-      doc.fillColor('#0f172a').font('Helvetica-Bold').text(data.employeeCode, 120, metaY);
-      doc.fillColor('#64748b').font('Helvetica').text('Employee Name:', 48, metaY + 14);
-      doc.fillColor('#0f172a').font('Helvetica-Bold').text(data.fullName, 120, metaY + 14);
-      doc.fillColor('#64748b').font('Helvetica').text('Designation:', 48, metaY + 28);
-      doc.fillColor('#0f172a').font('Helvetica-Bold').text(data.designation, 120, metaY + 28);
-      doc.fillColor('#64748b').font('Helvetica').text('Department:', 48, metaY + 42);
-      doc.fillColor('#0f172a').font('Helvetica').text(data.departmentName || 'Atelier', 120, metaY + 42);
+      // -------------------------------------------------------------
+      // 1. COMPANY HEADER BOX (DASHED)
+      // -------------------------------------------------------------
+      const headerHeight = 52;
+      drawDashedBox(curY, headerHeight);
 
-      // Col 2
-      doc.fillColor('#64748b').font('Helvetica').text('Location/Hub:', 300, metaY);
-      doc.fillColor('#0f172a').font('Helvetica-Bold').text(data.locationName || 'Belagavi Flagship', 370, metaY);
-      doc.fillColor('#64748b').font('Helvetica').text('Bank Account:', 300, metaY + 14);
-      doc.fillColor('#0f172a').font('Helvetica').text(data.bankAccount ? `•••• ${data.bankAccount.slice(-4)}` : 'On File', 370, metaY + 14);
-      doc.fillColor('#64748b').font('Helvetica').text('PAN Number:', 300, metaY + 28);
-      doc.fillColor('#0f172a').font('Helvetica').text(data.pan || 'On File', 370, metaY + 28);
-      doc.fillColor('#64748b').font('Helvetica').text('Pay Period:', 300, metaY + 42);
-      doc.fillColor('#0f172a').font('Helvetica').text(`${pStart} – ${pEnd}`, 370, metaY + 42);
-
-      doc.y = 206;
-
-      // --- EARNINGS & DEDUCTIONS TABLES ---
-      const tableTop = doc.y;
-      const colWidth = 256;
-      const leftColX = 36;
-      const rightColX = 303;
-
-      // Header Boxes
-      doc.rect(leftColX, tableTop, colWidth, 20).fill('#0058be');
-      doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold').text('EARNINGS & ALLOWANCES', leftColX + 10, tableTop + 5);
-      doc.text('AMOUNT', leftColX + colWidth - 70, tableTop + 5, { width: 60, align: 'right' });
-
-      doc.rect(rightColX, tableTop, colWidth, 20).fill('#be123c');
-      doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold').text('STATUTORY DEDUCTIONS', rightColX + 10, tableTop + 5);
-      doc.text('AMOUNT', rightColX + colWidth - 70, tableTop + 5, { width: 60, align: 'right' });
-
-      let leftY = tableTop + 24;
-      let rightY = tableTop + 24;
-
-      // Earnings items
-      const earningsList: Array<{ label: string; amount: number }> = [
-        { label: 'Basic Salary (Karnataka Form T)', amount: Number(data.basicSalary || 0) },
-        { label: 'House Rent Allowance (HRA 40%)', amount: Number(data.hra || (data.basicSalary * 0.4)) },
-        { label: 'Special & Conveyance Allowances', amount: Number(data.allowances || 2500) },
-        { label: 'Early Login Adherence Bonus', amount: Number(data.earlyIncentive || 0) },
-        { label: 'Full Attendance Bonus (100%)', amount: Number(data.attendanceIncentive || 0) },
-        { label: 'Sales & Target Commissions', amount: Number(data.salesIncentive || 0) },
-        { label: 'Approved Overtime (OT 2x)', amount: Number(data.overtime || 0) },
-      ];
-      if (Number(data.bonus) > 0) earningsList.push({ label: 'Festival / Performance Bonus', amount: Number(data.bonus) });
-
-      earningsList.forEach((e) => {
-        doc.fillColor('#334155').fontSize(8.5).font('Helvetica').text(e.label, leftColX + 8, leftY);
-        doc.fillColor('#0f172a').font('Helvetica-Bold').text(formatCurrency(e.amount), leftColX + colWidth - 85, leftY, { width: 75, align: 'right' });
-        doc.rect(leftColX, leftY + 12, colWidth, 0.5).strokeColor('#e2e8f0').stroke();
-        leftY += 16;
+      doc.font('Courier-Bold').fontSize(10).text(companyName, leftX, curY + 8, {
+        width: boxWidth,
+        align: 'center',
+      });
+      doc.font('Courier').fontSize(8.5).text(companyAddress, leftX, curY + 22, {
+        width: boxWidth,
+        align: 'center',
+      });
+      doc.font('Courier-Bold').fontSize(9).text(periodTitle, leftX, curY + 36, {
+        width: boxWidth,
+        align: 'center',
       });
 
-      // Deductions items
-      const pfEst = Number(data.pfDeduction || Math.round(Number(data.basicSalary || 0) * 0.12));
-      const ptEst = 200;
-      const taxEst = Number(data.taxDeduction || 0);
-      const penEst = Number(data.penalties || 0);
-      const lopEst = Number(data.lopDeduction || 0);
+      curY += headerHeight + 6;
 
-      const deductionsList: Array<{ label: string; amount: number }> = [
-        { label: 'Provident Fund (EPF 12%)', amount: pfEst },
-        { label: 'Professional Tax (Karnataka PT)', amount: ptEst },
-        { label: 'Income Tax TDS (Sec 192)', amount: taxEst },
-        { label: 'Biometric Late Arrival Penalties', amount: penEst },
-        { label: 'Loss of Pay / Unapproved Leaves', amount: lopEst },
+      // -------------------------------------------------------------
+      // 2. EMPLOYEE & PAYROLL DETAILS BOX
+      // -------------------------------------------------------------
+      const empBoxTop = curY;
+      const empBoxHeight = 152;
+      drawDashedBox(empBoxTop, empBoxHeight);
+
+      const col1LabelX = leftX + 8;
+      const col1ValX = leftX + 110;
+      const col2LabelX = leftX + 270;
+      const col2ValX = leftX + 380;
+
+      let lineY = empBoxTop + 8;
+      const rowGap = 13.5;
+
+      // Row 1: NAME
+      doc.font('Courier-Bold').fontSize(8.5);
+      doc.text('NAME', col1LabelX, lineY);
+      doc.font('Courier').text(`: ${data.fullName?.toUpperCase() || 'N/A'}`, col1ValX - 10, lineY);
+      lineY += rowGap;
+
+      // Row 2: PF NO | ESI NO
+      doc.font('Courier-Bold').text('PF NO', col1LabelX, lineY);
+      doc.font('Courier').text(`: ${data.pfNo || 'N/A'}`, col1ValX - 10, lineY);
+      doc.font('Courier-Bold').text('ESI NO', col2LabelX, lineY);
+      doc.font('Courier').text(`: ${data.esiNo || 'N/A'}`, col2ValX - 10, lineY);
+      lineY += rowGap;
+
+      // Row 3: EMP.NO | UAN NO
+      doc.font('Courier-Bold').text('EMP.NO', col1LabelX, lineY);
+      doc.font('Courier').text(`: ${data.employeeCode || 'N/A'}`, col1ValX - 10, lineY);
+      doc.font('Courier-Bold').text('UAN NO', col2LabelX, lineY);
+      doc.font('Courier').text(`: ${data.uanNo || data.uan || 'N/A'}`, col2ValX - 10, lineY);
+      lineY += rowGap;
+
+      // Row 4: BANK NAME | ACCOUNT
+      doc.font('Courier-Bold').text('BANK NAME', col1LabelX, lineY);
+      doc.font('Courier').text(`: ${data.bankName || 'N/A'}`, col1ValX - 10, lineY);
+      doc.font('Courier-Bold').text('ACCOUNT', col2LabelX, lineY);
+      const displayAcc = data.maskBankAccount !== false ? maskAcc(data.bankAccount, true) : (data.bankAccount || 'N/A');
+      doc.font('Courier').text(`: ${displayAcc}`, col2ValX - 10, lineY);
+      lineY += rowGap;
+
+      // Row 5: SALESMAN NO
+      doc.font('Courier-Bold').text('SALESMAN NO', col1LabelX, lineY);
+      doc.font('Courier').text(`: ${data.salesmanNo || data.employeeCode || 'N/A'}`, col1ValX - 10, lineY);
+      lineY += rowGap;
+
+      // Row 6: SECTION | LOCATION
+      doc.font('Courier-Bold').text('SECTION', col1LabelX, lineY);
+      doc.font('Courier').text(`: ${data.section || data.departmentName || 'KIDS'}`, col1ValX - 10, lineY);
+      doc.font('Courier-Bold').text('LOCATION', col2LabelX, lineY);
+      doc.font('Courier').text(`: ${data.locationCode || 'BSCTEX'}`, col2ValX - 10, lineY);
+      lineY += rowGap;
+
+      // Row 7: SHIFT | BATCH
+      doc.font('Courier-Bold').text('SHIFT', col1LabelX, lineY);
+      doc.font('Courier').text(`: ${data.shift || 'SHIFT II'}`, col1ValX - 10, lineY);
+      doc.font('Courier-Bold').text('BATCH', col2LabelX, lineY);
+      doc.font('Courier').text(`: ${data.batch || data.shift || 'SHIFT II'}`, col2ValX - 10, lineY);
+      lineY += rowGap;
+
+      // Row 8: PF PAY | PER DAY SALARY
+      const pfPayVal = data.pfPay !== undefined ? data.pfPay : (data.basicSalary || 12000);
+      doc.font('Courier-Bold').text('PF PAY', col1LabelX, lineY);
+      doc.font('Courier').text(`: ${fmtVal(pfPayVal)}`, col1ValX - 10, lineY);
+      doc.font('Courier-Bold').text('PER DAY SALARY', col2LabelX, lineY);
+      doc.font('Courier').text(`: ${fmtVal(data.perDaySalary)}`, col2ValX - 10, lineY);
+      lineY += rowGap;
+
+      // Row 9: HRA | DAYS PAYABLE
+      doc.font('Courier-Bold').text('HRA', col1LabelX, lineY);
+      doc.font('Courier').text(`: ${fmtVal(data.hra)}`, col1ValX - 10, lineY);
+      doc.font('Courier-Bold').text('DAYS PAYABLE', col2LabelX, lineY);
+      doc.font('Courier').text(`: ${fmtVal(data.daysPayable || 31)}`, col2ValX - 10, lineY);
+      lineY += rowGap;
+
+      // Row 10: GROSS SALARY (Structure)
+      doc.font('Courier-Bold').text('GROSS SALARY', col1LabelX, lineY);
+      doc.font('Courier').text(`: ${fmtVal(data.fixedGrossSalary || (Number(data.basicSalary || 0) + Number(data.hra || 0)))}`, col1ValX - 10, lineY);
+
+      curY += empBoxHeight + 6;
+
+      // -------------------------------------------------------------
+      // 3. EARNINGS & DEDUCTIONS DUAL TABLE
+      // -------------------------------------------------------------
+      const tblTop = curY;
+      const midX = leftX + (boxWidth / 2); // 297.5 pt
+
+      // Earnings & Deductions items
+      const earnings = data.earningsList && data.earningsList.length > 0 ? data.earningsList : [
+        { label: 'BASIC PAY', amount: Number(data.basicSalary || 12000) },
+        { label: 'HRA', amount: Number(data.hra || 4000) },
+        { label: 'OT', amount: Number(data.overtime || 0) },
+        { label: 'GOVT.HOLIDAY', amount: Number((data as any).govtHolidayPay || 0) },
+      ].filter(e => e.amount > 0 || e.label === 'BASIC PAY' || e.label === 'HRA');
+
+      const deductions = data.deductionsList && data.deductionsList.length > 0 ? data.deductionsList : [
+        { label: 'EMPLOYEE PF', amount: Number(data.pfDeduction || data.employeePf || 1440) },
+        { label: 'EMPLOYEE ESI', amount: Number(data.employeeEsi || (Number(data.grossSalary || 0) * 0.0075) || 153) },
+        { label: 'PROF TAX', amount: Number((data as any).profTax || 0) },
       ];
 
-      deductionsList.forEach((d) => {
-        doc.fillColor('#334155').fontSize(8.5).font('Helvetica').text(d.label, rightColX + 8, rightY);
-        doc.fillColor('#0f172a').font('Helvetica-Bold').text(formatCurrency(d.amount), rightColX + colWidth - 85, rightY, { width: 75, align: 'right' });
-        doc.rect(rightColX, rightY + 12, colWidth, 0.5).strokeColor('#e2e8f0').stroke();
-        rightY += 16;
-      });
+      const maxRows = Math.max(earnings.length, deductions.length, 4);
+      const rowH = 14;
+      const headerH = 18;
+      const subTotalH = 18;
+      const totalPayableH = 26;
+      const netPayableH = 18;
+      const mainTableHeight = headerH + (maxRows * rowH) + subTotalH + totalPayableH + netPayableH;
 
-      const maxY = Math.max(leftY, rightY) + 4;
-      const totalGross = earningsList.reduce((acc, curr) => acc + curr.amount, 0);
-      const totalDeductions = deductionsList.reduce((acc, curr) => acc + curr.amount, 0);
-      const calculatedNetPay = Math.max(0, totalGross - totalDeductions);
+      drawDashedBox(tblTop, mainTableHeight);
+      drawDashedVLine(midX, tblTop, tblTop + mainTableHeight);
 
-      // Totals Strip
-      doc.rect(leftColX, maxY, colWidth, 20).fill('#f1f5f9');
-      doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold').text('GROSS EARNINGS (A)', leftColX + 8, maxY + 5);
-      doc.text(formatCurrency(totalGross), leftColX + colWidth - 85, maxY + 5, { width: 75, align: 'right' });
+      // Table Header
+      drawDashedHLine(tblTop + headerH);
+      doc.font('Courier-Bold').fontSize(8.5);
+      doc.text('EARNINGS', leftX + 8, tblTop + 5);
+      doc.text('CURRENT MONTH', midX - 95, tblTop + 5, { width: 90, align: 'right' });
 
-      doc.rect(rightColX, maxY, colWidth, 20).fill('#f1f5f9');
-      doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold').text('TOTAL DEDUCTIONS (B)', rightColX + 8, maxY + 5);
-      doc.text(formatCurrency(totalDeductions), rightColX + colWidth - 85, maxY + 5, { width: 75, align: 'right' });
+      doc.text('DEDUCTIONS', midX + 8, tblTop + 5);
+      doc.text('CURRENT MONTH', rightX - 95, tblTop + 5, { width: 90, align: 'right' });
 
-      doc.y = maxY + 28;
+      // Rows
+      let rY = tblTop + headerH + 3;
+      for (let i = 0; i < maxRows; i++) {
+        const e = earnings[i];
+        const d = deductions[i];
 
-      // --- CUSTOM SECTIONS (HR ADDED DYNAMIC BLOCKS) ---
-      if (data.customSections && Array.isArray(data.customSections) && data.customSections.length > 0) {
-        data.customSections.forEach((sec) => {
-          doc.rect(36, doc.y, 523, 18).fill('#f8fafc').strokeColor('#cbd5e1').stroke();
-          doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold').text(sec.title.toUpperCase(), 44, doc.y + 4);
-          doc.y += 22;
+        if (e) {
+          doc.font('Courier-Bold').text(e.label, leftX + 8, rY);
+          doc.font('Courier').text(':', leftX + 115, rY);
+          doc.text(fmtVal(e.amount), midX - 95, rY, { width: 90, align: 'right' });
+        }
 
-          sec.items.forEach((item) => {
-            doc.fillColor('#475569').fontSize(8).font('Helvetica').text(`• ${item.label}`, 48, doc.y);
-            doc.fillColor('#0f172a').font('Helvetica-Bold').text(formatCurrency(item.amount), 450, doc.y, { width: 100, align: 'right' });
-            doc.y += 14;
-          });
-          doc.y += 4;
-        });
+        if (d) {
+          doc.font('Courier-Bold').text(d.label, midX + 8, rY);
+          doc.font('Courier').text(':', midX + 115, rY);
+          doc.text(fmtVal(d.amount), rightX - 95, rY, { width: 90, align: 'right' });
+        }
+
+        rY += rowH;
       }
 
-      // --- NET TAKE HOME SALARY BOX ---
-      const netBoxY = Math.max(doc.y + 6, 430);
-      doc.rect(36, netBoxY, 523, 44).fill('#022c22').strokeColor('#059669').lineWidth(1.5).stroke();
-      doc.fillColor('#34d399').fontSize(10).font('Helvetica-Bold').text('NET TAKE-HOME PAY (A - B):', 48, netBoxY + 10);
-      doc.fillColor('#ffffff').fontSize(14).font('Helvetica-Bold').text(formatCurrency(calculatedNetPay), 360, netBoxY + 8, { width: 190, align: 'right' });
-      doc.fillColor('#94a3b8').fontSize(7.5).font('Helvetica').text(`In Words: ${numberToWordsINR(calculatedNetPay)}`, 48, netBoxY + 26);
+      // Sub-Totals Strip
+      const subTotalY = tblTop + headerH + (maxRows * rowH);
+      drawDashedHLine(subTotalY);
+      drawDashedHLine(subTotalY + subTotalH);
 
-      // --- REMARKS (IF ANY) ---
+      const totalGrossEarn = data.grossSalary !== undefined ? data.grossSalary : earnings.reduce((acc, c) => acc + c.amount, 0);
+      const totalGrossDed = data.grossDeductions !== undefined ? data.grossDeductions : deductions.reduce((acc, c) => acc + c.amount, 0);
+
+      doc.font('Courier-Bold').text('GROSS SALARY', leftX + 8, subTotalY + 4);
+      doc.font('Courier').text(':', leftX + 115, subTotalY + 4);
+      doc.text(fmtVal(totalGrossEarn), midX - 95, subTotalY + 4, { width: 90, align: 'right' });
+
+      doc.font('Courier-Bold').text('GROSS DEDUCTIONS', midX + 8, subTotalY + 4);
+      doc.font('Courier').text(':', midX + 115, subTotalY + 4);
+      doc.text(fmtVal(totalGrossDed), rightX - 95, subTotalY + 4, { width: 90, align: 'right' });
+
+      // Total Payable & Advance Strip
+      const totalPayableY = subTotalY + subTotalH;
+      drawDashedHLine(totalPayableY + totalPayableH);
+
+      const totPayableVal = data.totalPayable !== undefined ? data.totalPayable : Math.max(0, totalGrossEarn - totalGrossDed);
+      doc.font('Courier-Bold').text('TOTAL PAYABLE', leftX + 8, totalPayableY + 5);
+      doc.font('Courier').text(':', leftX + 115, totalPayableY + 5);
+      doc.text(fmtVal(totPayableVal), midX - 95, totalPayableY + 5, { width: 90, align: 'right' });
+
+      // Right: Salary Advance & Loan Advance
+      doc.font('Courier-Bold').text('SALARY ADVANCE', midX + 8, totalPayableY + 3);
+      doc.font('Courier').text(':', midX + 115, totalPayableY + 3);
+      doc.text(fmtVal(data.salaryAdvance || 0), rightX - 95, totalPayableY + 3, { width: 90, align: 'right' });
+
+      doc.font('Courier-Bold').text('LOAN ADVANCE', midX + 8, totalPayableY + 14);
+      doc.font('Courier').text(':', midX + 115, totalPayableY + 14);
+      doc.text(fmtVal(data.loanAdvance || 0), rightX - 95, totalPayableY + 14, { width: 90, align: 'right' });
+
+      // Net Payable Strip (Full Width)
+      const netPayableY = totalPayableY + totalPayableH;
+      const finalNet = data.netPayable !== undefined ? data.netPayable : (data.netPay || totPayableVal);
+      doc.font('Courier-Bold').text('NET PAYABLE', leftX + 8, netPayableY + 4);
+      doc.font('Courier').text(':', leftX + 115, netPayableY + 4);
+      doc.font('Courier-Bold').text(fmtVal(finalNet), leftX + 130, netPayableY + 4, { width: 140, align: 'right' });
+
+      curY += mainTableHeight + 8;
+
+      // -------------------------------------------------------------
+      // 4. EMPLOYER CONTRIBUTIONS & CTC BOX
+      // -------------------------------------------------------------
+      const employerBoxH = 50;
+      drawDashedBox(curY, employerBoxH);
+
+      const empPfVal = data.employerPf !== undefined ? data.employerPf : Math.round(Number(data.basicSalary || 12000) * 0.12);
+      const empEsiVal = data.employerEsi !== undefined ? data.employerEsi : Math.round(Number(totalGrossEarn) * 0.0325);
+      const ctcVal = data.ctc !== undefined ? data.ctc : Math.round(totalGrossEarn + empPfVal + empEsiVal);
+
+      let empY = curY + 6;
+      doc.font('Courier-Bold').text('EMPLOYER PF', leftX + 8, empY);
+      doc.font('Courier').text(':', leftX + 115, empY);
+      doc.text(fmtVal(empPfVal), leftX + 130, empY, { width: 140, align: 'right' });
+      empY += 13.5;
+
+      doc.font('Courier-Bold').text('EMPLOYER ESI', leftX + 8, empY);
+      doc.font('Courier').text(':', leftX + 115, empY);
+      doc.text(fmtVal(empEsiVal), leftX + 130, empY, { width: 140, align: 'right' });
+      empY += 13.5;
+
+      // Divider inside employer box
+      drawDashedHLine(empY, leftX, leftX + 280);
+
+      doc.font('Courier-Bold').text('CTC', leftX + 8, empY + 3);
+      doc.font('Courier').text(':', leftX + 115, empY + 3);
+      doc.font('Courier-Bold').text(fmtVal(ctcVal), leftX + 130, empY + 3, { width: 140, align: 'right' });
+
+      curY += employerBoxH + 12;
+
+      // -------------------------------------------------------------
+      // 5. WORDS & REMARKS & STATUTORY FOOTER
+      // -------------------------------------------------------------
+      doc.font('Courier').fontSize(8);
+      doc.text(`Net Amount in Words: ${numberToWordsINR(finalNet)}`, leftX, curY);
+      curY += 12;
+
       if (data.remarks) {
-        doc.y = netBoxY + 52;
-        doc.rect(36, doc.y, 523, 26).fill('#fffbeb').strokeColor('#fde68a').stroke();
-        doc.fillColor('#92400e').fontSize(8).font('Helvetica-Bold').text('HR Adjustments & Audit Remarks: ', 44, doc.y + 5, { continued: true });
-        doc.font('Helvetica').text(data.remarks);
+        doc.font('Courier-Bold').text('HR Remarks: ', leftX, curY, { continued: true });
+        doc.font('Courier').text(data.remarks);
+        curY += 12;
       }
 
-      // --- STATUTORY DECLARATION & SIGNATURE FOOTER ---
-      const footY = 680;
-      doc.rect(36, footY, 523, 0.5).strokeColor('#cbd5e1').stroke();
+      curY += 15;
+      drawDashedHLine(curY);
+      curY += 6;
 
-      doc.fillColor('#64748b').fontSize(7.5).font('Helvetica')
-        .text('Note: This is a system-certified statutory wage statement under Rule 29(2) of Karnataka Shops and Commercial Establishments Rules, 1963.', 36, footY + 8, { width: 330 });
-      doc.text('For queries regarding deductions or tax computations, contact hr@bsctextiles.in within 7 days of pay disbursal.', 36, footY + 22, { width: 330 });
-
-      // Signatory block
-      doc.fillColor('#0f172a').fontSize(8.5).font('Helvetica-Bold').text(signatory, 390, footY + 8, { width: 160, align: 'right' });
-      doc.fillColor('#64748b').fontSize(7.5).font('Helvetica').text(signatoryRole, 390, footY + 20, { width: 160, align: 'right' });
-      doc.fillColor('#0058be').fontSize(7.5).font('Helvetica-Bold').text('BSC Textiles Directorate', 390, footY + 32, { width: 160, align: 'right' });
+      doc.font('Courier').fontSize(7).text(
+        'This is a computer-generated payslip under Karnataka Shops & Commercial Establishments Act. Authorized Signatory: BSC Textiles Pvt Ltd.',
+        leftX,
+        curY,
+        { width: boxWidth, align: 'center' }
+      );
 
       doc.end();
     } catch (err) {

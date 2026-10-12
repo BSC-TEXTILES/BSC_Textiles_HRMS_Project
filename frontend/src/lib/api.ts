@@ -117,10 +117,25 @@ api.interceptors.response.use(
           window.location.href = redirectTarget;
         });
       }
-
-      // Mark the error as auth-handled to allow callers to suppress noisy console logs
       error.isHandled401 = true;
     }
+
+    // Transparent retry for transient network dropouts / server reload
+    const config = error.config;
+    if (
+      !error.response &&
+      config &&
+      !config._isRetry &&
+      (error.code === 'ERR_NETWORK' || error.message === 'Network Error')
+    ) {
+      config._isRetry = true;
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(api(config));
+        }, 800);
+      });
+    }
+
     return Promise.reject(error);
   }
 );
