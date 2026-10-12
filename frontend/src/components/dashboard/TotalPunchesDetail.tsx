@@ -105,8 +105,16 @@ export function TotalPunchesDetail({
       if (!data) setLoading(true);
       const res = await fetch('/api/attendance/punches/detail?limit=50', { credentials: 'include' });
       if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
+        const text = await res.text().catch(() => '');
+        let json: any = null;
+        try {
+          if (text && text.trim().length > 0) {
+            json = JSON.parse(text);
+          }
+        } catch {
+          json = null;
+        }
+        if (json?.success && json?.data) {
           punchesCache = { data: json.data, timestamp: now };
           setData(json.data);
           setLastRefreshedSec(0);
@@ -650,10 +658,10 @@ export function TotalPunchesDetail({
                         </td>
                       </tr>
                     ) : (
-                      paginatedRecords.map((r) => {
+                      paginatedRecords.map((r, idx) => {
                         const isMissingRecord = Boolean(r.isMissingPunch || r.id === 'punch-6' || r.id === 'punch-18');
                         return (
-                          <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
+                          <tr key={`${r.id || idx}-${idx}`} className="hover:bg-slate-50/80 transition-colors">
                             {/* Employee */}
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-2.5">

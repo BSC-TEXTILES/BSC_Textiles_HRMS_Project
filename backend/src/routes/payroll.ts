@@ -4,6 +4,7 @@ import { pool, prisma } from '../nativeDb.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { Decimal } from '../db.js';
 import { generatePayslipPdf, PayslipPdfData } from '../services/payrollPdfService.js';
+import { safeJsonParse } from '../utils/safeJson.js';
 import { sendPayslipEmail } from '../services/payrollEmailService.js';
 
 const router = Router();
@@ -495,9 +496,7 @@ router.put('/payslip/:itemId', async (req: AuthRequest, res) => {
     const existing = existingRows[0];
     let existingCalc: any = {};
     if (existing.calculationDetails) {
-      existingCalc = typeof existing.calculationDetails === 'string'
-        ? JSON.parse(existing.calculationDetails)
-        : existing.calculationDetails;
+      existingCalc = safeJsonParse<any>(existing.calculationDetails, {});
     }
 
     const basicSalary = body.basicSalary ?? Number(existing.basicSalary);
@@ -665,7 +664,7 @@ router.post('/payslip/:itemId/finalize', async (req: AuthRequest, res) => {
       penalties: Number(p.penalties || 0),
       netPay: Number(p.netPay),
       status: 'APPROVED',
-      customSections: typeof p.customSections === 'string' ? JSON.parse(p.customSections) : p.customSections,
+      customSections: safeJsonParse<any[]>(p.customSections, []),
       remarks: p.remarks,
     };
 
@@ -747,7 +746,7 @@ router.post('/payslip/:itemId/email', async (req: AuthRequest, res) => {
       penalties: Number(p.penalties || 0),
       netPay: Number(p.netPay),
       status: p.status,
-      customSections: typeof p.customSections === 'string' ? JSON.parse(p.customSections) : p.customSections,
+      customSections: safeJsonParse<any[]>(p.customSections, []),
       remarks: p.remarks,
     };
 
@@ -829,7 +828,7 @@ router.get('/payslip/:itemId/pdf', async (req: AuthRequest, res) => {
       penalties: Number(p.penalties || 0),
       netPay: Number(p.netPay),
       status: p.status,
-      customSections: typeof p.customSections === 'string' ? JSON.parse(p.customSections) : p.customSections,
+      customSections: safeJsonParse<any[]>(p.customSections, []),
       remarks: p.remarks,
     };
 

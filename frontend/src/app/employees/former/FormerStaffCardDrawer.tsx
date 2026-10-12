@@ -117,12 +117,13 @@ export function FormerStaffCardDrawer({
 
     window.addEventListener('keydown', handleKeyDown);
 
+    const triggerElement = triggerRef?.current;
     return () => {
       document.body.style.overflow = originalOverflow;
       window.removeEventListener('keydown', handleKeyDown);
       // Return focus to trigger
-      if (triggerRef?.current) {
-        triggerRef.current.focus();
+      if (triggerElement) {
+        triggerElement.focus();
       }
     };
   }, [isOpen, onClose, triggerRef]);

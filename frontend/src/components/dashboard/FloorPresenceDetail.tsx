@@ -301,8 +301,16 @@ export function FloorPresenceDetail({
       if (!dataRef.current) setLoading(true);
       const res = await fetch('/api/presence/live-floor', { credentials: 'include' });
       if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
+        const text = await res.text().catch(() => '');
+        let json: any = null;
+        try {
+          if (text && text.trim().length > 0) {
+            json = JSON.parse(text);
+          }
+        } catch {
+          json = null;
+        }
+        if (json?.success && json?.data) {
           presenceCache = { data: json.data, timestamp: now };
           dataRef.current = json.data;
           setData(json.data);
@@ -727,8 +735,8 @@ export function FloorPresenceDetail({
                             </td>
                           </tr>
                         ) : (
-                          filteredRoster.map((staff) => (
-                            <tr key={staff.id} className="hover:bg-slate-50/80 transition-colors">
+                          filteredRoster.map((staff, idx) => (
+                            <tr key={`${staff.id || idx}-${idx}`} className="hover:bg-slate-50/80 transition-colors">
                               <td className="py-3 px-4">
                                 <div className="flex items-center gap-2.5">
                                   <div className="w-7 h-7 rounded-full bg-[#eff4ff] text-[#0058be] font-bold text-[10px] flex items-center justify-center border border-blue-200 shrink-0">
@@ -952,8 +960,8 @@ export function FloorPresenceDetail({
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {activeZone.staff && activeZone.staff.length > 0 ? (
-                              activeZone.staff.map((staff) => (
-                                <tr key={staff.id} className="hover:bg-slate-50/80 transition-colors">
+                              activeZone.staff.map((staff, idx) => (
+                                <tr key={`${staff.id || idx}-${idx}`} className="hover:bg-slate-50/80 transition-colors">
                                   <td className="py-3 px-4">
                                     <div className="flex items-center gap-2.5">
                                       <div className="w-7 h-7 rounded-full bg-[#eff4ff] text-[#0058be] font-bold text-[10px] flex items-center justify-center border border-blue-200 shrink-0">
@@ -1456,8 +1464,8 @@ export function FloorPresenceDetail({
                             </td>
                           </tr>
                         ) : (
-                          filteredMissing.map((staff) => (
-                            <tr key={staff.id} className="hover:bg-slate-50/80 transition-colors">
+                          filteredMissing.map((staff, idx) => (
+                            <tr key={`${staff.id || idx}-${idx}`} className="hover:bg-slate-50/80 transition-colors">
                               <td className="py-3 px-4">
                                 <div className="font-bold text-[#0b1c30]">{staff.name}</div>
                                 <div className="text-[10px] text-slate-400 font-mono">{staff.code}</div>

@@ -57,7 +57,7 @@ interface Payslip {
 }
 
 export default function PayslipsPage() {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const rawRole = session?.user?.role || 'EMPLOYEE';
   const isHrOrAdmin = ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'PAYROLL_MANAGER'].includes(rawRole);
 
@@ -69,7 +69,7 @@ export default function PayslipsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [monthFilter, setMonthFilter] = useState<string>('');
-  const [yearFilter, setYearFilter] = useState<string>('2024');
+  const [yearFilter, setYearFilter] = useState<string>(String(new Date().getFullYear()));
 
   // Modals
   const [viewingPayslip, setViewingPayslip] = useState<Payslip | null>(null);
@@ -129,8 +129,9 @@ export default function PayslipsPage() {
   }, [isHrOrAdmin, search, statusFilter, monthFilter, yearFilter]);
 
   useEffect(() => {
+    if (sessionStatus === 'loading') return;
     fetchPayslips();
-  }, [fetchPayslips]);
+  }, [fetchPayslips, sessionStatus]);
 
   // HR Edit init
   const handleOpenEdit = (p: Payslip) => {

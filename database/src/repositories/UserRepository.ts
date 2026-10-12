@@ -19,9 +19,17 @@ const COLUMNS = `id, email, passwordHash, fullName, role, permissions,
         locationId, employeeId, isActive, lastLoginAt, createdAt, updatedAt`;
 
 function mapUser(row: any): UserRow {
+  let permissions = row.permissions;
+  if (typeof permissions === 'string') {
+    try {
+      permissions = permissions ? JSON.parse(permissions) : [];
+    } catch {
+      permissions = [];
+    }
+  }
   return {
     ...row,
-    permissions: typeof row.permissions === 'string' ? JSON.parse(row.permissions) : row.permissions,
+    permissions,
   };
 }
 

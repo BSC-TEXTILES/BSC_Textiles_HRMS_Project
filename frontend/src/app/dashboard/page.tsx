@@ -434,6 +434,9 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* Clean Connected Horizontal Line Divider */}
+          <div className="w-full border-t border-slate-200/80 dark:border-slate-800 my-0.5" />
+
           {/* Filter & Terminal Connectivity Bar */}
           <div className="flex flex-col gap-3 pt-3 bg-[#eff4ff]/60 dark:bg-[#131f38]/60 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800 transition-all">
             <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
@@ -701,8 +704,8 @@ export default function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  {recentPunches.map((punch) => (
-                    <tr key={punch.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                  {recentPunches.map((punch, idx) => (
+                    <tr key={`${punch.id || idx}-${idx}`} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2.5">
                           <div className="w-7 h-7 rounded-full bg-[#131b2e] dark:bg-blue-600 text-white flex items-center justify-center font-bold text-[10px]">

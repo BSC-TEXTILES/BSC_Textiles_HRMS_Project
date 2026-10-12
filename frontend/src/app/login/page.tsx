@@ -1,26 +1,30 @@
 'use client';
 
 import { useState, useEffect, Suspense, useMemo } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { signIn, useSession, getSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { 
-  Eye, 
-  EyeOff, 
-  AlertCircle, 
-  ArrowRight, 
-  Loader2, 
-  ShieldCheck, 
-  Mail, 
-  Lock, 
+import {
+  Eye,
+  EyeOff,
+  AlertCircle,
+  ArrowRight,
+  ArrowLeft,
+  Home,
+  Loader2,
+  ShieldCheck,
+  Mail,
+  Lock,
   CheckCircle2,
   Building2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { sanitizeCallbackUrl, getRoleHomePath } from '@/lib/roles';
+import { safeJsonParse } from '@/lib/utils';
 
 const loginSchema = z.object({
   email: z
@@ -35,6 +39,16 @@ const loginSchema = z.object({
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
+
+const AUTH_COOKIE_NAMES = ['token', 'bsc_token'];
+
+function clearAuthCookies() {
+  if (typeof document === 'undefined') return;
+  for (const name of AUTH_COOKIE_NAMES) {
+    document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
+    document.cookie = `${name}=; path=/; max-age=0`;
+  }
+}
 
 /** Seeded authorized roles for test validation */
 const QUICK_TEST_ACCOUNTS = [
@@ -102,9 +116,9 @@ function LoginFormContent() {
     localStorage.removeItem('bsc_token');
     localStorage.removeItem('token');
     localStorage.removeItem('bsc_user');
-    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    document.cookie = 'bsc_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    clearAuthCookies();
   };
+
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
@@ -121,7 +135,8 @@ function LoginFormContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: data.email, password: data.password }),
         });
-        const loginData = await loginRes.json().catch(() => ({}));
+        const rawText = await loginRes.text().catch(() => '');
+        const loginData = safeJsonParse<any>(rawText, {});
         if (loginRes.ok && loginData?.token) {
           directToken = loginData.token;
           directUser = loginData.user;
@@ -199,6 +214,16 @@ function LoginFormContent() {
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-6 bg-[#F8F9FA] dark:bg-[#111317] text-[#18181B] dark:text-slate-100 transition-colors duration-200">
       {/* Top Header Utilities */}
+      {/* Top Header Utilities: Back to Home & Theme Toggle */}
+      <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-[#0058be] dark:hover:text-blue-400 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-gray-200/90 dark:border-slate-800 shadow-xs hover:shadow-sm transition-all group"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 text-slate-500 group-hover:text-[#0058be] dark:group-hover:text-blue-400" />
+          <span>Back to Home</span>
+        </Link>
+      </div>
       <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20">
         <ThemeToggle size="md" />
       </div>
@@ -206,9 +231,9 @@ function LoginFormContent() {
       {/* Main Login Card */}
       <div className="w-full max-w-[420px] my-auto">
         <div className="bg-white dark:bg-[#161920] rounded-xl border border-gray-200/90 dark:border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.04)] p-6 sm:p-8 transition-all">
-          
-          {/* Brand Header */}
-          <div className="flex flex-col items-center text-center">
+
+          {/* Brand Header — Clickable to return to Landing Page */}
+          <Link href="/" className="flex flex-col items-center text-center group cursor-pointer mb-1" title="Return to Landing Page">
             <div className="w-16 h-16 rounded-xl bg-white dark:bg-slate-900 p-1.5 border border-gray-200 dark:border-slate-800 shadow-xs flex items-center justify-center overflow-hidden mb-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -217,14 +242,14 @@ function LoginFormContent() {
                 className="w-full h-full object-contain"
               />
             </div>
-            
+
             <h1 className="text-xl font-bold tracking-tight text-[#18181B] dark:text-slate-100">
               BSC Textiles HRMS
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Since 1938 • Enterprise Workforce Portal
             </p>
-          </div>
+          </Link>
 
           {/* Error Banner Notification */}
           {errorMessage && (
@@ -260,7 +285,7 @@ function LoginFormContent() {
                   {...register('email')}
                   className={`w-full h-10 rounded-lg border bg-white dark:bg-[#1A1D24] pl-9 pr-3 text-xs text-[#18181B] dark:text-white placeholder:text-slate-400 outline-none transition-all
                     disabled:bg-slate-50 dark:disabled:bg-slate-800 disabled:text-slate-400
-                    focus:ring-2 focus:ring-[#722F37]/20 focus:border-[#722F37]
+                    focus:ring-2 focus:ring-[#0058be]/20 focus:border-[#0058be]
                     ${errors.email ? 'border-red-400 focus:border-red-500' : 'border-gray-300 dark:border-slate-700 hover:border-gray-400'}`}
                 />
               </div>
@@ -280,7 +305,7 @@ function LoginFormContent() {
                 <button
                   type="button"
                   onClick={() => toast('Please contact HR / IT Administrator to reset your password.', { icon: '🔐' })}
-                  className="text-[11px] font-medium text-[#722F37] dark:text-[#E8DCC6] hover:underline focus:outline-none"
+                  className="text-[11px] font-medium text-[#0058be] dark:text-blue-400 hover:underline focus:outline-none"
                 >
                   Forgot password?
                 </button>
@@ -300,7 +325,7 @@ function LoginFormContent() {
                   {...register('password')}
                   className={`w-full h-10 rounded-lg border bg-white dark:bg-[#1A1D24] pl-9 pr-10 text-xs text-[#18181B] dark:text-white placeholder:text-slate-400 outline-none transition-all
                     disabled:bg-slate-50 dark:disabled:bg-slate-800 disabled:text-slate-400
-                    focus:ring-2 focus:ring-[#722F37]/20 focus:border-[#722F37]
+                    focus:ring-2 focus:ring-[#0058be]/20 focus:border-[#0058be]
                     ${errors.password ? 'border-red-400 focus:border-red-500' : 'border-gray-300 dark:border-slate-700 hover:border-gray-400'}`}
                 />
                 <button
@@ -326,7 +351,7 @@ function LoginFormContent() {
                 <input
                   type="checkbox"
                   defaultChecked
-                  className="w-3.5 h-3.5 rounded border-gray-300 dark:border-slate-700 text-[#722F37] focus:ring-[#722F37]/20 cursor-pointer"
+                  className="w-3.5 h-3.5 rounded border-gray-300 dark:border-slate-700 text-[#0058be] focus:ring-[#0058be]/20 cursor-pointer"
                 />
                 <span>Remember this terminal</span>
               </label>
@@ -337,7 +362,7 @@ function LoginFormContent() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full h-10 mt-2 rounded-lg bg-[#722F37] hover:bg-[#5B232A] text-white text-xs font-semibold shadow-xs flex items-center justify-center gap-2 transition-all active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+              className="w-full h-10 mt-2 rounded-lg bg-[#0058be] hover:bg-[#0047a0] text-white text-xs font-semibold shadow-xs flex items-center justify-center gap-2 transition-all active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
             >
               {isLoading ? (
                 <>
@@ -357,7 +382,7 @@ function LoginFormContent() {
           <div className="mt-6 border-t border-gray-200/80 dark:border-slate-800 pt-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-300 flex items-center gap-1">
-                <Building2 className="w-3 h-3 text-[#722F37] dark:text-[#E8DCC6]" />
+                <Building2 className="w-3 h-3 text-[#0058be] dark:text-blue-400" />
                 <span>Test Role Credentials</span>
               </span>
               <span className="text-[10px] text-slate-400">1-click autofill</span>
@@ -372,20 +397,29 @@ function LoginFormContent() {
                     type="button"
                     onClick={() => applyAccount(p.email)}
                     disabled={isLoading}
-                    className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-[#722F37] bg-[#722F37]/5 dark:bg-[#722F37]/20 ring-1 ring-[#722F37]'
-                        : 'border-gray-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50 hover:bg-slate-100/80 dark:hover:bg-slate-800'
-                    }`}
+                    className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${isSelected
+                      ? 'border-[#0058be] bg-[#0058be]/10 dark:bg-blue-950/60 ring-1 ring-[#0058be]'
+                      : 'border-gray-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50 hover:bg-slate-100/80 dark:hover:bg-slate-800'
+                      }`}
                   >
                     <div className="flex items-center justify-between w-full">
                       <span className="text-[11px] font-semibold text-[#18181B] dark:text-white truncate">{p.label}</span>
-                      {isSelected && <CheckCircle2 className="w-3 h-3 text-[#722F37] dark:text-[#E8DCC6]" />}
+                      {isSelected && <CheckCircle2 className="w-3 h-3 text-[#0058be] dark:text-blue-400" />}
                     </div>
                     <span className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{p.desc}</span>
                   </button>
                 );
               })}
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-slate-800/80 text-center">
+              <Link
+                href="/"
+                className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#0058be] dark:text-slate-400 dark:hover:text-blue-400 transition-colors"
+              >
+                <Home className="w-3.5 h-3.5 text-slate-400" />
+                <span>Return to BSC Textiles Home Page</span>
+              </Link>
             </div>
           </div>
         </div>
@@ -393,7 +427,7 @@ function LoginFormContent() {
         {/* System Integrity & Legal Footer */}
         <div className="mt-5 text-center space-y-1">
           <div className="flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" aria-hidden="true" />
+            <ShieldCheck className="w-3.5 h-3.5 text-[#0058be] dark:text-blue-400" aria-hidden="true" />
             <span>Role-Based Access Control • TLS 1.3 Encryption</span>
           </div>
           <p className="text-[10px] text-slate-400">
@@ -411,7 +445,7 @@ export default function LoginPage() {
       fallback={
         <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA] dark:bg-[#111317]">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-3 border-[#722F37] border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-3 border-[#0058be] border-t-transparent rounded-full animate-spin" />
             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
               Loading BSC Textiles Workspace...
             </p>

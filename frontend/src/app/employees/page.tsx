@@ -23,6 +23,7 @@ import {
   Contact,
   FolderLock
 } from 'lucide-react';
+import { EmployeeQrModal } from '@/components/dashboard/EmployeeQrModal';
 
 import { useSession } from 'next-auth/react';
 
@@ -40,6 +41,7 @@ export default function EmployeesPage() {
 
   // Add Employee Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [selectedQrEmp, setSelectedQrEmp] = useState<any | null>(null);
   const [newEmp, setNewEmp] = useState({
     employeeCode: '',
     firstName: '',
@@ -412,10 +414,22 @@ export default function EmployeesPage() {
                             <ScanFace className="w-3 h-3" />
                             Face
                           </span>
-                          <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold border border-slate-200">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedQrEmp({
+                              id: emp.id,
+                              code: emp.employeeCode,
+                              name: emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim(),
+                              department: emp.department?.name,
+                              hub: emp.location?.name,
+                              shift: emp.shift?.name,
+                            })}
+                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-[#eff4ff] hover:bg-[#dce9ff] text-[#0058be] font-bold border border-[#dce9ff] transition-all cursor-pointer shadow-2xs active:scale-95"
+                            title={`Open One-Time QR Pass for ${emp.fullName || emp.employeeCode}`}
+                          >
                             <QrCode className="w-3 h-3" />
-                            QR
-                          </span>
+                            <span>QR Pass</span>
+                          </button>
                         </div>
                       </td>
                       <td className="py-3 px-4">
@@ -572,6 +586,15 @@ export default function EmployeesPage() {
               </form>
             </div>
           </div>
+        )}
+
+        {/* Employee One-Time QR Pass Modal */}
+        {selectedQrEmp && (
+          <EmployeeQrModal
+            open={!!selectedQrEmp}
+            onClose={() => setSelectedQrEmp(null)}
+            employee={selectedQrEmp}
+          />
         )}
       </div>
     </DashboardLayout>

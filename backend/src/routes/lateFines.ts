@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db.js';
 import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 import { socketIO } from '../socket.js';
+import { safeJsonParse } from '../utils/safeJson.js';
 
 const router = Router();
 
@@ -441,7 +442,7 @@ router.post('/approve/:id', authorize('EDIT'), async (req: AuthRequest, res) => 
     }
 
     const rec = rows[0];
-    const prevHistory = rec.historyJson ? (typeof rec.historyJson === 'string' ? JSON.parse(rec.historyJson) : rec.historyJson) : [];
+    const prevHistory = safeJsonParse<any[]>(rec.historyJson, []);
     
     const newEntry = {
       action: 'APPROVED',
@@ -504,7 +505,7 @@ router.post('/waive/:id', authorize('EDIT'), async (req: AuthRequest, res) => {
     }
 
     const rec = rows[0];
-    const prevHistory = rec.historyJson ? (typeof rec.historyJson === 'string' ? JSON.parse(rec.historyJson) : rec.historyJson) : [];
+    const prevHistory = safeJsonParse<any[]>(rec.historyJson, []);
     
     const newEntry = {
       action: 'WAIVED',
@@ -562,7 +563,7 @@ router.post('/reject/:id', authorize('EDIT'), async (req: AuthRequest, res) => {
     }
 
     const rec = rows[0];
-    const prevHistory = rec.historyJson ? (typeof rec.historyJson === 'string' ? JSON.parse(rec.historyJson) : rec.historyJson) : [];
+    const prevHistory = safeJsonParse<any[]>(rec.historyJson, []);
     
     const newEntry = {
       action: 'REJECTED',
@@ -622,7 +623,7 @@ router.post('/adjust/:id', authorize('EDIT'), async (req: AuthRequest, res) => {
     }
 
     const rec = rows[0];
-    const prevHistory = rec.historyJson ? (typeof rec.historyJson === 'string' ? JSON.parse(rec.historyJson) : rec.historyJson) : [];
+    const prevHistory = safeJsonParse<any[]>(rec.historyJson, []);
     
     const newEntry = {
       action: 'ADJUSTED',
@@ -688,7 +689,7 @@ router.post('/apply-payroll/:id', authorize('EDIT'), async (req: AuthRequest, re
       return res.json({ success: true, message: 'Fine is already applied to payroll (idempotent operation).', recordId: id });
     }
 
-    const prevHistory = rec.historyJson ? (typeof rec.historyJson === 'string' ? JSON.parse(rec.historyJson) : rec.historyJson) : [];
+    const prevHistory = safeJsonParse<any[]>(rec.historyJson, []);
     
     const newEntry = {
       action: 'APPLIED_TO_PAYROLL',
@@ -774,7 +775,7 @@ router.post('/reverse/:id', authorize('EDIT'), async (req: AuthRequest, res) => 
     }
 
     const rec = rows[0];
-    const prevHistory = rec.historyJson ? (typeof rec.historyJson === 'string' ? JSON.parse(rec.historyJson) : rec.historyJson) : [];
+    const prevHistory = safeJsonParse<any[]>(rec.historyJson, []);
     
     const newEntry = {
       action: 'REVERSED',

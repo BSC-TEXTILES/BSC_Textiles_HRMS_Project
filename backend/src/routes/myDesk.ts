@@ -547,7 +547,7 @@ myDeskRouter.post('/punch', async (req: AuthRequest, res) => {
 
     if (!existing.length) {
       // Create new clock in
-      const id = `att_${crypto.randomUUID()}`;
+      const id = 'att_' + Date.now().toString(36) + crypto.randomBytes(6).toString('hex');
       await pool.query(
         `INSERT INTO attendance 
          (id, employeeId, locationId, shiftId, attendanceDate, scheduledLogin, actualLogin, status, notes, createdAt, updatedAt)

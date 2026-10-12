@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Shared shift-correction / regularization records.
  *
  * Client-side source of truth for regularization requests (pending, supervisor
@@ -42,7 +42,7 @@ export const CORRECTION_RECORDS: CorrectionRecord[] = [
     hub: 'BEL-01 Flagship',
     dept: 'Bridal Silk & Atelier',
     avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80',
-    shift: 'Shift A (09:30 â€“ 18:30)',
+    shift: 'Shift A (09:30 - 18:30)',
     rawIn: '09:28 IN',
     rawOut: 'Missed OUT',
     terminal: 'BEL-IN-02',
@@ -50,7 +50,7 @@ export const CORRECTION_RECORDS: CorrectionRecord[] = [
     totalHours: '9h 47m Total',
     otHours: '+1h 15m Overtime (1.25x)',
     reason: 'VIP Bridal Kanjeevaram Showcase extended handover for royal wedding party.',
-    evidence: 'Bill #SLK-8819 (â‚¹3.4L) & CCTV CAM-04 Bridal Vault confirmed presence.',
+    evidence: 'Bill #SLK-8819 (₹3.4L) & CCTV CAM-04 Bridal Vault confirmed presence.',
     invoiceOrDoc: 'Invoice #SLK-8819',
     supervisor: 'Anand Kulkarni (Store Lead)',
     pipelineStep: '2',
@@ -67,7 +67,7 @@ export const CORRECTION_RECORDS: CorrectionRecord[] = [
     hub: 'SHI-03 Apex',
     dept: 'Tailoring & Alterations',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    shift: 'Shift B (11:30 â€“ 20:30)',
+    shift: 'Shift B (11:30 - 20:30)',
     rawIn: '14:02 IN (Late 2h 32m)',
     rawOut: '20:38 OUT',
     terminal: 'SHI-GATE-01',
@@ -93,7 +93,7 @@ export const CORRECTION_RECORDS: CorrectionRecord[] = [
     hub: 'DAV-02 Hub',
     dept: 'Jacquard Loom Yard',
     avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
-    shift: 'Shift C Night (20:30 â€“ 05:30)',
+    shift: 'Shift C Night (20:30 - 05:30)',
     rawIn: 'Sensor Glitch IN',
     rawOut: '05:32 OUT',
     terminal: 'DAV-GATE-01',
@@ -119,7 +119,7 @@ export const CORRECTION_RECORDS: CorrectionRecord[] = [
     hub: 'BEL-01 Flagship',
     dept: 'Cashiering & POS',
     avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80',
-    shift: 'Shift A (09:30 â€“ 18:30)',
+    shift: 'Shift A (09:30 - 18:30)',
     rawIn: '09:34 IN',
     rawOut: '13:45 OUT (Premature Tag)',
     terminal: 'BEL-POS-01',
@@ -144,7 +144,7 @@ export const CORRECTION_RECORDS: CorrectionRecord[] = [
     hub: 'BEL-01 Flagship',
     dept: 'Finished Goods Depot',
     avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=200&q=80',
-    shift: 'General (09:00 â€“ 18:00)',
+    shift: 'General (09:00 - 18:00)',
     rawIn: '08:58 IN',
     rawOut: 'On-Duty Slip (15:00-19:30)',
     terminal: 'BEL-LOG-01',
@@ -169,7 +169,7 @@ export const CORRECTION_RECORDS: CorrectionRecord[] = [
     hub: 'SHI-03 Apex',
     dept: 'Visual Merchandising',
     avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=200&q=80',
-    shift: 'Shift B (11:30 â€“ 20:30)',
+    shift: 'Shift B (11:30 - 20:30)',
     rawIn: '11:42 IN (Grace 12m)',
     rawOut: '21:10 OUT',
     terminal: 'SHI-VM-01',

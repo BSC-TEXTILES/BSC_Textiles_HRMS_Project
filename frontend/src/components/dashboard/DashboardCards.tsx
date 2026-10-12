@@ -144,12 +144,12 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
 
           <div className="mt-3 space-y-1">
             <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0058be] dark:text-blue-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#0058be] dark:bg-blue-400" />
                 94.0% Present
               </span>
-              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-red-500 dark:text-red-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+              <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
                 {late} Late
               </span>
             </div>
@@ -235,7 +235,7 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
               <span>Tea: {teaBreaks}</span>
             </div>
             <div className="flex items-center justify-between text-[11px]">
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Policy Compliant</span>
+              <span className="text-[#0058be] dark:text-blue-400 font-semibold">Policy Compliant</span>
               <span className="text-slate-400 dark:text-slate-500">0 Overruns</span>
             </div>
           </div>
@@ -261,11 +261,11 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 INCENTIVES TODAY
               </span>
-              <div className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight mt-1">
+              <div className="text-3xl font-extrabold text-[#0058be] dark:text-blue-400 tracking-tight mt-1">
                 ₹{incentiveToday.toLocaleString('en-IN')}
               </div>
             </div>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0 shadow-xs group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 flex items-center justify-center text-[#0058be] dark:text-blue-400 shrink-0 shadow-xs group-hover:bg-[#0058be] group-hover:text-white transition-colors">
               <Banknote className="w-4.5 h-4.5" />
             </div>
           </div>

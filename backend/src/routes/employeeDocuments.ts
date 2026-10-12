@@ -3,6 +3,7 @@ import { pool } from '../db.js';
 import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 import { FileSecurityService } from '../services/fileSecurityService.js';
 import { UserUploadService } from '../services/userUploadService.js';
+import { safeJsonParse } from '../utils/safeJson.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -337,8 +338,8 @@ router.get('/employee/:employeeId', authorize('VIEW'), async (req: AuthRequest, 
     // Parse JSON fields
     const parsedDocs = documents.map((doc: any) => ({
       ...doc,
-      versions: doc.versionsJson ? (typeof doc.versionsJson === 'string' ? JSON.parse(doc.versionsJson) : doc.versionsJson) : [],
-      auditHistory: doc.auditHistoryJson ? (typeof doc.auditHistoryJson === 'string' ? JSON.parse(doc.auditHistoryJson) : doc.auditHistoryJson) : []
+      versions: safeJsonParse<any[]>(doc.versionsJson, []),
+      auditHistory: safeJsonParse<any[]>(doc.auditHistoryJson, [])
     }));
 
     // Fetch all document type configs to calculate checklist
@@ -540,9 +541,7 @@ router.post('/:id/replace', authorize('EDIT'), async (req: AuthRequest, res) => 
     await fs.writeFile(targetFilePath, buffer);
 
     // Archive current version
-    const prevVersions = currentDoc.versionsJson
-      ? (typeof currentDoc.versionsJson === 'string' ? JSON.parse(currentDoc.versionsJson) : currentDoc.versionsJson)
-      : [];
+    const prevVersions = safeJsonParse<any[]>(currentDoc.versionsJson, []);
 
     prevVersions.push({
       version: currentDoc.version,
@@ -554,9 +553,7 @@ router.post('/:id/replace', authorize('EDIT'), async (req: AuthRequest, res) => 
       replacementReason: reason || 'Document replaced with new version'
     });
 
-    const auditHistory = currentDoc.auditHistoryJson
-      ? (typeof currentDoc.auditHistoryJson === 'string' ? JSON.parse(currentDoc.auditHistoryJson) : currentDoc.auditHistoryJson)
-      : [];
+    const auditHistory = safeJsonParse<any[]>(currentDoc.auditHistoryJson, []);
 
     auditHistory.push({
       action: 'REPLACED',
@@ -676,9 +673,7 @@ router.post('/:id/verify', authorize('EDIT'), async (req: AuthRequest, res) => {
     if (action === 'REJECT') newStatus = 'REJECTED';
     if (action === 'REQUEST_REPLACEMENT') newStatus = 'REQUIRES_REPLACEMENT';
 
-    const auditHistory = doc.auditHistoryJson
-      ? (typeof doc.auditHistoryJson === 'string' ? JSON.parse(doc.auditHistoryJson) : doc.auditHistoryJson)
-      : [];
+    const auditHistory = safeJsonParse<any[]>(doc.auditHistoryJson, []);
 
     auditHistory.push({
       action: newStatus,

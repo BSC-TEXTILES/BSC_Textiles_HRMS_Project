@@ -105,8 +105,16 @@ export function PunctualityDetail({
       if (!data) setLoading(true);
       const res = await fetch('/api/analytics/punctuality', { credentials: 'include' });
       if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
+        const text = await res.text().catch(() => '');
+        let json: any = null;
+        try {
+          if (text && text.trim().length > 0) {
+            json = JSON.parse(text);
+          }
+        } catch {
+          json = null;
+        }
+        if (json?.success && json?.data) {
           punctualityCache = { data: json.data, timestamp: now };
           setData(json.data);
           setLastRefreshedSec(0);
@@ -360,14 +368,14 @@ export function PunctualityDetail({
                 </div>
 
                 <div className="divide-y divide-slate-100">
-                  {data?.gracePeriodStaff.map((staff) => {
+                  {data?.gracePeriodStaff.map((staff, idx) => {
                     const secs = graceCountdowns[staff.id] ?? staff.remainingGraceSeconds;
                     const mins = Math.floor(secs / 60);
                     const remSecs = secs % 60;
                     const formattedTimer = `${mins}m ${String(remSecs).padStart(2, '0')}s`;
 
                     return (
-                      <div key={staff.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 transition-colors">
+                      <div key={`${staff.id || idx}-${idx}`} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50 transition-colors">
                         <div className="flex items-center gap-3">
                           <div
                             className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-[10px] shrink-0"

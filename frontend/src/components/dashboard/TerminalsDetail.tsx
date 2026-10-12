@@ -88,8 +88,16 @@ export function TerminalsDetail({
       if (!data) setLoading(true);
       const res = await fetch('/api/terminals/network-status', { credentials: 'include' });
       if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
+        const text = await res.text().catch(() => '');
+        let json: any = null;
+        try {
+          if (text && text.trim().length > 0) {
+            json = JSON.parse(text);
+          }
+        } catch {
+          json = null;
+        }
+        if (json?.success && json?.data) {
           terminalsCache = { data: json.data, timestamp: now };
           setData(json.data);
           setLastRefreshedSec(0);
@@ -306,7 +314,7 @@ export function TerminalsDetail({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {data?.terminals.map((term) => {
+                {data?.terminals.map((term, idx) => {
                   const isMaintenance = maintenanceStates[term.id];
                   const latencyColor =
                     term.latency < 50
@@ -317,7 +325,7 @@ export function TerminalsDetail({
 
                   return (
                     <div
-                      key={term.id}
+                      key={`${term.id || idx}-${idx}`}
                       className={`p-4 rounded-xl border bg-white shadow-xs space-y-3 transition-all hover:shadow-md ${
                         isMaintenance ? 'border-amber-300 bg-amber-50/20' : 'border-slate-200'
                       }`}

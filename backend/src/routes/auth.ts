@@ -776,7 +776,8 @@ router.post('/sessions/:id/revoke', authenticate, async (req: AuthRequest, res) 
  */
 router.post('/logout', async (req: AuthRequest, res) => {
   try {
-    const token = req.cookies?.token || req.headers.authorization?.replace('Bearer ', '');
+    const authHeader = req.headers.authorization?.replace('Bearer ', '');
+    const token = authHeader || req.cookies?.token;
     if (token) {
       try {
         const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as any;
