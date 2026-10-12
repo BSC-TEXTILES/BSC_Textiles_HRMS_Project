@@ -86,12 +86,12 @@ function adherenceCols(): DrillColumn[] {
           <span className="text-slate-400">N/A</span>
         ) : (
           <div className="min-w-[70px]">
-            <div className={`text-[11px] font-bold mb-1 ${r.adherence >= 90 ? 'text-emerald-600' : r.adherence >= 60 ? 'text-amber-600' : 'text-red-600'}`}>
+            <div className={`text-[11px] font-bold mb-1 ${r.adherence >= 90 ? 'text-[#0058be] dark:text-blue-400' : 'text-slate-500 dark:text-slate-400'}`}>
               {r.adherence}%
             </div>
-            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+            <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
               <div
-                className={`h-1.5 rounded-full ${r.adherence >= 90 ? 'bg-emerald-500' : r.adherence >= 60 ? 'bg-amber-500' : 'bg-red-500'}`}
+                className={`h-1.5 rounded-full ${r.adherence >= 90 ? 'bg-[#0058be] dark:bg-blue-400' : 'bg-slate-400'}`}
                 style={{ width: `${r.adherence}%` }}
               />
             </div>
@@ -155,7 +155,7 @@ function incentiveCols(): DrillColumn[] {
         </span>
       ),
     },
-    { key: 'amount', header: 'Amount', render: (r) => <span className="font-bold text-emerald-600">₹{r.amount}</span> },
+    { key: 'amount', header: 'Amount', render: (r) => <span className="font-bold text-[#0058be] dark:text-blue-400">₹{r.amount}</span> },
     { key: 'basis', header: 'Calculation Basis', render: (r) => <span className="text-slate-600">{r.basis}</span> },
     { key: 'date', header: 'Date', render: (r) => <span className="text-slate-500">{fmtDate(r.date)}</span> },
     {

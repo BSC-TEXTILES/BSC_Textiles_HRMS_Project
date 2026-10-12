@@ -7,10 +7,10 @@ import type { ReactNode } from 'react';
  */
 
 export const TONE = {
-  green: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800',
-  red: 'bg-red-50 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800',
-  amber: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800',
-  blue: 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800',
+  green: 'bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 border border-[#dce9ff] dark:border-blue-900',
+  red: 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700',
+  amber: 'bg-blue-50/50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-900',
+  blue: 'bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 border border-[#dce9ff] dark:border-blue-900',
   slate: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700',
 } as const;
 

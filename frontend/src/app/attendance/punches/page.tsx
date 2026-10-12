@@ -258,8 +258,8 @@ export default function BiometricPunchesPage() {
                   <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">employees</span>
                 </div>
                 <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
-                  <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  <span className="inline-flex items-center gap-1 font-semibold text-[#0058be] dark:text-blue-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#0058be] dark:bg-blue-400" />
                     {presentEmployeesCount} present
                   </span>
                   <span className="text-slate-300 dark:text-slate-600">•</span>
@@ -277,21 +277,21 @@ export default function BiometricPunchesPage() {
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Attendance Overview
                 </span>
-                <span className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                <span className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-400">
                   <UserCheck className="w-4 h-4" />
                 </span>
               </div>
               <div className="mt-3">
-                <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight flex items-baseline gap-1.5">
+                <div className="text-2xl font-black text-[#0058be] dark:text-blue-400 tracking-tight flex items-baseline gap-1.5">
                   <span>{presentEmployeesCount}</span>
                   <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">present</span>
                 </div>
                 <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5 flex-wrap">
-                  <span className="text-slate-600 dark:text-slate-300 font-medium">
+                  <span className="text-[#0058be] dark:text-blue-300 font-medium">
                     {absentEmployeesCount} absent
                   </span>
                   <span className="text-slate-300 dark:text-slate-600">•</span>
-                  <span className={lateEmployeesCount > 0 ? "text-amber-600 dark:text-amber-400 font-medium" : "text-slate-500 dark:text-slate-400"}>
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">
                     {lateEmployeesCount} late
                   </span>
                 </div>
@@ -317,11 +317,11 @@ export default function BiometricPunchesPage() {
                   <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">recorded today</span>
                 </div>
                 <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5 flex-wrap">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                  <span className="text-[#0058be] dark:text-blue-400 font-semibold">
                     {verifiedPunchesCount} verified
                   </span>
                   <span className="text-slate-300 dark:text-slate-600">•</span>
-                  <span className={failedPunchesCount > 0 ? "text-rose-600 dark:text-rose-400 font-medium" : "text-slate-500 dark:text-slate-400"}>
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">
                     {failedPunchesCount} failed/unverified
                   </span>
                 </div>
@@ -337,20 +337,20 @@ export default function BiometricPunchesPage() {
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   Attendance Incentives
                 </span>
-                <span className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                <span className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-400">
                   <Coins className="w-4 h-4" />
                 </span>
               </div>
               <div className="mt-3">
-                <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
+                <div className="text-2xl font-black text-[#0058be] dark:text-blue-400 tracking-tight">
                   ₹{Number(totalIncentivesEarned).toLocaleString('en-IN')}
                 </div>
                 <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5 flex-wrap">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                  <span className="text-[#0058be] dark:text-blue-300 font-medium">
                     ₹{Number(totalIncentivesEarned).toLocaleString('en-IN')} early login
                   </span>
                   <span className="text-slate-300 dark:text-slate-600">•</span>
-                  <span className={totalLateDeductions > 0 ? "text-rose-600 dark:text-rose-400 font-medium" : "text-slate-500 dark:text-slate-400"}>
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">
                     ₹{Number(totalLateDeductions).toLocaleString('en-IN')} deductions
                   </span>
                 </div>
@@ -491,7 +491,7 @@ export default function BiometricPunchesPage() {
                           {timeFormatted}
                         </td>
                         <td className="py-3 px-4">
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 border border-[#dce9ff] dark:border-blue-900">
                             VERIFIED (PASS)
                           </span>
                         </td>
@@ -516,11 +516,11 @@ export default function BiometricPunchesPage() {
                         </td>
                         <td className="py-3 px-4">
                           {isEarly ? (
-                            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
+                            <span className="text-[11px] font-bold text-[#0058be] dark:text-blue-400 bg-[#eff4ff] dark:bg-blue-950/60 px-2 py-0.5 rounded border border-[#dce9ff] dark:border-blue-900">
                               +₹{Number(punch.earlyLoginIncentive)} (₹1/s)
                             </span>
                           ) : isLate ? (
-                            <span className="text-[11px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/60 px-2 py-0.5 rounded border border-red-200 dark:border-red-800">
+                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700">
                               -₹{Number(punch.lateLoginPenalty)}
                             </span>
                           ) : (
