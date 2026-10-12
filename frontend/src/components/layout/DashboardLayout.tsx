@@ -51,7 +51,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Info,
-  XCircle
+  XCircle,
+  QrCode
 } from 'lucide-react';
 
 interface NavItem {
@@ -92,9 +93,17 @@ const enterpriseNavigation: NavSectionConfig[] = [
     ],
   },
   {
+    title: 'QR Code Attendance',
+    items: [
+      { title: 'Digital QR Passes', href: '/attendance/qr-codes', icon: QrCode, badge: 'Live ID' },
+      { title: 'Contactless QR Scanner', href: '/operations/qr-scanner', icon: ScanFace, badge: 'Scanner' },
+    ],
+  },
+  {
     title: 'Time & Attendance',
     items: [
       { title: 'Biometric Punches', href: '/attendance/punches', icon: Fingerprint },
+      { title: 'Digital QR Passes', href: '/attendance/qr-codes', icon: QrCode, badge: 'Daily' },
       { title: 'Floor Shifts & Rosters', href: '/attendance/shifts', icon: Calendar },
       { title: 'Late & Fine Management', href: '/attendance/late-fines', icon: AlertTriangle, badge: 'Policy' },
       { title: 'Lunch & Break Tracker', href: '/attendance/breaks', icon: Coffee },
@@ -251,7 +260,7 @@ export function DashboardLayout({
     return (
       <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#111317] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-3 border-[#722F37] border-t-transparent rounded-full animate-spin" />
+          <div className="w-10 h-10 border-3 border-[#0058be] border-t-transparent rounded-full animate-spin" />
           <p className="text-slate-600 dark:text-slate-400 text-xs font-medium">Loading workspace...</p>
         </div>
       </div>
@@ -264,7 +273,7 @@ export function DashboardLayout({
       return (
         <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#111317] flex items-center justify-center">
           <div className="flex flex-col items-center gap-3">
-            <div className="w-10 h-10 border-3 border-[#722F37] border-t-transparent rounded-full animate-spin" />
+            <div className="w-10 h-10 border-3 border-[#0058be] border-t-transparent rounded-full animate-spin" />
             <p className="text-slate-600 dark:text-slate-400 text-xs font-medium">Redirecting to login...</p>
           </div>
         </div>
@@ -307,6 +316,7 @@ export function DashboardLayout({
         }
         // Store floor & observation operations
         if (item.href.startsWith('/operations')) {
+          if (item.href === '/operations/qr-scanner') return true;
           return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole);
         }
         // Employee Payslips self-service view is accessible to all authenticated staff
@@ -491,7 +501,7 @@ export function DashboardLayout({
                           onClick={() => setMobileMenuOpen(false)}
                           className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs ${
                             isItemActive 
-                              ? 'bg-[#722F37]/10 dark:bg-[#722F37]/25 text-[#722F37] dark:text-[#E8DCC6] font-semibold' 
+                              ? 'bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 font-semibold' 
                               : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
                           }`}
                         >

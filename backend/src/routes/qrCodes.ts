@@ -195,18 +195,65 @@ router.post('/scan', authorize('SCAN'), validate(qrScanSchema), async (req: Auth
   try {
     const { token, purpose, locationId, sellingPointId, deviceInfo, ipAddress } = req.body;
     
-    if (req.user!.role !== 'SUPER_ADMIN' && locationId && locationId !== req.user!.locationId) {
+    if (req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN' && locationId && locationId !== req.user!.locationId) {
       return res.status(403).json({ success: false, error: 'Access denied', reason: 'Scanner location mismatch' });
     }
     
     // Find QR code
-    const qrCode = await prisma.qRCode.findUnique({
+    let qrCode = await prisma.qRCode.findUnique({
       where: { token },
       include: { employee: { include: { shift: true, floor: true, department: true } } },
     });
+
+    if (!qrCode) {
+      const emp = await prisma.employee.findFirst({
+        where: {
+          OR: [
+            { employeeCode: token },
+            { id: token },
+          ],
+        },
+        include: { shift: true, floor: true, department: true },
+      });
+
+      if (emp) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        let activeQr = await prisma.qRCode.findFirst({
+          where: {
+            employeeId: emp.id,
+            isConsumed: false,
+            validTo: { gte: new Date() },
+          },
+          include: { employee: { include: { shift: true, floor: true, department: true } } },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (!activeQr) {
+          const randomHex = crypto.randomBytes(16).toString('hex');
+          const generatedToken = `DAILY-${emp.employeeCode}-${today.toISOString().split('T')[0].replace(/-/g, '')}-${randomHex}`;
+          activeQr = await prisma.qRCode.create({
+            data: {
+              token: generatedToken,
+              type: 'DAILY',
+              employeeId: emp.id,
+              locationId: emp.locationId,
+              validFrom: today,
+              validTo: tomorrow,
+              isConsumed: false,
+            },
+            include: { employee: { include: { shift: true, floor: true, department: true } } },
+          });
+        }
+        qrCode = activeQr;
+      }
+    }
     
     if (!qrCode) {
-      return res.status(404).json({ success: false, error: 'Invalid QR code', reason: 'Invalid or unknown QR token', result: 'INVALID_TOKEN' });
+      return res.status(404).json({ success: false, error: 'Invalid QR code', reason: 'Invalid or unknown QR token or employee code', result: 'INVALID_TOKEN' });
     }
     
     // Check if QR is consumed (for daily QR)
@@ -235,7 +282,7 @@ router.post('/scan', authorize('SCAN'), validate(qrScanSchema), async (req: Auth
     
     // Check location match
     const effectiveLocationId = locationId || req.user!.locationId;
-    if (effectiveLocationId && qrCode.locationId !== effectiveLocationId && req.user!.role !== 'SUPER_ADMIN') {
+    if (effectiveLocationId && qrCode.locationId !== effectiveLocationId && req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN') {
       return res.status(400).json({ 
         success: false,
         error: 'Location mismatch', 
@@ -257,9 +304,9 @@ router.post('/scan', authorize('SCAN'), validate(qrScanSchema), async (req: Auth
     const rules = ruleLocationId ? await prisma.attendanceRules.findUnique({ where: { locationId: ruleLocationId } }) : null;
     const allowedRoles: string[] = Array.isArray(rules?.scannerRoles)
       ? (rules?.scannerRoles as string[])
-      : ['T_SHOP_OWNER', 'TEA_BREAK_MANAGER', 'HR_MANAGER', 'FLOOR_MANAGER'];
+      : ['SUPER_ADMIN', 'ADMIN', 'T_SHOP_OWNER', 'TEA_BREAK_MANAGER', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'];
     
-    if (!allowedRoles.includes(req.user!.role)) {
+    if (req.user!.role !== 'SUPER_ADMIN' && req.user!.role !== 'ADMIN' && !allowedRoles.includes(req.user!.role)) {
       return res.status(403).json({ 
         error: 'Unauthorized scanner role', 
         result: 'UNAUTHORIZED_SCANNER',
