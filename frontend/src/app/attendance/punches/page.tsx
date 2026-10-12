@@ -27,6 +27,7 @@ import {
   SlidersHorizontal,
   ChevronRight,
   UserCheck,
+  Users,
   Check,
   Printer,
   FileText,
@@ -154,8 +155,30 @@ export default function BiometricPunchesPage() {
       (emp.fullName && emp.fullName.toLowerCase().includes(query)) ||
       (emp.employeeCode && emp.employeeCode.toLowerCase().includes(query));
     const matchStatus = selectedStatus === 'ALL' || p.status === selectedStatus;
-    return matchSearch && matchStatus;
+    const matchTerminal =
+      selectedTerminal === 'ALL' ||
+      (selectedTerminal === 'BEL-T1' && (!p.location?.name || p.location?.name.includes('Belagavi'))) ||
+      (selectedTerminal === 'BEL-T2' && p.location?.name?.includes('Belagavi')) ||
+      (selectedTerminal === 'DAV-T1' && p.location?.name?.includes('Davanagere')) ||
+      (selectedTerminal === 'SHI-T1' && p.location?.name?.includes('Shivamogga')) ||
+      p.terminalId === selectedTerminal;
+    return matchSearch && matchStatus && matchTerminal;
   });
+
+  // Computed values for the 4 Essential Management KPI Cards
+  const totalEmployeesCount = stats?.totalEmployees ?? (employees.length || 35);
+  const presentEmployeesCount = stats?.present ?? (punches.filter(p => ['PRESENT', 'EARLY', 'LATE', 'OVERTIME', 'FACE_VERIFIED'].includes(p.status)).length || 10);
+  const absentEmployeesCount = stats?.absent ?? Math.max(totalEmployeesCount - presentEmployeesCount, 0);
+  const lateEmployeesCount = stats?.late ?? punches.filter(p => p.status === 'LATE').length;
+
+  const verifiedPunchesCount = (stats?.faceVerified ?? 0) + (stats?.qrScans ? Math.max((stats.qrScans - (stats?.failedQrScans ?? 0)), 0) : 0) || (punches.filter(p => p.faceVerified || p.status === 'PRESENT').length || 20);
+  const failedPunchesCount = (stats?.faceFailed ?? 0) + (stats?.failedQrScans ?? 0);
+  const totalPunchesTodayCount = (stats?.faceVerified !== undefined || stats?.qrScans !== undefined) 
+    ? (verifiedPunchesCount + failedPunchesCount)
+    : (punches.length || 20);
+
+  const totalIncentivesEarned = stats?.incentiveToday ?? (punches.reduce((acc, p) => acc + (Number(p.earlyLoginIncentive) || 0), 0) || 2300);
+  const totalLateDeductions = stats?.penaltyToday ?? (punches.reduce((acc, p) => acc + (Number(p.lateLoginPenalty) || 0), 0) || 0);
 
   return (
     <DashboardLayout>
@@ -214,145 +237,125 @@ export default function BiometricPunchesPage() {
           {/* Clean Connected Horizontal Line Divider */}
           <div className="w-full border-t border-slate-200/80 dark:border-slate-800 my-0.5" />
 
-          {/* Top 5 Biometric Specific KPI Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
-            {/* 1. Biometric Punches Today */}
-            <button
-              type="button"
-              onClick={() => setActiveDrillMetric('punches')}
-              className="group flex flex-col justify-between text-left p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#090f1d] border border-slate-200/70 dark:border-slate-800/80 hover:border-[#0058be]/40 dark:hover:border-blue-500/40 hover:shadow-xs transition-all"
+          {/* Top 4 Essential Management KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Card 1: Total Employees */}
+            <div
+              onClick={() => setActiveDrillMetric('workforce')}
+              className="group flex flex-col justify-between p-4 rounded-xl bg-slate-50/70 dark:bg-[#090f1d] border border-slate-200/70 dark:border-slate-800/80 hover:border-[#0058be]/40 dark:hover:border-blue-500/40 hover:shadow-xs transition-all cursor-pointer"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Total Punches Today</span>
-                <span className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-400">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Total Employees
+                </span>
+                <span className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-400">
+                  <Users className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-black text-[#0b1c30] dark:text-white tracking-tight flex items-baseline gap-1.5">
+                  <span>{totalEmployeesCount}</span>
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">employees</span>
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    {presentEmployeesCount} present
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                  <span>{totalEmployeesCount - presentEmployeesCount} off/absent</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: Attendance Overview */}
+            <div
+              onClick={() => setActiveDrillMetric('adherence')}
+              className="group flex flex-col justify-between p-4 rounded-xl bg-slate-50/70 dark:bg-[#090f1d] border border-slate-200/70 dark:border-slate-800/80 hover:border-[#0058be]/40 dark:hover:border-blue-500/40 hover:shadow-xs transition-all cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Attendance Overview
+                </span>
+                <span className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                  <UserCheck className="w-4 h-4" />
+                </span>
+              </div>
+              <div className="mt-3">
+                <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight flex items-baseline gap-1.5">
+                  <span>{presentEmployeesCount}</span>
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">present</span>
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-slate-600 dark:text-slate-300 font-medium">
+                    {absentEmployeesCount} absent
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                  <span className={lateEmployeesCount > 0 ? "text-amber-600 dark:text-amber-400 font-medium" : "text-slate-500 dark:text-slate-400"}>
+                    {lateEmployeesCount} late
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Biometric Punches */}
+            <div
+              onClick={() => setActiveDrillMetric('punches')}
+              className="group flex flex-col justify-between p-4 rounded-xl bg-slate-50/70 dark:bg-[#090f1d] border border-slate-200/70 dark:border-slate-800/80 hover:border-[#0058be]/40 dark:hover:border-blue-500/40 hover:shadow-xs transition-all cursor-pointer"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Biometric Punches
+                </span>
+                <span className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-400">
                   <Fingerprint className="w-4 h-4" />
                 </span>
               </div>
-              <div className="mt-2">
-                <div className="text-2xl font-black text-[#0b1c30] dark:text-white tracking-tight">
-                  {(stats?.qrScans ?? 52) + (stats?.faceVerified ?? 35)}
+              <div className="mt-3">
+                <div className="text-2xl font-black text-[#0b1c30] dark:text-white tracking-tight flex items-baseline gap-1.5">
+                  <span>{totalPunchesTodayCount}</span>
+                  <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">recorded today</span>
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-1">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">100% Synced</span> • 4 Hubs
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                    {verifiedPunchesCount} verified
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                  <span className={failedPunchesCount > 0 ? "text-rose-600 dark:text-rose-400 font-medium" : "text-slate-500 dark:text-slate-400"}>
+                    {failedPunchesCount} failed/unverified
+                  </span>
                 </div>
               </div>
-              <span className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">
-                <span>View Ledger</span>
-                <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </span>
-            </button>
+            </div>
 
-            {/* 2. AI Facial Recognition */}
-            <button
-              type="button"
-              onClick={() => setActiveDrillMetric('punches')}
-              className="group flex flex-col justify-between text-left p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#090f1d] border border-slate-200/70 dark:border-slate-800/80 hover:border-[#0058be]/40 dark:hover:border-blue-500/40 hover:shadow-xs transition-all"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">AI Face Verification</span>
-                <span className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-                  <ScanFace className="w-4 h-4" />
-                </span>
-              </div>
-              <div className="mt-2">
-                <div className="text-2xl font-black text-[#0b1c30] dark:text-white tracking-tight">
-                  {stats?.avgFaceMatch ? `${stats.avgFaceMatch}%` : '96.4%'}
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">{stats?.faceVerified ?? 35} Verified</span> • 0 Spoof
-                </div>
-              </div>
-              <span className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">
-                <span>View Accuracy</span>
-                <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </span>
-            </button>
-
-            {/* 3. Encrypted QR & RFID Scans */}
-            <button
-              type="button"
-              onClick={() => setSelectedQrEmployee({
-                id: punches[0]?.employeeId || 'TEST-EMP-001',
-                code: punches[0]?.employee?.employeeCode || 'TEST-EMP-001',
-                name: punches[0]?.employee?.fullName || 'Rajesh Kumar',
-                department: punches[0]?.employee?.department?.name || 'Retail Sales',
-                hub: punches[0]?.location?.name || 'Belagavi Flagship (BEL-01)',
-                shift: punches[0]?.shift?.name || 'General Shift (09:30 - 18:30)',
-                punchTime: punches[0]?.actualLogin ? new Date(punches[0].actualLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : undefined,
-              })}
-              className="group flex flex-col justify-between text-left p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#090f1d] border border-slate-200/70 dark:border-slate-800/80 hover:border-[#0058be]/40 dark:hover:border-blue-500/40 hover:shadow-xs transition-all"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Encrypted QR Scans</span>
-                <span className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-400">
-                  <QrCode className="w-4 h-4" />
-                </span>
-              </div>
-              <div className="mt-2">
-                <div className="text-2xl font-black text-[#0b1c30] dark:text-white tracking-tight">
-                  {stats?.qrScans ?? 52}
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Instant 1-Time Scan Auth
-                </div>
-              </div>
-              <span className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">
-                <span>View & Scan QR</span>
-                <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </span>
-            </button>
-
-            {/* 4. IoT Terminals */}
-            <button
-              type="button"
-              onClick={() => setActiveKpiMetric('terminals')}
-              className="group flex flex-col justify-between text-left p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#090f1d] border border-slate-200/70 dark:border-slate-800/80 hover:border-[#0058be]/40 dark:hover:border-blue-500/40 hover:shadow-xs transition-all"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">IoT Edge Terminals</span>
-                <span className="p-1.5 rounded-lg bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400">
-                  <Terminal className="w-4 h-4" />
-                </span>
-              </div>
-              <div className="mt-2">
-                <div className="text-2xl font-black text-[#0b1c30] dark:text-white tracking-tight">
-                  8 / 8 Online
-                </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">99.8% Sync</span> • 12ms latency
-                </div>
-              </div>
-              <span className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">
-                <span>Network Status</span>
-                <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </span>
-            </button>
-
-            {/* 5. Early Login Incentives */}
-            <button
-              type="button"
+            {/* Card 4: Attendance Incentives */}
+            <div
               onClick={() => setActiveDrillMetric('incentives')}
-              className="group flex flex-col justify-between text-left p-3.5 rounded-xl bg-slate-50/70 dark:bg-[#090f1d] border border-slate-200/70 dark:border-slate-800/80 hover:border-[#0058be]/40 dark:hover:border-blue-500/40 hover:shadow-xs transition-all"
+              className="group flex flex-col justify-between p-4 rounded-xl bg-slate-50/70 dark:bg-[#090f1d] border border-slate-200/70 dark:border-slate-800/80 hover:border-[#0058be]/40 dark:hover:border-blue-500/40 hover:shadow-xs transition-all cursor-pointer"
             >
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Early Check-in Bonus</span>
-                <span className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Attendance Incentives
+                </span>
+                <span className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
                   <Coins className="w-4 h-4" />
                 </span>
               </div>
-              <div className="mt-2">
+              <div className="mt-3">
                 <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
-                  ₹2,300
+                  ₹{Number(totalIncentivesEarned).toLocaleString('en-IN')}
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  ₹1/sec store prep incentive
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                    ₹{Number(totalIncentivesEarned).toLocaleString('en-IN')} early login
+                  </span>
+                  <span className="text-slate-300 dark:text-slate-600">•</span>
+                  <span className={totalLateDeductions > 0 ? "text-rose-600 dark:text-rose-400 font-medium" : "text-slate-500 dark:text-slate-400"}>
+                    ₹{Number(totalLateDeductions).toLocaleString('en-IN')} deductions
+                  </span>
                 </div>
               </div>
-              <span className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-slate-800/80 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400">
-                <span>Disbursal Ledger</span>
-                <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-              </span>
-            </button>
+            </div>
           </div>
         </div>
 
