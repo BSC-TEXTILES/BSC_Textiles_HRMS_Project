@@ -660,10 +660,9 @@ export default function DashboardPage() {
             </div>
           </div>
 
-<<<<<<< Updated upstream
           {/* Clean Connected Horizontal Line Divider */}
           <div className="w-full border-t border-slate-200/80 dark:border-slate-800 my-0.5" />
-=======
+
           {/* Shift Reset / Creation Notice */}
           {shiftNotice && (
             <div
@@ -685,7 +684,6 @@ export default function DashboardPage() {
               </button>
             </div>
           )}
->>>>>>> Stashed changes
 
           {/* Filter & Terminal Connectivity Bar */}
           <div className="flex flex-col gap-3 pt-3 bg-[#eff4ff]/60 dark:bg-[#131f38]/60 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800 transition-all">

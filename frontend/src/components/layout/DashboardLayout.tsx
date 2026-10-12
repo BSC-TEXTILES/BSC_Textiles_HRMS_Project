@@ -51,7 +51,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Info,
-  XCircle
+  XCircle,
+  QrCode
 } from 'lucide-react';
 
 interface NavItem {
@@ -95,6 +96,7 @@ const enterpriseNavigation: NavSectionConfig[] = [
     title: 'Time & Attendance',
     items: [
       { title: 'Biometric Punches', href: '/attendance/punches', icon: Fingerprint },
+      { title: 'Digital QR Passes', href: '/attendance/qr-codes', icon: QrCode, badge: 'Live ID' },
       { title: 'Floor Shifts & Rosters', href: '/attendance/shifts', icon: Calendar },
       { title: 'Late & Fine Management', href: '/attendance/late-fines', icon: AlertTriangle, badge: 'Policy' },
       { title: 'Lunch & Break Tracker', href: '/attendance/breaks', icon: Coffee },
