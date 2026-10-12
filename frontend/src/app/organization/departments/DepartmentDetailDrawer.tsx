@@ -115,12 +115,13 @@ export function DepartmentDetailDrawer({
       }
     }, 50);
 
+    const triggerElement = triggerRef?.current;
     return () => {
       document.body.style.overflow = originalOverflow;
       window.removeEventListener('keydown', handleKeyDown);
       clearTimeout(timer);
-      if (triggerRef?.current) {
-        triggerRef.current.focus();
+      if (triggerElement) {
+        triggerElement.focus();
       }
     };
   }, [isOpen, onClose, triggerRef]);

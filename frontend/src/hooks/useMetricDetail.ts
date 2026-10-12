@@ -74,7 +74,15 @@ export function useMetricDetail<T = any>(
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
         }
-        const json = await res.json();
+        const text = await res.text().catch(() => '');
+        let json: any = {};
+        try {
+          if (text && text.trim().length > 0) {
+            json = JSON.parse(text);
+          }
+        } catch {
+          json = {};
+        }
         memoryCache.set(cacheKey, { data: json, timestamp: Date.now() });
         setData(json);
         setLastRefreshed(new Date());

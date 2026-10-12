@@ -65,7 +65,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null);
 
   const fetchUnreadCount = useCallback(async () => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || window.location.pathname.startsWith('/login')) return;
     const token = localStorage.getItem('bsc_token') || localStorage.getItem('token') || (session as any)?.token;
     if (!token) return;
 
@@ -80,7 +80,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   }, [session]);
 
   const fetchNotifications = useCallback(async (params: any = {}) => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || window.location.pathname.startsWith('/login')) return;
     const token = localStorage.getItem('bsc_token') || localStorage.getItem('token') || (session as any)?.token;
     if (!token) return;
 
@@ -149,9 +149,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [notifications]);
 
-  // Initialize WebSocket connection only when user is authenticated
+  // Initialize WebSocket connection only when user is authenticated and not on login page
   useEffect(() => {
-    if (status !== 'authenticated') {
+    if (status !== 'authenticated' || (typeof window !== 'undefined' && window.location.pathname.startsWith('/login'))) {
       setSocket((prev) => {
         if (prev) prev.close();
         return null;
@@ -216,8 +216,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     };
   }, [status, session]);
 
-  // Fetch initial data only when authenticated
+  // Fetch initial data only when authenticated and not on login page
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/login')) {
+      return;
+    }
     if (status === 'authenticated') {
       fetchUnreadCount();
       fetchNotifications({ limit: 10 });

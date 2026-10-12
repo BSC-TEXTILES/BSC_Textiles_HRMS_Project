@@ -97,3 +97,32 @@ export function debounce<T extends (...args: any[]) => any>(
 export function generateId(): string {
   return Math.random().toString(36).substring(2, 15);
 }
+
+/**
+ * Parse a JSON string (or pass through an already-parsed value) without ever throwing.
+ *
+ * localStorage and API payloads frequently hold an empty or truncated string. A bare
+ * `JSON.parse('')` throws "Unexpected end of JSON input" and crashes the whole render
+ * tree, so every untrusted parse must go through here instead.
+ */
+export function safeJsonParse<T>(value: unknown, fallback: T): T {
+  if (value == null || value === '') {
+    return fallback;
+  }
+
+  if (typeof value !== 'string') {
+    return value as unknown as T;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return fallback;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as T;
+    return parsed == null ? fallback : parsed;
+  } catch {
+    return fallback;
+  }
+}

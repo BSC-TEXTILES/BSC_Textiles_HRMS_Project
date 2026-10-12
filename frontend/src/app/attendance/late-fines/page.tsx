@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
+import { safeJsonParse } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import {
   Clock,
@@ -1161,8 +1162,8 @@ export default function LateFinesPage() {
                       </td>
                     </tr>
                   ) : (
-                    earlyRecords.map((e) => (
-                      <tr key={e.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 whitespace-nowrap">
+                    earlyRecords.map((e, idx) => (
+                      <tr key={`${e.id || idx}-${idx}`} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 whitespace-nowrap">
                         <td className="py-2.5 px-3 font-mono font-bold text-slate-700 dark:text-slate-300">
                           {e.employeeCode}
                         </td>
@@ -1353,7 +1354,7 @@ export default function LateFinesPage() {
                   <div className="flex flex-col gap-2">
                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Action History & Audit Log:</span>
                     <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                      {(typeof selectedRecord.historyJson === 'string' ? JSON.parse(selectedRecord.historyJson) : selectedRecord.historyJson).map((h: any, idx: number) => (
+                      {safeJsonParse<any[]>(selectedRecord.historyJson, []).map((h: any, idx: number) => (
                         <div key={idx} className="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[11px]">
                           <div className="flex items-center justify-between font-bold text-slate-700 dark:text-slate-200">
                             <span>{h.action} by {h.byUser}</span>
@@ -1438,8 +1439,8 @@ export default function LateFinesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {drillDownModal.records.map((r) => (
-                      <tr key={r.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
+                    {drillDownModal.records.map((r, idx) => (
+                      <tr key={`${r.id || idx}-${idx}`} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40">
                         <td className="py-2 px-3 font-mono font-bold">{r.employeeCode}</td>
                         <td className="py-2 px-3 font-bold">{r.employeeName}</td>
                         <td className="py-2 px-3">{r.departmentName}</td>
@@ -1678,8 +1679,8 @@ export default function LateFinesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {employeeHistoryModal.data.records.map((r: any) => (
-                      <tr key={r.id}>
+                    {employeeHistoryModal.data.records.map((r: any, idx: number) => (
+                      <tr key={`${r.id || idx}-${idx}`}>
                         <td className="py-2 px-3 font-mono">{String(r.recordDate).split('T')[0]}</td>
                         <td className="py-2 px-3 font-mono">
                           {r.actualPunchIn ? new Date(r.actualPunchIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'MISSING'}

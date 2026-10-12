@@ -328,9 +328,34 @@ router.get('/floor-hierarchy', authorize('VIEW'), async (req: AuthRequest, res) 
       WHERE locationId = ?
     `, [targetLocId]);
 
-    const bs = billingSummaryRows[0] || {};
-    const completedCount = Number(bs.completedBills || 0);
-    const netSales = Number(bs.netSales || 0);
+    let bs = billingSummaryRows[0] || {};
+    let completedCount = Number(bs.completedBills || 0);
+    let netSales = Number(bs.netSales || 0);
+
+    // If no transactions have occurred yet today, fallback to the latest available store day/month transactions
+    if (completedCount === 0) {
+      const [fallbackRows]: any = await pool.query(`
+        SELECT
+          COUNT(CASE WHEN status = 'COMPLETED' THEN 1 ELSE NULL END) as completedBills,
+          COUNT(CASE WHEN status = 'PENDING' THEN 1 ELSE NULL END) as pendingBills,
+          COUNT(CASE WHEN status = 'CANCELLED' THEN 1 ELSE NULL END) as cancelledBills,
+          COUNT(CASE WHEN status = 'RETURNED' THEN 1 ELSE NULL END) as returnedBills,
+          SUM(CASE WHEN status = 'COMPLETED' THEN grossAmount ELSE 0 END) as grossSales,
+          SUM(CASE WHEN status = 'COMPLETED' THEN discountAmount ELSE 0 END) as totalDiscount,
+          SUM(CASE WHEN status = 'COMPLETED' THEN taxAmount ELSE 0 END) as totalTax,
+          SUM(CASE WHEN status = 'COMPLETED' THEN netAmount ELSE 0 END) as netSales,
+          SUM(CASE WHEN status = 'COMPLETED' AND paymentMethod = 'CASH' THEN netAmount ELSE 0 END) as cashTotal,
+          SUM(CASE WHEN status = 'COMPLETED' AND paymentMethod = 'CARD' THEN netAmount ELSE 0 END) as cardTotal,
+          SUM(CASE WHEN status = 'COMPLETED' AND paymentMethod = 'UPI' THEN netAmount ELSE 0 END) as upiTotal
+        FROM retail_sales_transaction
+        WHERE locationId = ?
+      `, [targetLocId]);
+      if (fallbackRows && fallbackRows[0] && Number(fallbackRows[0].completedBills || 0) > 0) {
+        bs = fallbackRows[0];
+        completedCount = Number(bs.completedBills || 0);
+        netSales = Number(bs.netSales || 0);
+      }
+    }
 
     // 14. Overall Store Overview Metrics
     let storeTotalCounters = 0;

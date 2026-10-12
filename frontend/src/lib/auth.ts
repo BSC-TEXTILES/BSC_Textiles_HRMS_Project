@@ -1,7 +1,14 @@
 import type { NextAuthOptions } from 'next-auth';
-import CredentialsProvider from 'next-auth/providers/credentials';
+import _CredentialsProvider from 'next-auth/providers/credentials';
 
-const API_URL = process.env.API_URL || 'http://127.0.0.1:4000/api';
+const CredentialsProvider: typeof _CredentialsProvider =
+  typeof _CredentialsProvider === 'function'
+    ? _CredentialsProvider
+    : typeof (_CredentialsProvider as any)?.default === 'function'
+    ? (_CredentialsProvider as any).default
+    : (_CredentialsProvider as any)?.default?.default || _CredentialsProvider;
+
+const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000/api';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -47,7 +54,13 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Could not connect to authentication server. Please ensure backend is running on port 4000.');
         }
 
-        const data = await response.json().catch(() => ({}));
+        const text = await response.text().catch(() => '');
+        let data: any = {};
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          data = {};
+        }
 
         if (!response.ok || !data?.user) {
           throw new Error(data?.error || data?.message || 'Invalid email or password');

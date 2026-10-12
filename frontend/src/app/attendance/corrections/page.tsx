@@ -44,7 +44,17 @@ export default function AttendanceCorrectionsPage() {
             type: 'MISSED_OUT',
             notes: c.reviewNote || c.reason,
           }));
-          setRecords((prev) => [...mapped, ...prev]);
+          setRecords((prev) => {
+            const seen = new Set<string>();
+            const merged: CorrectionRecord[] = [];
+            for (const item of [...mapped, ...prev]) {
+              if (item.id && !seen.has(item.id)) {
+                seen.add(item.id);
+                merged.push(item);
+              }
+            }
+            return merged;
+          });
         }
       })
       .catch(() => {});
@@ -62,7 +72,10 @@ export default function AttendanceCorrectionsPage() {
 
   const selectedRecord = records.find((r) => r.id === selectedRecordId) || records[0];
 
-  const filteredRecords = records.filter((r) => {
+  const filteredRecords = records.filter((r, idx, arr) => {
+    if (arr.findIndex((item) => item.id === r.id) !== idx) {
+      return false;
+    }
     const matchesTab = activeTab === 'ALL' || r.type === activeTab;
     const matchesHub = hubFilter === 'ALL' || r.hub.toLowerCase().includes(hubFilter.toLowerCase());
     const matchesSearch =
@@ -131,7 +144,7 @@ export default function AttendanceCorrectionsPage() {
       type: 'MISSED_OUT',
       notes: newRequest.reason,
     };
-    setRecords([newRec, ...records]);
+    setRecords((prev) => [newRec, ...prev.filter((r) => r.id !== newRec.id)]);
     setSelectedRecordId(newRec.id);
     setIsModalOpen(false);
     toast.success('Manual punch correction request logged!');
@@ -157,7 +170,7 @@ export default function AttendanceCorrectionsPage() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#722F37] opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-[#722F37]"></span>
                 </span>
-                Active Pay Cycle: 21 Oct â€“ 27 Oct 2024
+                Active Pay Cycle: 21 Oct - 27 Oct 2024
               </div>
               <div className="inline-flex items-center gap-1.5 text-slate-600 text-xs bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/60 font-medium">
                 <span className="material-symbols-outlined text-[15px] text-[#722F37]">verified_user</span>
@@ -224,7 +237,7 @@ export default function AttendanceCorrectionsPage() {
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 flex items-center gap-1">
               <span className="material-symbols-outlined text-[14px] text-[#722F37]">subdirectory_arrow_right</span>
-              4 Floor Approved â€¢ 2 with HR
+              4 Floor Approved • 2 with HR
             </div>
           </div>
 
@@ -245,7 +258,7 @@ export default function AttendanceCorrectionsPage() {
               </div>
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 truncate">
-              14 Single Punches â€¢ 6 Grace Breaches
+              14 Single Punches • 6 Grace Breaches
             </div>
           </div>
 
@@ -309,7 +322,7 @@ export default function AttendanceCorrectionsPage() {
                 Payroll Impact Saved
               </span>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-emerald-600 tracking-tight">â‚¹18,420</span>
+                <span className="text-2xl font-black text-emerald-600 tracking-tight">₹18,420</span>
               </div>
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500">
@@ -481,11 +494,11 @@ export default function AttendanceCorrectionsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredRecords.map((r) => {
+                    {filteredRecords.map((r, idx) => {
                       const isSelected = r.id === selectedRecordId;
                       return (
                         <tr
-                          key={r.id}
+                          key={`${r.id}-${idx}`}
                           onClick={() => setSelectedRecordId(r.id)}
                           className={`cursor-pointer transition-colors ${
                             isSelected ? 'bg-blue-50/60 border-l-4 border-l-[#722F37]' : 'hover:bg-slate-50/70'
@@ -506,7 +519,7 @@ export default function AttendanceCorrectionsPage() {
                                   {r.empCode}
                                 </span>
                                 <span className="inline-flex mt-1 items-center px-1.5 py-0.5 rounded text-[10px] font-semibold text-[#722F37] bg-[#F8F4F1] border border-[#E5D5D7] w-max">
-                                  {r.hub} â€¢ {r.dept}
+                                  {r.hub} • {r.dept}
                                 </span>
                               </div>
                             </div>
@@ -519,7 +532,7 @@ export default function AttendanceCorrectionsPage() {
                               </span>
                               <div className="flex items-center gap-1 text-slate-500 mt-0.5">
                                 <span className="font-mono text-slate-900">{r.rawIn}</span>
-                                <span>â€¢</span>
+                                <span>•</span>
                                 <span className="px-1 py-0.2 rounded bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200">
                                   {r.rawOut}
                                 </span>
@@ -637,7 +650,7 @@ export default function AttendanceCorrectionsPage() {
                   <span>
                     Showing <strong>{filteredRecords.length}</strong> of <strong>{records.length}</strong> regularization requests
                   </span>
-                  <span className="hidden sm:inline">â€¢</span>
+                  <span className="hidden sm:inline">•</span>
                   <span className="hidden sm:inline">428 Active Floor Staff Registered</span>
                 </div>
                 <div className="flex items-center gap-1">
@@ -710,10 +723,10 @@ export default function AttendanceCorrectionsPage() {
                       <span className="material-symbols-outlined text-[#722F37] text-[16px]">verified</span>
                     </div>
                     <span className="text-[11px] text-slate-500 font-mono">
-                      {selectedRecord.empCode} â€¢ {selectedRecord.role}
+                      {selectedRecord.empCode} • {selectedRecord.role}
                     </span>
                     <span className="text-[11px] text-slate-400 mt-0.5">
-                      {selectedRecord.hub} â€¢ {selectedRecord.dept}
+                      {selectedRecord.hub} • {selectedRecord.dept}
                     </span>
                   </div>
                 </div>
@@ -732,7 +745,7 @@ export default function AttendanceCorrectionsPage() {
                   <div className="flex flex-col">
                     <span className="text-[10px] font-bold text-slate-400 uppercase">Raw Ingestion</span>
                     <span className="font-mono text-xs text-slate-800 font-bold mt-0.5">
-                      {selectedRecord.rawIn} â†’ <span className="text-rose-600 font-bold">{selectedRecord.rawOut}</span>
+                      {selectedRecord.rawIn} → <span className="text-rose-600 font-bold">{selectedRecord.rawOut}</span>
                     </span>
                   </div>
                   <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200">
@@ -744,7 +757,7 @@ export default function AttendanceCorrectionsPage() {
                   <div className="flex flex-col">
                     <span className="text-[10px] font-bold text-[#722F37] uppercase">Proposed Approved Ledger</span>
                     <span className="font-mono text-xs text-slate-900 font-bold mt-0.5">
-                      {selectedRecord.rawIn} â†’ <span className="text-[#722F37] font-bold">{selectedRecord.overrideOut}</span>
+                      {selectedRecord.rawIn} → <span className="text-[#722F37] font-bold">{selectedRecord.overrideOut}</span>
                     </span>
                   </div>
                   <span className="px-2 py-0.5 rounded-full bg-[#722F37] text-white text-[10px] font-bold">
@@ -775,10 +788,10 @@ export default function AttendanceCorrectionsPage() {
                 </span>
                 <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 flex flex-col gap-1.5">
                   <p className="text-xs text-slate-700 italic leading-relaxed">
-                    â€œ{selectedRecord.notes}â€
+                    &ldquo;{selectedRecord.notes}&rdquo;
                   </p>
                   <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-[11px] text-slate-500">
-                    <span className="font-bold text-slate-800">â€” {selectedRecord.supervisor}</span>
+                    <span className="font-bold text-slate-800">— {selectedRecord.supervisor}</span>
                     <span className="font-mono">24 Oct 19:40 IST</span>
                   </div>
                 </div>

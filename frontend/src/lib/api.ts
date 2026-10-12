@@ -1,5 +1,5 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
-import { getSession } from 'next-auth/react';
+import { getSession, signOut } from 'next-auth/react';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api',
@@ -66,6 +66,9 @@ api.interceptors.request.use(async (config) => {
   }
 
   if (token) {
+    if (config.headers && typeof (config.headers as any).set === 'function') {
+      (config.headers as any).set('Authorization', `Bearer ${token}`);
+    }
     config.headers.Authorization = `Bearer ${token}`;
   }
 
@@ -93,19 +96,26 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       const pathname = window.location.pathname;
+
+      // DO NOT clear tokens or loop redirect if we are already on the login or 403 page
+      if (pathname.startsWith('/login') || pathname.startsWith('/403')) {
+        error.isHandled401 = true;
+        return Promise.reject(error);
+      }
+
       sessionToken = null;
       localStorage.removeItem('bsc_token');
       localStorage.removeItem('token');
       localStorage.removeItem('bsc_user');
-      document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      document.cookie = 'bsc_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      document.cookie = 'next-auth.session-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-      document.cookie = '__Secure-next-auth.session-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      document.cookie = 'token=; path=/; max-age=0';
+      document.cookie = 'bsc_token=; path=/; max-age=0';
 
       if (!pathname.startsWith('/login') && !isRedirecting) {
         isRedirecting = true;
-        const redirectTarget = `/login?callbackUrl=${encodeURIComponent(pathname + window.location.search)}`;
-        window.location.href = redirectTarget;
+        signOut({ redirect: false }).finally(() => {
+          const redirectTarget = `/login?callbackUrl=${encodeURIComponent(pathname + window.location.search)}`;
+          window.location.href = redirectTarget;
+        });
       }
 
       // Mark the error as auth-handled to allow callers to suppress noisy console logs

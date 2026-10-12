@@ -271,8 +271,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       localStorage.removeItem('bsc_token');
       localStorage.removeItem('token');
       localStorage.removeItem('bsc_user');
-      document.cookie = 'bsc_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      document.cookie = 'bsc_token=; path=/; max-age=0';
+      document.cookie = 'token=; path=/; max-age=0';
     }
+    api.post('/auth/logout').catch(() => {});
     signOut({ callbackUrl: '/login' });
   };
 
@@ -334,10 +336,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     if (!notification.isRead) {
       await markAsRead(notification.id);
     }
-    if (notification.actionUrl) {
-      setNotificationsOpen(false);
-      router.push(notification.actionUrl);
-    }
+    setNotificationsOpen(false);
+    router.push(`/notifications?id=${notification.id}`);
   };
 
   const handleMarkAllRead = async () => {

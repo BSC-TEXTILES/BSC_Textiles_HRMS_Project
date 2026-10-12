@@ -71,10 +71,12 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
-    return backendRoutes.map((route) => ({
-      source: `/api/${route}/:path*`,
-      destination: `${API_URL}/api/${route}/:path*`,
-    }));
+    return {
+      fallback: backendRoutes.map((route) => ({
+        source: `/api/${route}/:path*`,
+        destination: `${API_URL}/api/${route}/:path*`,
+      })),
+    };
   },
 };
 

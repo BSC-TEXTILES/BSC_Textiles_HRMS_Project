@@ -93,8 +93,16 @@ export function AILivenessDetail({
       if (!data) setLoading(true);
       const res = await fetch('/api/biometric/liveness-logs', { credentials: 'include' });
       if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
+        const text = await res.text().catch(() => '');
+        let json: any = null;
+        try {
+          if (text && text.trim().length > 0) {
+            json = JSON.parse(text);
+          }
+        } catch {
+          json = null;
+        }
+        if (json?.success && json?.data) {
           livenessCache = { data: json.data, timestamp: now };
           setData(json.data);
           setThreshold(json.data.summary.currentThreshold || 95);
@@ -134,7 +142,15 @@ export function AILivenessDetail({
         credentials: 'include',
         body: JSON.stringify({ threshold }),
       });
-      const json = await res.json();
+      const text = await res.text().catch(() => '');
+      let json: any = {};
+      try {
+        if (text && text.trim().length > 0) {
+          json = JSON.parse(text);
+        }
+      } catch {
+        json = {};
+      }
       if (json.success) {
         toast.success(`Facial recognition threshold updated to ${threshold}% match across all 8 terminals.`);
       } else {
@@ -357,8 +373,8 @@ export function AILivenessDetail({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {data?.recentLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
+                    {data?.recentLogs.map((log, idx) => (
+                      <tr key={`${log.id || idx}-${idx}`} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2.5">
                             <div className="w-7 h-7 rounded-full bg-blue-100 text-[#0058be] font-bold flex items-center justify-center text-[10px]">

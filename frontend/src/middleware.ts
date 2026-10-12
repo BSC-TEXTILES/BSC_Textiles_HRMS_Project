@@ -82,12 +82,9 @@ export default withAuth(
     const token = req.nextauth?.token;
     const pathname = req.nextUrl.pathname;
 
-    // Direct root visitor to login or their dashboard immediately at the edge/server
+    // Public landing page: always allow visitors to view / directly
     if (pathname === '/') {
-      if (token) {
-        return NextResponse.redirect(new URL('/dashboard', req.url));
-      }
-      return NextResponse.redirect(new URL('/login', req.url));
+      return NextResponse.next();
     }
 
     if (!isAllowed(pathname, token?.role)) {
@@ -118,7 +115,6 @@ export default withAuth(
 
 export const config = {
   matcher: [
-    '/',
     '/dashboard',
     '/dashboard/:path*',
     '/employees',

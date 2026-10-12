@@ -1,26 +1,30 @@
 'use client';
 
 import { useState, useEffect, Suspense, useMemo } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { signIn, useSession, getSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { 
-  Eye, 
-  EyeOff, 
-  AlertCircle, 
-  ArrowRight, 
-  Loader2, 
-  ShieldCheck, 
-  Mail, 
-  Lock, 
+import {
+  Eye,
+  EyeOff,
+  AlertCircle,
+  ArrowRight,
+  ArrowLeft,
+  Home,
+  Loader2,
+  ShieldCheck,
+  Mail,
+  Lock,
   CheckCircle2,
   Building2
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { sanitizeCallbackUrl, getRoleHomePath } from '@/lib/roles';
+import { safeJsonParse } from '@/lib/utils';
 
 const loginSchema = z.object({
   email: z
@@ -35,6 +39,16 @@ const loginSchema = z.object({
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
+
+const AUTH_COOKIE_NAMES = ['token', 'bsc_token'];
+
+function clearAuthCookies() {
+  if (typeof document === 'undefined') return;
+  for (const name of AUTH_COOKIE_NAMES) {
+    document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
+    document.cookie = `${name}=; path=/; max-age=0`;
+  }
+}
 
 /** Seeded authorized roles for test validation */
 const QUICK_TEST_ACCOUNTS = [
@@ -102,9 +116,9 @@ function LoginFormContent() {
     localStorage.removeItem('bsc_token');
     localStorage.removeItem('token');
     localStorage.removeItem('bsc_user');
-    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    document.cookie = 'bsc_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    clearAuthCookies();
   };
+
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
@@ -121,7 +135,8 @@ function LoginFormContent() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: data.email, password: data.password }),
         });
-        const loginData = await loginRes.json().catch(() => ({}));
+        const rawText = await loginRes.text().catch(() => '');
+        const loginData = safeJsonParse<any>(rawText, {});
         if (loginRes.ok && loginData?.token) {
           directToken = loginData.token;
           directUser = loginData.user;
@@ -199,6 +214,16 @@ function LoginFormContent() {
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-6 bg-[#F8F9FA] dark:bg-[#111317] text-[#18181B] dark:text-slate-100 transition-colors duration-200">
       {/* Top Header Utilities */}
+      {/* Top Header Utilities: Back to Home & Theme Toggle */}
+      <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-[#722F37] dark:hover:text-amber-400 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-gray-200/90 dark:border-slate-800 shadow-xs hover:shadow-sm transition-all group"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 text-slate-500 group-hover:text-[#722F37] dark:group-hover:text-amber-400" />
+          <span>Back to Home</span>
+        </Link>
+      </div>
       <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20">
         <ThemeToggle size="md" />
       </div>
@@ -206,9 +231,9 @@ function LoginFormContent() {
       {/* Main Login Card */}
       <div className="w-full max-w-[420px] my-auto">
         <div className="bg-white dark:bg-[#161920] rounded-xl border border-gray-200/90 dark:border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.04)] p-6 sm:p-8 transition-all">
-          
-          {/* Brand Header */}
-          <div className="flex flex-col items-center text-center">
+
+          {/* Brand Header — Clickable to return to Landing Page */}
+          <Link href="/" className="flex flex-col items-center text-center group cursor-pointer mb-1" title="Return to Landing Page">
             <div className="w-16 h-16 rounded-xl bg-white dark:bg-slate-900 p-1.5 border border-gray-200 dark:border-slate-800 shadow-xs flex items-center justify-center overflow-hidden mb-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -217,14 +242,14 @@ function LoginFormContent() {
                 className="w-full h-full object-contain"
               />
             </div>
-            
+
             <h1 className="text-xl font-bold tracking-tight text-[#18181B] dark:text-slate-100">
               BSC Textiles HRMS
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Since 1938 • Enterprise Workforce Portal
             </p>
-          </div>
+          </Link>
 
           {/* Error Banner Notification */}
           {errorMessage && (
@@ -372,11 +397,10 @@ function LoginFormContent() {
                     type="button"
                     onClick={() => applyAccount(p.email)}
                     disabled={isLoading}
-                    className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                      isSelected
-                        ? 'border-[#722F37] bg-[#722F37]/5 dark:bg-[#722F37]/20 ring-1 ring-[#722F37]'
-                        : 'border-gray-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50 hover:bg-slate-100/80 dark:hover:bg-slate-800'
-                    }`}
+                    className={`p-2 rounded-lg border text-left flex flex-col justify-between transition-all cursor-pointer ${isSelected
+                      ? 'border-[#722F37] bg-[#722F37]/5 dark:bg-[#722F37]/20 ring-1 ring-[#722F37]'
+                      : 'border-gray-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/50 hover:bg-slate-100/80 dark:hover:bg-slate-800'
+                      }`}
                   >
                     <div className="flex items-center justify-between w-full">
                       <span className="text-[11px] font-semibold text-[#18181B] dark:text-white truncate">{p.label}</span>
@@ -386,6 +410,16 @@ function LoginFormContent() {
                   </button>
                 );
               })}
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-slate-800/80 text-center">
+              <Link
+                href="/"
+                className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#722F37] dark:text-slate-400 dark:hover:text-amber-400 transition-colors"
+              >
+                <Home className="w-3.5 h-3.5 text-slate-400" />
+                <span>Return to BSC Textiles Home Page</span>
+              </Link>
             </div>
           </div>
         </div>
