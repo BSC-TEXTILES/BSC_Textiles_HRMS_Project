@@ -9,7 +9,7 @@ function genId(prefix: string) {
 
 const STORAGE_DIR = path.resolve(process.cwd(), 'storage/secure');
 
-async function run() {
+export async function setupEmployeeDocuments() {
   console.log('--- Initializing Employee Document Management Schema & Seed Data ---');
 
   await fs.mkdir(STORAGE_DIR, { recursive: true });
@@ -391,9 +391,11 @@ async function run() {
   console.log('Setup finished successfully!');
 }
 
-run()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error('Migration error:', err);
-    process.exit(1);
-  });
+if (process.argv[1]?.includes('setupEmployeeDocuments')) {
+  setupEmployeeDocuments()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('Migration error:', err);
+      process.exit(1);
+    });
+}

@@ -87,6 +87,11 @@ export function PunctualityDetail({
   const [activeTab, setActiveTab] = useState<'late' | 'grace' | 'departments' | 'trends'>('grace');
   const [lastRefreshedSec, setLastRefreshedSec] = useState(0);
   const [graceCountdowns, setGraceCountdowns] = useState<Record<string, number>>({});
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const fetchData = useCallback(async (force = false) => {
     const now = Date.now();
@@ -421,16 +426,18 @@ export function PunctualityDetail({
                 </div>
 
                 <div className="h-56 w-full pt-2">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data?.departmentBreakdown || []} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                      <XAxis dataKey="department" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <YAxis domain={[90, 100]} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" />
-                      <Tooltip />
-                      <ReferenceLine y={95} stroke="#ef4444" strokeDasharray="3 3" label={{ value: 'Target 95%', fill: '#ef4444', fontSize: 10 }} />
-                      <Bar dataKey="onTimePct" fill="#0058be" radius={[6, 6, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  {isMounted && (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={data?.departmentBreakdown || []} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="department" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                        <YAxis domain={[90, 100]} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" />
+                        <Tooltip />
+                        <ReferenceLine y={95} stroke="#ef4444" strokeDasharray="3 3" label={{ value: 'Target 95%', fill: '#ef4444', fontSize: 10 }} />
+                        <Bar dataKey="onTimePct" fill="#0058be" radius={[6, 6, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </div>
             )}
@@ -452,16 +459,18 @@ export function PunctualityDetail({
                 </div>
 
                 <div className="h-56 w-full pt-2">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={data?.sevenDayTrends || []} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                      <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <YAxis domain={[92, 98]} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" />
-                      <Tooltip />
-                      <ReferenceLine y={95} stroke="#f59e0b" strokeDasharray="3 3" label={{ value: 'Target 95%', fill: '#f59e0b', fontSize: 10 }} />
-                      <Line type="monotone" dataKey="punctualityRate" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} activeDot={{ r: 6 }} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                  {isMounted && (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={data?.sevenDayTrends || []} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                        <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                        <YAxis domain={[92, 98]} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" />
+                        <Tooltip />
+                        <ReferenceLine y={95} stroke="#f59e0b" strokeDasharray="3 3" label={{ value: 'Target 95%', fill: '#f59e0b', fontSize: 10 }} />
+                        <Line type="monotone" dataKey="punctualityRate" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981' }} activeDot={{ r: 6 }} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </div>
             )}

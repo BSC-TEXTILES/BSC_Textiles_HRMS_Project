@@ -59,7 +59,55 @@ export default function RootLayout({
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Icons&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('bsc_theme');if(t==='dark'){document.documentElement.classList.add('dark');document.documentElement.style.colorScheme='dark';}else{document.documentElement.classList.remove('dark');document.documentElement.style.colorScheme='light';}}catch(e){}})();`,
+            __html: `(function(){
+              try {
+                var t = localStorage.getItem('bsc_theme');
+                if (t === 'dark') {
+                  document.documentElement.classList.add('dark');
+                  document.documentElement.style.colorScheme = 'dark';
+                } else {
+                  document.documentElement.classList.remove('dark');
+                  document.documentElement.style.colorScheme = 'light';
+                }
+              } catch(e) {}
+
+              // Intercept non-Error DOM Event rejections (such as aborted script chunks or image events during Fast Refresh)
+              // to prevent Next.js dev overlay from displaying '[object Event]'
+              if (typeof window !== 'undefined') {
+                var isEventLike = function(val) {
+                  return val && (
+                    val instanceof Event ||
+                    Object.prototype.toString.call(val) === '[object Event]' ||
+                    (typeof val === 'object' && ('target' in val || 'isTrusted' in val) && !(val instanceof Error))
+                  );
+                };
+
+                var origAddEventListener = window.addEventListener;
+                window.addEventListener = function(type, listener, options) {
+                  if (type === 'unhandledrejection' && typeof listener === 'function') {
+                    var filteredListener = function(event) {
+                      var reason = event && event.reason;
+                      if (isEventLike(reason)) {
+                        if (event.preventDefault) event.preventDefault();
+                        console.warn('[HRMS] Filtered unhandled DOM Event rejection from dev overlay:', reason);
+                        return;
+                      }
+                      return listener.apply(this, arguments);
+                    };
+                    return origAddEventListener.call(this, type, filteredListener, options);
+                  }
+                  return origAddEventListener.apply(this, arguments);
+                };
+
+                window.addEventListener('unhandledrejection', function(event) {
+                  var reason = event && event.reason;
+                  if (isEventLike(reason)) {
+                    if (event.preventDefault) event.preventDefault();
+                    if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+                  }
+                }, true);
+              }
+            })();`,
           }}
         />
       </head>

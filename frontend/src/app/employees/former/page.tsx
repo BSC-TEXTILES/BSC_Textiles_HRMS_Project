@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -35,7 +36,9 @@ import {
   FileSpreadsheet,
   Send,
   HelpCircle,
+  ExternalLink,
 } from 'lucide-react';
+import { FormerStaffCardDrawer, FormerDrawerType } from './FormerStaffCardDrawer';
 
 export default function FormerEmployeesPage() {
   const [stats, setStats] = useState<any>({
@@ -53,11 +56,20 @@ export default function FormerEmployeesPage() {
   });
 
   const [exits, setExits] = useState<any[]>([]);
+  const [allExits, setAllExits] = useState<any[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [page, setPage] = useState(1);
   const [limit] = useState(10);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Summary Card Detail Drawer State
+  const [activeDrawer, setActiveDrawer] = useState<FormerDrawerType>(null);
+  const card1Ref = useRef<HTMLDivElement>(null);
+  const card2Ref = useRef<HTMLDivElement>(null);
+  const card3Ref = useRef<HTMLDivElement>(null);
+  const card4Ref = useRef<HTMLDivElement>(null);
+  const [activeTriggerRef, setActiveTriggerRef] = useState<React.RefObject<HTMLElement | null>>(card1Ref);
 
   // Quick filter tab
   const [activeTab, setActiveTab] = useState<'ALL' | 'RESIGNED' | 'TERMINATED' | 'READY_FOR_PAYMENT' | 'PAID'>('ALL');
@@ -112,12 +124,30 @@ export default function FormerEmployeesPage() {
   // Fetch Stats & Exits
   const fetchStats = useCallback(async () => {
     try {
-      const res = await api.get('/exits/dashboard-stats');
+      const res = await api.get('/exits/dashboard-stats', {
+        params: locationFilter ? { locationId: locationFilter } : {},
+      });
       setStats(res.data?.stats || res.data || {});
     } catch (e: any) {
       console.error('Failed to load stats:', e);
     }
-  }, []);
+  }, [locationFilter]);
+
+  // Fetch all exits for full synchronization between summary cards, drawers, and tabs
+  const fetchAllExits = useCallback(async () => {
+    try {
+      const params: any = { page: 1, limit: 100 };
+      if (search) params.search = search;
+      if (locationFilter) params.locationId = locationFilter;
+      if (exitTypeFilter) params.exitType = exitTypeFilter;
+
+      const res = await api.get('/exits', { params });
+      const list = res.data?.exits || res.data?.employees || [];
+      setAllExits(list);
+    } catch (e) {
+      console.error('Failed to load all exits for card synchronization:', e);
+    }
+  }, [search, locationFilter, exitTypeFilter]);
 
   const fetchExits = useCallback(async () => {
     setLoading(true);
@@ -174,11 +204,36 @@ export default function FormerEmployeesPage() {
 
   useEffect(() => {
     fetchExits();
-  }, [fetchExits]);
+    fetchAllExits();
+  }, [fetchExits, fetchAllExits]);
+
+  // Synchronized counts matching the current dataset
+  const tabCounts = useMemo(() => {
+    const dataset = allExits.length > 0 ? allExits : exits;
+    const all = dataset.length;
+    const resigned = dataset.filter((item) => item.exit_type === 'RESIGNATION').length;
+    const terminated = dataset.filter((item) => item.exit_type === 'TERMINATION').length;
+    const readyForPayment = dataset.filter((item) => {
+      const s = item.settlement_status || item.settlement?.status;
+      return s === 'APPROVED' || s === 'PAYMENT_PENDING' || item.exit_status === 'READY_FOR_PAYMENT';
+    }).length;
+    const paid = dataset.filter((item) => {
+      const s = item.settlement_status || item.settlement?.status || item.exit_status;
+      return s === 'PAID' || s === 'CLOSED';
+    }).length;
+
+    return {
+      all,
+      resigned,
+      terminated,
+      readyForPayment,
+      paid,
+    };
+  }, [allExits, exits]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchStats(), fetchExits()]);
+    await Promise.all([fetchStats(), fetchExits(), fetchAllExits()]);
   };
 
   // Actions
@@ -351,15 +406,55 @@ export default function FormerEmployeesPage() {
     }
   };
 
-  // Export current list to CSV
+  // Drawer Action Callbacks
+  const handleOpenBreakdownFromDrawer = (item: any) => {
+    const netAmount = item.settlement_amount ?? item.settlement?.net_payable ?? 0;
+    setSelectedSettlement(
+      item.settlement || {
+        id: item.settlement_id || item.id,
+        net_payable: netAmount,
+        unpaid_salary_amount: item.settlement?.unpaid_salary_amount || netAmount,
+        total_earnings: item.settlement?.total_earnings || netAmount,
+        total_deductions: item.settlement?.total_deductions || 0,
+        gratuity_amount: item.settlement?.gratuity_amount || 0,
+        leave_encashment_amount: item.settlement?.leave_encashment_amount || 0,
+      }
+    );
+    setCalcModalOpen(true);
+  };
+
+  const handleOpenPaymentFromDrawer = (item: any) => {
+    const netAmount = item.settlement_amount ?? item.settlement?.net_payable ?? 0;
+    setSelectedSettlement(
+      item.settlement || {
+        id: item.settlement_id || item.id,
+        net_payable: netAmount,
+      }
+    );
+    setPaymentModalOpen(true);
+  };
+
+  const handleShowInTable = (
+    tabKey: 'ALL' | 'RESIGNED' | 'TERMINATED' | 'READY_FOR_PAYMENT' | 'PAID',
+    newStatusFilter?: string
+  ) => {
+    setActiveTab(tabKey);
+    if (newStatusFilter !== undefined) {
+      setStatusFilter(newStatusFilter);
+    }
+    setActiveDrawer(null);
+  };
+
+  // Export current list to CSV (uses filtered records)
   const handleExportCsv = () => {
-    if (exits.length === 0) {
+    const exportDataset = allExits.length > 0 ? allExits : exits;
+    if (exportDataset.length === 0) {
       toast.error('No records to export');
       return;
     }
 
     const headers = ['Employee Code', 'Full Name', 'Branch', 'Department', 'Exit Type', 'Last Working Day', 'Status', 'Net Amount (INR)', 'Payment Ref'];
-    const rows = exits.map((item) => {
+    const rows = exportDataset.map((item) => {
       const name = item.full_name || item.employee_name || 'Staff Member';
       const code = item.employee_code || item.code || '';
       const loc = item.location_name || item.location?.name || 'All Locations';
@@ -473,103 +568,168 @@ export default function FormerEmployeesPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Card 1: Total Exits */}
           <div
-            onClick={() => setActiveTab('ALL')}
-            className={`cursor-pointer p-5 rounded-2xl border transition-all shadow-sm hover:shadow-md ${
-              activeTab === 'ALL'
-                ? 'bg-blue-50/60 dark:bg-blue-950/30 border-blue-300 dark:border-blue-700 ring-2 ring-blue-500/20'
-                : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-blue-300'
-            }`}
+            ref={card1Ref}
+            role="button"
+            tabIndex={0}
+            aria-label="View Total Staff Left details"
+            onClick={() => {
+              setActiveTriggerRef(card1Ref);
+              setActiveDrawer('TOTAL_EXITS');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setActiveTriggerRef(card1Ref);
+                setActiveDrawer('TOTAL_EXITS');
+              }
+            }}
+            className="group cursor-pointer p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 transition-all shadow-sm hover:shadow-md hover:border-blue-400 dark:hover:border-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 flex flex-col justify-between"
           >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Total Staff Left
-              </span>
-              <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-                <Users className="w-5 h-5" />
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Total Staff Left
+                </span>
+                <div className="w-9 h-9 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-transform group-hover:scale-105">
+                  <Users className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                {tabCounts.all}
+              </div>
+              <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <span className="font-semibold text-blue-600 dark:text-blue-400">{tabCounts.resigned} Resigned</span>
+                <span>•</span>
+                <span className="text-slate-500">{tabCounts.terminated} Terminated</span>
               </div>
             </div>
-            <div className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {stats.totalExits || stats.totalFormerEmployees || 2}
-            </div>
-            <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-              <span className="font-semibold text-blue-600 dark:text-blue-400">{stats.resigned || 2} Resigned</span>
-              <span>•</span>
-              <span className="text-slate-500">{stats.terminated || 0} Terminated</span>
+            <div className="mt-3.5 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs font-semibold text-blue-600 dark:text-blue-400 group-hover:text-blue-700 dark:group-hover:text-blue-300">
+              <span>View Details</span>
+              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
             </div>
           </div>
 
           {/* Card 2: Clearances */}
           <div
+            ref={card2Ref}
+            role="button"
+            tabIndex={0}
+            aria-label="View Handovers Pending details"
             onClick={() => {
-              setActiveTab('ALL');
-              setStatusFilter('CLEARANCE_IN_PROGRESS');
+              setActiveTriggerRef(card2Ref);
+              setActiveDrawer('CLEARANCES_PENDING');
             }}
-            className="cursor-pointer p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 transition-all shadow-sm hover:shadow-md hover:border-amber-300"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setActiveTriggerRef(card2Ref);
+                setActiveDrawer('CLEARANCES_PENDING');
+              }
+            }}
+            className="group cursor-pointer p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 transition-all shadow-sm hover:shadow-md hover:border-amber-400 dark:hover:border-amber-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 flex flex-col justify-between"
           >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Handovers Pending
-              </span>
-              <div className="w-9 h-9 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                <Clock className="w-5 h-5" />
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Handovers Pending
+                </span>
+                <div className="w-9 h-9 rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center transition-transform group-hover:scale-105">
+                  <Clock className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                {stats.awaitingClearance || 0}
+              </div>
+              <div className="mt-2 text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
+                <span>Department asset & key returns</span>
               </div>
             </div>
-            <div className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {stats.awaitingClearance || 0}
-            </div>
-            <div className="mt-2 text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
-              <span>Department asset & key returns</span>
+            <div className="mt-3.5 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs font-semibold text-amber-600 dark:text-amber-400 group-hover:text-amber-700 dark:group-hover:text-amber-300">
+              <span>View Details</span>
+              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
             </div>
           </div>
 
           {/* Card 3: Ready for Payment */}
           <div
-            onClick={() => setActiveTab('READY_FOR_PAYMENT')}
-            className={`cursor-pointer p-5 rounded-2xl border transition-all shadow-sm hover:shadow-md ${
-              activeTab === 'READY_FOR_PAYMENT'
-                ? 'bg-emerald-50/60 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700 ring-2 ring-emerald-500/20'
-                : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-emerald-300'
-            }`}
+            ref={card3Ref}
+            role="button"
+            tabIndex={0}
+            aria-label="View Ready for Payout details"
+            onClick={() => {
+              setActiveTriggerRef(card3Ref);
+              setActiveDrawer('READY_FOR_PAYOUT');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setActiveTriggerRef(card3Ref);
+                setActiveDrawer('READY_FOR_PAYOUT');
+              }
+            }}
+            className="group cursor-pointer p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 transition-all shadow-sm hover:shadow-md hover:border-emerald-400 dark:hover:border-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 flex flex-col justify-between"
           >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Ready for Payout
-              </span>
-              <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                <Banknote className="w-5 h-5" />
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Ready for Payout
+                </span>
+                <div className="w-9 h-9 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center transition-transform group-hover:scale-105">
+                  <Banknote className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight">
+                {tabCounts.readyForPayment}
+              </div>
+              <div className="mt-2 text-xs text-emerald-700 dark:text-emerald-300 font-medium flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5 inline" />
+                <span>Approved & ready for bank transfer</span>
               </div>
             </div>
-            <div className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight">
-              {stats.readyForPayment || 1}
-            </div>
-            <div className="mt-2 text-xs text-emerald-700 dark:text-emerald-300 font-medium flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5 inline" />
-              <span>Approved & ready for bank transfer</span>
+            <div className="mt-3.5 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs font-semibold text-emerald-600 dark:text-emerald-400 group-hover:text-emerald-700 dark:group-hover:text-emerald-300">
+              <span>View Details</span>
+              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
             </div>
           </div>
 
           {/* Card 4: Closed & Paid */}
           <div
-            onClick={() => setActiveTab('PAID')}
-            className={`cursor-pointer p-5 rounded-2xl border transition-all shadow-sm hover:shadow-md ${
-              activeTab === 'PAID'
-                ? 'bg-purple-50/60 dark:bg-purple-950/30 border-purple-300 dark:border-purple-700 ring-2 ring-purple-500/20'
-                : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 hover:border-purple-300'
-            }`}
+            ref={card4Ref}
+            role="button"
+            tabIndex={0}
+            aria-label="View Completed and Paid details"
+            onClick={() => {
+              setActiveTriggerRef(card4Ref);
+              setActiveDrawer('COMPLETED_PAID');
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setActiveTriggerRef(card4Ref);
+                setActiveDrawer('COMPLETED_PAID');
+              }
+            }}
+            className="group cursor-pointer p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 transition-all shadow-sm hover:shadow-md hover:border-purple-400 dark:hover:border-purple-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 flex flex-col justify-between"
           >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                Completed & Paid
-              </span>
-              <div className="w-9 h-9 rounded-lg bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                <CheckCircle2 className="w-5 h-5" />
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                  Completed & Paid
+                </span>
+                <div className="w-9 h-9 rounded-lg bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 flex items-center justify-center transition-transform group-hover:scale-105">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                {tabCounts.paid}
+              </div>
+              <div className="mt-2 text-xs text-purple-600 dark:text-purple-400 font-medium">
+                <span>Settlement fully disbursed</span>
               </div>
             </div>
-            <div className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {stats.closedPaid || 1}
-            </div>
-            <div className="mt-2 text-xs text-purple-600 dark:text-purple-400 font-medium">
-              <span>Settlement fully disbursed</span>
+            <div className="mt-3.5 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs font-semibold text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300">
+              <span>View Details</span>
+              <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-1" />
             </div>
           </div>
         </div>
@@ -579,16 +739,17 @@ export default function FormerEmployeesPage() {
           {/* Quick Filter Pill Tabs */}
           <div className="flex items-center flex-wrap gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
             {[
-              { id: 'ALL', label: 'All Records', count: stats.totalExits || exits.length },
-              { id: 'RESIGNED', label: 'Resigned', count: stats.resigned || 2 },
-              { id: 'TERMINATED', label: 'Terminated', count: stats.terminated || 0 },
-              { id: 'READY_FOR_PAYMENT', label: 'Ready to Pay', count: stats.readyForPayment || 1 },
-              { id: 'PAID', label: 'Paid & Closed', count: stats.closedPaid || 1 },
+              { id: 'ALL', label: 'All Records', count: tabCounts.all },
+              { id: 'RESIGNED', label: 'Resigned', count: tabCounts.resigned },
+              { id: 'TERMINATED', label: 'Terminated', count: tabCounts.terminated },
+              { id: 'READY_FOR_PAYMENT', label: 'Ready to Pay', count: tabCounts.readyForPayment },
+              { id: 'PAID', label: 'Paid & Closed', count: tabCounts.paid },
             ].map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => {
                   setActiveTab(tab.id as any);
+                  setStatusFilter('');
                   setPage(1);
                 }}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
@@ -767,22 +928,45 @@ export default function FormerEmployeesPage() {
                     return (
                       <tr
                         key={item.id || item.exit_id}
-                        className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                        onClick={(e) => {
+                          const target = e.target as HTMLElement;
+                          if (target.closest('button, a, input, select')) return;
+                          if (netAmount !== null || item.settlement_id) {
+                            setSelectedSettlement(
+                              settlement || {
+                                id: item.settlement_id || item.id,
+                                net_payable: netAmount,
+                                unpaid_salary_amount: netAmount,
+                                total_earnings: netAmount,
+                                total_deductions: 0,
+                              }
+                            );
+                            setCalcModalOpen(true);
+                          } else {
+                            handleOpenClearance(item);
+                          }
+                        }}
+                        className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors cursor-pointer"
                       >
                         {/* 1. Employee */}
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-sm shrink-0">
+                          <Link
+                            href={`/employees/profile/${item.employee_id || item.employeeId || item.id}`}
+                            className="group/emp flex items-center gap-3 hover:opacity-95 transition-opacity"
+                            title="View Employee Profile"
+                          >
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-sm shrink-0 group-hover/emp:ring-2 group-hover/emp:ring-blue-400">
                               {employeeName.substring(0, 2).toUpperCase()}
                             </div>
                             <div>
-                              <div className="font-semibold text-slate-900 dark:text-white leading-tight">
-                                {employeeName}
+                              <div className="font-semibold text-slate-900 dark:text-white leading-tight group-hover/emp:text-blue-600 dark:group-hover/emp:text-blue-400 transition-colors flex items-center gap-1">
+                                <span>{employeeName}</span>
+                                <ExternalLink className="w-3 h-3 opacity-0 group-hover/emp:opacity-100 transition-opacity text-blue-500" />
                               </div>
-                              <div className="text-xs text-slate-500 font-mono mt-0.5">{employeeCode}</div>
+                              <div className="text-xs text-slate-500 font-mono mt-0.5 group-hover/emp:text-blue-500 transition-colors">{employeeCode}</div>
                               {email && <div className="text-[11px] text-slate-400 truncate max-w-[180px]">{email}</div>}
                             </div>
-                          </div>
+                          </Link>
                         </td>
 
                         {/* 2. Branch & Department */}
@@ -1408,6 +1592,28 @@ export default function FormerEmployeesPage() {
           </div>
         </div>
       )}
+
+      {/* SUMMARY CARD DETAIL DRAWER */}
+      <FormerStaffCardDrawer
+        isOpen={Boolean(activeDrawer)}
+        type={activeDrawer}
+        onClose={() => setActiveDrawer(null)}
+        exits={exits}
+        allExits={allExits}
+        stats={stats}
+        locations={locations}
+        currentBranchId={locationFilter}
+        currentExitType={exitTypeFilter}
+        searchQuery={search}
+        loading={loading}
+        onRefresh={handleRefresh}
+        onShowInTable={handleShowInTable}
+        onOpenClearanceModal={handleOpenClearance}
+        onOpenPaymentModal={handleOpenPaymentFromDrawer}
+        onOpenBreakdownModal={handleOpenBreakdownFromDrawer}
+        onDownloadPdf={handleDownloadPdf}
+        triggerRef={activeTriggerRef}
+      />
     </DashboardLayout>
   );
 }

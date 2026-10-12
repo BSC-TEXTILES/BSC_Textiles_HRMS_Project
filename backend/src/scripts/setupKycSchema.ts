@@ -77,11 +77,16 @@ async function setupKycSchema() {
     );
   `);
 
-  console.log('✅ KYC & DigiLocker Database Tables created successfully!');
-  process.exit(0);
+  console.log('✅ KYC & DigiLocker Database Tables verified/created successfully!');
 }
 
-setupKycSchema().catch((err) => {
-  console.error('Failed to setup KYC schema:', err);
-  process.exit(1);
-});
+export { setupKycSchema };
+
+if (process.argv[1]?.includes('setupKycSchema')) {
+  setupKycSchema()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('Failed to setup KYC schema:', err);
+      process.exit(1);
+    });
+}
