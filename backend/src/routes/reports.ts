@@ -69,7 +69,14 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
     }
 
     if (shiftId) {
-      attendanceWhere.shiftId = shiftId;
+      if (shiftId.includes(',')) {
+        const idList = shiftId.split(',').map((s: string) => s.trim()).filter(Boolean);
+        employeeWhere.shiftId = { in: idList };
+        attendanceWhere.shiftId = { in: idList };
+      } else {
+        employeeWhere.shiftId = shiftId;
+        attendanceWhere.shiftId = shiftId;
+      }
     }
 
     const [

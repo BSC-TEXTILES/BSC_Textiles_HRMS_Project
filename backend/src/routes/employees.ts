@@ -47,7 +47,13 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
     if (floorId) where.floorId = floorId;
     if (departmentId) where.departmentId = departmentId;
     if (sectionId) where.sectionId = sectionId;
-    if (shiftId) where.shiftId = shiftId;
+    if (shiftId) {
+      if (String(shiftId).includes(',')) {
+        where.shiftId = { in: String(shiftId).split(',').map((s: string) => s.trim()).filter(Boolean) };
+      } else {
+        where.shiftId = shiftId;
+      }
+    }
     if (status) where.status = status;
     if (search) where.OR = [
       { employeeCode: { contains: String(search), mode: 'insensitive' } },

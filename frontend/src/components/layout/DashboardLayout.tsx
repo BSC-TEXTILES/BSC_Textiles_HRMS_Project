@@ -157,7 +157,13 @@ function formatTimeAgo(dateString: string): string {
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
 }
 
-export function DashboardLayout({ children }: { children: React.ReactNode }) {
+export function DashboardLayout({
+  children,
+  activeShiftLabel,
+}: {
+  children: React.ReactNode;
+  activeShiftLabel?: string;
+}) {
   const { data: session, status } = useSession();
   const pathname = usePathname();
   const router = useRouter();
@@ -572,7 +578,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
               <Clock className="w-3.5 h-3.5 text-[#0058be] dark:text-[#3b82f6]" />
               <span className="text-xs font-semibold text-[#0b1c30] dark:text-white font-mono">{currentTime || '19:16:52 IST'}</span>
             </div>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Today • Shift A</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+              Today • {activeShiftLabel || 'Shift A'}
+            </span>
           </div>
 
           {/* Dark / Bright Mode Toggle */}
