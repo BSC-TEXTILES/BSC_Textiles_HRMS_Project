@@ -137,10 +137,9 @@ export function PayslipDocument({
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
 
   const p = payslip || data;
-  if (!p) return null;
 
   // Masked vs Unmasked account
-  const rawAccount = p.bankAccount || '';
+  const rawAccount = p?.bankAccount || '';
   const maskedAccount = rawAccount
     ? rawAccount.length > 4
       ? '•'.repeat(rawAccount.length - 4) + rawAccount.slice(-4)
@@ -149,56 +148,56 @@ export function PayslipDocument({
   const displayAccount = unmaskAccount ? rawAccount || '50100374312528' : maskedAccount;
 
   // Month & Year string
-  const monthStr = p.salaryMonth || 'Aug';
-  const yearStr = p.salaryYear || '2026';
+  const monthStr = p?.salaryMonth || 'Aug';
+  const yearStr = p?.salaryYear || '2026';
 
   // Earnings Items
-  const earnings: PayslipItemDetail[] = p.earningsConfig && p.earningsConfig.length > 0
+  const earnings: PayslipItemDetail[] = p?.earningsConfig && p.earningsConfig.length > 0
     ? p.earningsConfig.filter(e => e.enabled !== false)
     : [
-        { label: 'BASIC PAY', amount: Number(p.basicSalary || 32000.00) },
-        { label: 'HRA', amount: Number(p.hra || 12800.00) },
-        ...(Number((p as any).otPay || (p as any).overtime || 0) > 0 ? [{ label: 'OT', amount: Number((p as any).otPay || (p as any).overtime || 1500.00) }] : []),
-        ...(Number((p as any).govtHolidayPay || 0) > 0 ? [{ label: 'GOVT.HOLIDAY', amount: Number((p as any).govtHolidayPay) }] : []),
+        { label: 'BASIC PAY', amount: Number(p?.basicSalary || 32000.00) },
+        { label: 'HRA', amount: Number(p?.hra || 12800.00) },
+        ...(Number((p as any)?.otPay || (p as any)?.overtime || 0) > 0 ? [{ label: 'OT', amount: Number((p as any)?.otPay || (p as any)?.overtime || 1500.00) }] : []),
+        ...(Number((p as any)?.govtHolidayPay || 0) > 0 ? [{ label: 'GOVT.HOLIDAY', amount: Number((p as any)?.govtHolidayPay) }] : []),
       ];
 
   // Deductions Items
-  const deductions: PayslipItemDetail[] = p.deductionsConfig && p.deductionsConfig.length > 0
+  const deductions: PayslipItemDetail[] = p?.deductionsConfig && p.deductionsConfig.length > 0
     ? p.deductionsConfig.filter(d => d.enabled !== false)
     : [
-        { label: 'EMPLOYEE PF', amount: Number((p as any).employeePf || (p as any).pfDeduction || 3840.00) },
-        { label: 'EMPLOYEE ESI', amount: Number((p as any).employeeEsi || 153.00) },
-        { label: 'PROF TAX', amount: Number((p as any).profTax || 0.00) },
-        ...(Number((p as any).lateFineDeduction || (p as any).penalties || 0) > 0 ? [{ label: 'LATE FINE DEDUCTION (₹1.0/SEC)', amount: Number((p as any).lateFineDeduction || (p as any).penalties) }] : []),
+        { label: 'EMPLOYEE PF', amount: Number((p as any)?.employeePf || (p as any)?.pfDeduction || 3840.00) },
+        { label: 'EMPLOYEE ESI', amount: Number((p as any)?.employeeEsi || 153.00) },
+        { label: 'PROF TAX', amount: Number((p as any)?.profTax || 0.00) },
+        ...(Number((p as any)?.lateFineDeduction || (p as any)?.penalties || 0) > 0 ? [{ label: 'LATE FINE DEDUCTION (₹1.0/SEC)', amount: Number((p as any)?.lateFineDeduction || (p as any)?.penalties) }] : []),
       ];
 
   // Totals
-  const grossSalary = p.grossSalary !== undefined
+  const grossSalary = p?.grossSalary !== undefined
     ? Number(p.grossSalary)
     : earnings.reduce((sum, e) => sum + Number(e.amount || 0), 0);
 
-  const totalDeductions = p.totalDeductions !== undefined
+  const totalDeductions = p?.totalDeductions !== undefined
     ? Number(p.totalDeductions)
     : deductions.reduce((sum, d) => sum + Number(d.amount || 0), 0);
 
-  const totalPayable = p.totalPayable !== undefined
+  const totalPayable = p?.totalPayable !== undefined
     ? Number(p.totalPayable)
     : Math.max(0, grossSalary - totalDeductions);
 
-  const netPayable = p.netPayable !== undefined
+  const netPayable = p?.netPayable !== undefined
     ? Number(p.netPayable)
-    : (p.netPay !== undefined ? Number(p.netPay) : totalPayable);
+    : (p?.netPay !== undefined ? Number(p.netPay) : totalPayable);
 
-  const employerPf = p.employerPf !== undefined
+  const employerPf = p?.employerPf !== undefined
     ? Number(p.employerPf)
-    : Math.round(Number(p.pfPay || p.basicSalary || 32000) * 0.12);
+    : Math.round(Number(p?.pfPay || p?.basicSalary || 32000) * 0.12);
 
   // Statutory ceiling: ESI only applies if Gross <= ₹21,000
-  const employerEsi = p.employerEsi !== undefined
+  const employerEsi = p?.employerEsi !== undefined
     ? Number(p.employerEsi)
     : (grossSalary <= 21000 ? Math.round(Number(grossSalary) * 0.0325) : 0);
 
-  const ctc = p.ctc !== undefined
+  const ctc = p?.ctc !== undefined
     ? Number(p.ctc)
     : Math.round(grossSalary + employerPf + employerEsi);
 
@@ -227,6 +226,8 @@ export function PayslipDocument({
       .then(setQrDataUrl)
       .catch((err) => console.error('Failed to generate verification QR', err));
   }, [p, monthStr, yearStr, grossSalary, netPayable, displayAccount]);
+
+  if (!p) return null;
 
   const formatCurr = (val: number | undefined | null) => {
     if (val === undefined || val === null || isNaN(Number(val))) return '0.00';

@@ -1,0 +1,27 @@
+# BSC Textiles Enterprise HRMS Robots Directives
+User-agent: *
+Allow: /
+Allow: /login
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /dashboard/
+Disallow: /employees
+Disallow: /employees/
+Disallow: /payroll
+Disallow: /payroll/
+Disallow: /attendance
+Disallow: /attendance/
+Disallow: /admin
+Disallow: /admin/
+Disallow: /organization
+Disallow: /organization/
+Disallow: /operations
+Disallow: /operations/
+Disallow: /reports
+Disallow: /reports/
+Disallow: /my-desk
+Disallow: /my-desk/
+Disallow: /notifications
+Disallow: /notifications/
+
+Sitemap: https://bsctextiles.com/sitemap.xml

@@ -2,17 +2,33 @@
 
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { MetricDrillDownModal, type MetricKey } from '@/components/dashboard/MetricDrillDownModal';
+import type { MetricKey } from '@/components/dashboard/MetricDrillDownModal';
 import { DashboardCards } from '@/components/dashboard/DashboardCards';
-import { KpiDetailContainer } from '@/components/dashboard/KpiDetailContainer';
 import type { MetricDetailType } from '@/types/metricDetail';
 import { BscHolidaysCalendar } from '@/components/dashboard/BscHolidaysCalendar';
 import { KarnatakaHubsCardSection } from '@/components/dashboard/KarnatakaHubsCardSection';
 import { ExecutiveShiftFilter, type ShiftOptionItem } from '@/components/dashboard/ExecutiveShiftFilter';
 import { ExecutiveDeptFilter, type DeptOptionItem } from '@/components/dashboard/ExecutiveDeptFilter';
-import { CreateCustomShiftModal, type CreatedBatchResult } from '@/components/dashboard/CreateCustomShiftModal';
+import type { CreatedBatchResult } from '@/components/dashboard/CreateCustomShiftModal';
 import api from '@/lib/api';
+
+// Dynamically import heavy modals to eliminate ~5MB from the initial critical JS bundle
+const MetricDrillDownModal = dynamic(
+  () => import('@/components/dashboard/MetricDrillDownModal').then((mod) => mod.MetricDrillDownModal),
+  { ssr: false }
+);
+
+const KpiDetailContainer = dynamic(
+  () => import('@/components/dashboard/KpiDetailContainer').then((mod) => mod.KpiDetailContainer),
+  { ssr: false }
+);
+
+const CreateCustomShiftModal = dynamic(
+  () => import('@/components/dashboard/CreateCustomShiftModal').then((mod) => mod.CreateCustomShiftModal),
+  { ssr: false }
+);
 
 interface DashboardStats {
   totalEmployees: number;
@@ -733,7 +749,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-3 mt-0.5">
                 <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 p-0.5 border border-slate-200/90 dark:border-slate-800 shadow-xs flex items-center justify-center shrink-0 overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/images/bsc_logo.png" alt="BSC Textiles Since 1938" className="w-full h-full object-contain" />
+                  <img src="/images/bsc_logo.png" alt="BSC Textiles Since 1938" width={40} height={40} className="w-full h-full object-contain" />
                 </div>
                 <h1 className="text-2xl font-bold text-[#0b1c30] dark:text-slate-100 tracking-tight">
                   Executive Workforce & Operations Dashboard
@@ -851,8 +867,10 @@ export default function DashboardPage() {
                 {/* Date Filter with Quick Today/Yesterday toggles */}
                 <div className="flex items-center gap-1.5 bg-white dark:bg-[#0c1424] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs text-xs group hover:border-[#0058be] dark:hover:border-blue-500 transition-colors">
                   <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[16px] group-hover:scale-110 transition-transform">calendar_today</span>
-                  <span className="text-[10px] uppercase text-slate-400 font-bold">Date:</span>
+                  <label htmlFor="dashboard-date-filter" className="text-[10px] uppercase text-slate-500 dark:text-slate-400 font-bold cursor-pointer">Date:</label>
                   <input
+                    id="dashboard-date-filter"
+                    aria-label="Filter by date"
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
@@ -862,6 +880,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={() => handleSetQuickDate('today')}
+                      aria-label="Set date to Today"
                       className={`px-1.5 py-0.5 text-[10px] font-bold rounded transition-colors ${
                         selectedDate === new Date().toISOString().slice(0, 10)
                           ? 'bg-[#0058be] text-white dark:bg-blue-600'
@@ -874,6 +893,7 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={() => handleSetQuickDate('yesterday')}
+                      aria-label="Set date to Yesterday"
                       className="px-1.5 py-0.5 text-[10px] font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
                       title="Set to Yesterday"
                     >
@@ -907,6 +927,7 @@ export default function DashboardPage() {
                 </div>
                 <button
                   onClick={handleManualSync}
+                  aria-label="Sync Live Biometric Feeds"
                   className={`flex items-center justify-center p-2 rounded-lg bg-white dark:bg-[#0c1424] text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 ${
                     syncing || loading ? 'animate-spin text-[#0058be]' : ''
                   }`}
@@ -933,6 +954,7 @@ export default function DashboardPage() {
                       onClick={() => setSelectedHub('all')}
                       className="hover:text-red-600 dark:hover:text-red-400 p-0.5 rounded-full"
                       title="Clear Hub filter"
+                      aria-label="Clear Hub filter"
                     >
                       <span className="material-symbols-outlined text-[13px] leading-none">close</span>
                     </button>
@@ -947,6 +969,7 @@ export default function DashboardPage() {
                       onClick={() => setSelectedDept('all')}
                       className="hover:text-red-600 dark:hover:text-red-400 p-0.5 rounded-full"
                       title="Clear Dept filter"
+                      aria-label="Clear Dept filter"
                     >
                       <span className="material-symbols-outlined text-[13px] leading-none">close</span>
                     </button>
@@ -961,6 +984,7 @@ export default function DashboardPage() {
                       onClick={() => setSelectedShift('all')}
                       className="hover:text-red-600 dark:hover:text-red-400 p-0.5 rounded-full"
                       title="Clear Shift filter"
+                      aria-label="Clear Shift filter"
                     >
                       <span className="material-symbols-outlined text-[13px] leading-none">close</span>
                     </button>
@@ -975,6 +999,7 @@ export default function DashboardPage() {
                       onClick={() => setSelectedDate(new Date().toISOString().slice(0, 10))}
                       className="hover:text-red-600 dark:hover:text-red-400 p-0.5 rounded-full"
                       title="Reset Date to Today"
+                      aria-label="Reset Date to Today"
                     >
                       <span className="material-symbols-outlined text-[13px] leading-none">close</span>
                     </button>
@@ -1027,7 +1052,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">fingerprint</span>
               <div>
-                <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Live Biometric & IoT Terminal Punch Ledger</h3>
+                <h2 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Live Biometric & IoT Terminal Punch Ledger</h2>
                 <p className="text-[11px] text-slate-400 dark:text-slate-500">
                   {recentPunches.length} punch records • {selectedHub !== 'all' ? (HUB_LABELS[selectedHub] || selectedHub) : 'Karnataka Hubs'} • {selectedDate}
                 </p>
@@ -1050,7 +1075,7 @@ export default function DashboardPage() {
                 <div className="w-12 h-12 rounded-full bg-[#eff4ff] dark:bg-slate-800 flex items-center justify-center text-[#0058be] dark:text-blue-400">
                   <span className="material-symbols-outlined text-[24px]">search_off</span>
                 </div>
-                <h4 className="text-sm font-bold text-[#0b1c30] dark:text-slate-200">No punches found for the selected filter combination</h4>
+                <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-200">No punches found for the selected filter combination</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
                   There are no attendance records matching this specific Hub, Department, Date, or Shift criteria.
                 </p>
@@ -1133,7 +1158,7 @@ export default function DashboardPage() {
           <div className="bg-white dark:bg-[#0e172a] p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Floor Shifts Overview</h3>
+                <h2 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Floor Shifts Overview</h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-400">3 Shift Windows</span>
               </div>
               <div className="space-y-3">
@@ -1214,7 +1239,7 @@ export default function DashboardPage() {
           <div className="bg-white dark:bg-[#0e172a] p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Break Compliance Policy</h3>
+                <h2 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Break Compliance Policy</h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">Audit Grade</span>
               </div>
               <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
@@ -1244,7 +1269,7 @@ export default function DashboardPage() {
           <div className="bg-white dark:bg-[#0e172a] p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Instant Quick Links</h3>
+                <h2 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Instant Quick Links</h2>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">HR Tools</span>
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs">

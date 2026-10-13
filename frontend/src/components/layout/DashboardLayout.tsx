@@ -709,6 +709,7 @@ export function DashboardLayout({
             <select
               value={selectedHub}
               onChange={(e) => setSelectedHub(e.target.value)}
+              aria-label="Select Store Hub Location"
               className="bg-transparent font-semibold text-xs text-white focus:outline-none cursor-pointer pr-1"
             >
               <option value="all" className="bg-[#09152b] text-white">All Hubs (Karnataka)</option>
@@ -726,6 +727,7 @@ export function DashboardLayout({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by ID (e.g. BSC-4029), Name, Dept..."
+              aria-label="Search employees, departments, or IDs"
               className="w-full !bg-transparent !border-none text-xs text-white placeholder:text-white/80 focus:outline-none"
             />
           </div>
@@ -759,7 +761,9 @@ export function DashboardLayout({
               }}
               className="relative flex items-center justify-center p-2 rounded-lg text-white/85 hover:text-white hover:bg-white/10 transition-colors cursor-pointer border border-transparent"
               title="Notifications & System Alerts"
-              aria-label="Notifications"
+              aria-label="Notifications & System Alerts"
+              aria-haspopup="dialog"
+              aria-expanded={notificationsOpen}
             >
               <Bell className="w-4 h-4 text-white" />
               {unreadCount > 0 && (
@@ -859,7 +863,9 @@ export function DashboardLayout({
               }}
               className="flex items-center gap-2 p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer text-left"
               title="User Account & Profile"
-              aria-label="User Account"
+              aria-label="User Account & Profile"
+              aria-haspopup="menu"
+              aria-expanded={profileMenuOpen}
             >
               <div className="hidden sm:flex flex-col text-right">
                 <span className="text-xs font-bold text-white leading-none">{userName}</span>

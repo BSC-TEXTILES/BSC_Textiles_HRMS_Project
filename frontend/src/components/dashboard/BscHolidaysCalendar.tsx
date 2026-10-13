@@ -428,7 +428,7 @@ export function BscHolidaysCalendar() {
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-white p-0.5 flex items-center justify-center shrink-0 shadow-xs overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/bsc_logo.png" alt="BSC Textiles Since 1938" className="w-full h-full object-contain" />
+              <img src="/images/bsc_logo.png" alt="BSC Textiles Since 1938" width={28} height={28} className="w-full h-full object-contain" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-white tracking-tight flex items-center gap-1.5">
@@ -451,6 +451,7 @@ export function BscHolidaysCalendar() {
             type="button"
             onClick={handleDownloadTemplate}
             title="Download CSV sample template formatted for BSC Textiles holidays"
+            aria-label="Download CSV sample template formatted for BSC Textiles holidays"
             className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[11px] font-semibold transition-all border border-white/15 active:scale-[0.98]"
           >
             <span className="material-symbols-outlined text-[15px] text-amber-300">download</span>
@@ -460,6 +461,7 @@ export function BscHolidaysCalendar() {
             type="button"
             onClick={() => setIsUploadModalOpen(true)}
             title="HR Upload CSV for mass holiday declaration"
+            aria-label="HR Upload CSV for mass holiday declaration"
             className="flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0058be] hover:bg-[#00479e] text-white text-[11px] font-semibold transition-all shadow-xs active:scale-[0.98]"
           >
             <span className="material-symbols-outlined text-[15px]">upload_file</span>
@@ -489,6 +491,7 @@ export function BscHolidaysCalendar() {
             onClick={handlePrevMonth}
             className="w-7 h-7 rounded-md bg-white dark:bg-[#0c1424] hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-colors"
             title="Previous Month"
+            aria-label="Previous Month"
           >
             <span className="material-symbols-outlined text-[16px]">chevron_left</span>
           </button>
@@ -497,6 +500,7 @@ export function BscHolidaysCalendar() {
             onClick={handleNextMonth}
             className="w-7 h-7 rounded-md bg-white dark:bg-[#0c1424] hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 transition-colors"
             title="Next Month"
+            aria-label="Next Month"
           >
             <span className="material-symbols-outlined text-[16px]">chevron_right</span>
           </button>

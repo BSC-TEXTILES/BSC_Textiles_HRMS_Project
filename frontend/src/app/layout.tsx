@@ -1,12 +1,23 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 
 const jakarta = Plus_Jakarta_Sans({ 
   subsets: ['latin'],
-  display: 'optional',
+  display: 'swap',
+  preload: true,
 });
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#0058be' },
+    { media: '(prefers-color-scheme: dark)', color: '#090e17' },
+  ],
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+};
 
 export const metadata: Metadata = {
   title: {
@@ -18,7 +29,10 @@ export const metadata: Metadata = {
   authors: [{ name: 'BSC Textiles' }],
   creator: 'BSC Textiles',
   publisher: 'BSC Textiles',
-  robots: 'index, follow',
+  robots: {
+    index: true,
+    follow: true,
+  },
   openGraph: {
     type: 'website',
     locale: 'en_IN',
@@ -56,6 +70,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/favicon.png" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Icons&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" />
         <script
           dangerouslySetInnerHTML={{

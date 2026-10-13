@@ -96,7 +96,11 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
       activeSellingPoints,
     ] = await Promise.all([
       prisma.employee.count({ where: employeeWhere }),
-      prisma.attendance.findMany({ where: attendanceWhere, select: { status: true } }),
+      prisma.attendance.groupBy({
+        by: ['status'],
+        where: attendanceWhere,
+        _count: { _all: true },
+      }),
       prisma.faceVerification.count({ where: { ...faceWhere, result: 'VERIFIED' } }),
       prisma.faceVerification.count({ where: { ...faceWhere, result: 'FAILED' } }),
       prisma.faceVerification.aggregate({ where: faceWhere, _avg: { matchPercentage: true } }),
@@ -114,25 +118,37 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
       prisma.sellingPoint.count({ where: sellingPointWhere }),
     ]);
 
-    // On Lunch / Tea cards count ACTIVE break sessions (source of truth),
-    // not attendance.status, which the seed leaves at PRESENT during breaks.
-    const activeBreaks = await prisma.employeeBreak.findMany({
+    // On Lunch / Tea cards count ACTIVE break sessions (source of truth) via fast groupBy
+    const activeBreaks = await prisma.employeeBreak.groupBy({
+      by: ['breakType'],
       where: {
         status: 'ACTIVE',
         breakDate: dbDate(),
         ...(locationId ? { employee: { locationId } } : {}),
       },
-      select: { breakType: true },
+      _count: { _all: true },
     });
-    const onLunch = activeBreaks.filter((b) => b.breakType === 'LUNCH').length;
-    const onTeaBreak = activeBreaks.filter((b) => b.breakType === 'TEA').length;
+    let onLunch = 0;
+    let onTeaBreak = 0;
+    for (const b of activeBreaks) {
+      if (b.breakType === 'LUNCH') onLunch = b._count._all;
+      if (b.breakType === 'TEA') onTeaBreak = b._count._all;
+    }
+
+    const statusCounts: Record<string, number> = {};
+    for (const g of attendance) {
+      statusCounts[g.status] = g._count._all;
+    }
 
     const checkedInStatuses = [
       'PRESENT', 'EARLY', 'LATE', 'OVERTIME', 'LEFT_STORE', 'FACE_VERIFIED',
       'FACE_VERIFICATION_FAILED', 'ON_LUNCH', 'ON_TEA_BREAK', 'ON_OTHER_BREAK',
     ];
-    const countStatus = (status: string) => attendance.filter((a: any) => a.status === status).length;
-    const present = attendance.filter((a: any) => checkedInStatuses.includes(a.status)).length;
+    const countStatus = (status: string) => statusCounts[status] || 0;
+    let present = 0;
+    for (const st of checkedInStatuses) {
+      present += (statusCounts[st] || 0);
+    }
     const weeklyOff = countStatus('WEEKLY_OFF');
     const absent = Math.max(totalEmployees - present - weeklyOff, 0);
 

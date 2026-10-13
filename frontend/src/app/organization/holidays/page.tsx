@@ -1,23 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
-
-export default function HolidaysPage() {
-  const [holidays, setHolidays] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newHoli, setNewHoli] = useState({
-    name: '',
-    date: '',
-    description: '',
-  });
-
-  useEffect(() => {
-    fetchHolidays();
-  }, []);
 
 function normalizeDateStr(raw: any): string {
   if (!raw) return '';
@@ -34,7 +20,17 @@ function normalizeDateStr(raw: any): string {
   }
 }
 
-  const fetchHolidays = async () => {
+export default function HolidaysPage() {
+  const [holidays, setHolidays] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newHoli, setNewHoli] = useState({
+    name: '',
+    date: '',
+    description: '',
+  });
+
+  const fetchHolidays = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get('/holidays');
@@ -75,7 +71,11 @@ function normalizeDateStr(raw: any): string {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchHolidays();
+  }, [fetchHolidays]);
 
   const handleAddHoliday = async (e: React.FormEvent) => {
     e.preventDefault();

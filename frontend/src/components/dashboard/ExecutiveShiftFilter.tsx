@@ -59,6 +59,9 @@ export function ExecutiveShiftFilter({
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
+          aria-haspopup="listbox"
+          aria-expanded={isOpen}
+          aria-label={`Select Shift, currently ${currentLabel}`}
           className="flex items-center gap-1.5 bg-transparent font-semibold text-xs text-[#0b1c30] dark:text-slate-100 focus:outline-none cursor-pointer max-w-[170px]"
         >
           <span className="truncate">{currentLabel}</span>
@@ -70,6 +73,7 @@ export function ExecutiveShiftFilter({
             type="button"
             onClick={onOpenCreateModal}
             title="Create Custom Shift Batch"
+            aria-label="Create Custom Shift Batch"
             className="ml-1 p-1 rounded-md text-slate-400 hover:text-[#0058be] dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/60 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />

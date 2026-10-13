@@ -84,7 +84,7 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
         <div>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 WORKFORCE REGISTER
               </span>
               <div className="text-3xl font-extrabold text-[#0b1c30] dark:text-slate-100 tracking-tight mt-1">
@@ -101,7 +101,7 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
               <span>Active On Floor:</span>
               <span className="font-bold text-[#0b1c30] dark:text-slate-100">{present}</span>
             </div>
-            <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500">
+            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
               <span>Probation: 4 • Off: {weeklyOff}</span>
               <span className="text-[#0058be] dark:text-blue-400 font-bold">+3 MTD</span>
             </div>
@@ -125,14 +125,14 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
         <div>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 FLOOR ADHERENCE
               </span>
               <div className="flex items-baseline gap-1 mt-1">
                 <span className="text-3xl font-extrabold text-[#0b1c30] dark:text-slate-100 tracking-tight">
                   {present}
                 </span>
-                <span className="text-xs font-semibold text-slate-400 dark:text-slate-500">
+                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
                   / {totalEmployees}
                 </span>
               </div>
@@ -153,7 +153,7 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
                 {late} Late
               </span>
             </div>
-            <div className="text-[11px] text-slate-400 dark:text-slate-500">
+            <div className="text-[11px] text-slate-500 dark:text-slate-400">
               {weeklyOff} Off/Leave • 0 Unexcused
             </div>
           </div>
@@ -176,7 +176,7 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
         <div>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 BIOMETRIC PUNCHES
               </span>
               <div className="text-3xl font-extrabold text-[#0b1c30] dark:text-slate-100 tracking-tight mt-1">
@@ -193,7 +193,7 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
               <span>Face Verified:</span>
               <span className="font-bold text-[#0b1c30] dark:text-slate-100">{avgFaceMatch}% Avg</span>
             </div>
-            <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500">
+            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
               <span>RFID & QR Scans:</span>
               <span className="font-semibold text-slate-500 dark:text-slate-400">{qrScans} scans</span>
             </div>
@@ -217,7 +217,7 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
         <div>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 ACTIVE FLOOR BREAKS
               </span>
               <div className="text-3xl font-extrabold text-[#0b1c30] dark:text-slate-100 tracking-tight mt-1">
@@ -236,7 +236,7 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
             </div>
             <div className="flex items-center justify-between text-[11px]">
               <span className="text-[#0058be] dark:text-blue-400 font-semibold">Policy Compliant</span>
-              <span className="text-slate-400 dark:text-slate-500">0 Overruns</span>
+              <span className="text-slate-500 dark:text-slate-400">0 Overruns</span>
             </div>
           </div>
         </div>
@@ -258,7 +258,7 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
         <div>
           <div className="flex items-start justify-between gap-2">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                 INCENTIVES TODAY
               </span>
               <div className="text-3xl font-extrabold text-[#0058be] dark:text-blue-400 tracking-tight mt-1">
@@ -275,7 +275,7 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
               <span>Early Login ₹1/sec:</span>
               <span className="font-bold text-[#0b1c30] dark:text-slate-100">₹2,300</span>
             </div>
-            <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500">
+            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
               <span>Sales & Overtime:</span>
               <span className="font-semibold text-slate-500 dark:text-slate-400">₹3,700</span>
             </div>

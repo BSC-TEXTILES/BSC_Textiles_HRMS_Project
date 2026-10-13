@@ -188,6 +188,7 @@ export function KarnatakaHubsCardSection({
             onClick={handleOpenAdd}
             className="opacity-0 group-hover:opacity-100 hover:opacity-100 inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-[#eff4ff] text-[#0058be] hover:bg-[#dce9ff] transition-all border border-[#dce9ff]"
             title="Add a new store outlet card"
+            aria-label="Add a new store outlet card"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add</span>
@@ -255,6 +256,7 @@ export function KarnatakaHubsCardSection({
                       }}
                       className="p-1 rounded text-slate-500 hover:text-[#0058be] dark:hover:text-blue-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 transition-colors"
                       title={`Edit ${hub.name} card`}
+                      aria-label={`Edit ${hub.name} card`}
                     >
                       <Edit className="w-3 h-3" />
                     </button>
@@ -266,6 +268,7 @@ export function KarnatakaHubsCardSection({
                       }}
                       className="p-1 rounded text-slate-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                       title={`Delete ${hub.name} card`}
+                      aria-label={`Delete ${hub.name} card`}
                     >
                       <Trash2 className="w-3 h-3" />
                     </button>

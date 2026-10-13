@@ -45,9 +45,14 @@ const nextConfig: NextConfig = {
   transpilePackages: ['recharts'],
   images: {
     remotePatterns: [{ protocol: 'http', hostname: 'localhost' }],
+    formats: ['image/avif', 'image/webp'],
   },
   experimental: {
     serverActions: { bodySizeLimit: '12mb' },
+    optimizePackageImports: ['lucide-react', 'recharts', 'date-fns'],
+  },
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,
   },
   async headers() {
     return [
@@ -57,6 +62,7 @@ const nextConfig: NextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'DENY' },
           { key: 'Referrer-Policy', value: 'same-origin' },
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
           {
             key: 'Permissions-Policy',
             value: 'camera=(self), microphone=(self), geolocation=()',
