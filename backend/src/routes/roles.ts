@@ -317,6 +317,7 @@ router.patch('/rbac/roles/:id', requireRoleAdmin, async (req: AuthRequest, res) 
       for (const holder of holders || []) {
         await invalidateUserAccessCache(holder.userId);
       }
+      await invalidateAllAccessCache();
     }
 
     await prisma.auditLog.create({

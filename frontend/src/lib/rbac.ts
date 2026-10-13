@@ -89,6 +89,14 @@ export async function getMyAccess(force = false): Promise<MyAccess> {
   return inflight;
 }
 
+export function invalidateMyAccessCache(): void {
+  cache = null;
+  inflight = null;
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('rbac-access-updated'));
+  }
+}
+
 export function canViewModule(access: MyAccess, moduleKey: string): boolean {
   if (access.source !== 'rbac') return true;
   return accessRank(access.access[moduleKey]) >= ACCESS_RANK.view;
@@ -99,7 +107,7 @@ export function canEditModule(access: MyAccess, moduleKey: string): boolean {
   return accessRank(access.access[moduleKey]) >= ACCESS_RANK.edit;
 }
 
-/** React hook: resolves the current user's effective module access once. */
+/** React hook: resolves the current user's effective module access with real-time updates. */
 export function useMyAccess(): MyAccess {
   const [state, setState] = useState<MyAccess>({ ...UNRESTRICTED, loading: true });
 
@@ -111,7 +119,19 @@ export function useMyAccess(): MyAccess {
 
   useEffect(() => {
     load(false);
+
+    const handleUpdate = () => {
+      load(true);
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('rbac-access-updated', handleUpdate);
+      return () => {
+        window.removeEventListener('rbac-access-updated', handleUpdate);
+      };
+    }
   }, [load]);
 
   return state;
 }
+
