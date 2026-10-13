@@ -10,6 +10,7 @@ import type { MetricDetailType } from '@/types/metricDetail';
 import { BscHolidaysCalendar } from '@/components/dashboard/BscHolidaysCalendar';
 import { KarnatakaHubsCardSection } from '@/components/dashboard/KarnatakaHubsCardSection';
 import { ExecutiveShiftFilter, type ShiftOptionItem } from '@/components/dashboard/ExecutiveShiftFilter';
+import { ExecutiveDeptFilter, type DeptOptionItem } from '@/components/dashboard/ExecutiveDeptFilter';
 import { CreateCustomShiftModal, type CreatedBatchResult } from '@/components/dashboard/CreateCustomShiftModal';
 import api from '@/lib/api';
 
@@ -79,14 +80,69 @@ const DEFAULT_HUBS = [
   { id: 'BLY', code: 'BLY', name: 'Bellary Hub (BLY-04)' },
 ];
 
-const DEFAULT_DEPTS = [
-  { id: 'SALES', name: 'Sales & Retail' },
-  { id: 'OPS', name: 'Store Operations' },
-  { id: 'HR', name: 'Human Resources' },
-  { id: 'FIN', name: 'Finance & Accounts' },
-  { id: 'INV', name: 'Inventory & Logistics' },
-  { id: 'CS', name: 'Customer Service & Billing' },
+const DEFAULT_DEPTS: DeptOptionItem[] = [
+  { id: 'CS', name: 'Customer Service & Billing', code: 'CS' },
+  { id: 'FIN', name: 'Finance & Accounts', code: 'FIN' },
+  { id: 'HR', name: 'Human Resources', code: 'HR' },
+  { id: 'INV', name: 'Inventory & Logistics', code: 'INV' },
+  { id: 'SALES', name: 'Sales & Retail', code: 'SALES' },
+  { id: 'OPS', name: 'Store Operations', code: 'OPS' },
 ];
+
+function processDepartments(rawDepts: any[], isAllHubs: boolean): DeptOptionItem[] {
+  if (!Array.isArray(rawDepts) || rawDepts.length === 0) return [];
+
+  // Filter out inactive departments if status is present
+  const activeDepts = rawDepts.filter((d: any) =>
+    d.status ? d.status === 'ACTIVE' : true
+  );
+
+  // Group by canonical department key (code if available, otherwise trimmed uppercase name)
+  const map = new Map<
+    string,
+    {
+      code?: string;
+      name: string;
+      ids: string[];
+      locations: Set<string>;
+    }
+  >();
+
+  for (const d of activeDepts) {
+    const key = (d.code || d.name || '').trim().toUpperCase();
+    if (!key) continue;
+
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, {
+        code: d.code,
+        name: d.name,
+        ids: d.id ? [d.id] : [],
+        locations: new Set(d.locationId ? [d.locationId] : []),
+      });
+    } else {
+      if (d.id && !existing.ids.includes(d.id)) {
+        existing.ids.push(d.id);
+      }
+      if (d.locationId) {
+        existing.locations.add(d.locationId);
+      }
+    }
+  }
+
+  // Map to DeptOptionItem list
+  const items: DeptOptionItem[] = Array.from(map.values()).map((g) => ({
+    id: isAllHubs ? g.ids.join(',') : g.ids[0] || g.code || g.name,
+    name: g.name,
+    code: g.code,
+    hubCount: g.locations.size,
+  }));
+
+  // Sort alphabetically by department name
+  items.sort((a, b) => a.name.localeCompare(b.name));
+
+  return items;
+}
 
 const DEFAULT_SHIFTS: ShiftOptionItem[] = [
   { id: 'MORNING', name: 'Morning Shift', timeRange: '09:00 – 18:00', staffCount: 24 },
@@ -242,7 +298,11 @@ export default function DashboardPage() {
   const [shiftNotice, setShiftNotice] = useState<string | null>(null);
   const [createBatchModalOpen, setCreateBatchModalOpen] = useState(false);
   const shiftCacheRef = useRef<Record<string, ShiftOptionItem[]>>({});
-  const [deptOptions, setDeptOptions] = useState<Array<{ id: string; name: string }>>(DEFAULT_DEPTS);
+  const [deptOptions, setDeptOptions] = useState<DeptOptionItem[]>(DEFAULT_DEPTS);
+  const [deptsLoading, setDeptsLoading] = useState(false);
+  const [deptsError, setDeptsError] = useState<string | null>(null);
+  const [deptNotice, setDeptNotice] = useState<string | null>(null);
+  const deptCacheRef = useRef<Record<string, DeptOptionItem[]>>({});
   const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null);
   const [selectedKpiMetric, setSelectedKpiMetric] = useState<MetricDetailType>(null);
   const [recentPunches, setRecentPunches] = useState<PunchRecord[]>([]);
@@ -256,7 +316,7 @@ export default function DashboardPage() {
       // Build comprehensive filter query parameters for backend
       const qp = new URLSearchParams();
       if (selectedHub !== 'all') qp.set('locationId', selectedHub);
-      if (selectedDept !== 'all') qp.set('departmentId', selectedDept);
+      if (selectedDept !== 'all' && selectedDept !== 'ALL') qp.set('departmentId', selectedDept);
       if (selectedShift !== 'all') qp.set('shiftId', selectedShift);
       if (selectedDate) qp.set('date', selectedDate);
       const qs = qp.toString() ? `?${qp.toString()}` : '';
@@ -481,22 +541,74 @@ export default function DashboardPage() {
     loadShiftOptions(selectedHub);
   }, [selectedHub, loadShiftOptions]);
 
-  // Load department and location options dynamically from backend
+  // Load department options dynamically with caching and duplicate removal
+  const loadDeptOptions = useCallback(
+    async (hub: string, force = false) => {
+      if (!force && deptCacheRef.current[hub]) {
+        setDeptOptions(deptCacheRef.current[hub]);
+        return;
+      }
+
+      try {
+        setDeptsLoading(true);
+        setDeptsError(null);
+        const loc = hub !== 'all' ? `&locationId=${hub}` : '';
+        const deptRes = await api.get(`/departments?limit=100${loc}`).catch(() => ({ data: null }));
+        const dList = deptRes.data?.departments || deptRes.data || [];
+        const processed = processDepartments(dList, hub === 'all');
+        const finalList = processed.length > 0 ? processed : DEFAULT_DEPTS;
+
+        deptCacheRef.current[hub] = finalList;
+        setDeptOptions(finalList);
+
+        // Verify that current selected department still exists in newly loaded options
+        setSelectedDept((prevDept) => {
+          if (prevDept === 'all' || prevDept === 'ALL') return 'all';
+          const match = finalList.find((d) => d.id === prevDept);
+          if (match) return prevDept;
+
+          // If exact ID not found, check if a department with matching name exists
+          const prevObj = deptOptions.find((o) => o.id === prevDept);
+          const nameMatch = finalList.find(
+            (d) => prevObj && d.name.toLowerCase() === prevObj.name.toLowerCase()
+          );
+          if (nameMatch) return nameMatch.id;
+
+          // Reset to All Departments and show short notice
+          setDeptNotice("Department selection reset to 'All Departments' for the selected hub.");
+          return 'all';
+        });
+      } catch {
+        setDeptsError('Could not load departments');
+        if (!deptCacheRef.current[hub]) {
+          setDeptOptions(DEFAULT_DEPTS);
+        }
+      } finally {
+        setDeptsLoading(false);
+      }
+    },
+    [deptOptions]
+  );
+
+  // Load departments whenever selectedHub changes (cached in memory)
+  useEffect(() => {
+    loadDeptOptions(selectedHub);
+  }, [selectedHub, loadDeptOptions]);
+
+  // Auto-dismiss department notice
+  useEffect(() => {
+    if (!deptNotice) return;
+    const timer = setTimeout(() => setDeptNotice(null), 4500);
+    return () => clearTimeout(timer);
+  }, [deptNotice]);
+
+  // Load location options dynamically from backend once per page load
   useEffect(() => {
     let ignore = false;
-    const loadDeptsAndLocs = async () => {
+    const loadLocations = async () => {
       try {
-        const loc = selectedHub !== 'all' ? `&locationId=${selectedHub}` : '';
-        const [deptRes, locRes] = await Promise.all([
-          api.get(`/departments?limit=100${loc}`).catch(() => ({ data: null })),
-          api.get('/locations/all').catch(() => ({ data: null })),
-        ]);
+        const locRes = await api.get('/locations/all').catch(() => ({ data: null }));
         if (!ignore) {
-          const dList = deptRes.data?.departments || deptRes.data || [];
-          if (Array.isArray(dList) && dList.length > 0) {
-            setDeptOptions(dList.map((d: any) => ({ id: d.id, name: d.name })));
-          }
-
           const lList = locRes.data;
           if (Array.isArray(lList) && lList.length > 0) {
             setHubOptions([
@@ -510,16 +622,14 @@ export default function DashboardPage() {
           }
         }
       } catch {
-        if (!ignore) {
-          setDeptOptions(DEFAULT_DEPTS);
-        }
+        // keep default hubs
       }
     };
-    loadDeptsAndLocs();
+    loadLocations();
     return () => {
       ignore = true;
     };
-  }, [selectedHub]);
+  }, []);
 
   const handleBatchCreated = (newBatch: CreatedBatchResult) => {
     // Invalidate shift caches
@@ -565,7 +675,7 @@ export default function DashboardPage() {
 
   const activeFilterCount =
     (selectedHub !== 'all' ? 1 : 0) +
-    (selectedDept !== 'all' ? 1 : 0) +
+    (selectedDept !== 'all' && selectedDept !== 'ALL' ? 1 : 0) +
     (selectedShift !== 'all' ? 1 : 0) +
     (selectedDate !== new Date().toISOString().slice(0, 10) ? 1 : 0);
 
@@ -685,6 +795,28 @@ export default function DashboardPage() {
             </div>
           )}
 
+          {/* Department Reset Notice */}
+          {deptNotice && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-xs text-[#0058be] dark:text-blue-300 animate-pop-in"
+            >
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px]">info</span>
+                <span>{deptNotice}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeptNotice(null)}
+                className="p-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors"
+                aria-label="Dismiss department notice"
+              >
+                <span className="material-symbols-outlined text-[14px]">close</span>
+              </button>
+            </div>
+          )}
+
           {/* Filter & Terminal Connectivity Bar */}
           <div className="flex flex-col gap-3 pt-3 bg-[#eff4ff]/60 dark:bg-[#131f38]/60 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800 transition-all">
             <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
@@ -706,23 +838,15 @@ export default function DashboardPage() {
                   </select>
                 </div>
 
-                {/* Department Filter */}
-                <div className="flex items-center gap-1.5 bg-white dark:bg-[#0c1424] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs text-xs group hover:border-[#0058be] dark:hover:border-blue-500 transition-colors">
-                  <span className="material-symbols-outlined text-slate-400 text-[16px] group-hover:scale-110 transition-transform">category</span>
-                  <span className="text-[10px] uppercase text-slate-400 font-bold">Dept:</span>
-                  <select
-                    value={selectedDept}
-                    onChange={(e) => setSelectedDept(e.target.value)}
-                    className="bg-transparent font-semibold text-xs text-[#0b1c30] dark:text-slate-100 focus:outline-none cursor-pointer pr-1"
-                  >
-                    <option value="all" className="dark:bg-[#0c1424]">All Departments</option>
-                    {deptOptions.map((d) => (
-                      <option key={d.id} value={d.id} className="dark:bg-[#0c1424]">
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {/* Department Filter (Custom Accessible Listbox with Built-in "All Departments" First) */}
+                <ExecutiveDeptFilter
+                  selectedDeptId={selectedDept}
+                  onSelectDept={(id) => setSelectedDept(id)}
+                  deptOptions={deptOptions}
+                  loading={deptsLoading}
+                  error={deptsError}
+                  onRetry={() => loadDeptOptions(selectedHub, true)}
+                />
 
                 {/* Date Filter with Quick Today/Yesterday toggles */}
                 <div className="flex items-center gap-1.5 bg-white dark:bg-[#0c1424] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs text-xs group hover:border-[#0058be] dark:hover:border-blue-500 transition-colors">
@@ -815,7 +939,7 @@ export default function DashboardPage() {
                   </span>
                 )}
 
-                {selectedDept !== 'all' && (
+                {selectedDept !== 'all' && selectedDept !== 'ALL' && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white dark:bg-slate-800 text-[#0058be] dark:text-blue-400 border border-blue-200 dark:border-blue-900 shadow-xs animate-pop-in">
                     <span>Dept: {deptOptions.find(d => d.id === selectedDept)?.name || selectedDept}</span>
                     <button
@@ -890,6 +1014,11 @@ export default function DashboardPage() {
               selectedHub={selectedHub}
               onSelectHub={setSelectedHub}
               selectedShiftLabel={selectedShift !== 'all' ? activeShiftName : undefined}
+              selectedDeptLabel={
+                selectedDept !== 'all' && selectedDept !== 'ALL'
+                  ? deptOptions.find((d) => d.id === selectedDept)?.name
+                  : undefined
+              }
             />
 
         {/* SECTION 3: RECENT BIOMETRIC TERMINAL PUNCHES LEDGER */}
