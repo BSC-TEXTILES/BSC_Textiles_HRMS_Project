@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
@@ -24,13 +24,19 @@ import {
   FolderLock
 } from 'lucide-react';
 import { EmployeeQrModal } from '@/components/dashboard/EmployeeQrModal';
+import { TotalWorkforceDrawer } from '@/components/employees/drawers/TotalWorkforceDrawer';
+import { ActiveOnFloorDrawer } from '@/components/employees/drawers/ActiveOnFloorDrawer';
+import { KycComplianceDrawer } from '@/components/employees/drawers/KycComplianceDrawer';
+import { BiometricProfilesDrawer } from '@/components/employees/drawers/BiometricProfilesDrawer';
+import { StoreLocationsDrawer } from '@/components/employees/drawers/StoreLocationsDrawer';
+import { CANONICAL_HUB_STORES } from '@/components/employees/drawers/storeLocationsHelper';
 
 import { useSession } from 'next-auth/react';
 
 export default function EmployeesPage() {
   const { data: session, status: authStatus } = useSession();
   const [employees, setEmployees] = useState<any[]>([]);
-  const [locations, setLocations] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>(CANONICAL_HUB_STORES);
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -38,6 +44,24 @@ export default function EmployeesPage() {
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('ACTIVE');
   const [totalCount, setTotalCount] = useState(0);
+
+  // Drawer state management
+  type DrawerType = 'workforce' | 'on-floor' | 'kyc' | 'biometrics' | 'locations' | null;
+  const [activeDrawer, setActiveDrawer] = useState<DrawerType>(null);
+  const [drawerLoading, setDrawerLoading] = useState(false);
+  const [drawerRefreshing, setDrawerRefreshing] = useState(false);
+  const [drawerError, setDrawerError] = useState<string | null>(null);
+
+  // Focus trigger refs for accessible focus restoration on close
+  const card1Ref = useRef<HTMLButtonElement>(null);
+  const card2Ref = useRef<HTMLButtonElement>(null);
+  const card3Ref = useRef<HTMLButtonElement>(null);
+  const card4Ref = useRef<HTMLButtonElement>(null);
+  const card5Ref = useRef<HTMLButtonElement>(null);
+
+  // In-memory cache for drawer workforce data and abort controller for cancellation
+  const drawerDataCacheRef = useRef<Record<string, any[]>>({});
+  const drawerAbortControllerRef = useRef<AbortController | null>(null);
 
   // Add Employee Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -60,12 +84,23 @@ export default function EmployeesPage() {
         api.get('/locations/all').catch(() => ({ data: [] })),
         api.get('/departments').catch(() => ({ data: [] })),
       ]);
-      setLocations(locRes.data || []);
+      const fetchedLocs = Array.isArray(locRes.data) && locRes.data.length > 0 ? locRes.data : CANONICAL_HUB_STORES;
+      const mergedLocs = CANONICAL_HUB_STORES.map((canonical) => {
+        const found = fetchedLocs.find(
+          (l: any) =>
+            l.code?.toUpperCase() === canonical.code.toUpperCase() ||
+            (canonical.code === 'HUB-HQ' && l.code === 'HUB') ||
+            l.id === canonical.id
+        );
+        return found ? { ...canonical, ...found, code: canonical.code } : canonical;
+      });
+      setLocations(mergedLocs);
       setDepartments(deptRes.data?.departments || deptRes.data || []);
     } catch (e: any) {
       if (e?.response?.status !== 401 && !e?.isHandled401) {
         console.warn('Metadata fetch error:', e?.message || e);
       }
+      setLocations(CANONICAL_HUB_STORES);
     }
   }, []);
 
@@ -99,6 +134,86 @@ export default function EmployeesPage() {
       fetchEmployees();
     }
   }, [authStatus, fetchMetadata, fetchEmployees]);
+
+  // Drawer handlers with caching and AbortController cancellation
+  const handleOpenDrawer = (type: DrawerType) => {
+    setActiveDrawer(type);
+    setDrawerError(null);
+
+    // If already cached, instant display
+    if (drawerDataCacheRef.current[type || '']) {
+      return;
+    }
+
+    if (drawerAbortControllerRef.current) {
+      drawerAbortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    drawerAbortControllerRef.current = controller;
+
+    setDrawerLoading(true);
+    api.get('/employees?limit=1000', { signal: controller.signal })
+      .then((res) => {
+        if (res?.data?.employees) {
+          drawerDataCacheRef.current[type || ''] = res.data.employees;
+        }
+      })
+      .catch((err) => {
+        if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
+          console.warn('Drawer data fetch error:', err?.message || err);
+        }
+      })
+      .finally(() => {
+        setDrawerLoading(false);
+      });
+  };
+
+  const handleCloseDrawer = () => {
+    if (drawerAbortControllerRef.current) {
+      drawerAbortControllerRef.current.abort();
+      drawerAbortControllerRef.current = null;
+    }
+    setActiveDrawer(null);
+    setDrawerLoading(false);
+    setDrawerError(null);
+  };
+
+  const handleRefreshDrawer = (type: DrawerType) => {
+    if (!type) return;
+    setDrawerRefreshing(true);
+    setDrawerError(null);
+
+    const controller = new AbortController();
+    drawerAbortControllerRef.current = controller;
+
+    api.get('/employees?limit=1000', { signal: controller.signal })
+      .then((res) => {
+        if (res?.data?.employees) {
+          drawerDataCacheRef.current[type] = res.data.employees;
+          toast.success('Drawer records refreshed');
+        }
+      })
+      .catch((err) => {
+        if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
+          setDrawerError('Failed to refresh data. Please retry.');
+        }
+      })
+      .finally(() => {
+        setDrawerRefreshing(false);
+      });
+  };
+
+  useEffect(() => {
+    return () => {
+      if (drawerAbortControllerRef.current) {
+        drawerAbortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  const drawerEmployees = (activeDrawer && drawerDataCacheRef.current[activeDrawer]) || employees;
+  const hqLocation = locations.find((l) => l.code === 'HUB-HQ' || l.code === 'HUB');
+  const nonHqLocations = locations.filter((l) => l.code !== 'HUB-HQ' && l.code !== 'HUB');
 
   const handleCreateEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,8 +307,15 @@ export default function EmployeesPage() {
 
         {/* 5 WORKFORCE KPIS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-1">
+          {/* 1. TOTAL WORKFORCE */}
+          <button
+            type="button"
+            ref={card1Ref}
+            onClick={() => handleOpenDrawer('workforce')}
+            aria-label="View details for Total Workforce"
+            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#722F37]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
+          >
+            <div className="flex items-center justify-between mb-1 w-full">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Workforce</span>
               <div className="w-8 h-8 rounded-lg bg-[#722F37]/10 flex items-center justify-center text-[#722F37]">
                 <Users className="w-4 h-4" />
@@ -203,15 +325,27 @@ export default function EmployeesPage() {
               <span className="text-3xl font-bold text-[#18181B]">{totalCount}</span>
               <span className="text-[10px] font-bold text-[#722F37] bg-[#722F37]/10 px-1.5 py-0.5 rounded-full">+3 MTD</span>
             </div>
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-              <span>Full-Time Staff</span>
-              <span>•</span>
-              <span>Active Roster</span>
+            <div className="w-full pt-2 border-t border-slate-100 space-y-1">
+              <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <span>Full-Time Staff</span>
+                <span>•</span>
+                <span>Active Roster</span>
+              </div>
+              <div className="flex items-center justify-end text-[10px] font-bold text-[#722F37]">
+                <span>View details &rarr;</span>
+              </div>
             </div>
-          </div>
+          </button>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-1">
+          {/* 2. ACTIVE ON-FLOOR */}
+          <button
+            type="button"
+            ref={card2Ref}
+            onClick={() => handleOpenDrawer('on-floor')}
+            aria-label="View details for Active On-Floor"
+            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#722F37]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
+          >
+            <div className="flex items-center justify-between mb-1 w-full">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active On-Floor</span>
               <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-700">
                 <Store className="w-4 h-4" />
@@ -221,14 +355,26 @@ export default function EmployeesPage() {
               <span className="text-3xl font-bold text-[#18181B]">12</span>
               <span className="text-xs text-slate-400">/ {totalCount}</span>
             </div>
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-              <span className="text-emerald-700 font-bold">Shift A Active</span>
-              <span>Off-Duty / Roster</span>
+            <div className="w-full pt-2 border-t border-slate-100 space-y-1">
+              <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <span className="text-emerald-700 font-bold">Shift A Active</span>
+                <span>Off-Duty / Roster</span>
+              </div>
+              <div className="flex items-center justify-end text-[10px] font-bold text-[#722F37]">
+                <span>View details &rarr;</span>
+              </div>
             </div>
-          </div>
+          </button>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-1">
+          {/* 3. KYC COMPLIANCE */}
+          <button
+            type="button"
+            ref={card3Ref}
+            onClick={() => handleOpenDrawer('kyc')}
+            aria-label="View details for KYC Compliance"
+            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#722F37]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
+          >
+            <div className="flex items-center justify-between mb-1 w-full">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">KYC Compliance</span>
               <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-700">
                 <ShieldCheck className="w-4 h-4" />
@@ -238,14 +384,26 @@ export default function EmployeesPage() {
               <span className="text-3xl font-bold text-[#18181B]">100%</span>
               <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full">Verified</span>
             </div>
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-              <span>PF & ESI Linked</span>
-              <span>Aadhaar KYC</span>
+            <div className="w-full pt-2 border-t border-slate-100 space-y-1">
+              <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <span>PF & ESI Linked</span>
+                <span>Aadhaar KYC</span>
+              </div>
+              <div className="flex items-center justify-end text-[10px] font-bold text-[#722F37]">
+                <span>View details &rarr;</span>
+              </div>
             </div>
-          </div>
+          </button>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-1">
+          {/* 4. BIOMETRIC PROFILES */}
+          <button
+            type="button"
+            ref={card4Ref}
+            onClick={() => handleOpenDrawer('biometrics')}
+            aria-label="View details for Biometric Profiles"
+            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#722F37]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
+          >
+            <div className="flex items-center justify-between mb-1 w-full">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Biometric Profiles</span>
               <div className="w-8 h-8 rounded-lg bg-[#722F37]/10 flex items-center justify-center text-[#722F37]">
                 <Fingerprint className="w-4 h-4" />
@@ -255,28 +413,47 @@ export default function EmployeesPage() {
               <span className="text-3xl font-bold text-[#18181B]">{totalCount}</span>
               <span className="text-xs text-slate-400">/ {totalCount}</span>
             </div>
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-              <span>Face Enrolled</span>
-              <span className="text-[#722F37] font-bold">QR Ready</span>
+            <div className="w-full pt-2 border-t border-slate-100 space-y-1">
+              <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <span>Face Enrolled</span>
+                <span className="text-[#722F37] font-bold">QR Ready</span>
+              </div>
+              <div className="flex items-center justify-end text-[10px] font-bold text-[#722F37]">
+                <span>View details &rarr;</span>
+              </div>
             </div>
-          </div>
+          </button>
 
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
-            <div className="flex items-center justify-between mb-1">
+          {/* 5. STORE LOCATIONS */}
+          <button
+            type="button"
+            ref={card5Ref}
+            onClick={() => handleOpenDrawer('locations')}
+            aria-label="View details for Store Locations"
+            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#722F37]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
+          >
+            <div className="flex items-center justify-between mb-1 w-full">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Store Locations</span>
               <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
                 <Building2 className="w-4 h-4" />
               </div>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-[#18181B]">4</span>
+              <span className="text-3xl font-bold text-[#18181B]">{locations.length}</span>
               <span className="text-xs text-slate-400">Hub Stores</span>
             </div>
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-              <span>BEL • DAV • SHI</span>
-              <span className="text-[#722F37] font-bold">HUB-HQ</span>
+            <div className="w-full pt-2 border-t border-slate-100 space-y-1">
+              <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <span>{nonHqLocations.map((l) => l.code).join(' • ')}</span>
+                {hqLocation && (
+                  <span className="text-[#722F37] font-bold">{hqLocation.code}</span>
+                )}
+              </div>
+              <div className="flex items-center justify-end text-[10px] font-bold text-[#722F37]">
+                <span>View details &rarr;</span>
+              </div>
             </div>
-          </div>
+          </button>
         </div>
 
         {/* SEARCH & FILTERS BAR */}
@@ -596,6 +773,110 @@ export default function EmployeesPage() {
             employee={selectedQrEmp}
           />
         )}
+
+        {/* 1. TOTAL WORKFORCE DRAWER */}
+        <TotalWorkforceDrawer
+          open={activeDrawer === 'workforce'}
+          onClose={handleCloseDrawer}
+          employees={drawerEmployees}
+          locations={locations}
+          departments={departments}
+          currentLocationId={selectedLocation}
+          currentDeptId={selectedDept}
+          onApplyDirectoryFilter={({ locationId, departmentId }) => {
+            if (locationId !== undefined) setSelectedLocation(locationId);
+            if (departmentId !== undefined) setSelectedDept(departmentId);
+          }}
+          onRefresh={() => handleRefreshDrawer('workforce')}
+          isRefreshing={drawerRefreshing}
+          triggerRef={card1Ref}
+          isLoading={drawerLoading}
+          error={drawerError}
+          onRetry={() => handleOpenDrawer('workforce')}
+        />
+
+        {/* 2. ACTIVE ON-FLOOR DRAWER */}
+        <ActiveOnFloorDrawer
+          open={activeDrawer === 'on-floor'}
+          onClose={handleCloseDrawer}
+          employees={drawerEmployees}
+          locations={locations}
+          departments={departments}
+          currentLocationId={selectedLocation}
+          currentDeptId={selectedDept}
+          onApplyDirectoryFilter={({ locationId, departmentId, status }) => {
+            if (locationId !== undefined) setSelectedLocation(locationId);
+            if (departmentId !== undefined) setSelectedDept(departmentId);
+            if (status !== undefined) setSelectedStatus(status);
+          }}
+          onRefresh={() => handleRefreshDrawer('on-floor')}
+          isRefreshing={drawerRefreshing}
+          triggerRef={card2Ref}
+          isLoading={drawerLoading}
+          error={drawerError}
+          onRetry={() => handleOpenDrawer('on-floor')}
+        />
+
+        {/* 3. KYC COMPLIANCE DRAWER */}
+        <KycComplianceDrawer
+          open={activeDrawer === 'kyc'}
+          onClose={handleCloseDrawer}
+          employees={drawerEmployees}
+          locations={locations}
+          departments={departments}
+          currentLocationId={selectedLocation}
+          currentDeptId={selectedDept}
+          onApplyDirectoryFilter={({ locationId, departmentId }) => {
+            if (locationId !== undefined) setSelectedLocation(locationId);
+            if (departmentId !== undefined) setSelectedDept(departmentId);
+          }}
+          onRefresh={() => handleRefreshDrawer('kyc')}
+          isRefreshing={drawerRefreshing}
+          triggerRef={card3Ref}
+          isLoading={drawerLoading}
+          error={drawerError}
+          onRetry={() => handleOpenDrawer('kyc')}
+        />
+
+        {/* 4. BIOMETRIC PROFILES DRAWER */}
+        <BiometricProfilesDrawer
+          open={activeDrawer === 'biometrics'}
+          onClose={handleCloseDrawer}
+          employees={drawerEmployees}
+          locations={locations}
+          departments={departments}
+          currentLocationId={selectedLocation}
+          currentDeptId={selectedDept}
+          onApplyDirectoryFilter={({ locationId, departmentId }) => {
+            if (locationId !== undefined) setSelectedLocation(locationId);
+            if (departmentId !== undefined) setSelectedDept(departmentId);
+          }}
+          onRefresh={() => handleRefreshDrawer('biometrics')}
+          isRefreshing={drawerRefreshing}
+          triggerRef={card4Ref}
+          isLoading={drawerLoading}
+          error={drawerError}
+          onRetry={() => handleOpenDrawer('biometrics')}
+        />
+
+        {/* 5. STORE LOCATIONS DRAWER */}
+        <StoreLocationsDrawer
+          open={activeDrawer === 'locations'}
+          onClose={handleCloseDrawer}
+          locations={locations}
+          employees={drawerEmployees}
+          currentLocationId={selectedLocation}
+          currentDeptId={selectedDept}
+          onSelectLocation={(locId) => {
+            setSelectedLocation(locId);
+          }}
+          onRefresh={() => handleRefreshDrawer('locations')}
+          isRefreshing={drawerRefreshing}
+          triggerRef={card5Ref}
+          isLoading={drawerLoading}
+          error={drawerError}
+          onRetry={() => handleOpenDrawer('locations')}
+        />
       </div>
     </DashboardLayout>
   );
