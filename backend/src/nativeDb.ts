@@ -121,6 +121,9 @@ export const MODEL_TO_TABLE: Record<string, string> = {
   securityEvent: 'security_event',
   securityAlertRule: 'security_alert_rule',
   passwordHistory: 'password_history',
+  role: 'role',
+  rolePermission: 'rolepermission',
+  userRole: 'userrole',
 };
 
 const RELATION_META: Record<
@@ -297,6 +300,17 @@ const RELATION_META: Record<
   passwordHistory: {
     user: { table: 'user', foreignKey: 'userId' },
   },
+  role: {
+    permissions: { table: 'rolepermission', parentKey: 'id', foreignKey: 'roleId', isMany: true },
+    userRoles: { table: 'userrole', parentKey: 'id', foreignKey: 'roleId', isMany: true },
+  },
+  rolePermission: {
+    role: { table: 'role', foreignKey: 'roleId' },
+  },
+  userRole: {
+    user: { table: 'user', foreignKey: 'userId' },
+    role: { table: 'role', foreignKey: 'roleId' },
+  },
 };
 
 const BOOLEAN_KEYS = new Set([
@@ -318,6 +332,7 @@ const BOOLEAN_KEYS = new Set([
   'sandwichRuleEnabled',
   'allowCarryForward',
   'encashable',
+  'isSystem',
 ]);
 
 function generateId(): string {

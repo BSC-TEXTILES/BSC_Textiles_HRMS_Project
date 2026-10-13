@@ -138,6 +138,7 @@ const enterpriseNavigation: NavSectionConfig[] = [
       { title: 'Governance Reports', href: '/reports', icon: FileText },
       { title: 'Local Database & Backups', href: '/admin/local-database', icon: Database, badge: 'SQLite' },
       { title: 'Audit Logs & Security', href: '/admin/audit-logs', icon: ShieldAlert },
+      { title: 'Roles & Permissions', href: '/admin/roles', icon: ShieldCheck, badge: 'RBAC' },
       { title: 'System Settings', href: '/admin/settings', icon: Settings },
     ],
   },

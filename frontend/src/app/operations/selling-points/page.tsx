@@ -8,12 +8,127 @@ import {
   CreditCard, Receipt, DollarSign, Download, ArrowRightLeft, 
   AlertTriangle, Sparkles, Filter, RefreshCw, Eye, Printer, 
   Phone, Mail, CheckCircle2, Clock, X, Shield, Award, UserCheck, 
-  UserX, ShoppingBag, Layers, BarChart3, HelpCircle, Store
+  UserX, ShoppingBag, Layers, BarChart3, HelpCircle, Store,
+  Upload, FileText, CheckSquare, Square, FileSpreadsheet
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils';
 import toast from 'react-hot-toast';
+
+// Pre-configured Selling Point Counter Templates
+const COUNTER_TEMPLATES = [
+  {
+    id: 'silk_sarees',
+    label: 'Pure Silk & Bridal Sarees',
+    name: 'Silk Sarees Counter',
+    category: 'Sales',
+    targetAmount: 1500000,
+    sectionKeyword: 'Silk',
+    icon: '✨',
+    badge: 'High Value Bridal',
+  },
+  {
+    id: 'cotton_sarees',
+    label: 'Cotton & Handloom Sarees',
+    name: 'Cotton Sarees Counter',
+    category: 'Sales',
+    targetAmount: 800000,
+    sectionKeyword: 'Cotton',
+    icon: '🌿',
+    badge: 'Handloom & Daily',
+  },
+  {
+    id: 'mens_wear',
+    label: 'Menswear & Suiting Lounge',
+    name: 'Mens Wear & Suiting Counter',
+    category: 'Sales',
+    targetAmount: 1200000,
+    sectionKeyword: 'Mens',
+    icon: '👔',
+    badge: 'Fabrics & Suits',
+  },
+  {
+    id: 'kids_wear',
+    label: 'Kids & Festive Ethnic Wear',
+    name: 'Kids Wear Counter',
+    category: 'Sales',
+    targetAmount: 600000,
+    sectionKeyword: 'Kids',
+    icon: '👶',
+    badge: 'Kids Apparel',
+  },
+  {
+    id: 'billing_pos',
+    label: 'Express POS Billing Terminal',
+    name: 'Billing Counter Terminal',
+    category: 'Billing',
+    targetAmount: 2500000,
+    sectionKeyword: 'Billing',
+    icon: '💳',
+    badge: 'Fast Checkout',
+  },
+  {
+    id: 'alterations',
+    label: 'Master Tailor & Alteration Desk',
+    name: 'Alteration & Tailoring Desk',
+    category: 'Alteration Desk',
+    targetAmount: 300000,
+    sectionKeyword: 'Alteration',
+    icon: '✂️',
+    badge: 'Fit & Alterations',
+  },
+  {
+    id: 'customer_service',
+    label: 'Customer Help & Exchange Desk',
+    name: 'Customer Service Desk',
+    category: 'Customer Service',
+    targetAmount: 500000,
+    sectionKeyword: 'Service',
+    icon: '🛎️',
+    badge: 'Guest Relations',
+  },
+];
+
+// Helper to parse CSV data from raw text
+function parseCsvRows(text: string): any[] {
+  if (!text || !text.trim()) return [];
+  const lines = text.trim().split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return [];
+
+  const firstLine = lines[0].toLowerCase();
+  const hasHeader = firstLine.includes('counter') || firstLine.includes('name') || firstLine.includes('category');
+  const dataLines = hasHeader ? lines.slice(1) : lines;
+
+  const rows: any[] = [];
+  for (const line of dataLines) {
+    const regex = /(?:,|\n|^)("(?:(?:"")*[^"]*)*"|[^",\n]*|(?:\n|$))/g;
+    const matches: string[] = [];
+    let match;
+    while ((match = regex.exec(line)) !== null) {
+      let cell = match[1];
+      if (cell === undefined) break;
+      if (cell.startsWith('"') && cell.endsWith('"')) {
+        cell = cell.slice(1, -1).replace(/""/g, '"');
+      }
+      matches.push(cell.trim());
+      if (regex.lastIndex === line.length) break;
+    }
+
+    const cols = matches.length > 1 ? matches : line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+    if (!cols[0]) continue;
+
+    rows.push({
+      name: cols[0],
+      code: cols[1] || '',
+      category: cols[2] || 'Sales',
+      targetAmount: Number(cols[3]) || 1000000,
+      sectionName: cols[4] || '',
+      employeeCodes: cols[5] || '',
+    });
+  }
+  return rows;
+}
 
 export default function SellingPointsPage() {
   // State
@@ -32,14 +147,17 @@ export default function SellingPointsPage() {
 
   // Modals & Drawers
   const [isAddCounterModalOpen, setIsAddCounterModalOpen] = useState(false);
+  const [isAddSectionModalOpen, setIsAddSectionModalOpen] = useState(false);
+  const [isImportCsvModalOpen, setIsImportCsvModalOpen] = useState(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [selectedSalespersonDrawer, setSelectedSalespersonDrawer] = useState<any>(null);
   const [selectedBillReceipt, setSelectedBillReceipt] = useState<any>(null);
 
-  // Form states
+  // Form states & Multi-select
   const [availableEmployees, setAvailableEmployees] = useState<any[]>([]);
   const [employeeSearch, setEmployeeSearch] = useState('');
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [assignForm, setAssignForm] = useState({
     counterId: '',
     employeeId: '',
@@ -63,6 +181,21 @@ export default function SellingPointsPage() {
     sectionId: '',
     category: 'Sales',
     targetAmount: 1000000,
+  });
+
+  const [newSectionForm, setNewSectionForm] = useState({
+    name: '',
+    code: '',
+    floorId: '',
+    departmentId: '',
+  });
+
+  const [importCsvForm, setImportCsvForm] = useState({
+    floorId: '',
+    sectionId: '',
+    sectionName: '',
+    csvText: '',
+    isSubmitting: false,
   });
 
   // Fetch Locations
@@ -228,25 +361,121 @@ export default function SellingPointsPage() {
     );
   }, [hierarchyData, searchQuery]);
 
-  // Handle Assign Employee Submit
+  // Handle Assign Employee Submit (Single & Batch Multi-select)
   const handleAssignSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!assignForm.counterId || !assignForm.employeeId) {
-      toast.error('Please select both a counter and an employee');
+    if (!assignForm.counterId) {
+      toast.error('Please select a target showroom counter');
+      return;
+    }
+    if (selectedEmployeeIds.length === 0) {
+      toast.error('Please select at least one salesperson to assign');
       return;
     }
     try {
-      await api.post(`/selling-points/${assignForm.counterId}/assign-employee`, {
-        employeeId: assignForm.employeeId,
-        isPrimary: assignForm.isPrimary,
-      });
-      toast.success('Salesperson assigned to counter successfully!');
+      if (selectedEmployeeIds.length === 1) {
+        await api.post(`/selling-points/${assignForm.counterId}/assign-employee`, {
+          employeeId: selectedEmployeeIds[0],
+          isPrimary: assignForm.isPrimary,
+        });
+        toast.success('Salesperson assigned to counter successfully!');
+      } else {
+        const res = await api.post(`/selling-points/${assignForm.counterId}/batch-assign`, {
+          employeeIds: selectedEmployeeIds,
+          isPrimary: assignForm.isPrimary,
+        });
+        toast.success(res.data?.message || `Successfully assigned ${selectedEmployeeIds.length} staff to counter!`);
+      }
       setIsAssignModalOpen(false);
+      setSelectedEmployeeIds([]);
       setAssignForm({ counterId: '', employeeId: '', isPrimary: true });
       fetchOperationsData(true);
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to assign salesperson');
     }
+  };
+
+  // Handle Create Showroom Section Submit
+  const handleCreateSectionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSectionForm.name.trim() || !newSectionForm.floorId) {
+      toast.error('Please provide a section name and select a showroom floor');
+      return;
+    }
+    try {
+      await api.post('/selling-points/sections', {
+        name: newSectionForm.name.trim(),
+        code: newSectionForm.code.trim(),
+        locationId: selectedLocation,
+        floorId: newSectionForm.floorId,
+      });
+      toast.success(`Showroom Section "${newSectionForm.name}" created successfully!`);
+      setIsAddSectionModalOpen(false);
+      setNewSectionForm({ name: '', code: '', floorId: '', departmentId: '' });
+      fetchOperationsData(true);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to create showroom section');
+    }
+  };
+
+  // Handle Import CSV Submit
+  const handleImportCsvSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const rows = parseCsvRows(importCsvForm.csvText);
+    if (rows.length === 0) {
+      toast.error('No valid counter rows found. Please upload or paste CSV data.');
+      return;
+    }
+
+    const targetFloorId = importCsvForm.floorId || hierarchyData?.floors?.[0]?.id;
+    if (!targetFloorId) {
+      toast.error('Please select a showroom floor');
+      return;
+    }
+
+    setImportCsvForm(prev => ({ ...prev, isSubmitting: true }));
+    try {
+      const res = await api.post('/selling-points/import-csv', {
+        locationId: selectedLocation,
+        floorId: targetFloorId,
+        sectionId: importCsvForm.sectionId || undefined,
+        rows,
+      });
+      toast.success(res.data?.message || `Imported ${res.data?.count || rows.length} selling points successfully!`);
+      setIsImportCsvModalOpen(false);
+      setImportCsvForm({ floorId: '', sectionId: '', sectionName: '', csvText: '', isSubmitting: false });
+      fetchOperationsData(true);
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to import selling points from CSV');
+    } finally {
+      setImportCsvForm(prev => ({ ...prev, isSubmitting: false }));
+    }
+  };
+
+  // 1-Click Counter Template Applicator
+  const applyCounterTemplate = (tmpl: typeof COUNTER_TEMPLATES[0]) => {
+    const locCode = hierarchyData?.location?.code || 'BEL';
+    const randomCode = `${locCode}-SP-${Math.floor(10 + Math.random() * 89)}`;
+
+    // Try finding a matching section on the selected floor
+    let matchedSecId = '';
+    const curFloor = hierarchyData?.floors?.find((f: any) => f.id === newCounterForm.floorId);
+    if (curFloor?.sections) {
+      const found = curFloor.sections.find((s: any) => 
+        s.name.toLowerCase().includes(tmpl.sectionKeyword.toLowerCase())
+      );
+      if (found) matchedSecId = found.id;
+    }
+
+    setNewCounterForm(prev => ({
+      ...prev,
+      name: `${tmpl.name} ${Math.floor(1 + Math.random() * 9)}`,
+      code: randomCode,
+      category: tmpl.category,
+      targetAmount: tmpl.targetAmount,
+      sectionId: matchedSecId || prev.sectionId,
+    }));
+    toast.success(`Template loaded: ${tmpl.label}`);
   };
 
   // Handle Transfer Employee Submit
@@ -492,19 +721,52 @@ export default function SellingPointsPage() {
             {/* Export CSV */}
             <button
               onClick={handleExportCSV}
-              className="px-3.5 py-2 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 hover:text-primary-600 dark:hover:text-primary-400 text-sm font-semibold rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm flex items-center gap-2 transition-colors"
+              className="px-3.5 py-2 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 hover:text-primary-600 dark:hover:text-primary-400 text-xs sm:text-sm font-semibold rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm flex items-center gap-2 transition-colors"
             >
               <Download className="w-4 h-4" />
               <span>Export CSV</span>
+            </button>
+
+            {/* Import CSV */}
+            <button
+              onClick={() => {
+                const firstFloor = hierarchyData?.floors?.[0]?.id || '';
+                setImportCsvForm({
+                  floorId: firstFloor,
+                  sectionId: '',
+                  sectionName: '',
+                  csvText: '',
+                  isSubmitting: false,
+                });
+                setIsImportCsvModalOpen(true);
+              }}
+              className="px-3.5 py-2 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 hover:text-purple-600 dark:hover:text-purple-400 text-xs sm:text-sm font-semibold rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm flex items-center gap-2 transition-colors"
+            >
+              <Upload className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <span>Import CSV</span>
+            </button>
+
+            {/* Add Section Action */}
+            <button
+              onClick={() => {
+                const firstFloor = hierarchyData?.floors?.[0]?.id || '';
+                setNewSectionForm({ name: '', code: '', floorId: firstFloor, departmentId: '' });
+                setIsAddSectionModalOpen(true);
+              }}
+              className="px-3.5 py-2 bg-white dark:bg-slate-900 text-gray-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 text-xs sm:text-sm font-semibold rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm flex items-center gap-2 transition-colors"
+            >
+              <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <span>+ Add Section</span>
             </button>
 
             {/* Assign Salesman Action */}
             <button
               onClick={() => {
                 setAssignForm({ counterId: '', employeeId: '', isPrimary: true });
+                setSelectedEmployeeIds([]);
                 setIsAssignModalOpen(true);
               }}
-              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm flex items-center gap-1.5 transition-colors"
+              className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm flex items-center gap-1.5 transition-colors"
             >
               <Users className="w-4 h-4" />
               <span>Assign Staff</span>
@@ -517,7 +779,7 @@ export default function SellingPointsPage() {
                 setNewCounterForm(prev => ({ ...prev, locationId: selectedLocation, floorId: firstFloor }));
                 setIsAddCounterModalOpen(true);
               }}
-              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-xl shadow-sm flex items-center gap-1.5 transition-colors"
+              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-sm flex items-center gap-1.5 transition-colors"
             >
               <Plus className="w-4 h-4" />
               <span>New Counter</span>
@@ -870,22 +1132,74 @@ export default function SellingPointsPage() {
                     {/* EXPANDED FLOOR BODY: SECTIONS & COUNTERS */}
                     {isExpanded && (
                       <div className="p-5 space-y-6 bg-gray-50/50 dark:bg-slate-950/40">
-                        {/* Section Pills if floor has sections */}
-                        {floor.sections && floor.sections.length > 0 && (
-                          <div className="flex items-center gap-2 flex-wrap text-xs pb-1">
+                        {/* Floor Sections Bar with + Add Section & Import CSV for this floor */}
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-white dark:bg-slate-900/90 p-3 rounded-xl border border-gray-200 dark:border-slate-800">
+                          <div className="flex items-center gap-2 flex-wrap text-xs">
                             <span className="font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider text-[10px]">
                               Floor Sections:
                             </span>
-                            {floor.sections.map((sec: any) => (
-                              <span 
-                                key={sec.id}
-                                className="px-3 py-1 rounded-lg bg-white dark:bg-slate-800 text-gray-700 dark:text-slate-200 border border-gray-200 dark:border-slate-700 font-semibold shadow-xs"
-                              >
-                                {sec.name}
-                              </span>
-                            ))}
+                            {floor.sections && floor.sections.length > 0 ? (
+                              floor.sections.map((sec: any) => (
+                                <div 
+                                  key={sec.id}
+                                  className="group inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gray-50 dark:bg-slate-800 text-gray-800 dark:text-slate-200 border border-gray-200 dark:border-slate-700 font-semibold shadow-xs hover:border-primary-400 dark:hover:border-primary-500 transition-colors"
+                                >
+                                  <span>{sec.name}</span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setImportCsvForm({
+                                        floorId: floor.id,
+                                        sectionId: sec.id,
+                                        sectionName: sec.name,
+                                        csvText: `counter_name,counter_code,category,target_amount,section_name,employee_codes\n${sec.name} Counter 1,,Sales,1000000,${sec.name},`,
+                                        isSubmitting: false,
+                                      });
+                                      setIsImportCsvModalOpen(true);
+                                    }}
+                                    title={`Import CSV into ${sec.name}`}
+                                    className="p-0.5 rounded text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                                  >
+                                    <Upload className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-xs text-gray-400 italic">No sections created yet on this floor.</span>
+                            )}
                           </div>
-                        )}
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setNewSectionForm({ name: '', code: '', floorId: floor.id, departmentId: '' });
+                                setIsAddSectionModalOpen(true);
+                              }}
+                              className="px-2.5 py-1 text-xs font-semibold text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/60 rounded-lg border border-primary-200 dark:border-primary-800 flex items-center gap-1 transition-colors"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Add Section</span>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setImportCsvForm({
+                                  floorId: floor.id,
+                                  sectionId: floor.sections?.[0]?.id || '',
+                                  sectionName: floor.sections?.[0]?.name || '',
+                                  csvText: '',
+                                  isSubmitting: false,
+                                });
+                                setIsImportCsvModalOpen(true);
+                              }}
+                              className="px-2.5 py-1 text-xs font-semibold text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/60 rounded-lg border border-purple-200 dark:border-purple-800 flex items-center gap-1 transition-colors"
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                              <span>Import Section CSV</span>
+                            </button>
+                          </div>
+                        </div>
 
                         {/* Counters Grid */}
                         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
@@ -1390,18 +1704,18 @@ export default function SellingPointsPage() {
         )}
 
         {/* ========================================== */}
-        {/* MODAL 1: ASSIGN SALESMAN TO COUNTER        */}
+        {/* MODAL 1: ASSIGN SALESMAN TO COUNTER (MULTI)*/}
         {/* ========================================== */}
         {isAssignModalOpen && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-gray-200 dark:border-slate-800 relative">
-              <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-slate-800">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-gray-200 dark:border-slate-800 relative max-h-[90vh] flex flex-col">
+              <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-slate-800 shrink-0">
                 <div>
                   <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                    Assign Salesperson to Counter
+                    Assign Staff to Showroom Counter
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-                    Connect an active employee to a showroom selling counter
+                    Select one or multiple employees from the HRMS database to assign to this counter
                   </p>
                 </div>
                 <button 
@@ -1412,9 +1726,9 @@ export default function SellingPointsPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleAssignSubmit} className="mt-5 space-y-4">
-                {/* Select Counter */}
-                <div>
+              <form onSubmit={handleAssignSubmit} className="mt-4 flex flex-col flex-1 overflow-hidden space-y-3.5">
+                {/* Select Target Counter */}
+                <div className="shrink-0">
                   <label className="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">
                     Select Target Counter *
                   </label>
@@ -1429,7 +1743,7 @@ export default function SellingPointsPage() {
                       <optgroup key={fl.id} label={fl.name.toUpperCase()}>
                         {fl.counters.map((c: any) => (
                           <option key={c.id} value={c.id}>
-                            {c.name} ({c.code}) - {fl.name}
+                            {c.name} ({c.code}) - {fl.name} • {c.category}
                           </option>
                         ))}
                       </optgroup>
@@ -1437,50 +1751,141 @@ export default function SellingPointsPage() {
                   </select>
                 </div>
 
-                {/* Search & Select Employee */}
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">
-                    Select Employee from HRMS Database *
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Search by name, ID (e.g. TEST-EMP-001)..."
-                    value={employeeSearch}
-                    onChange={(e) => setEmployeeSearch(e.target.value)}
-                    className="w-full mb-2 px-3 py-1.5 text-xs rounded-lg border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-white outline-none"
-                  />
-                  <select
-                    required
-                    value={assignForm.employeeId}
-                    onChange={(e) => setAssignForm({ ...assignForm, employeeId: e.target.value })}
-                    size={5}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
-                  >
+                {/* Employee Selection Controls */}
+                <div className="flex flex-col flex-1 overflow-hidden space-y-2">
+                  <div className="flex items-center justify-between gap-2 shrink-0">
+                    <label className="text-xs font-semibold text-gray-700 dark:text-slate-300">
+                      Select Employees ({availableEmployees.length} Total in Store)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary-100 text-primary-800 dark:bg-primary-950 dark:text-primary-300">
+                        {selectedEmployeeIds.length} Selected
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const filtered = availableEmployees.filter(emp => 
+                            !employeeSearch || 
+                            emp.fullName.toLowerCase().includes(employeeSearch.toLowerCase()) || 
+                            emp.employeeCode.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+                            (emp.designation && emp.designation.toLowerCase().includes(employeeSearch.toLowerCase()))
+                          );
+                          if (selectedEmployeeIds.length === filtered.length && filtered.length > 0) {
+                            setSelectedEmployeeIds([]);
+                          } else {
+                            setSelectedEmployeeIds(filtered.map(e => e.id));
+                          }
+                        }}
+                        className="text-[11px] font-bold text-primary-600 hover:text-primary-700 dark:text-primary-400 hover:underline cursor-pointer"
+                      >
+                        {selectedEmployeeIds.length > 0 ? 'Deselect All' : 'Select All Staff'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Search input */}
+                  <div className="relative shrink-0">
+                    <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search employee by name, ID (e.g. TEST-EMP-001), designation..."
+                      value={employeeSearch}
+                      onChange={(e) => setEmployeeSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                    {employeeSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setEmployeeSearch('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Scrollable Checkbox Employee List */}
+                  <div className="flex-1 overflow-y-auto rounded-xl border border-gray-200 dark:border-slate-700 divide-y divide-gray-100 dark:divide-slate-800 bg-gray-50/40 dark:bg-slate-900/40 max-h-56 p-1 space-y-0.5">
                     {availableEmployees
-                      .filter(emp => !employeeSearch || emp.fullName.toLowerCase().includes(employeeSearch.toLowerCase()) || emp.employeeCode.toLowerCase().includes(employeeSearch.toLowerCase()))
-                      .map((emp) => (
-                        <option key={emp.id} value={emp.id} className="py-1">
-                          {emp.fullName} ({emp.employeeCode}) — {emp.designation || 'Sales Staff'}
-                        </option>
-                      ))}
-                  </select>
+                      .filter(emp => 
+                        !employeeSearch || 
+                        emp.fullName.toLowerCase().includes(employeeSearch.toLowerCase()) || 
+                        emp.employeeCode.toLowerCase().includes(employeeSearch.toLowerCase()) ||
+                        (emp.designation && emp.designation.toLowerCase().includes(employeeSearch.toLowerCase()))
+                      )
+                      .map((emp) => {
+                        const isSelected = selectedEmployeeIds.includes(emp.id);
+                        return (
+                          <div
+                            key={emp.id}
+                            onClick={() => {
+                              setSelectedEmployeeIds(prev => 
+                                isSelected ? prev.filter(id => id !== emp.id) : [...prev, emp.id]
+                              );
+                            }}
+                            className={`p-2 rounded-lg flex items-center justify-between gap-3 cursor-pointer text-xs transition-colors ${
+                              isSelected 
+                                ? 'bg-primary-50 dark:bg-primary-950/60 border border-primary-200 dark:border-primary-800' 
+                                : 'hover:bg-white dark:hover:bg-slate-800'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => {}} // Handled by parent div onClick
+                                className="w-4 h-4 rounded text-primary-600 focus:ring-primary-500 cursor-pointer"
+                              />
+                              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-primary-600 to-indigo-600 text-white font-bold flex items-center justify-center text-[10px] shrink-0">
+                                {emp.fullName.slice(0, 2).toUpperCase()}
+                              </div>
+                              <div className="truncate">
+                                <span className="font-bold text-gray-900 dark:text-white block truncate">
+                                  {emp.fullName}
+                                </span>
+                                <span className="text-[11px] text-gray-500 dark:text-slate-400 block truncate">
+                                  <strong className="font-mono text-gray-700 dark:text-slate-300">{emp.employeeCode}</strong> • {emp.designation || 'Sales Staff'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="shrink-0 text-right">
+                              {emp.currentCounter ? (
+                                <span className="text-[10px] px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                  At {emp.currentCounter}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                  Available
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    {availableEmployees.length === 0 && (
+                      <div className="p-4 text-center text-xs text-gray-500">
+                        No employees found in HRMS database.
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Primary assignment checkbox */}
-                <div className="flex items-center gap-2 pt-2">
+                <div className="flex items-center gap-2 shrink-0 pt-1">
                   <input
                     type="checkbox"
                     id="isPrimary"
                     checked={assignForm.isPrimary}
                     onChange={(e) => setAssignForm({ ...assignForm, isPrimary: e.target.checked })}
-                    className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+                    className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500 cursor-pointer"
                   />
-                  <label htmlFor="isPrimary" className="text-xs text-gray-700 dark:text-slate-300 font-medium">
-                    Mark as Primary Counter Assignment for this salesperson
+                  <label htmlFor="isPrimary" className="text-xs text-gray-700 dark:text-slate-300 font-medium cursor-pointer">
+                    Set as Primary Counter Assignment for selected salesperson(s)
                   </label>
                 </div>
 
-                <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 dark:border-slate-800">
+                <div className="pt-3 flex justify-end gap-3 border-t border-gray-100 dark:border-slate-800 shrink-0">
                   <button
                     type="button"
                     onClick={() => setIsAssignModalOpen(false)}
@@ -1490,9 +1895,15 @@ export default function SellingPointsPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-sm"
+                    disabled={selectedEmployeeIds.length === 0}
+                    className="px-5 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 rounded-xl shadow-sm flex items-center gap-1.5"
                   >
-                    Confirm Assignment
+                    <UserCheck className="w-4 h-4" />
+                    <span>
+                      {selectedEmployeeIds.length === 0 
+                        ? 'Select Staff to Assign' 
+                        : `Confirm Assignment (${selectedEmployeeIds.length} Staff)`}
+                    </span>
                   </button>
                 </div>
               </form>
@@ -1581,18 +1992,18 @@ export default function SellingPointsPage() {
         )}
 
         {/* ========================================== */}
-        {/* MODAL 3: CREATE NEW COUNTER                */}
+        {/* MODAL 3: CREATE NEW COUNTER (WITH TEMPLATES)*/}
         {/* ========================================== */}
         {isAddCounterModalOpen && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-200 dark:border-slate-800 relative">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-gray-200 dark:border-slate-800 max-h-[90vh] overflow-y-auto relative">
               <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-slate-800">
                 <div>
                   <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                     Add Selling Point Counter
                   </h3>
                   <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
-                    Configure a new sales section or billing terminal
+                    Configure a showroom selling counter or billing terminal with 1-click templates
                   </p>
                 </div>
                 <button 
@@ -1603,7 +2014,38 @@ export default function SellingPointsPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleCreateCounterSubmit} className="mt-5 space-y-4">
+              {/* 1-Click Counter Templates Presets Bar */}
+              <div className="mt-4 p-3 rounded-2xl bg-primary-50/50 dark:bg-primary-950/40 border border-primary-100 dark:border-primary-900/60">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-primary-900 dark:text-primary-200 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" />
+                    Quick Counter Templates (1-Click Preset)
+                  </span>
+                  <span className="text-[10px] text-primary-700 dark:text-primary-300">Click to autofill</span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {COUNTER_TEMPLATES.map((tmpl) => (
+                    <button
+                      type="button"
+                      key={tmpl.id}
+                      onClick={() => applyCounterTemplate(tmpl)}
+                      className="p-2 text-left rounded-xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:border-primary-500 dark:hover:border-primary-400 shadow-2xs hover:shadow-xs transition-all group cursor-pointer"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm">{tmpl.icon}</span>
+                        <span className="font-bold text-[11px] text-gray-900 dark:text-white truncate group-hover:text-primary-600 dark:group-hover:text-primary-400">
+                          {tmpl.name.replace(' Counter', '')}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-gray-500 dark:text-slate-400 block truncate mt-0.5">
+                        {tmpl.category} • {formatCurrency(tmpl.targetAmount)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <form onSubmit={handleCreateCounterSubmit} className="mt-4 space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">
                     Counter Name *
@@ -1611,7 +2053,7 @@ export default function SellingPointsPage() {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Wedding Silk Saree Counter C"
+                    placeholder="e.g. Pure Kanchipuram Silk Counter A"
                     value={newCounterForm.name}
                     onChange={(e) => setNewCounterForm({ ...newCounterForm, name: e.target.value })}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
@@ -1649,21 +2091,49 @@ export default function SellingPointsPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">
-                    Showroom Floor *
-                  </label>
-                  <select
-                    required
-                    value={newCounterForm.floorId}
-                    onChange={(e) => setNewCounterForm({ ...newCounterForm, floorId: e.target.value })}
-                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
-                  >
-                    <option value="">Select Floor</option>
-                    {hierarchyData?.floors?.map((fl: any) => (
-                      <option key={fl.id} value={fl.id}>{fl.name}</option>
-                    ))}
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">
+                      Showroom Floor *
+                    </label>
+                    <select
+                      required
+                      value={newCounterForm.floorId}
+                      onChange={(e) => {
+                        const newFloorId = e.target.value;
+                        const floorObj = hierarchyData?.floors?.find((f: any) => f.id === newFloorId);
+                        setNewCounterForm({ 
+                          ...newCounterForm, 
+                          floorId: newFloorId,
+                          sectionId: floorObj?.sections?.[0]?.id || '',
+                        });
+                      }}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="">Select Floor</option>
+                      {hierarchyData?.floors?.map((fl: any) => (
+                        <option key={fl.id} value={fl.id}>{fl.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">
+                      Showroom Section
+                    </label>
+                    <select
+                      value={newCounterForm.sectionId}
+                      onChange={(e) => setNewCounterForm({ ...newCounterForm, sectionId: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="">-- Choose Section --</option>
+                      {hierarchyData?.floors
+                        ?.find((f: any) => f.id === newCounterForm.floorId)
+                        ?.sections?.map((sec: any) => (
+                          <option key={sec.id} value={sec.id}>{sec.name}</option>
+                        ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div>
@@ -1691,6 +2161,279 @@ export default function SellingPointsPage() {
                     className="px-5 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-sm"
                   >
                     Create Counter
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================== */}
+        {/* MODAL 5: ADD SHOWROOM SECTION              */}
+        {/* ========================================== */}
+        {isAddSectionModalOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-200 dark:border-slate-800 relative">
+              <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-slate-800">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                    Add Showroom Section
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                    Define a department selling section under a showroom floor
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setIsAddSectionModalOpen(false)}
+                  className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-slate-200"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateSectionSubmit} className="mt-5 space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">
+                    Showroom Floor *
+                  </label>
+                  <select
+                    required
+                    value={newSectionForm.floorId}
+                    onChange={(e) => setNewSectionForm({ ...newSectionForm, floorId: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <option value="">Select Floor</option>
+                    {hierarchyData?.floors?.map((fl: any) => (
+                      <option key={fl.id} value={fl.id}>{fl.name} (Level {fl.floorNumber})</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">
+                    Section Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Silk Sarees, Cotton Sarees, Mens Wear"
+                    value={newSectionForm.name}
+                    onChange={(e) => setNewSectionForm({ ...newSectionForm, name: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">
+                    Section Code (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. SEC-SLK-01"
+                    value={newSectionForm.code}
+                    onChange={(e) => setNewSectionForm({ ...newSectionForm, code: e.target.value })}
+                    className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white font-mono outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+
+                <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddSectionModalOpen(false)}
+                    className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 text-xs font-bold text-white bg-primary-600 hover:bg-primary-700 rounded-xl shadow-sm"
+                  >
+                    Create Section
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================== */}
+        {/* MODAL 6: IMPORT SELLING POINTS VIA CSV     */}
+        {/* ========================================== */}
+        {isImportCsvModalOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-gray-200 dark:border-slate-800 max-h-[90vh] overflow-y-auto relative">
+              <div className="flex items-center justify-between pb-4 border-b border-gray-100 dark:border-slate-800">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-purple-100 dark:bg-purple-950 text-purple-600 dark:text-purple-400">
+                      <FileSpreadsheet className="w-4 h-4" />
+                    </span>
+                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+                      Import Selling Points & Counters (CSV)
+                    </h3>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                    Upload or paste CSV rows to automatically generate showroom selling points and assign staff
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setIsImportCsvModalOpen(false)}
+                  className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-slate-200"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleImportCsvSubmit} className="mt-5 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">
+                      Target Showroom Floor *
+                    </label>
+                    <select
+                      required
+                      value={importCsvForm.floorId}
+                      onChange={(e) => setImportCsvForm({ ...importCsvForm, floorId: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="">Select Floor</option>
+                      {hierarchyData?.floors?.map((fl: any) => (
+                        <option key={fl.id} value={fl.id}>{fl.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">
+                      Section (Optional / Auto-detect)
+                    </label>
+                    <select
+                      value={importCsvForm.sectionId}
+                      onChange={(e) => setImportCsvForm({ ...importCsvForm, sectionId: e.target.value })}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                      <option value="">Auto-create / Detect from CSV row</option>
+                      {hierarchyData?.floors
+                        ?.find((fl: any) => fl.id === importCsvForm.floorId)
+                        ?.sections?.map((sec: any) => (
+                          <option key={sec.id} value={sec.id}>{sec.name}</option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* CSV File Input & Sample Template Button */}
+                <div className="p-3.5 rounded-2xl bg-gray-50 dark:bg-slate-800/60 border border-gray-200 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-2.5">
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          const content = event.target?.result as string;
+                          if (content) {
+                            setImportCsvForm(prev => ({ ...prev, csvText: content }));
+                          }
+                        };
+                        reader.readAsText(file);
+                      }}
+                      className="text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const sampleCsv = `counter_name,counter_code,category,target_amount,section_name,employee_codes
+Kanchipuram Silk Counter,BEL-SP-10,Sales,1500000,Silk Sarees,"TEST-EMP-001,TEST-EMP-002"
+Chanderi Handloom Desk,BEL-SP-11,Sales,800000,Cotton Sarees,"TEST-EMP-003"
+Menswear Lounge B,BEL-SP-12,Sales,1200000,Mens Wear,"TEST-EMP-019"
+POS Terminal 4,BEL-SP-13,Billing,2500000,Billing & Reception,"TEST-EMP-007"`;
+                      setImportCsvForm(prev => ({ ...prev, csvText: sampleCsv }));
+                      toast.success('Sample template inserted');
+                    }}
+                    className="px-3 py-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/60 hover:bg-purple-100 rounded-xl border border-purple-200 dark:border-purple-800 flex items-center gap-1.5 self-start sm:self-auto transition-colors cursor-pointer"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Load Sample Template</span>
+                  </button>
+                </div>
+
+                {/* CSV Prompt / Textarea */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-slate-300 mb-1">
+                    CSV Rows / Paste Prompt Content *
+                  </label>
+                  <textarea
+                    rows={5}
+                    required
+                    placeholder="counter_name,counter_code,category,target_amount,section_name,employee_codes&#10;Kanchipuram Silk Counter,BEL-SP-10,Sales,1500000,Silk Sarees,&quot;TEST-EMP-001,TEST-EMP-002&quot;"
+                    value={importCsvForm.csvText}
+                    onChange={(e) => setImportCsvForm({ ...importCsvForm, csvText: e.target.value })}
+                    className="w-full px-3 py-2 text-xs font-mono rounded-xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-gray-900 dark:text-white outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                  <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-1">
+                    Format: <code>counter_name, counter_code, category, target_amount, section_name, employee_codes</code>
+                  </p>
+                </div>
+
+                {/* Live Preview Table */}
+                {parseCsvRows(importCsvForm.csvText).length > 0 && (
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wider block">
+                      Preview: {parseCsvRows(importCsvForm.csvText).length} Counters Detected
+                    </span>
+                    <div className="max-h-40 overflow-y-auto rounded-xl border border-gray-200 dark:border-slate-700 text-xs">
+                      <table className="w-full text-left">
+                        <thead className="bg-gray-50 dark:bg-slate-800 sticky top-0 text-[11px] font-bold text-gray-600 dark:text-slate-300 border-b">
+                          <tr>
+                            <th className="p-2">Name</th>
+                            <th className="p-2">Code</th>
+                            <th className="p-2">Category</th>
+                            <th className="p-2">Target</th>
+                            <th className="p-2">Section</th>
+                            <th className="p-2">Staff</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                          {parseCsvRows(importCsvForm.csvText).map((row, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50/50">
+                              <td className="p-2 font-medium">{row.name}</td>
+                              <td className="p-2 font-mono text-[11px]">{row.code || 'Auto'}</td>
+                              <td className="p-2">{row.category}</td>
+                              <td className="p-2">{formatCurrency(row.targetAmount)}</td>
+                              <td className="p-2">{row.sectionName || 'Default'}</td>
+                              <td className="p-2 font-mono text-[11px] truncate max-w-[120px]">{row.employeeCodes || 'None'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-4 flex justify-end gap-3 border-t border-gray-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setIsImportCsvModalOpen(false)}
+                    className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-xl"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={importCsvForm.isSubmitting || parseCsvRows(importCsvForm.csvText).length === 0}
+                    className="px-5 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 rounded-xl shadow-sm flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>
+                      {importCsvForm.isSubmitting 
+                        ? 'Importing...' 
+                        : `Import ${parseCsvRows(importCsvForm.csvText).length} Counters`}
+                    </span>
                   </button>
                 </div>
               </form>

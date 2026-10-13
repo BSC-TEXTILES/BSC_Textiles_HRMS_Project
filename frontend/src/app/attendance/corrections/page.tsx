@@ -5,15 +5,87 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
 
-import { CORRECTION_RECORDS, type CorrectionRecord } from '@/lib/correctionRecords';
+import {
+  CORRECTION_RECORDS,
+  STORE_SECTIONS,
+  STORE_FLOORS,
+  type CorrectionRecord,
+} from '@/lib/correctionRecords';
+
+interface EditFormData {
+  id: string;
+  name: string;
+  empCode: string;
+  role: string;
+  hub: string;
+  dept: string;
+  floor: string;
+  avatar: string;
+  shift: string;
+  rawIn: string;
+  rawOut: string;
+  terminal: string;
+  overrideIn: string;
+  overrideOut: string;
+  totalHours: string;
+  otHours: string;
+  reason: string;
+  evidence: string;
+  invoiceOrDoc: string;
+  supervisor: string;
+  status: 'PENDING' | 'SUPERVISOR_OK' | 'APPROVED' | 'REJECTED';
+  type: 'MISSED_OUT' | 'LATE_GRACE' | 'ON_DUTY' | 'SENSOR_GLITCH';
+  notes: string;
+}
+
+const SHIFT_OPTIONS = [
+  'General (09:00 - 18:00)',
+  'Shift A (09:30 - 18:30)',
+  'Shift B (11:30 - 20:30)',
+  'Shift C Night (20:30 - 05:30)',
+  'Overnight (16:30 - 01:30)',
+];
 
 export default function AttendanceCorrectionsPage() {
   const [records, setRecords] = useState<CorrectionRecord[]>(CORRECTION_RECORDS);
   const [activeTab, setActiveTab] = useState<'ALL' | 'MISSED_OUT' | 'LATE_GRACE' | 'ON_DUTY' | 'SENSOR_GLITCH'>('ALL');
   const [hubFilter, setHubFilter] = useState('ALL');
+  const [deptFilter, setDeptFilter] = useState('ALL');
+  const [floorFilter, setFloorFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRecordId, setSelectedRecordId] = useState<string>('CORR-4029');
+  
+  // Modals state
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editStep, setEditStep] = useState<1 | 2 | 3>(1);
+
+  // Edit Form State
+  const [editForm, setEditForm] = useState<EditFormData>({
+    id: '',
+    name: '',
+    empCode: '',
+    role: 'Floor Associate',
+    hub: 'BEL-01 Flagship',
+    dept: STORE_SECTIONS[0],
+    floor: STORE_FLOORS[0],
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+    shift: 'Shift A (09:30 - 18:30)',
+    rawIn: '09:30 IN',
+    rawOut: 'Missed OUT',
+    terminal: 'BEL-IN-02',
+    overrideIn: '09:30 AM',
+    overrideOut: '18:30 PM',
+    totalHours: '8h 00m Total',
+    otHours: 'Standard Rate',
+    reason: '',
+    evidence: 'Biometric System Sync',
+    invoiceOrDoc: '',
+    supervisor: 'Floor Manager',
+    status: 'PENDING',
+    type: 'MISSED_OUT',
+    notes: '',
+  });
 
   useEffect(() => {
     // Optionally fetch backend corrections
@@ -26,9 +98,10 @@ export default function AttendanceCorrectionsPage() {
             name: c.employeeName || 'Staff Member',
             role: c.designation || 'Floor Associate',
             hub: c.locationName || 'BEL-01 Flagship',
-            dept: c.departmentName || 'Customer Retail',
+            dept: c.departmentName || 'Bridal Silk & Atelier',
+            floor: 'Ground Floor (Atelier & Heritage Sarees)',
             avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-            shift: 'Shift A (09:30 – 18:30)',
+            shift: 'Shift A (09:30 - 18:30)',
             rawIn: c.requestedLogin ? new Date(c.requestedLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '09:30 AM',
             rawOut: c.requestedLogout ? new Date(c.requestedLogout).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '18:30 PM',
             terminal: 'MANUAL-OVERRIDE',
@@ -78,12 +151,15 @@ export default function AttendanceCorrectionsPage() {
     }
     const matchesTab = activeTab === 'ALL' || r.type === activeTab;
     const matchesHub = hubFilter === 'ALL' || r.hub.toLowerCase().includes(hubFilter.toLowerCase());
+    const matchesDept = deptFilter === 'ALL' || r.dept.toLowerCase() === deptFilter.toLowerCase();
+    const matchesFloor = floorFilter === 'ALL' || (r.floor && r.floor.toLowerCase().includes(floorFilter.toLowerCase()));
     const matchesSearch =
       searchQuery === '' ||
       r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.empCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.dept.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesTab && matchesHub && matchesSearch;
+      r.dept.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (r.floor && r.floor.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchesTab && matchesHub && matchesDept && matchesFloor && matchesSearch;
   });
 
   const handleApprove = async (id: string) => {
@@ -104,6 +180,154 @@ export default function AttendanceCorrectionsPage() {
       prev.map((r) => (r.id === id ? { ...r, status: 'REJECTED' } : r))
     );
     toast.error(`Punch correction #${id} rejected. LOP applied per policy.`);
+  };
+
+  // Open Edit for an existing record
+  const handleOpenEditRecord = (record: CorrectionRecord) => {
+    setEditForm({
+      id: record.id,
+      name: record.name,
+      empCode: record.empCode,
+      role: record.role,
+      hub: record.hub,
+      dept: record.dept,
+      floor: record.floor || STORE_FLOORS[0],
+      avatar: record.avatar,
+      shift: record.shift,
+      rawIn: record.rawIn,
+      rawOut: record.rawOut,
+      terminal: record.terminal,
+      overrideIn: record.overrideIn || record.rawIn,
+      overrideOut: record.overrideOut,
+      totalHours: record.totalHours,
+      otHours: record.otHours,
+      reason: record.reason,
+      evidence: record.evidence,
+      invoiceOrDoc: record.invoiceOrDoc || '',
+      supervisor: record.supervisor,
+      status: record.status,
+      type: record.type,
+      notes: record.notes,
+    });
+    setEditStep(3); // jump directly to editing details when opened from row
+    setIsEditModalOpen(true);
+  };
+
+  // Open Edit flow from top button (starts at Step 1: Section & Floor)
+  const handleOpenGuidedEdit = () => {
+    const target = selectedRecord || records[0];
+    setEditForm({
+      id: target.id,
+      name: target.name,
+      empCode: target.empCode,
+      role: target.role,
+      hub: target.hub,
+      dept: target.dept,
+      floor: target.floor || STORE_FLOORS[0],
+      avatar: target.avatar,
+      shift: target.shift,
+      rawIn: target.rawIn,
+      rawOut: target.rawOut,
+      terminal: target.terminal,
+      overrideIn: target.overrideIn || target.rawIn,
+      overrideOut: target.overrideOut,
+      totalHours: target.totalHours,
+      otHours: target.otHours,
+      reason: target.reason,
+      evidence: target.evidence,
+      invoiceOrDoc: target.invoiceOrDoc || '',
+      supervisor: target.supervisor,
+      status: target.status,
+      type: target.type,
+      notes: target.notes,
+    });
+    setEditStep(1); // start by selecting section and floor
+    setIsEditModalOpen(true);
+  };
+
+  // Select employee in guided edit flow
+  const handleSelectEmployeeInEdit = (rec: CorrectionRecord) => {
+    setEditForm((prev) => ({
+      ...prev,
+      id: rec.id,
+      name: rec.name,
+      empCode: rec.empCode,
+      role: rec.role,
+      hub: rec.hub,
+      dept: rec.dept,
+      floor: rec.floor || prev.floor,
+      avatar: rec.avatar,
+      shift: rec.shift,
+      rawIn: rec.rawIn,
+      rawOut: rec.rawOut,
+      terminal: rec.terminal,
+      overrideIn: rec.overrideIn || rec.rawIn,
+      overrideOut: rec.overrideOut,
+      totalHours: rec.totalHours,
+      otHours: rec.otHours,
+      reason: rec.reason,
+      evidence: rec.evidence,
+      invoiceOrDoc: rec.invoiceOrDoc || '',
+      supervisor: rec.supervisor,
+      status: rec.status,
+      type: rec.type,
+      notes: rec.notes,
+    }));
+    setEditStep(3);
+  };
+
+  // Save the Edited Correction
+  const handleSaveEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm.name || !editForm.empCode || !editForm.reason) {
+      toast.error('Employee name, code, and justification are required');
+      return;
+    }
+
+    try {
+      await api.put(`/attendance/corrections/${editForm.id}`, {
+        requestedLogin: editForm.overrideIn,
+        requestedLogout: editForm.overrideOut,
+        reason: editForm.reason,
+        status: editForm.status,
+        reviewNote: editForm.notes,
+      });
+    } catch {}
+
+    const updatedRec: CorrectionRecord = {
+      id: editForm.id,
+      empCode: editForm.empCode,
+      name: editForm.name,
+      role: editForm.role,
+      hub: editForm.hub,
+      dept: editForm.dept,
+      floor: editForm.floor,
+      avatar: editForm.avatar,
+      shift: editForm.shift,
+      rawIn: editForm.rawIn,
+      rawOut: editForm.rawOut,
+      terminal: editForm.terminal,
+      overrideIn: editForm.overrideIn,
+      overrideOut: editForm.overrideOut,
+      totalHours: editForm.totalHours,
+      otHours: editForm.otHours,
+      reason: editForm.reason,
+      evidence: editForm.evidence,
+      invoiceOrDoc: editForm.invoiceOrDoc,
+      supervisor: editForm.supervisor,
+      pipelineStep: editForm.status === 'APPROVED' ? '3' : '2',
+      pipelineTotal: '3',
+      status: editForm.status,
+      type: editForm.type,
+      notes: editForm.notes,
+    };
+
+    setRecords((prev) =>
+      prev.map((r) => (r.id === editForm.id ? updatedRec : r))
+    );
+    setSelectedRecordId(updatedRec.id);
+    setIsEditModalOpen(false);
+    toast.success(`Regularization record for ${editForm.name} updated & ledger synced!`);
   };
 
   const handleCreateRequest = async (e: React.FormEvent) => {
@@ -127,6 +351,7 @@ export default function AttendanceCorrectionsPage() {
       role: 'Floor Associate',
       hub: newRequest.hub,
       dept: 'Customer Retail',
+      floor: 'Ground Floor (Atelier & Heritage Sarees)',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
       shift: newRequest.shift,
       rawIn: newRequest.overrideIn,
@@ -149,6 +374,13 @@ export default function AttendanceCorrectionsPage() {
     setIsModalOpen(false);
     toast.success('Manual punch correction request logged!');
   };
+
+  // Filter candidates for guided selection
+  const candidateStaff = records.filter(
+    (r) =>
+      (editForm.dept === 'ALL' || r.dept.toLowerCase() === editForm.dept.toLowerCase()) &&
+      (!editForm.floor || !r.floor || r.floor.toLowerCase().includes(editForm.floor.toLowerCase()))
+  );
 
   return (
     <DashboardLayout>
@@ -183,7 +415,7 @@ export default function AttendanceCorrectionsPage() {
           <div className="flex items-center gap-2.5 flex-wrap self-start lg:self-center">
             <button
               onClick={() => toast.success('Muster roll audit exported (.xlsx)')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white text-slate-700 hover:bg-slate-50 transition-colors rounded-xl text-xs font-semibold shadow-xs border border-slate-200"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white text-slate-700 hover:bg-slate-50 transition-colors rounded-xl text-xs font-semibold shadow-xs border border-slate-200"
               type="button"
             >
               <span className="material-symbols-outlined text-[17px] text-slate-500">file_download</span>
@@ -196,15 +428,24 @@ export default function AttendanceCorrectionsPage() {
                 );
                 toast.success('Batch approved all pending requests!');
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white text-slate-700 hover:bg-slate-50 transition-colors rounded-xl text-xs font-semibold shadow-xs border border-slate-200"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white text-slate-700 hover:bg-slate-50 transition-colors rounded-xl text-xs font-semibold shadow-xs border border-slate-200"
               type="button"
             >
               <span className="material-symbols-outlined text-[17px] text-[#722F37]">checklist_rtl</span>
               Batch Approve All Pending
             </button>
             <button
+              onClick={handleOpenGuidedEdit}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#722F37]/10 text-[#722F37] hover:bg-[#722F37]/20 border border-[#722F37]/30 transition-colors rounded-xl text-xs font-bold"
+              type="button"
+              title="Select Section, Floor and Employee to Edit"
+            >
+              <span className="material-symbols-outlined text-[17px]">edit_note</span>
+              Edit Employee Regularization
+            </button>
+            <button
               onClick={() => setIsModalOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#722F37] text-white hover:bg-blue-700 transition-colors rounded-xl text-xs font-semibold shadow-sm active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#722F37] text-white hover:bg-[#5B232A] transition-colors rounded-xl text-xs font-bold shadow-xs active:scale-95"
               type="button"
             >
               <span className="material-symbols-outlined text-[17px]">add_circle</span>
@@ -254,7 +495,7 @@ export default function AttendanceCorrectionsPage() {
               </span>
               <div className="flex items-baseline gap-1.5">
                 <span className="text-2xl font-black text-slate-900 tracking-tight">24</span>
-                <span className="text-xs font-semibold text-amber-600">Flagged</span>
+                <span className="text-xs font-semibold text-slate-500">Flagged</span>
               </div>
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 truncate">
@@ -267,7 +508,7 @@ export default function AttendanceCorrectionsPage() {
               <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
                 <span className="material-symbols-outlined text-[20px]">speed</span>
               </div>
-              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+              <span className="text-[10px] text-emerald-700 font-bold px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
                 94.2% SLA
               </span>
             </div>
@@ -287,10 +528,10 @@ export default function AttendanceCorrectionsPage() {
 
           <div className="bg-white rounded-xl p-4 shadow-xs border border-slate-200/90 flex flex-col justify-between hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-3">
-              <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center text-[#722F37]">
+              <div className="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
                 <span className="material-symbols-outlined text-[20px]">fingerprint</span>
               </div>
-              <span className="text-[#722F37] text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200">
+              <span className="text-[10px] text-slate-500 font-bold px-2 py-0.5 rounded-full bg-slate-100">
                 -0.4% MoM
               </span>
             </div>
@@ -303,17 +544,17 @@ export default function AttendanceCorrectionsPage() {
                 <span className="text-xs font-semibold text-slate-500">Error Rate</span>
               </div>
             </div>
-            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 truncate">
+            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500">
               Across 792 daily terminal punches
             </div>
           </div>
 
           <div className="bg-white rounded-xl p-4 shadow-xs border border-slate-200/90 flex flex-col justify-between hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-3">
-              <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+              <div className="w-9 h-9 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600">
                 <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
               </div>
-              <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[10px] font-bold">
+              <span className="text-[10px] text-teal-700 font-bold px-2 py-0.5 rounded-full bg-teal-50 border border-teal-200">
                 Live Safeguard
               </span>
             </div>
@@ -322,19 +563,19 @@ export default function AttendanceCorrectionsPage() {
                 Payroll Impact Saved
               </span>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-emerald-600 tracking-tight">₹18,420</span>
+                <span className="text-2xl font-black text-slate-900 tracking-tight">₹18,420</span>
               </div>
             </div>
-            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500">
+            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 truncate">
               Protected from wrongful LOP deductions
             </div>
           </div>
         </div>
 
-        {/* MULTI-LEVEL FILTER, TAB STRIP & QUERY TOOLS */}
+        {/* WORKSTREAM FILTER TABS & SEARCH CONTROLS */}
         <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-200/90 flex flex-col gap-4">
-          {/* Tab Strip */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+          {/* Category Tabs */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
             <button
               onClick={() => setActiveTab('ALL')}
               className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${
@@ -417,18 +658,21 @@ export default function AttendanceCorrectionsPage() {
             </button>
           </div>
 
-          {/* Filter Fields Bar */}
+          {/* Filter Fields Bar (Hub, Section, Floor, Search) */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center pt-1 border-t border-slate-100">
-            <div className="md:col-span-6 relative flex items-center bg-slate-50 rounded-xl px-3 py-2 border border-slate-200/80">
+            {/* Search */}
+            <div className="md:col-span-4 relative flex items-center bg-slate-50 rounded-xl px-3 py-2 border border-slate-200/80">
               <span className="material-symbols-outlined text-[18px] text-slate-400 mr-2 shrink-0">search</span>
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-transparent text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none"
-                placeholder="Search by Employee, ID (e.g. BSC-EMP-0042), or Supervisor..."
+                placeholder="Search staff, ID (BSC-EMP-0094), supervisor, floor..."
                 type="text"
               />
             </div>
+
+            {/* Store Hub Filter */}
             <div className="md:col-span-3 relative flex items-center bg-slate-50 rounded-xl px-3 py-2 border border-slate-200/80">
               <span className="material-symbols-outlined text-[16px] text-[#722F37] mr-2 shrink-0">store</span>
               <select
@@ -442,22 +686,44 @@ export default function AttendanceCorrectionsPage() {
                 <option value="SHI">SHI-03 Retail Apex Shivamogga</option>
               </select>
             </div>
-            <div className="md:col-span-3 flex items-center gap-2 justify-end">
-              <span className="text-xs font-medium text-slate-500">Showing {filteredRecords.length} records</span>
-              <button
-                onClick={() => toast.success('Form T flags refreshed')}
-                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-semibold flex items-center gap-1 transition-colors border border-slate-200/60"
-                type="button"
+
+            {/* Section / Dept Filter */}
+            <div className="md:col-span-3 relative flex items-center bg-slate-50 rounded-xl px-3 py-2 border border-slate-200/80">
+              <span className="material-symbols-outlined text-[16px] text-slate-500 mr-2 shrink-0">category</span>
+              <select
+                value={deptFilter}
+                onChange={(e) => setDeptFilter(e.target.value)}
+                className="w-full bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer truncate"
               >
-                <span className="material-symbols-outlined text-[14px] text-[#722F37]">tune</span>
-                Form T Flags
-              </button>
+                <option value="ALL">All Sections / Depts</option>
+                {STORE_SECTIONS.map((sec) => (
+                  <option key={sec} value={sec}>
+                    {sec}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Floor Filter */}
+            <div className="md:col-span-2 relative flex items-center bg-slate-50 rounded-xl px-3 py-2 border border-slate-200/80">
+              <span className="material-symbols-outlined text-[16px] text-slate-500 mr-2 shrink-0">layers</span>
+              <select
+                value={floorFilter}
+                onChange={(e) => setFloorFilter(e.target.value)}
+                className="w-full bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer truncate"
+              >
+                <option value="ALL">All Floors</option>
+                <option value="Ground">Ground Floor</option>
+                <option value="1st">1st Floor</option>
+                <option value="2nd">2nd Floor</option>
+                <option value="3rd">3rd Floor</option>
+                <option value="Basement">Basement Depot</option>
+              </select>
             </div>
           </div>
         </div>
 
         {/* MAIN WORK SURFACE: 12-COLUMN LEDGER & INSPECTOR */}
-        {/* Uses xl:grid-cols-12 with min-w-0 on both columns to eliminate horizontal overflow/overlay bugs */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
           {/* LEFT COLUMN (Table Ledger): xl:col-span-7 2xl:col-span-8 */}
           <div className="xl:col-span-7 2xl:col-span-8 min-w-0 flex flex-col gap-6">
@@ -469,6 +735,11 @@ export default function AttendanceCorrectionsPage() {
                   <span className="px-2 py-0.5 rounded-full bg-blue-50 text-[#722F37] text-[11px] font-semibold border border-blue-200">
                     {records.filter((r) => r.status === 'PENDING').length} Pending Signoffs
                   </span>
+                  {(deptFilter !== 'ALL' || floorFilter !== 'ALL') && (
+                    <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10px] font-semibold border border-amber-200">
+                      Filtered: {deptFilter !== 'ALL' ? deptFilter : ''} {floorFilter !== 'ALL' ? `• ${floorFilter}` : ''}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 text-slate-500 text-[11px]">
                   <span className="flex items-center gap-1">
@@ -482,7 +753,7 @@ export default function AttendanceCorrectionsPage() {
 
               {/* Tabular Ledger Content */}
               <div className="overflow-x-auto w-full">
-                <table className="w-full text-left text-xs whitespace-normal min-w-[700px]">
+                <table className="w-full text-left text-xs whitespace-normal min-w-[720px]">
                   <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
                     <tr>
                       <th className="py-3 px-4 font-bold">Staff &amp; Unit</th>
@@ -494,152 +765,178 @@ export default function AttendanceCorrectionsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredRecords.map((r, idx) => {
-                      const isSelected = r.id === selectedRecordId;
-                      return (
-                        <tr
-                          key={`${r.id}-${idx}`}
-                          onClick={() => setSelectedRecordId(r.id)}
-                          className={`cursor-pointer transition-colors ${
-                            isSelected ? 'bg-blue-50/60 border-l-4 border-l-[#722F37]' : 'hover:bg-slate-50/70'
-                          }`}
-                        >
-                          <td className="py-3 px-4 align-top">
-                            <div className="flex items-start gap-2.5">
-                              <img
-                                className="w-8 h-8 rounded-full object-cover shrink-0 shadow-xs border border-slate-200"
-                                src={r.avatar}
-                                alt={r.name}
-                              />
-                              <div className="flex flex-col min-w-0">
-                                <span className="font-bold text-slate-900 truncate">
-                                  {r.name}
+                    {filteredRecords.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-slate-400">
+                          <p className="font-semibold text-slate-600">No punch correction records found</p>
+                          <p className="text-[11px] mt-1">Try adjusting your Section, Floor, or Hub filters.</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredRecords.map((r, idx) => {
+                        const isSelected = r.id === selectedRecordId;
+                        return (
+                          <tr
+                            key={`${r.id}-${idx}`}
+                            onClick={() => setSelectedRecordId(r.id)}
+                            className={`cursor-pointer transition-colors ${
+                              isSelected ? 'bg-blue-50/60 border-l-4 border-l-[#722F37]' : 'hover:bg-slate-50/70'
+                            }`}
+                          >
+                            <td className="py-3 px-4 align-top">
+                              <div className="flex items-start gap-2.5">
+                                <img
+                                  className="w-8 h-8 rounded-full object-cover shrink-0 shadow-xs border border-slate-200"
+                                  src={r.avatar}
+                                  alt={r.name}
+                                />
+                                <div className="flex flex-col min-w-0">
+                                  <span className="font-bold text-slate-900 truncate">
+                                    {r.name}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-mono">
+                                    {r.empCode}
+                                  </span>
+                                  <span className="inline-flex mt-1 items-center px-1.5 py-0.5 rounded text-[10px] font-semibold text-[#722F37] bg-[#F8F4F1] border border-[#E5D5D7] w-max">
+                                    {r.hub} • {r.dept}
+                                  </span>
+                                  {r.floor && (
+                                    <span className="text-[10px] text-slate-500 mt-0.5 truncate" title={r.floor}>
+                                      {r.floor}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="py-3 px-4 align-top">
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-slate-800">
+                                  {r.shift}
                                 </span>
-                                <span className="text-[10px] text-slate-400 font-mono">
-                                  {r.empCode}
-                                </span>
-                                <span className="inline-flex mt-1 items-center px-1.5 py-0.5 rounded text-[10px] font-semibold text-[#722F37] bg-[#F8F4F1] border border-[#E5D5D7] w-max">
-                                  {r.hub} • {r.dept}
+                                <div className="flex items-center gap-1 text-slate-500 mt-0.5">
+                                  <span className="font-mono text-slate-900">{r.rawIn}</span>
+                                  <span>•</span>
+                                  <span className="px-1 py-0.2 rounded bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200">
+                                    {r.rawOut}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-slate-400 mt-0.5">
+                                  Terminal: {r.terminal}
                                 </span>
                               </div>
-                            </div>
-                          </td>
+                            </td>
 
-                          <td className="py-3 px-4 align-top">
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-slate-800">
-                                {r.shift}
-                              </span>
-                              <div className="flex items-center gap-1 text-slate-500 mt-0.5">
-                                <span className="font-mono text-slate-900">{r.rawIn}</span>
-                                <span>•</span>
-                                <span className="px-1 py-0.2 rounded bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200">
-                                  {r.rawOut}
+                            <td className="py-3 px-4 align-top">
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono font-bold text-[#722F37]">{r.overrideOut}</span>
+                                  <span className="text-[10px] text-slate-400">(Override)</span>
+                                </div>
+                                <span className="font-semibold text-slate-800 mt-0.5">
+                                  {r.totalHours}
+                                </span>
+                                <span className="text-[10px] text-amber-700 font-semibold">
+                                  {r.otHours}
                                 </span>
                               </div>
-                              <span className="text-[10px] text-slate-400 mt-0.5">
-                                Terminal: {r.terminal}
-                              </span>
-                            </div>
-                          </td>
+                            </td>
 
-                          <td className="py-3 px-4 align-top">
-                            <div className="flex flex-col">
-                              <div className="flex items-center gap-1">
-                                <span className="font-mono font-bold text-[#722F37]">{r.overrideOut}</span>
-                                <span className="text-[10px] text-slate-400">(Override)</span>
-                              </div>
-                              <span className="font-semibold text-slate-800 mt-0.5">
-                                {r.totalHours}
-                              </span>
-                              <span className="text-[10px] text-amber-700 font-semibold">
-                                {r.otHours}
-                              </span>
-                            </div>
-                          </td>
-
-                          <td className="py-3 px-4 align-top max-w-[180px]">
-                            <div className="flex flex-col">
-                              <span className="text-slate-800 font-medium truncate block" title={r.reason}>
-                                {r.reason}
-                              </span>
-                              <span className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
-                                <span className="material-symbols-outlined text-[13px] text-[#722F37]">verified</span>
-                                Sup: {r.supervisor}
-                              </span>
-                              {r.invoiceOrDoc && (
-                                <span className="text-[11px] text-[#722F37] underline cursor-pointer mt-0.5">
-                                  {r.invoiceOrDoc} attached
+                            <td className="py-3 px-4 align-top max-w-[180px]">
+                              <div className="flex flex-col">
+                                <span className="text-slate-800 font-medium truncate block" title={r.reason}>
+                                  {r.reason}
                                 </span>
-                              )}
-                            </div>
-                          </td>
+                                <span className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[13px] text-[#722F37]">verified</span>
+                                  Sup: {r.supervisor}
+                                </span>
+                                {r.invoiceOrDoc && (
+                                  <span className="text-[11px] text-[#722F37] underline cursor-pointer mt-0.5">
+                                    {r.invoiceOrDoc} attached
+                                  </span>
+                                )}
+                              </div>
+                            </td>
 
-                          <td className="py-3 px-4 align-top text-center">
-                            <div className="inline-flex flex-col items-center">
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  r.status === 'APPROVED'
-                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                    : r.status === 'REJECTED'
-                                    ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                                    : 'bg-blue-50 text-[#722F37] border border-blue-200'
-                                }`}
-                              >
-                                {r.status}
-                              </span>
-                              <span className="text-[10px] text-slate-400 mt-0.5">
-                                Step {r.pipelineStep} of {r.pipelineTotal}
-                              </span>
-                            </div>
-                          </td>
+                            <td className="py-3 px-4 align-top text-center">
+                              <div className="inline-flex flex-col items-center">
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                    r.status === 'APPROVED'
+                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                      : r.status === 'REJECTED'
+                                      ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                      : 'bg-blue-50 text-[#722F37] border border-blue-200'
+                                  }`}
+                                >
+                                  {r.status}
+                                </span>
+                                <span className="text-[10px] text-slate-400 mt-0.5">
+                                  Step {r.pipelineStep} of {r.pipelineTotal}
+                                </span>
+                              </div>
+                            </td>
 
-                          <td className="py-3 px-4 align-top text-right">
-                            <div className="flex items-center justify-end gap-1">
-                              {r.status === 'PENDING' ? (
-                                <>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleApprove(r.id);
-                                    }}
-                                    className="p-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-xs"
-                                    title="Quick Approve"
-                                    type="button"
-                                  >
-                                    <span className="material-symbols-outlined text-[16px]">check</span>
-                                  </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleReject(r.id);
-                                    }}
-                                    className="p-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                                    title="Reject or Flag"
-                                    type="button"
-                                  >
-                                    <span className="material-symbols-outlined text-[16px]">close</span>
-                                  </button>
-                                </>
-                              ) : (
-                                <span className="text-[11px] text-slate-400 font-medium">Archived</span>
-                              )}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedRecordId(r.id);
-                                }}
-                                className="p-1 rounded-lg bg-blue-50 text-[#722F37] hover:bg-blue-100 transition-colors"
-                                title="Inspect Record"
-                                type="button"
-                              >
-                                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                            <td className="py-3 px-4 align-top text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                {r.status === 'PENDING' && (
+                                  <>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleApprove(r.id);
+                                      }}
+                                      className="p-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-xs"
+                                      title="Quick Approve"
+                                      type="button"
+                                    >
+                                      <span className="material-symbols-outlined text-[16px]">check</span>
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleReject(r.id);
+                                      }}
+                                      className="p-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                                      title="Reject or Flag"
+                                      type="button"
+                                    >
+                                      <span className="material-symbols-outlined text-[16px]">close</span>
+                                    </button>
+                                  </>
+                                )}
+                                
+                                {/* EDIT BUTTON ON EVERY ROW */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenEditRecord(r);
+                                  }}
+                                  className="p-1 rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 transition-colors"
+                                  title="Edit Regularization & Times"
+                                  type="button"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">edit</span>
+                                </button>
+
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedRecordId(r.id);
+                                  }}
+                                  className="p-1 rounded-lg bg-blue-50 text-[#722F37] hover:bg-blue-100 transition-colors"
+                                  title="Inspect Record"
+                                  type="button"
+                                >
+                                  <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -728,6 +1025,11 @@ export default function AttendanceCorrectionsPage() {
                     <span className="text-[11px] text-slate-400 mt-0.5">
                       {selectedRecord.hub} • {selectedRecord.dept}
                     </span>
+                    {selectedRecord.floor && (
+                      <span className="text-[10px] text-[#722F37] font-semibold mt-0.5">
+                        Floor: {selectedRecord.floor}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <span className="px-2 py-0.5 rounded-full bg-blue-50 text-[#722F37] text-xs font-bold border border-blue-200">
@@ -805,42 +1107,54 @@ export default function AttendanceCorrectionsPage() {
                 )}
               </div>
 
-              {/* Action Execution Strip */}
-              {selectedRecord.status === 'PENDING' ? (
-                <div className="flex flex-col gap-2 pt-1 border-t border-slate-100">
-                  <button
-                    onClick={() => handleApprove(selectedRecord.id)}
-                    className="w-full py-2.5 px-4 rounded-xl bg-[#722F37] text-white hover:bg-blue-700 transition-colors text-xs font-bold flex items-center justify-center gap-2 shadow-sm active:scale-98"
-                    type="button"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">verified</span>
-                    Approve &amp; Commit to Payroll Ledger
-                  </button>
-                  <div className="grid grid-cols-2 gap-2">
+              {/* Action Execution Strip with Edit Button */}
+              <div className="flex flex-col gap-2 pt-1 border-t border-slate-100">
+                {selectedRecord.status === 'PENDING' ? (
+                  <>
                     <button
-                      onClick={() => toast.success(`Clarification ping sent to ${selectedRecord.supervisor}`)}
-                      className="py-2 px-3 rounded-xl bg-white text-slate-700 hover:bg-slate-50 transition-colors text-xs font-semibold flex items-center justify-center gap-1 border border-slate-200"
+                      onClick={() => handleApprove(selectedRecord.id)}
+                      className="w-full py-2.5 px-4 rounded-xl bg-[#722F37] text-white hover:bg-[#5B232A] transition-colors text-xs font-bold flex items-center justify-center gap-2 shadow-sm active:scale-98"
                       type="button"
                     >
-                      <span className="material-symbols-outlined text-[16px] text-slate-400">contact_support</span>
-                      Request Info
+                      <span className="material-symbols-outlined text-[18px]">verified</span>
+                      Approve &amp; Commit to Payroll Ledger
                     </button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handleOpenEditRecord(selectedRecord)}
+                        className="py-2 px-3 rounded-xl bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors text-xs font-bold flex items-center justify-center gap-1.5 border border-amber-200"
+                        type="button"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">edit</span>
+                        Edit Record
+                      </button>
+                      <button
+                        onClick={() => handleReject(selectedRecord.id)}
+                        className="py-2 px-3 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors text-xs font-semibold flex items-center justify-center gap-1 border border-rose-200"
+                        type="button"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">cancel</span>
+                        Reject &amp; LOP
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <div className="p-3 bg-emerald-50 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2 border border-emerald-200">
+                      <span className="material-symbols-outlined text-[18px] text-emerald-600">check_circle</span>
+                      Resolution Audited &amp; Synchronized with Karnataka Factories Act Form T
+                    </div>
                     <button
-                      onClick={() => handleReject(selectedRecord.id)}
-                      className="py-2 px-3 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors text-xs font-semibold flex items-center justify-center gap-1 border border-rose-200"
+                      onClick={() => handleOpenEditRecord(selectedRecord)}
+                      className="py-2 px-3 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-200"
                       type="button"
                     >
-                      <span className="material-symbols-outlined text-[16px]">cancel</span>
-                      Reject &amp; LOP
+                      <span className="material-symbols-outlined text-[16px]">edit</span>
+                      Edit Regularization Details
                     </button>
                   </div>
-                </div>
-              ) : (
-                <div className="p-3 bg-emerald-50 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2 border border-emerald-200">
-                  <span className="material-symbols-outlined text-[18px] text-emerald-600">check_circle</span>
-                  Resolution Audited &amp; Synchronized with Karnataka Factories Act Form T
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             {/* Karnataka Statutory Compliance Box */}
@@ -881,7 +1195,459 @@ export default function AttendanceCorrectionsPage() {
           </div>
         </div>
 
-        {/* MANUAL CORRECTION REQUEST MODAL */}
+        {/* ------------------------------------------------------------- */}
+        {/* COMPREHENSIVE EDIT REGULARIZATION MODAL                        */}
+        {/* Step 1: Section & Floor                                        */}
+        {/* Step 2: Employee Picker (ID or Name)                           */}
+        {/* Step 3: Full Timing & Punch Edit Form                          */}
+        {/* ------------------------------------------------------------- */}
+        {isEditModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b pb-3 border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-[#722F37]/10 flex items-center justify-center text-[#722F37]">
+                    <span className="material-symbols-outlined text-[22px]">edit_calendar</span>
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">Edit Employee Regularization &amp; Punches</h3>
+                    <p className="text-[11px] text-slate-500">
+                      Step {editStep} of 3: {editStep === 1 ? 'Select Section & Floor' : editStep === 2 ? 'Select Employee' : 'Edit Punch Override Details'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+
+              {/* Progress Steps Indicator */}
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => setEditStep(1)}
+                  className={`p-2 rounded-xl text-center font-bold transition-all border ${
+                    editStep === 1
+                      ? 'bg-[#722F37] text-white border-[#722F37]'
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  1. Section &amp; Floor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditStep(2)}
+                  className={`p-2 rounded-xl text-center font-bold transition-all border ${
+                    editStep === 2
+                      ? 'bg-[#722F37] text-white border-[#722F37]'
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  2. Choose Staff
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditStep(3)}
+                  className={`p-2 rounded-xl text-center font-bold transition-all border ${
+                    editStep === 3
+                      ? 'bg-[#722F37] text-white border-[#722F37]'
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  3. Edit Punches
+                </button>
+              </div>
+
+              {/* STEP 1: SECTION & FLOOR SELECTION */}
+              {editStep === 1 && (
+                <div className="space-y-4 py-2 text-xs">
+                  <div className="p-3 bg-blue-50 text-[#722F37] rounded-xl border border-blue-200 flex items-start gap-2">
+                    <span className="material-symbols-outlined text-[18px] shrink-0 mt-0.5">info</span>
+                    <span>
+                      Select the department section and store floor where the attendance anomaly occurred.
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700 block">Department / Section</label>
+                    <select
+                      value={editForm.dept}
+                      onChange={(e) => setEditForm({ ...editForm, dept: e.target.value })}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#722F37]/30 text-xs font-semibold text-slate-800"
+                    >
+                      {STORE_SECTIONS.map((sec) => (
+                        <option key={sec} value={sec}>
+                          {sec}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700 block">Showroom Floor / Operational Unit</label>
+                    <select
+                      value={editForm.floor}
+                      onChange={(e) => setEditForm({ ...editForm, floor: e.target.value })}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#722F37]/30 text-xs font-semibold text-slate-800"
+                    >
+                      {STORE_FLOORS.map((flr) => (
+                        <option key={flr} value={flr}>
+                          {flr}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700 block">Store Location / Hub</label>
+                    <select
+                      value={editForm.hub}
+                      onChange={(e) => setEditForm({ ...editForm, hub: e.target.value })}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#722F37]/30 text-xs font-semibold text-slate-800"
+                    >
+                      <option value="BEL-01 Flagship">BEL-01 Flagship Belagavi</option>
+                      <option value="DAV-02 Hub">DAV-02 Weaving Davanagere</option>
+                      <option value="SHI-03 Apex">SHI-03 Retail Apex Shivamogga</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditModalOpen(false)}
+                      className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditStep(2)}
+                      className="px-5 py-2 bg-[#722F37] text-white hover:bg-[#5B232A] rounded-xl font-bold flex items-center gap-1.5 shadow-xs"
+                    >
+                      <span>Proceed to Staff Selection</span>
+                      <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2: EMPLOYEE SELECTION */}
+              {editStep === 2 && (
+                <div className="space-y-4 py-2 text-xs">
+                  <div className="space-y-1.5">
+                    <label className="font-bold text-slate-700 block">Search by Employee Name or ID</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Rekha Naik, BSC-EMP-0094, Amit Deshpande..."
+                      value={editForm.name}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#722F37]/30 text-xs text-slate-800 font-medium"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="font-bold text-slate-700 block">
+                      Registered Staff in {editForm.dept} ({candidateStaff.length} matching)
+                    </label>
+                    <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
+                      {candidateStaff.length === 0 ? (
+                        <div className="p-4 text-center text-slate-400 bg-slate-50 rounded-xl">
+                          No staff in this specific filter. You can also pick from all staff below or enter name directly.
+                        </div>
+                      ) : (
+                        candidateStaff.map((st) => (
+                          <div
+                            key={st.id}
+                            onClick={() => handleSelectEmployeeInEdit(st)}
+                            className={`p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                              editForm.empCode === st.empCode
+                                ? 'bg-[#722F37]/10 border-[#722F37] text-[#722F37]'
+                                : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <img src={st.avatar} alt={st.name} className="w-8 h-8 rounded-full object-cover" />
+                              <div>
+                                <span className="font-bold text-slate-900 block">{st.name}</span>
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  {st.empCode} • {st.role}
+                                </span>
+                              </div>
+                            </div>
+                            <span className="text-[11px] font-bold text-[#722F37] flex items-center gap-1">
+                              Select <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Manual Employee Code override */}
+                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Employee ID / Code</label>
+                      <input
+                        type="text"
+                        value={editForm.empCode}
+                        onChange={(e) => setEditForm({ ...editForm, empCode: e.target.value })}
+                        placeholder="e.g. BSC-EMP-0094"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Designation / Role</label>
+                      <input
+                        type="text"
+                        value={editForm.role}
+                        onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setEditStep(1)}
+                      className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditStep(3)}
+                      className="px-5 py-2 bg-[#722F37] text-white hover:bg-[#5B232A] rounded-xl font-bold flex items-center gap-1.5 shadow-xs"
+                    >
+                      <span>Next: Edit Punch Timings</span>
+                      <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 3: EDIT PUNCHES & PROPOSED LEDGER */}
+              {editStep === 3 && (
+                <form onSubmit={handleSaveEditSubmit} className="space-y-3.5 py-1 text-xs">
+                  {/* Selected Staff Badge */}
+                  <div className="p-3 bg-[#F8F4F1] border border-[#E5D5D7] rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img src={editForm.avatar} alt={editForm.name} className="w-10 h-10 rounded-xl object-cover border border-white shadow-2xs" />
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-slate-900 text-sm">{editForm.name}</span>
+                          <span className="px-1.5 py-0.2 rounded font-mono text-[10px] font-bold bg-[#722F37] text-white">
+                            {editForm.empCode}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-slate-500">
+                          {editForm.dept} • {editForm.floor} • {editForm.hub}
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditStep(1)}
+                      className="text-xs text-[#722F37] hover:underline font-bold"
+                    >
+                      Change Staff
+                    </button>
+                  </div>
+
+                  {/* Shift & Anomaly Type */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Shift Schedule</label>
+                      <select
+                        value={editForm.shift}
+                        onChange={(e) => setEditForm({ ...editForm, shift: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
+                      >
+                        {SHIFT_OPTIONS.map((sh) => (
+                          <option key={sh} value={sh}>
+                            {sh}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Anomaly Regularization Type</label>
+                      <select
+                        value={editForm.type}
+                        onChange={(e) => setEditForm({ ...editForm, type: e.target.value as any })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
+                      >
+                        <option value="MISSED_OUT">Missed Out-Punches</option>
+                        <option value="LATE_GRACE">Late In-Punch Grace Breach</option>
+                        <option value="ON_DUTY">On-Duty &amp; Mill Out-Slip</option>
+                        <option value="SENSOR_GLITCH">Biometric Optical Failure</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Raw Punches vs Proposed Overrides */}
+                  <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                    <div className="space-y-2">
+                      <div className="font-bold text-rose-700 uppercase tracking-wider text-[10px] flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Raw Ingestion (Terminal)
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-500 block mb-0.5">Raw IN</label>
+                        <input
+                          type="text"
+                          value={editForm.rawIn}
+                          onChange={(e) => setEditForm({ ...editForm, rawIn: e.target.value })}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-500 block mb-0.5">Raw OUT</label>
+                        <input
+                          type="text"
+                          value={editForm.rawOut}
+                          onChange={(e) => setEditForm({ ...editForm, rawOut: e.target.value })}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-rose-600 font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="font-bold text-[#722F37] uppercase tracking-wider text-[10px] flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#722F37]"></span> Proposed Ledger (Approved)
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-500 block mb-0.5">Override IN Punch</label>
+                        <input
+                          type="text"
+                          value={editForm.overrideIn}
+                          onChange={(e) => setEditForm({ ...editForm, overrideIn: e.target.value })}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-[#722F37]"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-500 block mb-0.5">Override OUT Punch</label>
+                        <input
+                          type="text"
+                          value={editForm.overrideOut}
+                          onChange={(e) => setEditForm({ ...editForm, overrideOut: e.target.value })}
+                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-[#722F37]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Calculated Hours & Status */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Total Net Shift Hours</label>
+                      <input
+                        type="text"
+                        value={editForm.totalHours}
+                        onChange={(e) => setEditForm({ ...editForm, totalHours: e.target.value })}
+                        placeholder="e.g. 8h 00m Shift"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Overtime / Grace Adjustment</label>
+                      <input
+                        type="text"
+                        value={editForm.otHours}
+                        onChange={(e) => setEditForm({ ...editForm, otHours: e.target.value })}
+                        placeholder="e.g. Standard Rate or +1h 35m"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-amber-700"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Regularization Status</label>
+                      <select
+                        value={editForm.status}
+                        onChange={(e) => setEditForm({ ...editForm, status: e.target.value as any })}
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none"
+                      >
+                        <option value="PENDING">PENDING (Floor Review)</option>
+                        <option value="SUPERVISOR_OK">SUPERVISOR_OK (Step 2)</option>
+                        <option value="APPROVED">APPROVED (Committed)</option>
+                        <option value="REJECTED">REJECTED (LOP Applied)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Reason & Evidence */}
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Operational Justification / Reason</label>
+                    <textarea
+                      rows={2}
+                      required
+                      value={editForm.reason}
+                      onChange={(e) => setEditForm({ ...editForm, reason: e.target.value })}
+                      placeholder="e.g. VIP client bridal showcase, stock transit dispatch, bus depot strike..."
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Supervisor Attestation</label>
+                      <input
+                        type="text"
+                        value={editForm.supervisor}
+                        onChange={(e) => setEditForm({ ...editForm, supervisor: e.target.value })}
+                        placeholder="e.g. Anand Kulkarni (Store Lead)"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-bold text-slate-700 block mb-1">Evidence / Waybill Ref #</label>
+                      <input
+                        type="text"
+                        value={editForm.invoiceOrDoc}
+                        onChange={(e) => setEditForm({ ...editForm, invoiceOrDoc: e.target.value })}
+                        placeholder="e.g. Waybill #EWB-9041, Gate Pass #GP-882"
+                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold text-[#722F37]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Form Footer Actions */}
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setEditStep(2)}
+                      className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+                      Back
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsEditModalOpen(false)}
+                        className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-5 py-2 bg-[#722F37] text-white hover:bg-[#5B232A] rounded-xl font-bold flex items-center gap-1.5 shadow-xs"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">save</span>
+                        Save Regularization Changes
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* MANUAL CORRECTION REQUEST MODAL (EXISTING CREATE FLOW) */}
         {isModalOpen && (
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg p-6 flex flex-col gap-4">
@@ -977,7 +1743,7 @@ export default function AttendanceCorrectionsPage() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 text-xs bg-[#722F37] text-white hover:bg-blue-700 rounded-xl transition-colors font-bold shadow-xs"
+                    className="px-4 py-2 text-xs bg-[#722F37] text-white hover:bg-[#5B232A] rounded-xl transition-colors font-bold shadow-xs"
                   >
                     Submit for Dual Attestation
                   </button>

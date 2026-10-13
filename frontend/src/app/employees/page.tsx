@@ -23,8 +23,10 @@ import {
   Contact,
   FolderLock,
   AlertCircle,
+  Eye,
 } from 'lucide-react';
 import { EmployeeQrModal } from '@/components/dashboard/EmployeeQrModal';
+import { EmployeeQuickDetailsDrawer } from '@/components/employees/drawers/EmployeeQuickDetailsDrawer';
 import { TotalWorkforceDrawer } from '@/components/employees/drawers/TotalWorkforceDrawer';
 import { ActiveOnFloorDrawer } from '@/components/employees/drawers/ActiveOnFloorDrawer';
 import { KycComplianceDrawer } from '@/components/employees/drawers/KycComplianceDrawer';
@@ -68,6 +70,8 @@ export default function EmployeesPage() {
   // Add Employee Dialog
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedQrEmp, setSelectedQrEmp] = useState<any | null>(null);
+  const [selectedDetailEmp, setSelectedDetailEmp] = useState<any | null>(null);
+  const detailsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const addEmployeeBtnRef = useRef<HTMLButtonElement>(null);
   const [filterNotice, setFilterNotice] = useState<string | null>(null);
 
@@ -664,14 +668,29 @@ export default function EmployeesPage() {
                           {emp.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right w-[130px] min-w-[130px] whitespace-nowrap">
-                        <Link
-                          href={`/employees/profile/${emp.id}`}
-                          aria-label={`View profile for ${emp.fullName || `${emp.firstName} ${emp.lastName}`}`}
-                          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-semibold text-[#722F37] hover:bg-[#722F37]/10 active:bg-[#722F37]/20 rounded-lg border border-[#722F37]/30 transition-colors whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-1"
-                        >
-                          View Profile
-                        </Link>
+                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              detailsTriggerRef.current = e.currentTarget;
+                              setSelectedDetailEmp(emp);
+                            }}
+                            aria-label={`View quick details for ${emp.fullName || `${emp.firstName} ${emp.lastName}`}`}
+                            className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-lg border border-slate-200/80 transition-all cursor-pointer shadow-2xs active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                            title="Open quick details summary"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Details</span>
+                          </button>
+                          <Link
+                            href={`/employees/profile/${emp.id}`}
+                            aria-label={`View profile for ${emp.fullName || `${emp.firstName} ${emp.lastName}`}`}
+                            className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-semibold text-[#722F37] hover:bg-[#722F37]/10 active:bg-[#722F37]/20 rounded-lg border border-[#722F37]/30 transition-colors whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-1"
+                          >
+                            View Profile
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -702,6 +721,18 @@ export default function EmployeesPage() {
             employee={selectedQrEmp}
           />
         )}
+
+        {/* Employee Quick Details Drawer */}
+        <EmployeeQuickDetailsDrawer
+          open={Boolean(selectedDetailEmp)}
+          onClose={() => setSelectedDetailEmp(null)}
+          employee={selectedDetailEmp}
+          onOpenQrPass={(emp) => {
+            setSelectedDetailEmp(null);
+            setSelectedQrEmp(emp);
+          }}
+          triggerRef={detailsTriggerRef}
+        />
 
         {/* 1. TOTAL WORKFORCE DRAWER */}
         <TotalWorkforceDrawer

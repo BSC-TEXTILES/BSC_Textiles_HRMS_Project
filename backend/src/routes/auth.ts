@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../index.js';
@@ -959,6 +959,35 @@ router.put('/change-password', authenticate, async (req: AuthRequest, res) => {
   } catch (error: any) {
     console.error('Change password error:', error);
     res.status(500).json({ error: 'Failed to change password', message: error.message });
+  }
+});
+
+/**
+ * POST /api/auth/forgot-password
+ * Account enumeration defense: returns generic 200 success regardless of whether email exists.
+ */
+router.post('/forgot-password', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (email && typeof email === 'string') {
+      const cleanEmail = email.trim().toLowerCase();
+      const user = await prisma.user.findUnique({ where: { email: cleanEmail } });
+      if (user && user.isActive) {
+        await AuditService.log({
+          userId: user.id,
+          locationId: user.locationId || undefined,
+          action: 'PASSWORD_RESET_REQUESTED',
+          entityType: 'User',
+          entityId: user.id,
+          ipAddress: req.ip,
+          tags: ['auth', 'password-reset'],
+        });
+      }
+    }
+    res.json({ message: 'If an account exists with this email, password reset instructions have been sent.' });
+  } catch (error: any) {
+    console.error('Forgot password error:', error);
+    res.json({ message: 'If an account exists with this email, password reset instructions have been sent.' });
   }
 });
 

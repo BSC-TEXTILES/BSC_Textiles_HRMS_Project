@@ -30,7 +30,6 @@ if (!gotTheLock) {
       mainWindow.focus();
     }
   });
-}
 
 // 2. Determine Persistent App Storage (%APPDATA%\BSCTextiles\data)
 function getAppDataPaths() {
@@ -292,3 +291,4 @@ app.on('before-quit', () => {
     backendProcess = null;
   }
 });
+}

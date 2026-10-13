@@ -9,7 +9,7 @@ import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
 // Configurable rule: Indian mobile numbers must start with 6-9 followed by 9 digits
-export const INDIAN_MOBILE_REGEX = /^[6-9]\d{9}$/;
+const INDIAN_MOBILE_REGEX = /^[6-9]\d{9}$/;
 
 export default function EmployeeProfileDossierPage() {
   const params = useParams();
