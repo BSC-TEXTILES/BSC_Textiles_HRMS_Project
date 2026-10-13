@@ -548,13 +548,13 @@ export default function LateFinesPage() {
             <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400 text-xs font-semibold tracking-wider uppercase">
               <span>Time & Attendance</span>
               <span>/</span>
-              <span className="text-[#722F37] dark:text-[#E8DCC6]">Late Attendance & Fine Management</span>
+              <span className="text-[#1346a1] dark:text-[#E8DCC6]">Late Attendance & Fine Management</span>
             </div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl lg:text-3xl font-extrabold text-[#0b1c30] dark:text-white tracking-tight">
                 Late Attendance & Fine Management
               </h1>
-              <span className="px-3 py-1 rounded-full bg-[#722F37]/10 dark:bg-[#722F37]/30 text-[#722F37] dark:text-[#E8DCC6] text-xs font-bold border border-[#722F37]/20 flex items-center gap-1.5">
+              <span className="px-3 py-1 rounded-full bg-[#1346a1]/10 dark:bg-[#1346a1]/30 text-[#1346a1] dark:text-[#E8DCC6] text-xs font-bold border border-[#1346a1]/20 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                 Policy Active: ₹1/sec • 5m Grace
               </span>
@@ -569,7 +569,7 @@ export default function LateFinesPage() {
               onClick={() => setIsPolicyModalOpen(true)}
               className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 text-xs font-semibold shadow-xs transition-all"
             >
-              <Sliders className="w-3.5 h-3.5 text-[#722F37] dark:text-[#E8DCC6]" />
+              <Sliders className="w-3.5 h-3.5 text-[#1346a1] dark:text-[#E8DCC6]" />
               <span>Policy Rules Settings</span>
             </button>
             <button
@@ -581,7 +581,7 @@ export default function LateFinesPage() {
             </button>
             <button
               onClick={() => { fetchDashboardMetrics(); fetchRecords(); }}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#722F37] hover:bg-[#5B232A] text-white text-xs font-bold shadow-md shadow-[#722F37]/20 transition-all"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#1346a1] hover:bg-[#0e3882] text-white text-xs font-bold shadow-md shadow-[#1346a1]/20 transition-all"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Refresh Records</span>
@@ -600,7 +600,7 @@ export default function LateFinesPage() {
               <select
                 value={selectedLocation}
                 onChange={(e) => setSelectedLocation(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#722F37]"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
               >
                 <option value="all">All Karnataka Hubs</option>
                 {locations.map((loc) => (
@@ -617,7 +617,7 @@ export default function LateFinesPage() {
               <select
                 value={selectedDept}
                 onChange={(e) => setSelectedDept(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#722F37]"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
               >
                 <option value="all">All Departments</option>
                 {departments.map((dept) => (
@@ -634,7 +634,7 @@ export default function LateFinesPage() {
               <select
                 value={selectedShift}
                 onChange={(e) => setSelectedShift(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#722F37]"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
               >
                 <option value="all">All Floor Shifts</option>
                 {shifts.map((s) => (
@@ -651,7 +651,7 @@ export default function LateFinesPage() {
               <select
                 value={selectedApproval}
                 onChange={(e) => setSelectedApproval(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#722F37]"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
               >
                 <option value="all">All Approvals</option>
                 <option value="PENDING_APPROVAL">Pending Approval</option>
@@ -670,7 +670,7 @@ export default function LateFinesPage() {
               <select
                 value={selectedPayroll}
                 onChange={(e) => setSelectedPayroll(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#722F37]"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
               >
                 <option value="all">All Payroll States</option>
                 <option value="NOT_APPLIED">Not Applied</option>
@@ -690,7 +690,7 @@ export default function LateFinesPage() {
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#722F37]"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
                 />
               </div>
             </div>
@@ -704,7 +704,7 @@ export default function LateFinesPage() {
                 onClick={() => setSelectedDate('2026-10-11')}
                 className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
                   selectedDate === '2026-10-11'
-                    ? 'bg-[#722F37] text-white'
+                    ? 'bg-[#1346a1] text-white'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
                 }`}
               >
@@ -714,7 +714,7 @@ export default function LateFinesPage() {
                 onClick={() => setSelectedDate('2026-10-10')}
                 className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
                   selectedDate === '2026-10-10'
-                    ? 'bg-[#722F37] text-white'
+                    ? 'bg-[#1346a1] text-white'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
                 }`}
               >
@@ -724,7 +724,7 @@ export default function LateFinesPage() {
                 onClick={() => setSelectedDate('2026-10-05')}
                 className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
                   selectedDate === '2026-10-05'
-                    ? 'bg-[#722F37] text-white'
+                    ? 'bg-[#1346a1] text-white'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
                 }`}
               >
@@ -734,7 +734,7 @@ export default function LateFinesPage() {
                 onClick={() => setSelectedDate('2026-10-01')}
                 className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all ${
                   selectedDate === '2026-10-01'
-                    ? 'bg-[#722F37] text-white'
+                    ? 'bg-[#1346a1] text-white'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
                 }`}
               >
@@ -749,7 +749,7 @@ export default function LateFinesPage() {
                 placeholder="Search by Employee ID, Name, Role..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#722F37]"
+                className="w-full pl-9 pr-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
               />
             </div>
           </div>
@@ -763,7 +763,7 @@ export default function LateFinesPage() {
               <button
                 key={card.id}
                 onClick={() => handleCardClick(card.drillMetric, card.title)}
-                className={`group bg-white dark:bg-[#1A1D24] p-3.5 rounded-xl border border-slate-200/90 dark:border-slate-800 text-left cursor-pointer transition-all hover:shadow-md hover:border-[#722F37]/50 hover:bg-[#F8F4F1]/30 dark:hover:bg-slate-800/40 relative flex flex-col justify-between ${card.borderColor || ''}`}
+                className={`group bg-white dark:bg-[#1A1D24] p-3.5 rounded-xl border border-slate-200/90 dark:border-slate-800 text-left cursor-pointer transition-all hover:shadow-md hover:border-[#1346a1]/50 hover:bg-[#F8F4F1]/30 dark:hover:bg-slate-800/40 relative flex flex-col justify-between ${card.borderColor || ''}`}
               >
                 <div className="flex items-center justify-between w-full mb-2">
                   <span className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-wider line-clamp-1">
@@ -774,14 +774,14 @@ export default function LateFinesPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-xl font-black text-[#0b1c30] dark:text-white group-hover:text-[#722F37] dark:group-hover:text-[#E8DCC6] transition-colors">
+                  <div className="text-xl font-black text-[#0b1c30] dark:text-white group-hover:text-[#1346a1] dark:group-hover:text-[#E8DCC6] transition-colors">
                     {card.value}
                   </div>
                   <div className="text-[10px] text-slate-400 dark:text-slate-400 font-medium line-clamp-1 mt-0.5">
                     {card.subtitle}
                   </div>
                 </div>
-                <div className="text-[9px] font-bold text-[#722F37] dark:text-[#E8DCC6] opacity-0 group-hover:opacity-100 transition-opacity mt-1 flex items-center gap-1">
+                <div className="text-[9px] font-bold text-[#1346a1] dark:text-[#E8DCC6] opacity-0 group-hover:opacity-100 transition-opacity mt-1 flex items-center gap-1">
                   <span>Drill down</span>
                   <ArrowRight className="w-2.5 h-2.5" />
                 </div>
@@ -796,7 +796,7 @@ export default function LateFinesPage() {
             onClick={() => setActiveTab('register')}
             className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
               activeTab === 'register'
-                ? 'border-[#722F37] text-[#722F37] dark:text-[#E8DCC6]'
+                ? 'border-[#1346a1] text-[#1346a1] dark:text-[#E8DCC6]'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
@@ -807,7 +807,7 @@ export default function LateFinesPage() {
             onClick={() => setActiveTab('repeated')}
             className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
               activeTab === 'repeated'
-                ? 'border-[#722F37] text-[#722F37] dark:text-[#E8DCC6]'
+                ? 'border-[#1346a1] text-[#1346a1] dark:text-[#E8DCC6]'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
@@ -818,7 +818,7 @@ export default function LateFinesPage() {
             onClick={() => setActiveTab('early')}
             className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
               activeTab === 'early'
-                ? 'border-[#722F37] text-[#722F37] dark:text-[#E8DCC6]'
+                ? 'border-[#1346a1] text-[#1346a1] dark:text-[#E8DCC6]'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
@@ -829,7 +829,7 @@ export default function LateFinesPage() {
             onClick={() => setActiveTab('summary')}
             className={`px-4 py-2.5 text-xs font-bold border-b-2 transition-all flex items-center gap-2 ${
               activeTab === 'summary'
-                ? 'border-[#722F37] text-[#722F37] dark:text-[#E8DCC6]'
+                ? 'border-[#1346a1] text-[#1346a1] dark:text-[#E8DCC6]'
                 : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
             }`}
           >
@@ -858,7 +858,7 @@ export default function LateFinesPage() {
                     <th className="py-3 px-3">Calculated Fine</th>
                     <th className="py-3 px-3">Approved</th>
                     <th className="py-3 px-3">Waived</th>
-                    <th className="py-3 px-3 font-extrabold text-[#722F37] dark:text-[#E8DCC6]">Final Fine</th>
+                    <th className="py-3 px-3 font-extrabold text-[#1346a1] dark:text-[#E8DCC6]">Final Fine</th>
                     <th className="py-3 px-3">Approval Status</th>
                     <th className="py-3 px-3">Payroll Status</th>
                     <th className="py-3 px-3">Remarks</th>
@@ -870,7 +870,7 @@ export default function LateFinesPage() {
                     <tr>
                       <td colSpan={18} className="py-12 text-center text-slate-400 dark:text-slate-500">
                         <div className="flex flex-col items-center justify-center gap-2">
-                          <RefreshCw className="w-6 h-6 animate-spin text-[#722F37]" />
+                          <RefreshCw className="w-6 h-6 animate-spin text-[#1346a1]" />
                           <span>Loading late attendance & fine records...</span>
                         </div>
                       </td>
@@ -898,7 +898,7 @@ export default function LateFinesPage() {
                           <td className="py-2.5 px-3">
                             <button
                               onClick={() => handleOpenEmployeeHistory(r.employeeId)}
-                              className="font-bold text-[#0b1c30] dark:text-white hover:text-[#722F37] hover:underline text-left"
+                              className="font-bold text-[#0b1c30] dark:text-white hover:text-[#1346a1] hover:underline text-left"
                             >
                               {r.employeeName}
                             </button>
@@ -959,7 +959,7 @@ export default function LateFinesPage() {
                           <td className="py-2.5 px-3 font-mono text-slate-500 dark:text-slate-400">
                             {r.waivedFine > 0 ? `₹${r.waivedFine}` : '-'}
                           </td>
-                          <td className="py-2.5 px-3 font-mono font-extrabold text-[#722F37] dark:text-[#E8DCC6]">
+                          <td className="py-2.5 px-3 font-mono font-extrabold text-[#1346a1] dark:text-[#E8DCC6]">
                             ₹{r.finalFine}
                           </td>
                           <td className="py-2.5 px-3">
@@ -1109,7 +1109,7 @@ export default function LateFinesPage() {
 
                   <button
                     onClick={() => handleOpenEmployeeHistory(r.employeeId)}
-                    className="w-full py-2 rounded-lg bg-[#722F37] hover:bg-[#5B232A] text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                    className="w-full py-2 rounded-lg bg-[#1346a1] hover:bg-[#0e3882] text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5"
                   >
                     <span>View Complete Punctuality Log</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -1210,7 +1210,7 @@ export default function LateFinesPage() {
           <div className="bg-white dark:bg-[#1A1D24] p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col gap-6">
             <div>
               <h3 className="text-lg font-bold text-[#0b1c30] dark:text-white flex items-center gap-2">
-                <History className="w-5 h-5 text-[#722F37]" />
+                <History className="w-5 h-5 text-[#1346a1]" />
                 <span>BSC Textiles Authorized Attendance & Late Fine Policy Manual</span>
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -1220,7 +1220,7 @@ export default function LateFinesPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex flex-col gap-2">
-                <span className="text-xs font-bold text-[#722F37] dark:text-[#E8DCC6] uppercase tracking-wider">
+                <span className="text-xs font-bold text-[#1346a1] dark:text-[#E8DCC6] uppercase tracking-wider">
                   Rule 1: Grace Period Window
                 </span>
                 <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">5-Minute Buffer Window</h4>
@@ -1231,7 +1231,7 @@ export default function LateFinesPage() {
               </div>
 
               <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex flex-col gap-2">
-                <span className="text-xs font-bold text-[#722F37] dark:text-[#E8DCC6] uppercase tracking-wider">
+                <span className="text-xs font-bold text-[#1346a1] dark:text-[#E8DCC6] uppercase tracking-wider">
                   Rule 2: Calculation Formula
                 </span>
                 <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Late Duration Formula</h4>
@@ -1244,7 +1244,7 @@ export default function LateFinesPage() {
               </div>
 
               <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex flex-col gap-2">
-                <span className="text-xs font-bold text-[#722F37] dark:text-[#E8DCC6] uppercase tracking-wider">
+                <span className="text-xs font-bold text-[#1346a1] dark:text-[#E8DCC6] uppercase tracking-wider">
                   Rule 3: Financial Safety & Approval Workflow
                 </span>
                 <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Multi-stage Lifecycle</h4>
@@ -1255,7 +1255,7 @@ export default function LateFinesPage() {
               </div>
 
               <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex flex-col gap-2">
-                <span className="text-xs font-bold text-[#722F37] dark:text-[#E8DCC6] uppercase tracking-wider">
+                <span className="text-xs font-bold text-[#1346a1] dark:text-[#E8DCC6] uppercase tracking-wider">
                   Rule 4: Auditable Waivers & Reversals
                 </span>
                 <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Mandatory Justification Reasons</h4>
@@ -1273,7 +1273,7 @@ export default function LateFinesPage() {
             <div className="bg-white dark:bg-[#1A1D24] w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]">
               <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/60">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-[#722F37]/10 flex items-center justify-center text-[#722F37]">
+                  <div className="w-10 h-10 rounded-xl bg-[#1346a1]/10 flex items-center justify-center text-[#1346a1]">
                     <Clock className="w-5 h-5" />
                   </div>
                   <div>
@@ -1317,8 +1317,8 @@ export default function LateFinesPage() {
                 </div>
 
                 {/* Calculation Breakdown Step by Step */}
-                <div className="flex flex-col gap-2 p-4 rounded-xl border border-[#722F37]/20 bg-[#722F37]/5">
-                  <span className="text-xs font-bold text-[#722F37] uppercase tracking-wider flex items-center gap-1.5">
+                <div className="flex flex-col gap-2 p-4 rounded-xl border border-[#1346a1]/20 bg-[#1346a1]/5">
+                  <span className="text-xs font-bold text-[#1346a1] uppercase tracking-wider flex items-center gap-1.5">
                     <Info className="w-3.5 h-3.5" />
                     <span>Transparent Policy Calculation Math</span>
                   </span>
@@ -1345,7 +1345,7 @@ export default function LateFinesPage() {
                   </div>
                   <div className="p-3 rounded-lg border border-slate-200 dark:border-slate-700">
                     <span className="text-[10px] font-bold text-slate-400">Final Deductible Fine</span>
-                    <div className="font-extrabold text-[#722F37] dark:text-[#E8DCC6] text-sm mt-1">₹{selectedRecord.finalFine}</div>
+                    <div className="font-extrabold text-[#1346a1] dark:text-[#E8DCC6] text-sm mt-1">₹{selectedRecord.finalFine}</div>
                   </div>
                 </div>
 
@@ -1406,7 +1406,7 @@ export default function LateFinesPage() {
             <div className="bg-white dark:bg-[#1A1D24] w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[85vh]">
               <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-slate-50 dark:bg-slate-800/60">
                 <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-[#722F37]" />
+                  <FileText className="w-5 h-5 text-[#1346a1]" />
                   <div>
                     <h3 className="text-base font-bold text-slate-900 dark:text-white">
                       Drill-down: {drillDownModal.title}
@@ -1453,7 +1453,7 @@ export default function LateFinesPage() {
                         <td className="py-2 px-3 font-bold text-rose-600">
                           {r.chargeableLateSeconds > 0 ? `+${Math.round(r.chargeableLateSeconds / 60)}m` : '0m'}
                         </td>
-                        <td className="py-2 px-3 font-mono font-bold text-[#722F37] dark:text-[#E8DCC6]">
+                        <td className="py-2 px-3 font-mono font-bold text-[#1346a1] dark:text-[#E8DCC6]">
                           ₹{r.finalFine}
                         </td>
                         <td className="py-2 px-3">
@@ -1510,7 +1510,7 @@ export default function LateFinesPage() {
                   value={waiveModal.reason}
                   onChange={(e) => setWaiveModal(prev => ({ ...prev, reason: e.target.value }))}
                   placeholder="e.g. Heavy rainfall in Belagavi hub causing public transport gridlock approved by Floor Manager"
-                  className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#722F37]"
+                  className="w-full p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
                 />
               </div>
 
@@ -1523,7 +1523,7 @@ export default function LateFinesPage() {
                 </button>
                 <button
                   onClick={handleWaiveSubmit}
-                  className="px-4 py-2 rounded-lg bg-[#722F37] hover:bg-[#5B232A] text-white text-xs font-bold"
+                  className="px-4 py-2 rounded-lg bg-[#1346a1] hover:bg-[#0e3882] text-white text-xs font-bold"
                 >
                   Confirm & Waive Fine
                 </button>
@@ -1538,7 +1538,7 @@ export default function LateFinesPage() {
             <div className="bg-white dark:bg-[#1A1D24] w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-6 flex flex-col gap-4">
               <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
                 <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <Sliders className="w-4 h-4 text-[#722F37]" />
+                  <Sliders className="w-4 h-4 text-[#1346a1]" />
                   <span>Late & Fine Rules Settings</span>
                 </h3>
                 <button
@@ -1608,7 +1608,7 @@ export default function LateFinesPage() {
                       toast.error('Failed to update policy');
                     }
                   }}
-                  className="px-4 py-2 rounded-lg bg-[#722F37] text-white text-xs font-bold"
+                  className="px-4 py-2 rounded-lg bg-[#1346a1] text-white text-xs font-bold"
                 >
                   Save Policy Configuration
                 </button>
@@ -1654,7 +1654,7 @@ export default function LateFinesPage() {
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 font-bold uppercase">Calculated Fines</span>
-                  <div className="text-base font-bold text-[#722F37] dark:text-[#E8DCC6]">
+                  <div className="text-base font-bold text-[#1346a1] dark:text-[#E8DCC6]">
                     ₹{employeeHistoryModal.data.summary.totalCalculatedFine}
                   </div>
                 </div>
@@ -1688,7 +1688,7 @@ export default function LateFinesPage() {
                         <td className="py-2 px-3 font-bold text-rose-600">
                           {r.chargeableLateSeconds > 0 ? `+${Math.round(r.chargeableLateSeconds / 60)}m` : 'Grace / On time'}
                         </td>
-                        <td className="py-2 px-3 font-mono font-bold text-[#722F37] dark:text-[#E8DCC6]">
+                        <td className="py-2 px-3 font-mono font-bold text-[#1346a1] dark:text-[#E8DCC6]">
                           ₹{r.finalFine}
                         </td>
                         <td className="py-2 px-3 font-semibold">{r.approvalStatus}</td>

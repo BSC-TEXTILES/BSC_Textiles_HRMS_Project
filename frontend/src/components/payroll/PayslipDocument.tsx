@@ -257,7 +257,7 @@ export function PayslipDocument({
               onClick={() => setViewFormat('AUTHENTIC_BSC')}
               className={`px-3 py-1.5 rounded-md font-medium transition-all ${
                 viewFormat === 'AUTHENTIC_BSC'
-                  ? 'bg-white text-[#722F37] shadow-xs font-bold'
+                  ? 'bg-white text-[#1346a1] shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -267,7 +267,7 @@ export function PayslipDocument({
               onClick={() => setViewFormat('MODERN_EXECUTIVE')}
               className={`px-3 py-1.5 rounded-md font-medium transition-all ${
                 viewFormat === 'MODERN_EXECUTIVE'
-                  ? 'bg-white text-[#722F37] shadow-xs font-bold'
+                  ? 'bg-white text-[#1346a1] shadow-xs font-bold'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -298,7 +298,7 @@ export function PayslipDocument({
             {onEdit && (
               <button
                 onClick={onEdit}
-                className="px-3 py-1.5 rounded-lg border border-[#722F37]/30 bg-[#722F37]/5 text-[#722F37] font-semibold hover:bg-[#722F37]/10 flex items-center gap-1.5 transition-colors"
+                className="px-3 py-1.5 rounded-lg border border-[#1346a1]/30 bg-[#1346a1]/5 text-[#1346a1] font-semibold hover:bg-[#1346a1]/10 flex items-center gap-1.5 transition-colors"
               >
                 <Edit className="w-3.5 h-3.5" />
                 <span>Edit Components</span>
@@ -326,7 +326,7 @@ export function PayslipDocument({
             {onDownloadPdf && (
               <button
                 onClick={onDownloadPdf}
-                className="px-4 py-1.5 rounded-lg bg-[#722F37] hover:bg-[#5B232A] text-white font-bold flex items-center gap-1.5 shadow-xs transition-colors"
+                className="px-4 py-1.5 rounded-lg bg-[#1346a1] hover:bg-[#0e3882] text-white font-bold flex items-center gap-1.5 shadow-xs transition-colors"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Download PDF</span>
@@ -642,14 +642,14 @@ export function PayslipDocument({
           <div className="flex justify-between items-start pb-5 border-b border-slate-200">
             <div>
               <div className="flex items-center gap-2 mb-1">
-                <Building2 className="w-6 h-6 text-[#722F37]" />
-                <h2 className="text-xl font-extrabold text-[#722F37] tracking-tight">BSC TEXTILES PVT. LTD.</h2>
+                <Building2 className="w-6 h-6 text-[#1346a1]" />
+                <h2 className="text-xl font-extrabold text-[#1346a1] tracking-tight">BSC TEXTILES PVT. LTD.</h2>
               </div>
               <p className="text-xs text-slate-500">DENTAL COLLEGE ROAD,, DAVANGERE - 577004</p>
               <p className="text-[11px] text-slate-400">Hub / Showroom: {p.locationName || 'Davanagere Mega Store'}</p>
             </div>
             <div className="text-right">
-              <span className="inline-block px-3 py-1 bg-[#722F37]/10 text-[#722F37] font-bold text-xs rounded-full uppercase tracking-wider mb-1">
+              <span className="inline-block px-3 py-1 bg-[#1346a1]/10 text-[#1346a1] font-bold text-xs rounded-full uppercase tracking-wider mb-1">
                 Form T Payslip
               </span>
               <p className="text-sm font-bold text-slate-800">{monthStr} {yearStr}</p>
@@ -665,7 +665,7 @@ export function PayslipDocument({
             </div>
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Employee ID</span>
-              <span className="font-mono font-bold text-[#722F37]">{p.employeeCode}</span>
+              <span className="font-mono font-bold text-[#1346a1]">{p.employeeCode}</span>
             </div>
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">PF Number</span>
@@ -749,7 +749,7 @@ export function PayslipDocument({
           </div>
 
           {/* Net Pay Callout */}
-          <div className="bg-[#722F37] text-white p-4 rounded-xl flex items-center justify-between mb-5 shadow-sm">
+          <div className="bg-[#1346a1] text-white p-4 rounded-xl flex items-center justify-between mb-5 shadow-sm">
             <div>
               <span className="text-[11px] uppercase tracking-wider text-amber-200 font-bold block">Net Take-Home Pay</span>
               <span className="text-xs text-white/80">{numberToWordsINR(netPayable)}</span>
@@ -771,8 +771,8 @@ export function PayslipDocument({
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
-                <span className="text-[10px] text-[#722F37] block font-bold uppercase">Cost to Company (CTC)</span>
-                <span className="font-mono font-bold text-base text-[#722F37]">₹{formatCurr(ctc)}</span>
+                <span className="text-[10px] text-[#1346a1] block font-bold uppercase">Cost to Company (CTC)</span>
+                <span className="font-mono font-bold text-base text-[#1346a1]">₹{formatCurr(ctc)}</span>
               </div>
               {qrDataUrl && (
                 <div className="flex items-center gap-2 pl-4 border-l border-slate-200">

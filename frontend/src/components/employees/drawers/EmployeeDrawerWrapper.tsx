@@ -100,7 +100,7 @@ export function EmployeeDrawerWrapper({
                 {title}
               </h2>
               {recordCount !== undefined && (
-                <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-[#722F37]/10 text-[#722F37] border border-[#722F37]/20 whitespace-nowrap">
+                <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-[#1346a1]/10 text-[#1346a1] border border-[#1346a1]/20 whitespace-nowrap">
                   {recordCount} Records
                 </span>
               )}
@@ -132,7 +132,7 @@ export function EmployeeDrawerWrapper({
                 title="Refresh Records"
               >
                 <RefreshCw
-                  className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-[#722F37]' : ''}`}
+                  className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-[#1346a1]' : ''}`}
                 />
               </button>
             )}

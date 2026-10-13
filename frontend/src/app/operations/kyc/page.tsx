@@ -236,7 +236,7 @@ export default function KycDashboardPage() {
             <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-bl-full pointer-events-none group-hover:scale-110 transition-transform" />
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400">Total Digital Dossiers</span>
-              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-[#722F37] shadow-xs">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-[#1346a1] shadow-xs">
                 <FileText className="w-5 h-5" />
               </div>
             </div>
@@ -326,7 +326,7 @@ export default function KycDashboardPage() {
           <div className="flex flex-wrap items-center gap-3">
             {/* Location Selector */}
             <div className="flex items-center bg-slate-50 hover:bg-slate-100/80 transition-colors px-3 py-2 rounded-xl border border-slate-200/80 text-xs">
-              <Building2 className="w-4 h-4 text-[#722F37] mr-2 shrink-0" />
+              <Building2 className="w-4 h-4 text-[#1346a1] mr-2 shrink-0" />
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mr-2">Hub:</span>
               <select
                 value={locationFilter}
@@ -410,7 +410,7 @@ export default function KycDashboardPage() {
           <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
             <div>
               <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-[#722F37]" />
+                <FileText className="w-5 h-5 text-[#1346a1]" />
                 Employee Digital Verification Ledger
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -440,7 +440,7 @@ export default function KycDashboardPage() {
                 {loading ? (
                   <tr>
                     <td colSpan={8} className="text-center py-12 text-slate-500">
-                      <RefreshCw className="w-6 h-6 animate-spin mx-auto text-[#722F37] mb-2" />
+                      <RefreshCw className="w-6 h-6 animate-spin mx-auto text-[#1346a1] mb-2" />
                       Loading employee KYC records...
                     </td>
                   </tr>
@@ -464,11 +464,11 @@ export default function KycDashboardPage() {
                       >
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#0b1c30] to-[#722F37] text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#0b1c30] to-[#1346a1] text-white flex items-center justify-center font-bold text-xs shadow-xs">
                               {doc.employeeName ? doc.employeeName.charAt(0) : 'E'}
                             </div>
                             <div>
-                              <p className="font-bold text-slate-900 group-hover:text-[#722F37] transition-colors">
+                              <p className="font-bold text-slate-900 group-hover:text-[#1346a1] transition-colors">
                                 {doc.employeeName || 'Unknown Employee'}
                               </p>
                               <p className="font-mono text-[11px] text-slate-400">{doc.employeeCode || 'N/A'}</p>
@@ -495,7 +495,7 @@ export default function KycDashboardPage() {
                         <td className="py-3.5 px-4">
                           {isDigi ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                              <Shield className="w-3 h-3 text-[#722F37]" />
+                              <Shield className="w-3 h-3 text-[#1346a1]" />
                               DigiLocker Verified
                             </span>
                           ) : (
@@ -537,7 +537,7 @@ export default function KycDashboardPage() {
                               setSelectedDoc(doc);
                               setReviewModalOpen(true);
                             }}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-[#F8F4F1] text-slate-700 hover:text-[#722F37] font-semibold text-xs transition-colors"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-[#F8F4F1] text-slate-700 hover:text-[#1346a1] font-semibold text-xs transition-colors"
                           >
                             Review
                             <ChevronRight className="w-3.5 h-3.5" />
@@ -558,7 +558,7 @@ export default function KycDashboardPage() {
             <div className="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
               <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 rounded-t-2xl">
                 <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-blue-100 text-[#722F37]">
+                  <div className="p-2 rounded-xl bg-blue-100 text-[#1346a1]">
                     <Shield className="w-5 h-5" />
                   </div>
                   <div>
@@ -577,7 +577,7 @@ export default function KycDashboardPage() {
               <div className="p-6 space-y-5">
                 {/* Employee Card */}
                 <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200/80">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#0b1c30] to-[#722F37] text-white flex items-center justify-center font-bold text-lg shadow-sm">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-[#0b1c30] to-[#1346a1] text-white flex items-center justify-center font-bold text-lg shadow-sm">
                     {selectedDoc.employeeName ? selectedDoc.employeeName.charAt(0) : 'E'}
                   </div>
                   <div className="flex-1">
@@ -599,7 +599,7 @@ export default function KycDashboardPage() {
                   </div>
                   <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Masked Identifier</span>
-                    <p className="text-sm font-mono font-black text-[#722F37] mt-1">{selectedDoc.documentNumberMasked}</p>
+                    <p className="text-sm font-mono font-black text-[#1346a1] mt-1">{selectedDoc.documentNumberMasked}</p>
                   </div>
                   <div className="p-3.5 rounded-xl border border-slate-200 bg-white">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Issuing Authority</span>
@@ -688,7 +688,7 @@ export default function KycDashboardPage() {
             <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <Settings className="w-5 h-5 text-[#722F37]" />
+                  <Settings className="w-5 h-5 text-[#1346a1]" />
                   <h3 className="font-bold text-base text-slate-900">DigiLocker Integration Settings</h3>
                 </div>
                 <button onClick={() => setSettingsModalOpen(false)} className="text-slate-400 hover:text-slate-700">
@@ -726,7 +726,7 @@ export default function KycDashboardPage() {
                     type="checkbox"
                     checked={settingsData.isSandbox}
                     onChange={(e) => setSettingsData({ ...settingsData, isSandbox: e.target.checked })}
-                    className="w-4 h-4 text-[#722F37] rounded cursor-pointer"
+                    className="w-4 h-4 text-[#1346a1] rounded cursor-pointer"
                   />
                 </div>
 
@@ -739,7 +739,7 @@ export default function KycDashboardPage() {
                     type="checkbox"
                     checked={settingsData.requireAadhaarMasking}
                     onChange={(e) => setSettingsData({ ...settingsData, requireAadhaarMasking: e.target.checked })}
-                    className="w-4 h-4 text-[#722F37] rounded cursor-pointer"
+                    className="w-4 h-4 text-[#1346a1] rounded cursor-pointer"
                   />
                 </div>
 
@@ -747,7 +747,7 @@ export default function KycDashboardPage() {
                   <Button variant="outline" onClick={() => setSettingsModalOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" className="bg-[#722F37] text-white">
+                  <Button type="submit" className="bg-[#1346a1] text-white">
                     Save Configuration
                   </Button>
                 </div>

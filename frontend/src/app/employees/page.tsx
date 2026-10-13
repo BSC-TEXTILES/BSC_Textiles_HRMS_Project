@@ -283,7 +283,7 @@ export default function EmployeesPage() {
             <div className="flex items-center gap-1.5 text-slate-400 text-[11px] uppercase tracking-wider font-semibold">
               <span>Workforce Directory</span>
               <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-[#722F37] font-bold">Staff Master Ledger</span>
+              <span className="text-[#1346a1] font-bold">Staff Master Ledger</span>
               <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
               <span>Karnataka Hubs</span>
             </div>
@@ -291,7 +291,7 @@ export default function EmployeesPage() {
               <h1 className="text-2xl font-bold text-[#18181B] tracking-tight">
                 Workforce Directory & Staff Records
               </h1>
-              <span className="bg-[#722F37]/10 text-[#722F37] border border-[#722F37]/20 px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider">
+              <span className="bg-[#1346a1]/10 text-[#1346a1] border border-[#1346a1]/20 px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider">
                 Live Synced ({totalCount} Staff)
               </span>
             </div>
@@ -320,7 +320,7 @@ export default function EmployeesPage() {
               ref={addEmployeeBtnRef}
               type="button"
               onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-1.5 bg-[#722F37] hover:bg-[#5B232A] text-white px-3.5 py-2 rounded-lg text-xs font-bold shadow-xs transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
+              className="flex items-center gap-1.5 bg-[#1346a1] hover:bg-[#0e3882] text-white px-3.5 py-2 rounded-lg text-xs font-bold shadow-xs transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1346a1] focus-visible:ring-offset-2"
               aria-haspopup="dialog"
             >
               <UserPlus className="w-4 h-4" />
@@ -337,17 +337,17 @@ export default function EmployeesPage() {
             ref={card1Ref}
             onClick={() => handleOpenDrawer('workforce')}
             aria-label="View details for Total Workforce"
-            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#722F37]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
+            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#1346a1]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1346a1] focus-visible:ring-offset-2"
           >
             <div className="flex items-center justify-between mb-1 w-full">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Workforce</span>
-              <div className="w-8 h-8 rounded-lg bg-[#722F37]/10 flex items-center justify-center text-[#722F37]">
+              <div className="w-8 h-8 rounded-lg bg-[#1346a1]/10 flex items-center justify-center text-[#1346a1]">
                 <Users className="w-4 h-4" />
               </div>
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-bold text-[#18181B]">{totalCount}</span>
-              <span className="text-[10px] font-bold text-[#722F37] bg-[#722F37]/10 px-1.5 py-0.5 rounded-full">+3 MTD</span>
+              <span className="text-[10px] font-bold text-[#1346a1] bg-[#1346a1]/10 px-1.5 py-0.5 rounded-full">+3 MTD</span>
             </div>
             <div className="w-full pt-2 border-t border-slate-100 space-y-1">
               <div className="flex items-center justify-between text-[11px] text-slate-500">
@@ -355,7 +355,7 @@ export default function EmployeesPage() {
                 <span>•</span>
                 <span>Active Roster</span>
               </div>
-              <div className="flex items-center justify-end text-[10px] font-bold text-[#722F37]">
+              <div className="flex items-center justify-end text-[10px] font-bold text-[#1346a1]">
                 <span>View details &rarr;</span>
               </div>
             </div>
@@ -367,7 +367,7 @@ export default function EmployeesPage() {
             ref={card2Ref}
             onClick={() => handleOpenDrawer('on-floor')}
             aria-label="View details for Active On-Floor"
-            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#722F37]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
+            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#1346a1]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1346a1] focus-visible:ring-offset-2"
           >
             <div className="flex items-center justify-between mb-1 w-full">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active On-Floor</span>
@@ -384,7 +384,7 @@ export default function EmployeesPage() {
                 <span className="text-emerald-700 font-bold">Shift A Active</span>
                 <span>Off-Duty / Roster</span>
               </div>
-              <div className="flex items-center justify-end text-[10px] font-bold text-[#722F37]">
+              <div className="flex items-center justify-end text-[10px] font-bold text-[#1346a1]">
                 <span>View details &rarr;</span>
               </div>
             </div>
@@ -396,7 +396,7 @@ export default function EmployeesPage() {
             ref={card3Ref}
             onClick={() => handleOpenDrawer('kyc')}
             aria-label="View details for KYC Compliance"
-            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#722F37]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
+            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#1346a1]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1346a1] focus-visible:ring-offset-2"
           >
             <div className="flex items-center justify-between mb-1 w-full">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">KYC Compliance</span>
@@ -413,7 +413,7 @@ export default function EmployeesPage() {
                 <span>PF & ESI Linked</span>
                 <span>Aadhaar KYC</span>
               </div>
-              <div className="flex items-center justify-end text-[10px] font-bold text-[#722F37]">
+              <div className="flex items-center justify-end text-[10px] font-bold text-[#1346a1]">
                 <span>View details &rarr;</span>
               </div>
             </div>
@@ -425,11 +425,11 @@ export default function EmployeesPage() {
             ref={card4Ref}
             onClick={() => handleOpenDrawer('biometrics')}
             aria-label="View details for Biometric Profiles"
-            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#722F37]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
+            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#1346a1]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1346a1] focus-visible:ring-offset-2"
           >
             <div className="flex items-center justify-between mb-1 w-full">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Biometric Profiles</span>
-              <div className="w-8 h-8 rounded-lg bg-[#722F37]/10 flex items-center justify-center text-[#722F37]">
+              <div className="w-8 h-8 rounded-lg bg-[#1346a1]/10 flex items-center justify-center text-[#1346a1]">
                 <Fingerprint className="w-4 h-4" />
               </div>
             </div>
@@ -440,9 +440,9 @@ export default function EmployeesPage() {
             <div className="w-full pt-2 border-t border-slate-100 space-y-1">
               <div className="flex items-center justify-between text-[11px] text-slate-500">
                 <span>Face Enrolled</span>
-                <span className="text-[#722F37] font-bold">QR Ready</span>
+                <span className="text-[#1346a1] font-bold">QR Ready</span>
               </div>
-              <div className="flex items-center justify-end text-[10px] font-bold text-[#722F37]">
+              <div className="flex items-center justify-end text-[10px] font-bold text-[#1346a1]">
                 <span>View details &rarr;</span>
               </div>
             </div>
@@ -454,7 +454,7 @@ export default function EmployeesPage() {
             ref={card5Ref}
             onClick={() => handleOpenDrawer('locations')}
             aria-label="View details for Store Locations"
-            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#722F37]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
+            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#1346a1]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1346a1] focus-visible:ring-offset-2"
           >
             <div className="flex items-center justify-between mb-1 w-full">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Store Locations</span>
@@ -470,10 +470,10 @@ export default function EmployeesPage() {
               <div className="flex items-center justify-between text-[11px] text-slate-500">
                 <span>{nonHqLocations.map((l) => l.code).join(' • ')}</span>
                 {hqLocation && (
-                  <span className="text-[#722F37] font-bold">{hqLocation.code}</span>
+                  <span className="text-[#1346a1] font-bold">{hqLocation.code}</span>
                 )}
               </div>
-              <div className="flex items-center justify-end text-[10px] font-bold text-[#722F37]">
+              <div className="flex items-center justify-end text-[10px] font-bold text-[#1346a1]">
                 <span>View details &rarr;</span>
               </div>
             </div>
@@ -482,7 +482,7 @@ export default function EmployeesPage() {
 
         {/* SEARCH & FILTERS BAR */}
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="flex flex-1 items-center gap-2 max-w-xl bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg focus-within:border-[#722F37] focus-within:ring-1 focus-within:ring-[#722F37]/20 transition-all">
+          <div className="flex flex-1 items-center gap-2 max-w-xl bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg focus-within:border-[#1346a1] focus-within:ring-1 focus-within:ring-[#1346a1]/20 transition-all">
             <Search className="w-4 h-4 text-slate-400" />
             <input
               type="text"
@@ -498,7 +498,7 @@ export default function EmployeesPage() {
             <select
               value={selectedLocation}
               onChange={(e) => setSelectedLocation(e.target.value)}
-              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#722F37]"
+              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#1346a1]"
             >
               <option value="">All Locations</option>
               {locations.map((loc) => (
@@ -512,7 +512,7 @@ export default function EmployeesPage() {
             <select
               value={selectedDept}
               onChange={(e) => setSelectedDept(e.target.value)}
-              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#722F37]"
+              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#1346a1]"
             >
               <option value="">All Departments</option>
               {departments.map((dept) => (
@@ -526,7 +526,7 @@ export default function EmployeesPage() {
             <select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#722F37]"
+              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-[#1346a1]"
             >
               <option value="ALL">All Statuses</option>
               <option value="ACTIVE">Active Workforce</option>
@@ -574,7 +574,7 @@ export default function EmployeesPage() {
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="p-4 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Contact className="w-4 h-4 text-[#722F37]" />
+              <Contact className="w-4 h-4 text-[#1346a1]" />
               <h2 className="text-sm font-bold text-[#18181B]">Registered Staff Directory</h2>
               <span className="text-xs text-slate-400">({employees.length} Records)</span>
             </div>
@@ -607,13 +607,13 @@ export default function EmployeesPage() {
                         <Link
                           href={`/employees/profile/${emp.id}`}
                           aria-label={`View profile for ${emp.fullName || `${emp.firstName} ${emp.lastName}`}`}
-                          className="flex items-center gap-2.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] rounded-lg"
+                          className="flex items-center gap-2.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1346a1] rounded-lg"
                         >
-                          <div className="w-8 h-8 rounded-full bg-[#722F37] text-white flex items-center justify-center font-bold text-xs shrink-0 group-hover:opacity-90">
+                          <div className="w-8 h-8 rounded-full bg-[#1346a1] text-white flex items-center justify-center font-bold text-xs shrink-0 group-hover:opacity-90">
                             {emp.firstName?.[0]}{emp.lastName?.[0]}
                           </div>
                           <div>
-                            <div className="font-bold text-[#18181B] group-hover:text-[#722F37] transition-colors">
+                            <div className="font-bold text-[#18181B] group-hover:text-[#1346a1] transition-colors">
                               {emp.fullName || `${emp.firstName} ${emp.lastName}`}
                             </div>
                             <div className="text-[10px] font-mono text-slate-400">{emp.employeeCode}</div>
@@ -686,7 +686,7 @@ export default function EmployeesPage() {
                           <Link
                             href={`/employees/profile/${emp.id}`}
                             aria-label={`View profile for ${emp.fullName || `${emp.firstName} ${emp.lastName}`}`}
-                            className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-semibold text-[#722F37] hover:bg-[#722F37]/10 active:bg-[#722F37]/20 rounded-lg border border-[#722F37]/30 transition-colors whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-1"
+                            className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-semibold text-[#1346a1] hover:bg-[#1346a1]/10 active:bg-[#1346a1]/20 rounded-lg border border-[#1346a1]/30 transition-colors whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1346a1] focus-visible:ring-offset-1"
                           >
                             View Profile
                           </Link>

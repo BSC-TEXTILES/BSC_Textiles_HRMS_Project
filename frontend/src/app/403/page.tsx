@@ -35,7 +35,7 @@ function ForbiddenContent() {
       {/* Main 403 Card */}
       <main className="max-w-xl w-full mx-auto my-auto bg-white dark:bg-[#161920] rounded-xl border border-slate-200 dark:border-[#272A30] shadow-xs p-8 sm:p-10 text-center relative overflow-hidden">
         {/* Decorative Top Accent Bar */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-[#722F37]" />
+        <div className="absolute top-0 left-0 right-0 h-1 bg-[#1346a1]" />
 
         {/* Shield / Lock Icon */}
         <div className="w-16 h-16 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-100 dark:border-red-900/40 flex items-center justify-center mx-auto mb-6 text-red-600 shadow-xs">
@@ -63,7 +63,7 @@ function ForbiddenContent() {
           </div>
           <div className="flex justify-between items-center text-xs">
             <span className="text-slate-500 font-medium">Assigned Role:</span>
-            <span className="font-bold text-[#722F37] uppercase px-2 py-0.5 rounded bg-[#722F37]/10 border border-[#722F37]/20">
+            <span className="font-bold text-[#1346a1] uppercase px-2 py-0.5 rounded bg-[#1346a1]/10 border border-[#1346a1]/20">
               {userRole}
             </span>
           </div>
@@ -81,7 +81,7 @@ function ForbiddenContent() {
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             href="/dashboard"
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#722F37] text-white text-xs font-semibold hover:bg-[#5B232A] transition-all shadow-xs"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-[#1346a1] text-white text-xs font-semibold hover:bg-[#0e3882] transition-all shadow-xs"
           >
             <LayoutDashboard className="w-4 h-4" />
             Dashboard
@@ -126,7 +126,7 @@ export default function ForbiddenPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#111317] flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-[#722F37] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-[#1346a1] border-t-transparent rounded-full animate-spin" />
       </div>
     }>
       <ForbiddenContent />

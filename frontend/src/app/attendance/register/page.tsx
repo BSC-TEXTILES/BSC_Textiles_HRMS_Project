@@ -244,13 +244,13 @@ export default function AttendanceRegisterPage() {
             <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold tracking-wider uppercase">
               <span>Time &amp; Attendance</span>
               <span className="material-symbols-outlined text-[14px] text-slate-400">chevron_right</span>
-              <span className="text-[#722F37] font-bold">Muster Roll &amp; Form T</span>
+              <span className="text-[#1346a1] font-bold">Muster Roll &amp; Form T</span>
             </div>
             <div className="flex flex-wrap items-center gap-3 pt-0.5">
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
                 Attendance Register &amp; Statutory Muster Roll
               </h1>
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F8F4F1] text-[#722F37] text-xs font-bold border border-[#E5D5D7]">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F8F4F1] text-[#1346a1] text-xs font-bold border border-[#E5D5D7]">
                 <span className="material-symbols-outlined text-[15px]">verified</span>
                 Karnataka Factories Act 1948 (Form T)
               </div>
@@ -271,7 +271,7 @@ export default function AttendanceRegisterPage() {
             </button>
             <button
               onClick={() => toast.success('Exported monthly attendance register (.xlsx)')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#722F37] text-white hover:bg-[#5B232A] transition-colors rounded-xl text-xs font-bold shadow-xs"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#1346a1] text-white hover:bg-[#0e3882] transition-colors rounded-xl text-xs font-bold shadow-xs"
               type="button"
             >
               <span className="material-symbols-outlined text-[16px]">file_download</span>
@@ -290,7 +290,7 @@ export default function AttendanceRegisterPage() {
 
           <div className="bg-white rounded-xl p-4 shadow-xs border border-slate-200/90 flex flex-col justify-between">
             <span className="text-[11px] uppercase tracking-wider text-slate-400 font-bold">Average Presenteeism</span>
-            <div className="text-2xl font-bold font-mono text-[#722F37] mt-1">98.4%</div>
+            <div className="text-2xl font-bold font-mono text-[#1346a1] mt-1">98.4%</div>
             <span className="text-[11px] text-emerald-700 font-semibold mt-1">Month to Date</span>
           </div>
 
@@ -339,7 +339,7 @@ export default function AttendanceRegisterPage() {
             {/* Month & Year Selectors */}
             <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
-                <span className="material-symbols-outlined text-[16px] text-[#722F37] mr-1.5">calendar_month</span>
+                <span className="material-symbols-outlined text-[16px] text-[#1346a1] mr-1.5">calendar_month</span>
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(Number(e.target.value))}
@@ -367,7 +367,7 @@ export default function AttendanceRegisterPage() {
 
               {/* Location Hub Filter */}
               <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
-                <span className="material-symbols-outlined text-[16px] text-[#722F37] mr-1.5">store</span>
+                <span className="material-symbols-outlined text-[16px] text-[#1346a1] mr-1.5">store</span>
                 <select
                   value={selectedLocation}
                   onChange={(e) => setSelectedLocation(e.target.value)}
@@ -448,7 +448,7 @@ export default function AttendanceRegisterPage() {
                 {loading ? (
                   <tr>
                     <td colSpan={daysList.length + 5} className="py-16 text-center text-slate-400">
-                      <div className="inline-block animate-spin material-symbols-outlined text-[24px] text-[#722F37] mb-2">
+                      <div className="inline-block animate-spin material-symbols-outlined text-[24px] text-[#1346a1] mb-2">
                         autorenew
                       </div>
                       <p className="text-xs font-semibold text-slate-600">Loading statutory muster register...</p>
@@ -536,7 +536,7 @@ export default function AttendanceRegisterPage() {
             <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md p-6 flex flex-col gap-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-[#722F37]/10 flex items-center justify-center text-[#722F37]">
+                  <div className="w-8 h-8 rounded-lg bg-[#1346a1]/10 flex items-center justify-center text-[#1346a1]">
                     <span className="material-symbols-outlined text-[20px]">edit_calendar</span>
                   </div>
                   <div>
@@ -562,7 +562,7 @@ export default function AttendanceRegisterPage() {
                     {editingCell.employee.employeeCode} • {editingCell.employee.role || editingCell.employee.designation || 'Staff'}
                   </div>
                 </div>
-                <span className="px-2 py-0.5 rounded-full bg-[#722F37]/10 text-[#722F37] font-bold text-[10px]">
+                <span className="px-2 py-0.5 rounded-full bg-[#1346a1]/10 text-[#1346a1] font-bold text-[10px]">
                   Database Synced
                 </span>
               </div>
@@ -647,7 +647,7 @@ export default function AttendanceRegisterPage() {
                   <button
                     type="submit"
                     disabled={savingRecord}
-                    className="px-5 py-2 bg-[#722F37] text-white hover:bg-[#5B232A] rounded-xl font-bold flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                    className="px-5 py-2 bg-[#1346a1] text-white hover:bg-[#0e3882] rounded-xl font-bold flex items-center gap-1.5 shadow-xs disabled:opacity-50"
                   >
                     <span className="material-symbols-outlined text-[16px]">save</span>
                     {savingRecord ? 'Saving to Database...' : 'Save to Database'}

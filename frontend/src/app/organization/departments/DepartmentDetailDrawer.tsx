@@ -186,25 +186,25 @@ export function DepartmentDetailDrawer({
         return {
           title: 'Active Divisions',
           subtitle: `${activeLoc ? activeLoc.name : 'All Hubs'} • ${departments.length} Operational Units`,
-          icon: <Layers className="w-5 h-5 text-[#722F37] dark:text-[#E8DCC6]" />,
+          icon: <Layers className="w-5 h-5 text-[#1346a1] dark:text-[#E8DCC6]" />,
         };
       case 'KARNATAKA_HUBS':
         return {
           title: 'Karnataka Hubs',
           subtitle: `${locations.length} Retail & Weaving Centers Across Karnataka`,
-          icon: <Store className="w-5 h-5 text-[#722F37] dark:text-[#E8DCC6]" />,
+          icon: <Store className="w-5 h-5 text-[#1346a1] dark:text-[#E8DCC6]" />,
         };
       case 'STAFF_ALLOCATED':
         return {
           title: 'Staff Allocated',
           subtitle: `${allEmployees.length} of ${allEmployees.length} Active Staff • 100% Departmentalized`,
-          icon: <Users className="w-5 h-5 text-[#722F37] dark:text-[#E8DCC6]" />,
+          icon: <Users className="w-5 h-5 text-[#1346a1] dark:text-[#E8DCC6]" />,
         };
       case 'FLAGSHIP_DIVISION':
         return {
           title: 'Flagship Division — Bridal & Silk',
           subtitle: 'Belagavi Atelier Apex • Primary Revenue Unit',
-          icon: <Sparkles className="w-5 h-5 text-[#722F37] dark:text-[#E8DCC6]" />,
+          icon: <Sparkles className="w-5 h-5 text-[#1346a1] dark:text-[#E8DCC6]" />,
         };
       case 'STRUCTURE_HEALTH':
         return {
@@ -217,19 +217,19 @@ export function DepartmentDetailDrawer({
         return {
           title: loc ? `${loc.name} (${loc.code})` : 'Store Location Overview',
           subtitle: `${departments.length} Units • ${allEmployees.filter((e) => e.locationId === loc?.id).length} Staff Members`,
-          icon: <MapPin className="w-5 h-5 text-[#722F37] dark:text-[#E8DCC6]" />,
+          icon: <MapPin className="w-5 h-5 text-[#1346a1] dark:text-[#E8DCC6]" />,
         };
       case 'DEPARTMENT_DETAIL':
         return {
           title: selectedDepartment ? `${selectedDepartment.name}` : 'Department Details',
           subtitle: selectedDepartment ? `Code: ${selectedDepartment.code} • ${activeLoc?.name}` : 'Unit Specifications',
-          icon: <Building2 className="w-5 h-5 text-[#722F37] dark:text-[#E8DCC6]" />,
+          icon: <Building2 className="w-5 h-5 text-[#1346a1] dark:text-[#E8DCC6]" />,
         };
       case 'TEAM_ROSTER':
         return {
           title: selectedDepartment ? `Team Roster — ${selectedDepartment.name}` : 'Team Roster',
           subtitle: `${rosterEmployees.length} Staff Deployed • ${activeLoc?.name}`,
-          icon: <Users className="w-5 h-5 text-[#722F37] dark:text-[#E8DCC6]" />,
+          icon: <Users className="w-5 h-5 text-[#1346a1] dark:text-[#E8DCC6]" />,
         };
       default:
         return { title: 'Details', subtitle: '', icon: null };
@@ -326,7 +326,7 @@ export function DepartmentDetailDrawer({
                     </div>
                     <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800">
                       <div className="text-[10px] uppercase font-bold text-slate-400">Active Staff</div>
-                      <div className="text-xl font-bold text-[#722F37] dark:text-[#E8DCC6] mt-0.5">
+                      <div className="text-xl font-bold text-[#1346a1] dark:text-[#E8DCC6] mt-0.5">
                         {allEmployees.filter((e) => e.locationId === selectedLocationId).length}
                       </div>
                       <div className="text-[10px] text-slate-500">Assigned</div>
@@ -342,7 +342,7 @@ export function DepartmentDetailDrawer({
                       placeholder="Search divisions by name or code..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#722F37]"
+                      className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]"
                     />
                   </div>
 
@@ -360,11 +360,11 @@ export function DepartmentDetailDrawer({
                         return (
                           <div
                             key={dept.id}
-                            className="p-4 rounded-xl bg-white dark:bg-[#0e172a] border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-[#722F37]/50 dark:hover:border-[#E8DCC6]/40 transition-all space-y-2.5"
+                            className="p-4 rounded-xl bg-white dark:bg-[#0e172a] border border-slate-200/80 dark:border-slate-800 shadow-xs hover:border-[#1346a1]/50 dark:hover:border-[#E8DCC6]/40 transition-all space-y-2.5"
                           >
                             <div className="flex items-start justify-between">
                               <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-mono font-bold text-[#722F37] dark:text-[#E8DCC6] bg-[#F8F4F1] dark:bg-slate-800 px-2 py-0.5 rounded border border-[#E5D5D7] dark:border-slate-700">
+                                <span className="text-[10px] font-mono font-bold text-[#1346a1] dark:text-[#E8DCC6] bg-[#F8F4F1] dark:bg-slate-800 px-2 py-0.5 rounded border border-[#E5D5D7] dark:border-slate-700">
                                   {dept.code}
                                 </span>
                                 <h3 className="font-bold text-sm text-[#0b1c30] dark:text-white">{dept.name}</h3>
@@ -379,7 +379,7 @@ export function DepartmentDetailDrawer({
                                 Branch Hub: <span className="font-semibold text-slate-800 dark:text-slate-200">{dept.location?.name || activeLoc?.name || 'Retail Flagship'}</span>
                               </div>
                               <div className="text-slate-500">
-                                Floor Allocation: <span className="font-semibold text-[#722F37] dark:text-[#E8DCC6]">Ground & 1st Floor</span>
+                                Floor Allocation: <span className="font-semibold text-[#1346a1] dark:text-[#E8DCC6]">Ground & 1st Floor</span>
                               </div>
                               <div className="text-slate-500">
                                 Assigned Staff: <span className="font-bold text-slate-800 dark:text-slate-200">{staffCount} Staff</span>
@@ -396,14 +396,14 @@ export function DepartmentDetailDrawer({
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => onOpenDeptDetail?.(dept)}
-                                  className="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-[#722F37] dark:hover:text-[#E8DCC6] transition-colors"
+                                  className="text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-[#1346a1] dark:hover:text-[#E8DCC6] transition-colors"
                                 >
                                   View Details
                                 </button>
                                 <span className="text-slate-300 dark:text-slate-700">•</span>
                                 <button
                                   onClick={() => onOpenTeamRoster?.(dept)}
-                                  className="text-xs font-bold text-[#722F37] dark:text-[#E8DCC6] hover:underline flex items-center gap-0.5"
+                                  className="text-xs font-bold text-[#1346a1] dark:text-[#E8DCC6] hover:underline flex items-center gap-0.5"
                                 >
                                   <span>View Team Roster</span>
                                   <ChevronRight className="w-3 h-3" />
@@ -424,7 +424,7 @@ export function DepartmentDetailDrawer({
               {type === 'KARNATAKA_HUBS' && (
                 <div className="space-y-4">
                   {/* Enterprise Overview Banner */}
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-[#722F37] to-[#551E24] text-white space-y-1.5 shadow-sm">
+                  <div className="p-4 rounded-xl bg-gradient-to-br from-[#1346a1] to-[#551E24] text-white space-y-1.5 shadow-sm">
                     <div className="text-[10px] font-bold uppercase tracking-wider text-[#E8DCC6]">Karnataka Topology</div>
                     <div className="text-xl font-bold tracking-tight">4 Retail & Weaving Hubs Active</div>
                     <p className="text-xs text-white/80">
@@ -451,7 +451,7 @@ export function DepartmentDetailDrawer({
                           key={loc.id}
                           className={`p-4 rounded-xl border transition-all ${
                             isSelected
-                              ? 'bg-[#F8F4F1] dark:bg-[#722F37]/15 border-[#722F37] dark:border-[#E8DCC6]/60 shadow-sm'
+                              ? 'bg-[#F8F4F1] dark:bg-[#1346a1]/15 border-[#1346a1] dark:border-[#E8DCC6]/60 shadow-sm'
                               : 'bg-white dark:bg-[#0e172a] border-slate-200/80 dark:border-slate-800 hover:border-slate-300'
                           }`}
                         >
@@ -480,7 +480,7 @@ export function DepartmentDetailDrawer({
                             </div>
                             <div>
                               <span className="text-slate-400">Total Units:</span>{' '}
-                              <span className="font-bold text-[#722F37] dark:text-[#E8DCC6]">6 Units</span>
+                              <span className="font-bold text-[#1346a1] dark:text-[#E8DCC6]">6 Units</span>
                             </div>
                             <div>
                               <span className="text-slate-400">Allocated Staff:</span>{' '}
@@ -503,7 +503,7 @@ export function DepartmentDetailDrawer({
                               }}
                               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
                                 isSelected
-                                  ? 'bg-[#722F37] text-white shadow-xs'
+                                  ? 'bg-[#1346a1] text-white shadow-xs'
                                   : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200'
                               }`}
                             >
@@ -549,13 +549,13 @@ export function DepartmentDetailDrawer({
                         placeholder="Search by name, ID, role..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#722F37]"
+                        className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]"
                       />
                     </div>
                     <select
                       value={hubFilter}
                       onChange={(e) => setHubFilter(e.target.value)}
-                      className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#722F37]"
+                      className="px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]"
                     >
                       <option value="ALL">All Hubs ({allEmployees.length})</option>
                       {locations.map((l) => (
@@ -596,13 +596,13 @@ export function DepartmentDetailDrawer({
                                     title={`Open complete profile for ${emp.fullName}`}
                                     aria-label={`Open complete profile for ${emp.fullName}`}
                                   >
-                                    <div className="w-7 h-7 rounded-full bg-[#722F37] text-white flex items-center justify-center font-bold text-[10px] shrink-0">
+                                    <div className="w-7 h-7 rounded-full bg-[#1346a1] text-white flex items-center justify-center font-bold text-[10px] shrink-0">
                                       {emp.fullName?.substring(0, 2).toUpperCase() || 'EM'}
                                     </div>
                                     <div>
-                                      <div className="font-bold text-slate-900 dark:text-white group-hover/emp:text-[#722F37] dark:group-hover/emp:text-[#E8DCC6] transition-colors flex items-center gap-1">
+                                      <div className="font-bold text-slate-900 dark:text-white group-hover/emp:text-[#1346a1] dark:group-hover/emp:text-[#E8DCC6] transition-colors flex items-center gap-1">
                                         <span>{emp.fullName}</span>
-                                        <ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover/emp:opacity-100 text-[#722F37]" />
+                                        <ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover/emp:opacity-100 text-[#1346a1]" />
                                       </div>
                                       <div className="text-[10px] font-mono text-slate-400">{emp.employeeCode}</div>
                                     </div>
@@ -623,7 +623,7 @@ export function DepartmentDetailDrawer({
                                 <td className="py-2.5 px-3 text-right">
                                   <Link
                                     href={`/employees/profile/${emp.id}`}
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[#F8F4F1] dark:bg-slate-800 text-[#722F37] dark:text-[#E8DCC6] font-semibold text-[10px] hover:underline"
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded bg-[#F8F4F1] dark:bg-slate-800 text-[#1346a1] dark:text-[#E8DCC6] font-semibold text-[10px] hover:underline"
                                     title={`Open complete profile for ${emp.fullName}`}
                                   >
                                     <span>Profile</span>
@@ -646,7 +646,7 @@ export function DepartmentDetailDrawer({
               {type === 'FLAGSHIP_DIVISION' && (
                 <div className="space-y-4">
                   {/* Hero Banner */}
-                  <div className="p-4 rounded-xl bg-gradient-to-br from-[#722F37] to-[#45161C] text-white space-y-2">
+                  <div className="p-4 rounded-xl bg-gradient-to-br from-[#1346a1] to-[#45161C] text-white space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="px-2 py-0.5 rounded-full bg-white/20 text-[#E8DCC6] text-[10px] font-bold uppercase tracking-wider">
                         Primary Revenue Apex
@@ -673,7 +673,7 @@ export function DepartmentDetailDrawer({
                     </div>
                     <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800">
                       <span className="text-slate-400 text-[10px] uppercase font-bold">Assigned Consultants</span>
-                      <div className="font-bold text-[#722F37] dark:text-[#E8DCC6] mt-1">
+                      <div className="font-bold text-[#1346a1] dark:text-[#E8DCC6] mt-1">
                         {allEmployees.filter((e) => e.location?.code === 'BEL' && e.department?.code === 'SALES').length} Master Consultants
                       </div>
                       <div className="text-[11px] text-slate-500">Dedicated Silk Specialists</div>
@@ -700,13 +700,13 @@ export function DepartmentDetailDrawer({
                             className="p-3 rounded-xl bg-white dark:bg-[#0e172a] border border-slate-200/80 dark:border-slate-800 flex items-center justify-between"
                           >
                             <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-full bg-[#722F37] text-white flex items-center justify-center font-bold text-xs shrink-0">
+                              <div className="w-8 h-8 rounded-full bg-[#1346a1] text-white flex items-center justify-center font-bold text-xs shrink-0">
                                 {emp.fullName?.substring(0, 2).toUpperCase()}
                               </div>
                               <div>
                                 <Link
                                   href={`/employees/profile/${emp.id}`}
-                                  className="font-bold text-xs text-slate-900 dark:text-white hover:text-[#722F37] transition-colors"
+                                  className="font-bold text-xs text-slate-900 dark:text-white hover:text-[#1346a1] transition-colors"
                                 >
                                   {emp.fullName}
                                 </Link>
@@ -715,7 +715,7 @@ export function DepartmentDetailDrawer({
                             </div>
                             <Link
                               href={`/employees/profile/${emp.id}`}
-                              className="text-[11px] font-bold text-[#722F37] dark:text-[#E8DCC6] hover:underline flex items-center gap-0.5"
+                              className="text-[11px] font-bold text-[#1346a1] dark:text-[#E8DCC6] hover:underline flex items-center gap-0.5"
                             >
                               <span>Dossier</span>
                               <ChevronRight className="w-3 h-3" />
@@ -814,7 +814,7 @@ export function DepartmentDetailDrawer({
                       <>
                         <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-2">
                           <div className="flex items-center justify-between">
-                            <span className="font-mono font-bold text-xs bg-[#722F37] text-white px-2 py-0.5 rounded">
+                            <span className="font-mono font-bold text-xs bg-[#1346a1] text-white px-2 py-0.5 rounded">
                               {loc?.code}
                             </span>
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
@@ -832,7 +832,7 @@ export function DepartmentDetailDrawer({
                         <div className="grid grid-cols-2 gap-3 text-xs">
                           <div className="p-3 rounded-xl bg-white dark:bg-[#0e172a] border border-slate-200 dark:border-slate-800">
                             <div className="text-slate-400 text-[10px] font-bold uppercase">Assigned Units</div>
-                            <div className="text-xl font-bold text-[#722F37] dark:text-[#E8DCC6] mt-0.5">
+                            <div className="text-xl font-bold text-[#1346a1] dark:text-[#E8DCC6] mt-0.5">
                               {departments.length} Operational Units
                             </div>
                           </div>
@@ -855,11 +855,11 @@ export function DepartmentDetailDrawer({
                               return (
                                 <div
                                   key={dept.id}
-                                  className="p-3 rounded-xl bg-white dark:bg-[#0e172a] border border-slate-200/80 dark:border-slate-800 flex items-center justify-between hover:border-[#722F37]/40 transition-colors"
+                                  className="p-3 rounded-xl bg-white dark:bg-[#0e172a] border border-slate-200/80 dark:border-slate-800 flex items-center justify-between hover:border-[#1346a1]/40 transition-colors"
                                 >
                                   <div>
                                     <div className="font-bold text-xs text-slate-900 dark:text-white flex items-center gap-1.5">
-                                      <span className="font-mono text-[10px] text-[#722F37] dark:text-[#E8DCC6] bg-[#F8F4F1] dark:bg-slate-800 px-1.5 py-0.2 rounded border border-[#E5D5D7] dark:border-slate-700">
+                                      <span className="font-mono text-[10px] text-[#1346a1] dark:text-[#E8DCC6] bg-[#F8F4F1] dark:bg-slate-800 px-1.5 py-0.2 rounded border border-[#E5D5D7] dark:border-slate-700">
                                         {dept.code}
                                       </span>
                                       <span>{dept.name}</span>
@@ -868,7 +868,7 @@ export function DepartmentDetailDrawer({
                                   </div>
                                   <button
                                     onClick={() => onOpenTeamRoster?.(dept)}
-                                    className="text-xs font-bold text-[#722F37] dark:text-[#E8DCC6] hover:underline flex items-center gap-0.5"
+                                    className="text-xs font-bold text-[#1346a1] dark:text-[#E8DCC6] hover:underline flex items-center gap-0.5"
                                   >
                                     <span>Roster</span>
                                     <ChevronRight className="w-3 h-3" />
@@ -891,7 +891,7 @@ export function DepartmentDetailDrawer({
                 <div className="space-y-4">
                   <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-800 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono font-bold text-[#722F37] dark:text-[#E8DCC6] bg-[#F8F4F1] dark:bg-slate-800 px-2 py-0.5 rounded border border-[#E5D5D7] dark:border-slate-700">
+                      <span className="text-[10px] font-mono font-bold text-[#1346a1] dark:text-[#E8DCC6] bg-[#F8F4F1] dark:bg-slate-800 px-2 py-0.5 rounded border border-[#E5D5D7] dark:border-slate-700">
                         {selectedDepartment.code}
                       </span>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
@@ -908,7 +908,7 @@ export function DepartmentDetailDrawer({
                   <div className="grid grid-cols-2 gap-3 text-xs">
                     <div className="p-3 rounded-xl bg-white dark:bg-[#0e172a] border border-slate-200 dark:border-slate-800">
                       <div className="text-slate-400 text-[10px] font-bold uppercase">Floor Allocation</div>
-                      <div className="font-bold text-[#722F37] dark:text-[#E8DCC6] mt-0.5">Ground & 1st Floor</div>
+                      <div className="font-bold text-[#1346a1] dark:text-[#E8DCC6] mt-0.5">Ground & 1st Floor</div>
                     </div>
                     <div className="p-3 rounded-xl bg-white dark:bg-[#0e172a] border border-slate-200 dark:border-slate-800">
                       <div className="text-slate-400 text-[10px] font-bold uppercase">Assigned Staff</div>
@@ -932,7 +932,7 @@ export function DepartmentDetailDrawer({
                   <div className="pt-2 flex items-center justify-end">
                     <button
                       onClick={() => onOpenTeamRoster?.(selectedDepartment)}
-                      className="px-4 py-2 bg-[#722F37] hover:bg-[#5B232A] text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                      className="px-4 py-2 bg-[#1346a1] hover:bg-[#0e3882] text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
                     >
                       <span>View Team Roster</span>
                       <ChevronRight className="w-3.5 h-3.5" />
@@ -949,7 +949,7 @@ export function DepartmentDetailDrawer({
                   {/* Roster Header */}
                   <div className="p-4 rounded-xl bg-[#F8F4F1] dark:bg-slate-800/60 border border-[#E5D5D7] dark:border-slate-700 flex items-center justify-between">
                     <div>
-                      <div className="text-[10px] font-mono font-bold text-[#722F37] dark:text-[#E8DCC6]">
+                      <div className="text-[10px] font-mono font-bold text-[#1346a1] dark:text-[#E8DCC6]">
                         {selectedDepartment?.code || 'DEPT'}
                       </div>
                       <h3 className="text-base font-bold text-slate-900 dark:text-white">
@@ -959,7 +959,7 @@ export function DepartmentDetailDrawer({
                         Branch: {activeLoc?.name} • {rosterEmployees.length} Members Deployed
                       </div>
                     </div>
-                    <div className="text-2xl font-black text-[#722F37] dark:text-[#E8DCC6]">
+                    <div className="text-2xl font-black text-[#1346a1] dark:text-[#E8DCC6]">
                       {rosterEmployees.length}
                     </div>
                   </div>
@@ -973,7 +973,7 @@ export function DepartmentDetailDrawer({
                       placeholder="Search roster by staff name or ID..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
-                      className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#722F37]"
+                      className="w-full pl-9 pr-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]"
                     />
                   </div>
 
@@ -1007,13 +1007,13 @@ export function DepartmentDetailDrawer({
                                     title={`Open complete profile for ${emp.fullName}`}
                                     aria-label={`Open complete profile for ${emp.fullName}`}
                                   >
-                                    <div className="w-7 h-7 rounded-full bg-[#722F37] text-white flex items-center justify-center font-bold text-[10px] shrink-0">
+                                    <div className="w-7 h-7 rounded-full bg-[#1346a1] text-white flex items-center justify-center font-bold text-[10px] shrink-0">
                                       {emp.fullName?.substring(0, 2).toUpperCase() || 'EM'}
                                     </div>
                                     <div>
-                                      <div className="font-bold text-slate-900 dark:text-white group-hover/emp:text-[#722F37] transition-colors flex items-center gap-1">
+                                      <div className="font-bold text-slate-900 dark:text-white group-hover/emp:text-[#1346a1] transition-colors flex items-center gap-1">
                                         <span>{emp.fullName}</span>
-                                        <ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover/emp:opacity-100 text-[#722F37]" />
+                                        <ExternalLink className="w-2.5 h-2.5 opacity-0 group-hover/emp:opacity-100 text-[#1346a1]" />
                                       </div>
                                       <div className="text-[10px] font-mono text-slate-400">{emp.employeeCode}</div>
                                     </div>
@@ -1033,7 +1033,7 @@ export function DepartmentDetailDrawer({
                                 <td className="py-2.5 px-3 text-right">
                                   <Link
                                     href={`/employees/profile/${emp.id}`}
-                                    className="inline-flex items-center gap-0.5 text-[#722F37] dark:text-[#E8DCC6] font-bold hover:underline"
+                                    className="inline-flex items-center gap-0.5 text-[#1346a1] dark:text-[#E8DCC6] font-bold hover:underline"
                                     title={`Open complete profile for ${emp.fullName}`}
                                   >
                                     <span>Profile</span>

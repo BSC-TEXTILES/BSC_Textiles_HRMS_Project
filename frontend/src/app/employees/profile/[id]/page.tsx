@@ -485,7 +485,7 @@ export default function EmployeeProfileDossierPage() {
               toast.dismiss(t.id);
               handleDownloadPdf();
             }}
-            className="px-2 py-1 bg-[#722F37] text-white rounded font-bold hover:bg-slate-800"
+            className="px-2 py-1 bg-[#1346a1] text-white rounded font-bold hover:bg-slate-800"
           >
             Retry
           </button>
@@ -609,7 +609,7 @@ export default function EmployeeProfileDossierPage() {
             type="button"
             onClick={() => router.back()}
             aria-label="Go back"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#722F37]/30"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             <span>Back to Workforce Directory</span>
@@ -645,7 +645,7 @@ export default function EmployeeProfileDossierPage() {
             <p className="text-[13px] text-slate-500 mt-1 mb-4">{fetchError}</p>
             <button
               onClick={() => router.push('/employees')}
-              className="px-4 py-2 bg-[#722F37] text-white text-[13px] font-medium rounded-lg"
+              className="px-4 py-2 bg-[#1346a1] text-white text-[13px] font-medium rounded-lg"
             >
               Return to Employees List
             </button>
@@ -666,7 +666,7 @@ export default function EmployeeProfileDossierPage() {
                     />
                   ) : (
                     <div
-                      className="w-24 h-24 rounded-xl bg-[#fdf2f3] text-[#722F37] border border-[#f5d0d4] shadow-xs flex items-center justify-center font-semibold text-2xl tracking-wider"
+                      className="w-24 h-24 rounded-xl bg-[#fdf2f3] text-[#1346a1] border border-[#f5d0d4] shadow-xs flex items-center justify-center font-semibold text-2xl tracking-wider"
                       title={emp.fullName}
                     >
                       {initials}
@@ -681,7 +681,7 @@ export default function EmployeeProfileDossierPage() {
                         onClick={() => fileInputRef.current?.click()}
                         aria-label="Change profile photo"
                         title="Upload profile photo (JPG, PNG, WebP • max 2MB)"
-                        className="w-7 h-7 rounded-full bg-white hover:bg-slate-50 text-slate-700 hover:text-[#722F37] shadow-sm border border-slate-200 flex items-center justify-center transition-all opacity-100 sm:opacity-90 sm:group-hover:opacity-100 focus:opacity-100 focus:ring-2 focus:ring-[#722F37]/40"
+                        className="w-7 h-7 rounded-full bg-white hover:bg-slate-50 text-slate-700 hover:text-[#1346a1] shadow-sm border border-slate-200 flex items-center justify-center transition-all opacity-100 sm:opacity-90 sm:group-hover:opacity-100 focus:opacity-100 focus:ring-2 focus:ring-[#1346a1]/40"
                       >
                         <span className="material-symbols-outlined text-[16px]">photo_camera</span>
                       </button>
@@ -723,7 +723,7 @@ export default function EmployeeProfileDossierPage() {
 
                     {/* Branch badge */}
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 text-[11px] font-medium border border-slate-200">
-                      <span className="material-symbols-outlined text-[13px] text-[#722F37]">storefront</span>
+                      <span className="material-symbols-outlined text-[13px] text-[#1346a1]">storefront</span>
                       <span>{emp.location?.name || 'Belagavi Flagship Store (BEL-01)'}</span>
                     </span>
                   </div>
@@ -785,14 +785,14 @@ export default function EmployeeProfileDossierPage() {
                   {/* Contact strip: in its own row below identity block, separated by dividers, wraps cleanly */}
                   <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] font-normal text-slate-700">
                     <div className="inline-flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[15px] text-[#722F37]">mail</span>
+                      <span className="material-symbols-outlined text-[15px] text-[#1346a1]">mail</span>
                       <span className="break-all">{emp.email}</span>
                     </div>
 
                     <span className="hidden sm:inline text-slate-300">|</span>
 
                     <div className="inline-flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[15px] text-[#722F37]">phone_iphone</span>
+                      <span className="material-symbols-outlined text-[15px] text-[#1346a1]">phone_iphone</span>
                       <span>+91 {emp.phone}</span>
                     </div>
 
@@ -819,7 +819,7 @@ export default function EmployeeProfileDossierPage() {
                       setIsEditModalOpen(true);
                     }}
                     aria-label="Edit employee profile"
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-[13px] font-medium shadow-xs transition-colors focus:ring-2 focus:ring-[#722F37]/30"
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-[13px] font-medium shadow-xs transition-colors focus:ring-2 focus:ring-[#1346a1]/30"
                   >
                     <span className="material-symbols-outlined text-[16px]">edit_square</span>
                     <span>Edit Profile</span>
@@ -831,7 +831,7 @@ export default function EmployeeProfileDossierPage() {
                   type="button"
                   onClick={() => router.push('/attendance/corrections')}
                   aria-label="Open log correction"
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-[13px] font-medium shadow-xs transition-colors focus:ring-2 focus:ring-[#722F37]/30"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-[13px] font-medium shadow-xs transition-colors focus:ring-2 focus:ring-[#1346a1]/30"
                 >
                   <span className="material-symbols-outlined text-[16px]">more_time</span>
                   <span>Log Correction</span>
@@ -843,7 +843,7 @@ export default function EmployeeProfileDossierPage() {
                   disabled={isDownloadingPdf}
                   onClick={handleDownloadPdf}
                   aria-label={`Download complete profile PDF for ${emp.fullName}`}
-                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#722F37] hover:bg-[#5B232A] text-white text-[13px] font-semibold shadow-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed focus:ring-2 focus:ring-[#722F37]/40"
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#1346a1] hover:bg-[#0e3882] text-white text-[13px] font-semibold shadow-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed focus:ring-2 focus:ring-[#1346a1]/40"
                 >
                   {isDownloadingPdf ? (
                     <>
@@ -882,9 +882,9 @@ export default function EmployeeProfileDossierPage() {
                   onKeyDown={(e) => handleTabKeyDown(e, idx)}
                   onClick={() => setActiveTab(tab.key as any)}
                   type="button"
-                  className={`px-3 py-2 text-[13px] whitespace-nowrap border-b-2 transition-all focus:outline-none focus:ring-2 focus:ring-[#722F37]/30 ${
+                  className={`px-3 py-2 text-[13px] whitespace-nowrap border-b-2 transition-all focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30 ${
                     isActive
-                      ? 'border-[#722F37] text-[#722F37] font-semibold bg-red-50/30'
+                      ? 'border-[#1346a1] text-[#1346a1] font-semibold bg-red-50/30'
                       : 'border-transparent text-slate-600 hover:text-slate-900 font-medium hover:border-slate-300'
                   }`}
                 >
@@ -906,7 +906,7 @@ export default function EmployeeProfileDossierPage() {
                 <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs">
                   <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
                     <div className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[#722F37] text-[18px]">badge</span>
+                      <span className="material-symbols-outlined text-[#1346a1] text-[18px]">badge</span>
                       <h3 className="text-[15px] font-semibold text-slate-900">Personal Demographics</h3>
                     </div>
                     <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 uppercase">
@@ -939,7 +939,7 @@ export default function EmployeeProfileDossierPage() {
                       {emp.addressLine1},<br />
                       {emp.city}, {emp.state} – {emp.pincode}
                     </p>
-                    <div className="flex items-center gap-1 mt-1.5 text-[#722F37] text-[11px] font-medium">
+                    <div className="flex items-center gap-1 mt-1.5 text-[#1346a1] text-[11px] font-medium">
                       <span className="material-symbols-outlined text-[13px]">home_pin</span>
                       <span>Proof of Residence: Aadhaar on file</span>
                     </div>
@@ -950,7 +950,7 @@ export default function EmployeeProfileDossierPage() {
                 <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs">
                   <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100">
                     <div className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[#722F37] text-[18px]">account_balance</span>
+                      <span className="material-symbols-outlined text-[#1346a1] text-[18px]">account_balance</span>
                       <h3 className="text-[15px] font-semibold text-slate-900">Statutory &amp; Bank Registry</h3>
                     </div>
                     <span className="material-symbols-outlined text-emerald-600 text-[18px]">verified_user</span>
@@ -978,7 +978,7 @@ export default function EmployeeProfileDossierPage() {
                         <span className="text-[11px] font-normal text-slate-400 uppercase tracking-wider block">Provident Fund (UAN)</span>
                         <span className="text-[13px] font-medium text-slate-900">{emp.uan}</span>
                       </div>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-blue-50 text-[#722F37]">EPFO Synced</span>
+                      <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-blue-50 text-[#1346a1]">EPFO Synced</span>
                     </div>
 
                     <div className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg">
@@ -991,7 +991,7 @@ export default function EmployeeProfileDossierPage() {
 
                     {/* Bank Account */}
                     <div className="p-2.5 bg-slate-100 rounded-lg flex items-start gap-2.5 mt-2">
-                      <div className="w-7 h-7 rounded bg-white flex items-center justify-center shrink-0 text-[#722F37]">
+                      <div className="w-7 h-7 rounded bg-white flex items-center justify-center shrink-0 text-[#1346a1]">
                         <span className="material-symbols-outlined text-[16px]">account_balance_wallet</span>
                       </div>
                       <div className="flex flex-col flex-1 min-w-0">
@@ -1031,7 +1031,7 @@ export default function EmployeeProfileDossierPage() {
                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/60">
                       <span className="text-[12px] font-normal text-slate-500 block">Avg Check-in</span>
                       <div className="text-[18px] font-semibold text-slate-900 mt-0.5">09:27 AM</div>
-                      <span className="text-[11px] text-[#722F37] font-normal block mt-0.5">3m Early Shift Buffer</span>
+                      <span className="text-[11px] text-[#1346a1] font-normal block mt-0.5">3m Early Shift Buffer</span>
                     </div>
 
                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/60">
@@ -1042,7 +1042,7 @@ export default function EmployeeProfileDossierPage() {
 
                     <div className="p-3 bg-slate-50 rounded-lg border border-slate-200/60">
                       <span className="text-[12px] font-normal text-slate-500 block">Total Overtime Hours</span>
-                      <div className="text-[18px] font-semibold text-[#722F37] mt-0.5">6.5 Hours</div>
+                      <div className="text-[18px] font-semibold text-[#1346a1] mt-0.5">6.5 Hours</div>
                       <span className="text-[11px] text-slate-500 font-normal block mt-0.5">1.25x Overtime Credit</span>
                     </div>
 
@@ -1058,7 +1058,7 @@ export default function EmployeeProfileDossierPage() {
                 <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                     <div className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[#722F37] text-[18px]">payments</span>
+                      <span className="material-symbols-outlined text-[#1346a1] text-[18px]">payments</span>
                       <h3 className="text-[15px] font-semibold text-slate-900">Compensation &amp; Salary Structure</h3>
                     </div>
                     <span className="text-[11px] font-medium text-slate-500">Cycle: Oct 2024</span>
@@ -1081,7 +1081,7 @@ export default function EmployeeProfileDossierPage() {
                       </div>
                       <div className="flex justify-between text-[13px]">
                         <span className="text-slate-500">Sales Performance Incentive:</span>
-                        <span className="font-semibold text-[#722F37]">₹4,500</span>
+                        <span className="font-semibold text-[#1346a1]">₹4,500</span>
                       </div>
                       <div className="pt-2 border-t border-slate-200 flex justify-between font-semibold text-[14px]">
                         <span>Gross Earnings:</span>
@@ -1108,8 +1108,8 @@ export default function EmployeeProfileDossierPage() {
                         <span className="font-semibold text-slate-900">₹0</span>
                       </div>
                       <div className="pt-2 border-t border-slate-200 flex justify-between font-semibold text-[14px]">
-                        <span className="text-[#722F37]">Net Take-Home Pay:</span>
-                        <span className="text-[#722F37]">₹50,233</span>
+                        <span className="text-[#1346a1]">Net Take-Home Pay:</span>
+                        <span className="text-[#1346a1]">₹50,233</span>
                       </div>
                     </div>
                   </div>
@@ -1119,7 +1119,7 @@ export default function EmployeeProfileDossierPage() {
                 <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                     <div className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[#722F37] text-[18px]">military_tech</span>
+                      <span className="material-symbols-outlined text-[#1346a1] text-[18px]">military_tech</span>
                       <h3 className="text-[15px] font-semibold text-slate-900">Supervisory Commendations &amp; Milestones</h3>
                     </div>
                     <span className="text-[11px] text-slate-400">Total: 2 Citations</span>
@@ -1169,7 +1169,7 @@ export default function EmployeeProfileDossierPage() {
                 </div>
 
                 <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-blue-50 text-[#722F37] flex items-center justify-center shrink-0">
+                  <div className="w-10 h-10 rounded-lg bg-blue-50 text-[#1346a1] flex items-center justify-center shrink-0">
                     <span className="material-symbols-outlined text-[22px]">qr_code_2</span>
                   </div>
                   <div>
@@ -1201,7 +1201,7 @@ export default function EmployeeProfileDossierPage() {
                   <button
                     type="button"
                     onClick={() => router.push('/attendance/punches')}
-                    className="px-3 py-1.5 text-[12px] font-medium text-[#722F37] bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-[12px] font-medium text-[#1346a1] bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
                   >
                     View All Hub Punches
                   </button>
@@ -1285,7 +1285,7 @@ export default function EmployeeProfileDossierPage() {
                   <button
                     type="button"
                     onClick={() => router.push('/attendance/breaks')}
-                    className="px-3 py-1.5 text-[12px] font-medium text-[#722F37] bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-[12px] font-medium text-[#1346a1] bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
                   >
                     Manage Policies
                   </button>
@@ -1369,7 +1369,7 @@ export default function EmployeeProfileDossierPage() {
                   <button
                     type="button"
                     onClick={() => router.push('/leaves')}
-                    className="px-3 py-1.5 text-[12px] font-medium text-[#722F37] bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-[12px] font-medium text-[#1346a1] bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
                   >
                     Apply Leave
                   </button>
@@ -1427,7 +1427,7 @@ export default function EmployeeProfileDossierPage() {
                   <button
                     type="button"
                     onClick={() => router.push('/payroll')}
-                    className="px-3 py-1.5 text-[12px] font-medium text-[#722F37] bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-[12px] font-medium text-[#1346a1] bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
                   >
                     View Master Payroll
                   </button>
@@ -1462,12 +1462,12 @@ export default function EmployeeProfileDossierPage() {
                           <td className="py-2.5 px-3 text-emerald-600 font-medium">{row.bonus}</td>
                           <td className="py-2.5 px-3 font-semibold text-slate-900">{row.gross}</td>
                           <td className="py-2.5 px-3 text-rose-600">{row.ded}</td>
-                          <td className="py-2.5 px-3 font-semibold text-[#722F37]">{row.net}</td>
+                          <td className="py-2.5 px-3 font-semibold text-[#1346a1]">{row.net}</td>
                           <td className="py-2.5 px-3 text-right">
                             <button
                               type="button"
                               onClick={() => toast.success(`Downloaded Certified Payslip for ${row.period}`)}
-                              className="px-2.5 py-1 text-[11px] font-medium text-[#722F37] hover:bg-red-50 border border-red-200 rounded transition-colors inline-flex items-center gap-1"
+                              className="px-2.5 py-1 text-[11px] font-medium text-[#1346a1] hover:bg-red-50 border border-red-200 rounded transition-colors inline-flex items-center gap-1"
                             >
                               <span className="material-symbols-outlined text-[14px]">download</span>
                               Form T PDF
@@ -1569,7 +1569,7 @@ export default function EmployeeProfileDossierPage() {
                               setSelectedDocPreview(doc);
                               setIsPreviewModalOpen(true);
                             }}
-                            className="text-[#722F37] font-semibold hover:underline"
+                            className="text-[#1346a1] font-semibold hover:underline"
                           >
                             Inspect
                           </button>
@@ -1599,7 +1599,7 @@ export default function EmployeeProfileDossierPage() {
                   { time: '12 Jan 2021 • 09:00 AM', event: 'EMPLOYEE_ONBOARDING_COMPLETED', actor: 'HR Operations Directorate', desc: 'Master dossier created with employee code BSC-EMP-0042. UIDAI e-KYC verified.' },
                 ].map((log, idx) => (
                   <div key={idx} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200/60">
-                    <div className="w-7 h-7 rounded bg-red-100 text-[#722F37] flex items-center justify-center shrink-0 mt-0.5">
+                    <div className="w-7 h-7 rounded bg-red-100 text-[#1346a1] flex items-center justify-center shrink-0 mt-0.5">
                       <span className="material-symbols-outlined text-[16px]">verified</span>
                     </div>
                     <div className="flex-1 min-w-0">
@@ -1646,7 +1646,7 @@ export default function EmployeeProfileDossierPage() {
 
               {/* Square Crop Viewport */}
               <div className="flex flex-col items-center gap-2">
-                <div className="w-48 h-48 rounded-xl overflow-hidden border-2 border-[#722F37] relative shadow-inner bg-slate-100 flex items-center justify-center">
+                <div className="w-48 h-48 rounded-xl overflow-hidden border-2 border-[#1346a1] relative shadow-inner bg-slate-100 flex items-center justify-center">
                   <img
                     src={tempPhotoUrl}
                     alt="Photo crop preview"
@@ -1675,7 +1675,7 @@ export default function EmployeeProfileDossierPage() {
                   type="button"
                   disabled={isUploadingPhoto}
                   onClick={handleSaveCroppedPhoto}
-                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[13px] font-semibold bg-[#722F37] hover:bg-[#5B232A] text-white shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[13px] font-semibold bg-[#1346a1] hover:bg-[#0e3882] text-white shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isUploadingPhoto ? (
                     <>
@@ -1766,7 +1766,7 @@ export default function EmployeeProfileDossierPage() {
                       {editForm.phone.length}/10
                     </span>
                   </div>
-                  <div className="flex rounded-lg border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-[#722F37]/30 focus-within:border-[#722F37]">
+                  <div className="flex rounded-lg border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-[#1346a1]/30 focus-within:border-[#1346a1]">
                     <span className="px-3 py-2 bg-slate-100 text-slate-600 text-[12px] font-medium border-r border-slate-200 select-none">
                       +91
                     </span>
@@ -1802,7 +1802,7 @@ export default function EmployeeProfileDossierPage() {
                       {editForm.emergencyContactPhone.length}/10
                     </span>
                   </div>
-                  <div className="flex rounded-lg border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-[#722F37]/30 focus-within:border-[#722F37]">
+                  <div className="flex rounded-lg border border-slate-200 overflow-hidden focus-within:ring-2 focus-within:ring-[#1346a1]/30 focus-within:border-[#1346a1]">
                     <span className="px-3 py-2 bg-slate-100 text-slate-600 text-[12px] font-medium border-r border-slate-200 select-none">
                       +91
                     </span>
@@ -1841,7 +1841,7 @@ export default function EmployeeProfileDossierPage() {
                         emergencyContact: `+91 ${prev.emergencyContactPhone}${rel ? ` (${rel})` : ''}`,
                       }));
                     }}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#722F37]/30"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
                   />
                 </div>
 
@@ -1854,7 +1854,7 @@ export default function EmployeeProfileDossierPage() {
                     rows={2}
                     value={editForm.addressLine1}
                     onChange={(e) => setEditForm({ ...editForm, addressLine1: e.target.value })}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#722F37]/30"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
                   />
                 </div>
 
@@ -1865,7 +1865,7 @@ export default function EmployeeProfileDossierPage() {
                       type="text"
                       value={editForm.city}
                       onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#722F37]/30"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
                     />
                   </div>
                   <div>
@@ -1874,7 +1874,7 @@ export default function EmployeeProfileDossierPage() {
                       type="text"
                       value={editForm.state}
                       onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#722F37]/30"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
                     />
                   </div>
                   <div>
@@ -1884,7 +1884,7 @@ export default function EmployeeProfileDossierPage() {
                       maxLength={6}
                       value={editForm.pincode}
                       onChange={(e) => setEditForm({ ...editForm, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) })}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#722F37]/30"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
                     />
                   </div>
                 </div>
@@ -1900,7 +1900,7 @@ export default function EmployeeProfileDossierPage() {
                   <button
                     type="submit"
                     disabled={!isFormValid || isSavingProfile}
-                    className="px-4 py-1.5 rounded-lg text-[13px] font-semibold bg-[#722F37] hover:bg-[#5B232A] text-white shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-1.5 rounded-lg text-[13px] font-semibold bg-[#1346a1] hover:bg-[#0e3882] text-white shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isSavingProfile ? 'Saving…' : 'Save Changes'}
                   </button>
@@ -1923,7 +1923,7 @@ export default function EmployeeProfileDossierPage() {
             <div className="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-lg p-5 flex flex-col gap-4">
               <div className="flex items-center justify-between border-b pb-2.5 border-slate-100">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#722F37] text-[20px]">cloud_sync</span>
+                  <span className="material-symbols-outlined text-[#1346a1] text-[20px]">cloud_sync</span>
                   <h3 id="digilocker-title" className="text-[15px] font-semibold text-slate-900">
                     Connect National DigiLocker
                   </h3>
@@ -1959,7 +1959,7 @@ export default function EmployeeProfileDossierPage() {
                     type="checkbox"
                     checked={consentAccepted}
                     onChange={(e) => setConsentAccepted(e.target.checked)}
-                    className="mt-0.5 rounded text-[#722F37] focus:ring-[#722F37]"
+                    className="mt-0.5 rounded text-[#1346a1] focus:ring-[#1346a1]"
                   />
                   <span className="text-[11px] text-slate-700 leading-snug">
                     I grant explicit consent to BSC Textiles Pvt Ltd to initiate DigiLocker authorization and fetch certified documents for employment compliance.
@@ -2025,7 +2025,7 @@ export default function EmployeeProfileDossierPage() {
                   <select
                     value={uploadForm.documentType}
                     onChange={(e) => setUploadForm({ ...uploadForm, documentType: e.target.value })}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#722F37]/30"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
                   >
                     <option value="AADHAAR">Aadhaar Card (UIDAI)</option>
                     <option value="PAN">PAN Card (Income Tax)</option>
@@ -2042,7 +2042,7 @@ export default function EmployeeProfileDossierPage() {
                     placeholder="e.g. 12-digit number / PAN"
                     value={uploadForm.documentNumber}
                     onChange={(e) => setUploadForm({ ...uploadForm, documentNumber: e.target.value })}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#722F37]/30"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
                   />
                   {uploadForm.documentType === 'AADHAAR' && (
                     <span className="text-[11px] text-emerald-600 block mt-1">
@@ -2057,7 +2057,7 @@ export default function EmployeeProfileDossierPage() {
                     type="text"
                     value={uploadForm.issuer}
                     onChange={(e) => setUploadForm({ ...uploadForm, issuer: e.target.value })}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#722F37]/30"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
                   />
                 </div>
 
@@ -2072,7 +2072,7 @@ export default function EmployeeProfileDossierPage() {
                   <button
                     type="submit"
                     disabled={uploading}
-                    className="px-4 py-1.5 rounded-lg text-[13px] font-semibold bg-[#722F37] hover:bg-[#5B232A] text-white shadow-xs disabled:opacity-50"
+                    className="px-4 py-1.5 rounded-lg text-[13px] font-semibold bg-[#1346a1] hover:bg-[#0e3882] text-white shadow-xs disabled:opacity-50"
                   >
                     {uploading ? 'Submitting…' : 'Submit for Attestation'}
                   </button>

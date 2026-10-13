@@ -173,7 +173,7 @@ export function StoreLocationsDrawer({
           <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
             Total Staff
           </span>
-          <div className="text-2xl font-extrabold text-[#722F37] dark:text-rose-400 mt-1">
+          <div className="text-2xl font-extrabold text-[#1346a1] dark:text-rose-400 mt-1">
             {totalNetworkStaff}
           </div>
           <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Verified Employees</span>
@@ -202,7 +202,7 @@ export function StoreLocationsDrawer({
 
       {/* 2. SEARCH BAR */}
       <div className="space-y-2.5 pt-1">
-        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg focus-within:border-[#722F37] focus-within:ring-1 focus-within:ring-[#722F37]/20 transition-all">
+        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg focus-within:border-[#1346a1] focus-within:ring-1 focus-within:ring-[#1346a1]/20 transition-all">
           <Search className="w-4 h-4 text-slate-400 shrink-0" />
           <input
             type="text"
@@ -296,7 +296,7 @@ export function StoreLocationsDrawer({
                       }`}
                     >
                       <td className="py-2.5 px-3 font-mono font-bold whitespace-nowrap">
-                        <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[#722F37] font-bold text-xs border border-slate-200 dark:border-slate-700">
+                        <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-[#1346a1] font-bold text-xs border border-slate-200 dark:border-slate-700">
                           {store.code}
                         </span>
                       </td>
@@ -338,7 +338,7 @@ export function StoreLocationsDrawer({
                           className={`px-2.5 py-1 text-xs font-bold rounded-lg transition-all shadow-2xs cursor-pointer ${
                             isCurrent
                               ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                              : 'bg-[#722F37] hover:bg-[#5B232A] text-white'
+                              : 'bg-[#1346a1] hover:bg-[#0e3882] text-white'
                           }`}
                           title={`Filter main directory table by ${store.name}`}
                         >

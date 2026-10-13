@@ -154,7 +154,7 @@ export function ActiveOnFloorDrawer({
           <button
             type="button"
             onClick={handleShowInDirectory}
-            className="px-3 py-1.5 rounded-lg bg-[#722F37] hover:bg-[#5B232A] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-[#1346a1] hover:bg-[#0e3882] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
             title="Filter main directory by Active Workforce"
           >
             Show in directory
@@ -237,7 +237,7 @@ export function ActiveOnFloorDrawer({
             onClick={() => setActiveTab('ON_FLOOR')}
             className={`pb-2 text-xs font-bold transition-all relative ${
               activeTab === 'ON_FLOOR'
-                ? 'text-[#722F37] border-b-2 border-[#722F37]'
+                ? 'text-[#1346a1] border-b-2 border-[#1346a1]'
                 : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
             }`}
           >
@@ -248,7 +248,7 @@ export function ActiveOnFloorDrawer({
             onClick={() => setActiveTab('OFF_DUTY')}
             className={`pb-2 text-xs font-bold transition-all relative ${
               activeTab === 'OFF_DUTY'
-                ? 'text-[#722F37] border-b-2 border-[#722F37]'
+                ? 'text-[#1346a1] border-b-2 border-[#1346a1]'
                 : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
             }`}
           >
@@ -259,7 +259,7 @@ export function ActiveOnFloorDrawer({
             onClick={() => setActiveTab('ALL')}
             className={`pb-2 text-xs font-bold transition-all relative ${
               activeTab === 'ALL'
-                ? 'text-[#722F37] border-b-2 border-[#722F37]'
+                ? 'text-[#1346a1] border-b-2 border-[#1346a1]'
                 : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
             }`}
           >
@@ -267,7 +267,7 @@ export function ActiveOnFloorDrawer({
           </button>
         </div>
 
-        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg focus-within:border-[#722F37] focus-within:ring-1 focus-within:ring-[#722F37]/20 transition-all">
+        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg focus-within:border-[#1346a1] focus-within:ring-1 focus-within:ring-[#1346a1]/20 transition-all">
           <Search className="w-4 h-4 text-slate-400 shrink-0" />
           <input
             type="text"
@@ -363,21 +363,21 @@ export function ActiveOnFloorDrawer({
                         <Link
                           href={`/employees/profile/${emp.id}`}
                           aria-label={`Open complete profile for ${empName}`}
-                          className="text-[#722F37] hover:underline"
+                          className="text-[#1346a1] hover:underline"
                         >
                           {emp.employeeCode}
                         </Link>
                       </td>
                       <td className="py-2.5 px-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-[#722F37] text-white flex items-center justify-center font-bold text-[10px] shrink-0">
+                          <div className="w-6 h-6 rounded-full bg-[#1346a1] text-white flex items-center justify-center font-bold text-[10px] shrink-0">
                             {initials}
                           </div>
                           <div>
                             <Link
                               href={`/employees/profile/${emp.id}`}
                               aria-label={`Open complete profile for ${empName}`}
-                              className="font-bold text-[#18181B] dark:text-slate-100 hover:text-[#722F37] transition-colors"
+                              className="font-bold text-[#18181B] dark:text-slate-100 hover:text-[#1346a1] transition-colors"
                             >
                               {empName}
                             </Link>

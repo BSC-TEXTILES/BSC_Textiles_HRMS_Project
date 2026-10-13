@@ -159,7 +159,7 @@ export function BiometricProfilesDrawer({
             <button
               type="button"
               onClick={handleShowInDirectory}
-              className="px-3 py-1.5 rounded-lg bg-[#722F37] hover:bg-[#5B232A] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+              className="px-3 py-1.5 rounded-lg bg-[#1346a1] hover:bg-[#0e3882] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
               title="Apply drawer store and dept filters to main directory"
             >
               Show in directory
@@ -174,7 +174,7 @@ export function BiometricProfilesDrawer({
           <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
             Face Enrolled
           </span>
-          <div className="text-2xl font-extrabold text-[#722F37] dark:text-rose-400 mt-1">
+          <div className="text-2xl font-extrabold text-[#1346a1] dark:text-rose-400 mt-1">
             {faceCount}
           </div>
           <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">100% Mobile & Terminal</span>
@@ -213,7 +213,7 @@ export function BiometricProfilesDrawer({
 
       {/* 2. SEARCH & FILTER CHIPS */}
       <div className="space-y-2.5 pt-1">
-        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg focus-within:border-[#722F37] focus-within:ring-1 focus-within:ring-[#722F37]/20 transition-all">
+        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 px-3 py-1.5 rounded-lg focus-within:border-[#1346a1] focus-within:ring-1 focus-within:ring-[#1346a1]/20 transition-all">
           <Search className="w-4 h-4 text-slate-400 shrink-0" />
           <input
             type="text"
@@ -240,7 +240,7 @@ export function BiometricProfilesDrawer({
             onClick={() => setFilterChip('ALL')}
             className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all ${
               filterChip === 'ALL'
-                ? 'bg-[#722F37] text-white shadow-2xs'
+                ? 'bg-[#1346a1] text-white shadow-2xs'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
             }`}
           >
@@ -251,7 +251,7 @@ export function BiometricProfilesDrawer({
             onClick={() => setFilterChip('FACE_ENROLLED')}
             className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all ${
               filterChip === 'FACE_ENROLLED'
-                ? 'bg-[#722F37] text-white shadow-2xs'
+                ? 'bg-[#1346a1] text-white shadow-2xs'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
             }`}
           >
@@ -262,7 +262,7 @@ export function BiometricProfilesDrawer({
             onClick={() => setFilterChip('QR_READY')}
             className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all ${
               filterChip === 'QR_READY'
-                ? 'bg-[#722F37] text-white shadow-2xs'
+                ? 'bg-[#1346a1] text-white shadow-2xs'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
             }`}
           >
@@ -273,7 +273,7 @@ export function BiometricProfilesDrawer({
             onClick={() => setFilterChip('MISSING_FAILED')}
             className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all ${
               filterChip === 'MISSING_FAILED'
-                ? 'bg-[#722F37] text-white shadow-2xs'
+                ? 'bg-[#1346a1] text-white shadow-2xs'
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-slate-200'
             }`}
           >
@@ -356,21 +356,21 @@ export function BiometricProfilesDrawer({
                         <Link
                           href={`/employees/profile/${emp.id}`}
                           aria-label={`Open complete profile for ${empName}`}
-                          className="text-[#722F37] hover:underline"
+                          className="text-[#1346a1] hover:underline"
                         >
                           {emp.employeeCode}
                         </Link>
                       </td>
                       <td className="py-2.5 px-3 whitespace-nowrap">
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full bg-[#722F37] text-white flex items-center justify-center font-bold text-[10px] shrink-0">
+                          <div className="w-6 h-6 rounded-full bg-[#1346a1] text-white flex items-center justify-center font-bold text-[10px] shrink-0">
                             {initials}
                           </div>
                           <div>
                             <Link
                               href={`/employees/profile/${emp.id}`}
                               aria-label={`Open complete profile for ${empName}`}
-                              className="font-bold text-[#18181B] dark:text-slate-100 hover:text-[#722F37] transition-colors"
+                              className="font-bold text-[#18181B] dark:text-slate-100 hover:text-[#1346a1] transition-colors"
                             >
                               {empName}
                             </Link>

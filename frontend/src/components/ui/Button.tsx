@@ -13,11 +13,11 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const baseStyles = 'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]';
 
 const variants = {
-  primary: 'bg-[#722F37] text-white hover:bg-[#5B232A] focus:ring-[#722F37]/30 shadow-xs hover:shadow-sm',
+  primary: 'bg-[#1346a1] text-white hover:bg-[#0e3882] focus:ring-[#1346a1]/30 shadow-xs hover:shadow-sm',
   secondary: 'bg-gray-100 dark:bg-slate-800 text-gray-900 dark:text-slate-100 hover:bg-gray-200 dark:hover:bg-slate-700 focus:ring-gray-400',
   danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 shadow-xs',
   ghost: 'bg-transparent hover:bg-gray-100 dark:hover:bg-slate-800 focus:ring-gray-400 text-gray-700 dark:text-slate-200',
-  outline: 'border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 focus:ring-[#722F37]/30 text-gray-700 dark:text-slate-200',
+  outline: 'border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 focus:ring-[#1346a1]/30 text-gray-700 dark:text-slate-200',
   success: 'bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500 shadow-xs',
 };
 

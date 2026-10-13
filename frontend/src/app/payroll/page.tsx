@@ -112,7 +112,7 @@ export default function PayrollPage() {
             <div className="flex items-center gap-1.5 text-slate-400 text-[11px] uppercase tracking-wider font-semibold">
               <span>Payroll Management</span>
               <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-[#722F37] font-bold">Salary Operations</span>
+              <span className="text-[#1346a1] font-bold">Salary Operations</span>
             </div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-[#18181B] tracking-tight">
@@ -132,28 +132,28 @@ export default function PayrollPage() {
               href="/payroll/payslips"
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 transition-all text-xs font-semibold"
             >
-              <Receipt className="w-4 h-4 text-[#722F37]" />
+              <Receipt className="w-4 h-4 text-[#1346a1]" />
               <span>Manage Payslips</span>
             </Link>
             <Link
               href="/payroll/floor-overview"
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 transition-all text-xs font-semibold"
             >
-              <Building2 className="w-4 h-4 text-[#722F37]" />
+              <Building2 className="w-4 h-4 text-[#1346a1]" />
               <span>Floor-Wise Salary</span>
             </Link>
             <Link
               href="/payroll/salary-structure"
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 transition-all text-xs font-semibold"
             >
-              <Wallet className="w-4 h-4 text-[#722F37]" />
+              <Wallet className="w-4 h-4 text-[#1346a1]" />
               <span>Salary Structures</span>
             </Link>
             <Link
               href="/payroll/reports"
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white text-slate-700 border border-slate-200 shadow-xs hover:bg-slate-50 transition-all text-xs font-semibold"
             >
-              <BarChart3 className="w-4 h-4 text-[#722F37]" />
+              <BarChart3 className="w-4 h-4 text-[#1346a1]" />
               <span>Reports</span>
             </Link>
             <button
@@ -166,7 +166,7 @@ export default function PayrollPage() {
             <button
               onClick={handleGeneratePayroll}
               disabled={generating}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#722F37] hover:bg-[#5B232A] text-white shadow-xs transition-all text-xs font-bold disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#1346a1] hover:bg-[#0e3882] text-white shadow-xs transition-all text-xs font-bold disabled:opacity-50"
             >
               <Coins className="w-4 h-4" />
               <span>{generating ? 'Processing Run...' : '+ Generate Wage Run'}</span>
@@ -179,7 +179,7 @@ export default function PayrollPage() {
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Gross Payout</span>
-              <div className="w-8 h-8 rounded-lg bg-[#722F37]/10 flex items-center justify-center text-[#722F37]">
+              <div className="w-8 h-8 rounded-lg bg-[#1346a1]/10 flex items-center justify-center text-[#1346a1]">
                 <Coins className="w-4 h-4" />
               </div>
             </div>
@@ -187,7 +187,7 @@ export default function PayrollPage() {
               <div className="text-2xl font-bold text-[#18181B]">₹{totalPayout.toLocaleString()}</div>
               <div className="text-[11px] text-slate-400 truncate">Current Month Payout</div>
             </div>
-            <div className="pt-2 border-t border-slate-100 text-[11px] text-[#722F37] font-semibold">
+            <div className="pt-2 border-t border-slate-100 text-[11px] text-[#1346a1] font-semibold">
               <span>Audited & Approved</span>
             </div>
           </div>
@@ -195,7 +195,7 @@ export default function PayrollPage() {
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Basic Pay</span>
-              <div className="w-8 h-8 rounded-lg bg-[#722F37]/10 flex items-center justify-center text-[#722F37]">
+              <div className="w-8 h-8 rounded-lg bg-[#1346a1]/10 flex items-center justify-center text-[#1346a1]">
                 <Receipt className="w-4 h-4" />
               </div>
             </div>
@@ -243,7 +243,7 @@ export default function PayrollPage() {
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Covered Staff</span>
-              <div className="w-8 h-8 rounded-lg bg-[#722F37]/10 flex items-center justify-center text-[#722F37]">
+              <div className="w-8 h-8 rounded-lg bg-[#1346a1]/10 flex items-center justify-center text-[#1346a1]">
                 <Users className="w-4 h-4" />
               </div>
             </div>
@@ -251,7 +251,7 @@ export default function PayrollPage() {
               <div className="text-2xl font-bold text-[#18181B]">{coveredCount} / {coveredCount}</div>
               <div className="text-[11px] text-slate-400 truncate">100% Payroll Processed</div>
             </div>
-            <div className="pt-2 border-t border-slate-100 text-[11px] text-[#722F37] font-semibold">
+            <div className="pt-2 border-t border-slate-100 text-[11px] text-[#1346a1] font-semibold">
               <span>Zero Pending Claims</span>
             </div>
           </div>
@@ -260,7 +260,7 @@ export default function PayrollPage() {
         {/* CURRENT CYCLE RUN SELECTION & METADATA */}
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-[#722F37]/10 flex items-center justify-center text-[#722F37]">
+            <div className="w-10 h-10 rounded-lg bg-[#1346a1]/10 flex items-center justify-center text-[#1346a1]">
               <Calendar className="w-5 h-5" />
             </div>
             <div>
@@ -277,7 +277,7 @@ export default function PayrollPage() {
             <select
               value={selectedRun?.id || ''}
               onChange={(e) => loadRunDetails(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-semibold focus:outline-none focus:border-[#722F37]"
+              className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-semibold focus:outline-none focus:border-[#1346a1]"
             >
               {runs.map((r) => (
                 <option key={r.id} value={r.id}>
@@ -295,7 +295,7 @@ export default function PayrollPage() {
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="p-4 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-[#722F37]" />
+              <CreditCard className="w-4 h-4 text-[#1346a1]" />
               <h2 className="text-sm font-bold text-[#18181B]">Salary Disbursal & Payslip Ledger</h2>
               <span className="text-xs text-slate-400">({runItems.length} Staff Entries)</span>
             </div>
@@ -328,7 +328,7 @@ export default function PayrollPage() {
                       <tr key={item.id || idx} className="hover:bg-slate-50/70 transition-colors">
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-full bg-[#722F37] text-white flex items-center justify-center font-bold text-[10px]">
+                            <div className="w-7 h-7 rounded-full bg-[#1346a1] text-white flex items-center justify-center font-bold text-[10px]">
                               {emp.fullName?.[0] || 'E'}
                             </div>
                             <div>
@@ -361,7 +361,7 @@ export default function PayrollPage() {
                         <td className="py-3 px-4 text-right">
                           <button
                             onClick={() => setSelectedPayslip(item)}
-                            className="px-2.5 py-1 text-xs font-semibold text-[#722F37] hover:bg-[#722F37]/10 rounded border border-[#722F37]/20 transition-colors"
+                            className="px-2.5 py-1 text-xs font-semibold text-[#1346a1] hover:bg-[#1346a1]/10 rounded border border-[#1346a1]/20 transition-colors"
                           >
                             View Payslip
                           </button>
@@ -381,7 +381,7 @@ export default function PayrollPage() {
             <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <Receipt className="w-5 h-5 text-[#722F37]" />
+                  <Receipt className="w-5 h-5 text-[#1346a1]" />
                   <div>
                     <h3 className="font-bold text-base text-[#18181B]">BSC Textiles Payslip</h3>
                     <p className="text-[10px] text-slate-400">Monthly Remuneration Statement</p>
@@ -402,7 +402,7 @@ export default function PayrollPage() {
                     <div className="text-[11px] text-slate-500 font-mono">{selectedPayslip.employee?.employeeCode}</div>
                   </div>
                   <div className="text-right">
-                    <div className="font-bold text-xs text-[#722F37]">{selectedPayslip.employee?.location?.name || 'Retail Flagship'}</div>
+                    <div className="font-bold text-xs text-[#1346a1]">{selectedPayslip.employee?.location?.name || 'Retail Flagship'}</div>
                     <div className="text-[10px] text-slate-400">Period: Oct 2024</div>
                   </div>
                 </div>
@@ -422,9 +422,9 @@ export default function PayrollPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center text-sm font-bold bg-[#722F37]/10 p-3 rounded-lg text-[#18181B] border border-[#722F37]/20">
+                <div className="flex justify-between items-center text-sm font-bold bg-[#1346a1]/10 p-3 rounded-lg text-[#18181B] border border-[#1346a1]/20">
                   <span>Net Take-Home Pay:</span>
-                  <span className="text-lg font-mono text-[#722F37]">₹{Number(selectedPayslip.netSalary).toLocaleString()}</span>
+                  <span className="text-lg font-mono text-[#1346a1]">₹{Number(selectedPayslip.netSalary).toLocaleString()}</span>
                 </div>
 
                 <div className="flex items-center justify-end gap-2 pt-2">
@@ -455,7 +455,7 @@ export default function PayrollPage() {
                         toast.error('Failed to download PDF');
                       }
                     }}
-                    className="px-4 py-1.5 rounded-lg bg-[#722F37] text-white font-bold hover:bg-[#5B232A] text-xs flex items-center gap-1.5 shadow-xs transition-colors"
+                    className="px-4 py-1.5 rounded-lg bg-[#1346a1] text-white font-bold hover:bg-[#0e3882] text-xs flex items-center gap-1.5 shadow-xs transition-colors"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Download PDF</span>

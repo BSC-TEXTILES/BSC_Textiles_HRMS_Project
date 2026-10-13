@@ -406,7 +406,7 @@ export default function FloorOverviewPage() {
           </div>
           <Link
             href="/payroll"
-            className="mt-6 px-4 py-2 rounded-xl bg-[#722F37] hover:bg-[#5B232A] text-white text-xs font-bold transition-all shadow-sm"
+            className="mt-6 px-4 py-2 rounded-xl bg-[#1346a1] hover:bg-[#0e3882] text-white text-xs font-bold transition-all shadow-sm"
           >
             Return to Payroll Dashboard
           </Link>
@@ -428,10 +428,10 @@ export default function FloorOverviewPage() {
                 Payroll
               </Link>
               <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-[#722F37] font-bold">Floor-Wise Salary Overview</span>
+              <span className="text-[#1346a1] font-bold">Floor-Wise Salary Overview</span>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#722F37] to-[#8B263E] text-white flex items-center justify-center shadow-sm">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#1346a1] to-[#8B263E] text-white flex items-center justify-center shadow-sm">
                 <Building2 className="w-5 h-5" />
               </div>
               <div>
@@ -454,7 +454,7 @@ export default function FloorOverviewPage() {
               href="/payroll/payslips"
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold shadow-xs transition-all"
             >
-              <Receipt className="w-4 h-4 text-[#722F37]" />
+              <Receipt className="w-4 h-4 text-[#1346a1]" />
               <span>HR Payslip Management</span>
             </Link>
             <button
@@ -467,7 +467,7 @@ export default function FloorOverviewPage() {
             <button
               onClick={() => fetchFloorOverview()}
               disabled={loading}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#722F37] hover:bg-[#5B232A] text-white text-xs font-bold shadow-xs transition-all disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#1346a1] hover:bg-[#0e3882] text-white text-xs font-bold shadow-xs transition-all disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
               <span>Refresh Totals</span>
@@ -491,7 +491,7 @@ export default function FloorOverviewPage() {
                   setSelectedLocation(e.target.value);
                   setSelectedFloorId('ALL');
                 }}
-                className="w-full text-xs font-semibold rounded-lg border border-slate-200 px-2.5 py-1.5 bg-slate-50/50 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#722F37]"
+                className="w-full text-xs font-semibold rounded-lg border border-slate-200 px-2.5 py-1.5 bg-slate-50/50 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
               >
                 <option value="ALL">All Showrooms (BEL, DAV, SHI, HUB)</option>
                 {availableFilters.locations.map(loc => (
@@ -510,7 +510,7 @@ export default function FloorOverviewPage() {
               <select
                 value={selectedFloorId}
                 onChange={e => setSelectedFloorId(e.target.value)}
-                className="w-full text-xs font-semibold rounded-lg border border-slate-200 px-2.5 py-1.5 bg-slate-50/50 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#722F37]"
+                className="w-full text-xs font-semibold rounded-lg border border-slate-200 px-2.5 py-1.5 bg-slate-50/50 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
               >
                 <option value="ALL">All Floors</option>
                 {availableFilters.floors
@@ -531,7 +531,7 @@ export default function FloorOverviewPage() {
               <select
                 value={selectedSectionId}
                 onChange={e => setSelectedSectionId(e.target.value)}
-                className="w-full text-xs font-semibold rounded-lg border border-slate-200 px-2.5 py-1.5 bg-slate-50/50 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#722F37]"
+                className="w-full text-xs font-semibold rounded-lg border border-slate-200 px-2.5 py-1.5 bg-slate-50/50 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
               >
                 <option value="ALL">All Sections</option>
                 {availableFilters.sections.map(s => (
@@ -551,7 +551,7 @@ export default function FloorOverviewPage() {
                 <select
                   value={selectedMonth}
                   onChange={e => setSelectedMonth(e.target.value)}
-                  className="w-1/2 text-xs font-semibold rounded-lg border border-slate-200 px-2 py-1.5 bg-slate-50/50 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#722F37]"
+                  className="w-1/2 text-xs font-semibold rounded-lg border border-slate-200 px-2 py-1.5 bg-slate-50/50 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
                 >
                   {availableFilters.months.map(m => (
                     <option key={m} value={m}>
@@ -562,7 +562,7 @@ export default function FloorOverviewPage() {
                 <select
                   value={selectedYear}
                   onChange={e => setSelectedYear(Number(e.target.value))}
-                  className="w-1/2 text-xs font-semibold rounded-lg border border-slate-200 px-2 py-1.5 bg-slate-50/50 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#722F37]"
+                  className="w-1/2 text-xs font-semibold rounded-lg border border-slate-200 px-2 py-1.5 bg-slate-50/50 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
                 >
                   {availableFilters.years.map(y => (
                     <option key={y} value={y}>
@@ -582,7 +582,7 @@ export default function FloorOverviewPage() {
               placeholder="Search floor, manager, staff..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full text-xs pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50/50 focus:outline-none focus:ring-1 focus:ring-[#722F37] text-slate-800 placeholder-slate-400"
+              className="w-full text-xs pl-8 pr-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50/50 focus:outline-none focus:ring-1 focus:ring-[#1346a1] text-slate-800 placeholder-slate-400"
             />
           </div>
         </div>
@@ -635,7 +635,7 @@ export default function FloorOverviewPage() {
             </div>
 
             {/* Total Net Payable */}
-            <div className="bg-gradient-to-br from-[#722F37] to-[#5B232A] rounded-2xl p-4 text-white shadow-md flex flex-col justify-between">
+            <div className="bg-gradient-to-br from-[#1346a1] to-[#0e3882] rounded-2xl p-4 text-white shadow-md flex flex-col justify-between">
               <div className="flex items-center justify-between text-rose-200 text-xs font-semibold">
                 <span>Net Payable</span>
                 <Sparkles className="w-4 h-4 text-amber-300" />
@@ -711,7 +711,7 @@ export default function FloorOverviewPage() {
         {/* ============================================================= */}
         {loading ? (
           <div className="flex flex-col items-center justify-center p-16 bg-white rounded-2xl border border-slate-200 shadow-xs">
-            <RefreshCw className="w-8 h-8 text-[#722F37] animate-spin mb-3" />
+            <RefreshCw className="w-8 h-8 text-[#1346a1] animate-spin mb-3" />
             <p className="text-sm font-semibold text-slate-700">Computing floor-wise salary registers...</p>
             <p className="text-xs text-slate-400 mt-1">Fetching live attendance, incentives, and PF/ESI contributions</p>
           </div>
@@ -730,7 +730,7 @@ export default function FloorOverviewPage() {
               {/* Showroom Location Banner */}
               <div className="bg-slate-50/90 border-b border-slate-200/80 px-5 py-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center text-[#722F37] font-bold text-sm">
+                  <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 shadow-xs flex items-center justify-center text-[#1346a1] font-bold text-sm">
                     {location.code}
                   </div>
                   <div>
@@ -759,7 +759,7 @@ export default function FloorOverviewPage() {
                   <div className="h-6 w-px bg-slate-200" />
                   <div>
                     <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Net Payable</span>
-                    <span className="font-bold text-[#722F37]">
+                    <span className="font-bold text-[#1346a1]">
                       ₹{location.summary.totalNetPayable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -788,7 +788,7 @@ export default function FloorOverviewPage() {
                         {/* Floor Particulars & Floor Manager */}
                         <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                           <div className="flex items-center gap-2">
-                            <span className="w-8 h-8 rounded-lg bg-[#722F37]/10 text-[#722F37] font-bold text-xs flex items-center justify-center">
+                            <span className="w-8 h-8 rounded-lg bg-[#1346a1]/10 text-[#1346a1] font-bold text-xs flex items-center justify-center">
                               F{floor.floorNumber}
                             </span>
                             <div>
@@ -845,7 +845,7 @@ export default function FloorOverviewPage() {
                           </div>
                           <div className="text-center sm:text-right">
                             <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Net Payable</span>
-                            <span className="font-bold text-[#722F37] text-sm">
+                            <span className="font-bold text-[#1346a1] text-sm">
                               ₹{floor.summary.totalNetPayable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </span>
                           </div>
@@ -878,7 +878,7 @@ export default function FloorOverviewPage() {
                               key={sec.id}
                               className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-700 text-[11px] font-semibold flex items-center gap-1.5 shadow-2xs"
                             >
-                              <span className="w-1.5 h-1.5 rounded-full bg-[#722F37]" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#1346a1]" />
                               <span>{sec.name}</span>
                               <span className="text-slate-400 font-normal">({sec.employeeCount} staff)</span>
                               <span className="text-emerald-700 font-bold ml-1">
@@ -908,7 +908,7 @@ export default function FloorOverviewPage() {
                                   <th className="py-2.5 px-3 text-right">Basic</th>
                                   <th className="py-2.5 px-3 text-right">Gross Salary</th>
                                   <th className="py-2.5 px-3 text-right">Deductions</th>
-                                  <th className="py-2.5 px-3 text-right text-[#722F37]">Net Payable</th>
+                                  <th className="py-2.5 px-3 text-right text-[#1346a1]">Net Payable</th>
                                   <th className="py-2.5 px-3 text-right">Employer Contrib</th>
                                   <th className="py-2.5 px-3 text-right">CTC</th>
                                   <th className="py-2.5 px-3 text-center">Actions</th>
@@ -952,7 +952,7 @@ export default function FloorOverviewPage() {
                                       <td className="py-2.5 px-3 text-right font-mono text-amber-700">
                                         ₹{emp.totalDeductions.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                       </td>
-                                      <td className="py-2.5 px-3 text-right font-mono font-bold text-[#722F37]">
+                                      <td className="py-2.5 px-3 text-right font-mono font-bold text-[#1346a1]">
                                         ₹{emp.netPayable.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                       </td>
                                       <td className="py-2.5 px-3 text-right font-mono text-emerald-700">
@@ -965,7 +965,7 @@ export default function FloorOverviewPage() {
                                         <div className="flex items-center justify-center gap-1.5">
                                           <button
                                             onClick={() => handleViewPayslip(emp)}
-                                            className="p-1 rounded-md text-slate-600 hover:text-[#722F37] hover:bg-slate-100 transition-colors"
+                                            className="p-1 rounded-md text-slate-600 hover:text-[#1346a1] hover:bg-slate-100 transition-colors"
                                             title="View Full Payslip Document"
                                           >
                                             <Eye className="w-4 h-4" />
@@ -1003,7 +1003,7 @@ export default function FloorOverviewPage() {
             <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-4xl w-full p-4 sm:p-6 space-y-4 max-h-[95vh] overflow-y-auto">
               <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-[#722F37]" />
+                  <FileText className="w-5 h-5 text-[#1346a1]" />
                   <div>
                     <h3 className="font-bold text-sm text-slate-900">
                       Authentic Payslip Document — {viewingPayslip.fullName}

@@ -137,7 +137,7 @@ export async function generateEmployeeProfilePdf(data: EmployeeProfilePdfData): 
       });
       doc.on('error', (err) => reject(err));
 
-      const primaryColor = '#722F37'; // BSC Maroon Accent
+      const primaryColor = '#1346a1'; // BSC Maroon Accent
       const darkColor = '#0f172a';
       const slateColor = '#475569';
       const lightBg = '#f8fafc';

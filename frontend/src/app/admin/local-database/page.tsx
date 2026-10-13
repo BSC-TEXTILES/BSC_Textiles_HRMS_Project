@@ -161,7 +161,7 @@ export default function LocalDatabasePage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2.5 py-1 rounded-md text-[11px] font-extrabold uppercase tracking-wider bg-[#722F37] text-white flex items-center gap-1.5 shadow-2xs">
+              <span className="px-2.5 py-1 rounded-md text-[11px] font-extrabold uppercase tracking-wider bg-[#1346a1] text-white flex items-center gap-1.5 shadow-2xs">
                 <Laptop className="w-3.5 h-3.5" />
                 <span>Single-Computer Architecture</span>
               </span>
@@ -190,7 +190,7 @@ export default function LocalDatabasePage() {
             <button
               onClick={handleCreateBackup}
               disabled={creatingBackup}
-              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[#722F37] text-white hover:bg-[#582128] flex items-center gap-1.5 transition-colors shadow-2xs disabled:opacity-50"
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[#1346a1] text-white hover:bg-[#582128] flex items-center gap-1.5 transition-colors shadow-2xs disabled:opacity-50"
             >
               <Download className={`w-3.5 h-3.5 ${creatingBackup ? 'animate-bounce' : ''}`} />
               <span>{creatingBackup ? 'Exporting...' : 'Create Hot Backup'}</span>
@@ -205,7 +205,7 @@ export default function LocalDatabasePage() {
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-1">
             <div className="flex items-center justify-between text-slate-400 text-xs">
               <span className="font-semibold">Database Engine</span>
-              <Database className="w-4 h-4 text-[#722F37]" />
+              <Database className="w-4 h-4 text-[#1346a1]" />
             </div>
             <div className="text-lg font-black text-slate-900">SQLite 3 (WAL)</div>
             <p className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
@@ -217,7 +217,7 @@ export default function LocalDatabasePage() {
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-1">
             <div className="flex items-center justify-between text-slate-400 text-xs">
               <span className="font-semibold">Local Storage Size</span>
-              <HardDrive className="w-4 h-4 text-[#722F37]" />
+              <HardDrive className="w-4 h-4 text-[#1346a1]" />
             </div>
             <div className="text-lg font-black text-slate-900">{dbInfo?.fileSizeFormatted || 'Loading...'}</div>
             <p className="text-[11px] text-slate-400 font-mono truncate">
@@ -239,7 +239,7 @@ export default function LocalDatabasePage() {
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs space-y-1">
             <div className="flex items-center justify-between text-slate-400 text-xs">
               <span className="font-semibold">Attendance & Payslips</span>
-              <Layers className="w-4 h-4 text-[#722F37]" />
+              <Layers className="w-4 h-4 text-[#1346a1]" />
             </div>
             <div className="text-lg font-black text-slate-900">
               {dbInfo?.records?.attendancePunches || 0} Punches
@@ -255,7 +255,7 @@ export default function LocalDatabasePage() {
         {/* ============================================================= */}
         <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-xs shadow-2xs">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#722F37]/10 text-[#722F37] flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-[#1346a1]/10 text-[#1346a1] flex items-center justify-center shrink-0">
               <ShieldCheck className="w-5 h-5" />
             </div>
             <div>
@@ -283,7 +283,7 @@ export default function LocalDatabasePage() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div className="flex items-center gap-2">
-                <Archive className="w-4 h-4 text-[#722F37]" />
+                <Archive className="w-4 h-4 text-[#1346a1]" />
                 <h3 className="font-bold text-slate-900 text-sm">Local Database Backups</h3>
               </div>
               <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold border border-slate-200">
@@ -294,7 +294,7 @@ export default function LocalDatabasePage() {
             <div className="p-4 flex-1 space-y-3">
               {backups.length === 0 ? (
                 <div className="p-8 text-center text-slate-400 text-xs">
-                  <Archive className="w-8 h-8 mx-auto mb-2 opacity-30 text-[#722F37]" />
+                  <Archive className="w-8 h-8 mx-auto mb-2 opacity-30 text-[#1346a1]" />
                   <p className="font-bold text-slate-700">No backups found in local folder</p>
                   <p className="text-[11px] mt-0.5">Click &quot;Create Hot Backup&quot; above to export a copy.</p>
                 </div>
@@ -333,7 +333,7 @@ export default function LocalDatabasePage() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
             <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div className="flex items-center gap-2">
-                <Fingerprint className="w-4 h-4 text-[#722F37]" />
+                <Fingerprint className="w-4 h-4 text-[#1346a1]" />
                 <h3 className="font-bold text-slate-900 text-sm">eSSL Biometric Offline Import</h3>
               </div>
               <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
@@ -351,7 +351,7 @@ export default function LocalDatabasePage() {
                 <select
                   value={selectedLocation}
                   onChange={(e) => setSelectedLocation(e.target.value)}
-                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-[#722F37]"
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:outline-none focus:border-[#1346a1]"
                 >
                   <option value="DAV">[DAV] Davanagere Mega Store</option>
                   <option value="BEL">[BEL] Belagavi Mega Showroom</option>
@@ -368,7 +368,7 @@ export default function LocalDatabasePage() {
                   value={biometricContent}
                   onChange={(e) => setBiometricContent(e.target.value)}
                   placeholder="Example:&#10;1372&#9;2026-10-12&#9;10:28:15&#10;1024&#9;2026-10-12&#9;10:32:00"
-                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:border-[#722F37] placeholder-slate-400"
+                  className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:outline-none focus:border-[#1346a1] placeholder-slate-400"
                 />
               </div>
 
@@ -377,7 +377,7 @@ export default function LocalDatabasePage() {
                   type="button"
                   onClick={handleImportBiometric}
                   disabled={importingBiometric}
-                  className="px-4 py-2 bg-[#722F37] text-white font-bold rounded-xl text-xs hover:bg-[#582128] transition-colors flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
+                  className="px-4 py-2 bg-[#1346a1] text-white font-bold rounded-xl text-xs hover:bg-[#582128] transition-colors flex items-center gap-1.5 shadow-2xs disabled:opacity-50"
                 >
                   <Upload className={`w-3.5 h-3.5 ${importingBiometric ? 'animate-spin' : ''}`} />
                   <span>{importingBiometric ? 'Processing Logs...' : 'Import into Local DB'}</span>

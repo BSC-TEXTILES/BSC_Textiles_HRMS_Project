@@ -126,7 +126,7 @@ export function EmployeeQuickDetailsDrawer({
           </button>
           <Link
             href={`/employees/profile/${employee.id}`}
-            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-[#722F37] hover:bg-[#5B252C] active:bg-[#451B21] rounded-xl shadow-xs transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-[#1346a1] hover:bg-[#5B252C] active:bg-[#451B21] rounded-xl shadow-xs transition-all cursor-pointer"
           >
             <span>Open Full 360° Dossier</span>
             <ExternalLink className="w-3.5 h-3.5" />
@@ -136,9 +136,9 @@ export function EmployeeQuickDetailsDrawer({
     >
       <div className="space-y-6 pb-6">
         {/* HERO CARD */}
-        <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-[#722F37]/80 text-white shadow-sm border border-slate-700/50">
+        <div className="p-5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-[#1346a1]/80 text-white shadow-sm border border-slate-700/50">
           <div className="flex items-start gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#722F37] to-rose-400 text-white flex items-center justify-center font-bold text-xl shadow-md border-2 border-white/20 shrink-0">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#1346a1] to-rose-400 text-white flex items-center justify-center font-bold text-xl shadow-md border-2 border-white/20 shrink-0">
               {initials || <User className="w-8 h-8" />}
             </div>
             <div className="flex-1 min-w-0">
@@ -180,7 +180,7 @@ export function EmployeeQuickDetailsDrawer({
         <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-3">
           <div className="flex items-center justify-between">
             <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-[#722F37]" />
+              <Building2 className="w-3.5 h-3.5 text-[#1346a1]" />
               Store & Operational Assignment
             </h4>
             <span className="text-[10px] font-mono px-1.5 py-0.5 bg-slate-200 text-slate-700 rounded font-bold">

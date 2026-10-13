@@ -4,7 +4,7 @@ export default function NotFound() {
   return (
     <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#111317] flex items-center justify-center p-6">
       <div className="max-w-md w-full text-center space-y-6 bg-white dark:bg-[#161920] p-8 rounded-xl shadow-xs border border-slate-200 dark:border-[#272A30]">
-        <div className="w-14 h-14 rounded-xl bg-[#722F37]/10 text-[#722F37] mx-auto flex items-center justify-center font-bold text-xl border border-[#722F37]/20">
+        <div className="w-14 h-14 rounded-xl bg-[#1346a1]/10 text-[#1346a1] mx-auto flex items-center justify-center font-bold text-xl border border-[#1346a1]/20">
           404
         </div>
         <div className="space-y-2">
@@ -18,7 +18,7 @@ export default function NotFound() {
         <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link
             href="/dashboard"
-            className="w-full sm:w-auto px-5 py-2.5 bg-[#722F37] hover:bg-[#5B232A] text-white rounded-lg text-xs font-bold transition-all shadow-xs"
+            className="w-full sm:w-auto px-5 py-2.5 bg-[#1346a1] hover:bg-[#0e3882] text-white rounded-lg text-xs font-bold transition-all shadow-xs"
           >
             Go to Executive Dashboard
           </Link>

@@ -424,7 +424,7 @@ export function AddEmployeeDialog({
         {/* Sticky Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#722F37]/10 flex items-center justify-center text-[#722F37]">
+            <div className="w-8 h-8 rounded-lg bg-[#1346a1]/10 flex items-center justify-center text-[#1346a1]">
               <UserPlus className="w-4 h-4" />
             </div>
             <div>
@@ -439,7 +439,7 @@ export function AddEmployeeDialog({
           <button
             type="button"
             onClick={handleRequestClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37]"
+            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1346a1]"
             aria-label="Cancel and close"
           >
             <X className="w-4 h-4" />
@@ -494,7 +494,7 @@ export function AddEmployeeDialog({
                   className={`w-full px-3 py-2 border rounded-lg text-xs transition-colors focus:outline-none ${
                     errors.firstName
                       ? 'border-red-400 focus:border-red-500 bg-red-50/20'
-                      : 'border-slate-300 focus:border-[#722F37] focus:ring-1 focus:ring-[#722F37]'
+                      : 'border-slate-300 focus:border-[#1346a1] focus:ring-1 focus:ring-[#1346a1]'
                   }`}
                 />
                 {errors.firstName && (
@@ -524,7 +524,7 @@ export function AddEmployeeDialog({
                   className={`w-full px-3 py-2 border rounded-lg text-xs transition-colors focus:outline-none ${
                     errors.lastName
                       ? 'border-red-400 focus:border-red-500 bg-red-50/20'
-                      : 'border-slate-300 focus:border-[#722F37] focus:ring-1 focus:ring-[#722F37]'
+                      : 'border-slate-300 focus:border-[#1346a1] focus:ring-1 focus:ring-[#1346a1]'
                   }`}
                 />
                 {errors.lastName && (
@@ -556,7 +556,7 @@ export function AddEmployeeDialog({
                 className={`w-full px-3 py-2 border rounded-lg text-xs transition-colors focus:outline-none ${
                   errors.email
                     ? 'border-red-400 focus:border-red-500 bg-red-50/20'
-                    : 'border-slate-300 focus:border-[#722F37] focus:ring-1 focus:ring-[#722F37]'
+                    : 'border-slate-300 focus:border-[#1346a1] focus:ring-1 focus:ring-[#1346a1]'
                 }`}
               />
               {errors.email && (
@@ -581,10 +581,10 @@ export function AddEmployeeDialog({
                 </span>
               </div>
               <div
-                className={`flex items-center border rounded-lg overflow-hidden transition-colors focus-within:ring-1 focus-within:ring-[#722F37] ${
+                className={`flex items-center border rounded-lg overflow-hidden transition-colors focus-within:ring-1 focus-within:ring-[#1346a1] ${
                   errors.phone
                     ? 'border-red-400 focus-within:border-red-500 bg-red-50/20'
-                    : 'border-slate-300 focus-within:border-[#722F37] bg-white'
+                    : 'border-slate-300 focus-within:border-[#1346a1] bg-white'
                 }`}
               >
                 <span
@@ -654,7 +654,7 @@ export function AddEmployeeDialog({
                   className={`w-full px-3 py-2 border rounded-lg text-xs bg-white transition-colors focus:outline-none ${
                     errors.locationId
                       ? 'border-red-400 focus:border-red-500 bg-red-50/20'
-                      : 'border-slate-300 focus:border-[#722F37] focus:ring-1 focus:ring-[#722F37]'
+                      : 'border-slate-300 focus:border-[#1346a1] focus:ring-1 focus:ring-[#1346a1]'
                   }`}
                 >
                   <option value="">Select Location</option>
@@ -712,7 +712,7 @@ export function AddEmployeeDialog({
                     aria-label="Department"
                     value={formData.departmentId}
                     onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#722F37] focus:ring-1 focus:ring-[#722F37] transition-colors"
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#1346a1] focus:ring-1 focus:ring-[#1346a1] transition-colors"
                   >
                     <option value="">Select Department (Optional)</option>
                     {departmentOptions.map((opt) => (
@@ -744,7 +744,7 @@ export function AddEmployeeDialog({
                       gender: e.target.value as 'male' | 'female',
                     })
                   }
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#722F37] focus:ring-1 focus:ring-[#722F37] transition-colors"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#1346a1] focus:ring-1 focus:ring-[#1346a1] transition-colors"
                 >
                   <option value="male">Male</option>
                   <option value="female">Female</option>
@@ -759,7 +759,7 @@ export function AddEmployeeDialog({
                   id="field-role"
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#722F37] focus:ring-1 focus:ring-[#722F37] transition-colors"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#1346a1] focus:ring-1 focus:ring-[#1346a1] transition-colors"
                 >
                   {AVAILABLE_ROLES.map((r) => (
                     <option key={r.value} value={r.value}>
@@ -786,7 +786,7 @@ export function AddEmployeeDialog({
             type="submit"
             form="add-employee-form"
             disabled={isSubmitting || !isPhoneValid}
-            className="inline-flex items-center justify-center px-4 py-2 text-xs bg-[#722F37] hover:bg-[#5B232A] text-white rounded-lg font-bold shadow-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-1"
+            className="inline-flex items-center justify-center px-4 py-2 text-xs bg-[#1346a1] hover:bg-[#0e3882] text-white rounded-lg font-bold shadow-xs transition-colors disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1346a1] focus-visible:ring-offset-1"
           >
             {isSubmitting ? (
               <>
