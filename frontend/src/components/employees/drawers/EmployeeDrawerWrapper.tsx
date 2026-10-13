@@ -81,7 +81,7 @@ export function EmployeeDrawerWrapper({
     >
       {/* Fixed backdrop with even dim tone, no blur, no gradient */}
       <div
-        className="fixed inset-0 bg-slate-900/60 transition-opacity"
+        className="fixed inset-0 bg-slate-900/40 dark:bg-black/50 transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />

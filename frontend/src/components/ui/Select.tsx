@@ -14,12 +14,12 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     <select
       ref={ref}
       className={cn(
-        'flex h-10 w-full appearance-none rounded-lg border bg-white px-3 py-2 text-sm transition-colors',
+        'flex h-10 w-full appearance-none rounded-lg border bg-white dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100 px-3 py-2 text-sm transition-colors',
         'placeholder:text-slate-400',
-        'focus:outline-none focus:ring-2 focus:ring-[#0058be] focus:border-transparent',
-        'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-slate-50',
+        'focus:outline-none focus:ring-2 focus:ring-[#1346a1] focus:border-transparent',
+        'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-slate-50 dark:disabled:bg-slate-800',
         error && 'border-red-500 focus:ring-red-500',
-        'border-slate-300 hover:border-slate-400',
+        'border-slate-300 hover:border-slate-400 dark:hover:border-slate-600',
         className
       )}
       onChange={(e) => {
@@ -44,10 +44,10 @@ export const SelectTrigger = forwardRef<HTMLButtonElement, SelectTriggerProps>(
       ref={ref}
       type="button"
       className={cn(
-        'flex h-10 w-full items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 transition-colors',
-        'hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0058be] focus:border-transparent',
-        'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-slate-50',
-        'data-[placeholder]:text-slate-400',
+        'flex h-10 w-full items-center justify-between rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 transition-colors',
+        'hover:border-slate-400 dark:hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-[#1346a1] focus:border-transparent',
+        'disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-slate-50 dark:disabled:bg-slate-800',
+        'data-[placeholder]:text-slate-400 dark:data-[placeholder]:text-slate-500',
         className
       )}
       {...props}
@@ -81,7 +81,7 @@ export function SelectContent({ className, children, position = 'popper', ...pro
   return (
     <div
       className={cn(
-        'relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-lg border border-slate-300 bg-white text-slate-950 shadow-lg',
+        'relative z-50 max-h-96 min-w-[8rem] overflow-hidden rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-950 dark:text-slate-100 shadow-lg',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
         'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -109,9 +109,9 @@ export const SelectItem = forwardRef<HTMLDivElement, SelectItemProps>(
       className={cn(
         'relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none',
         'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
-        'data-[highlighted]:outline-none data-[highlighted]:bg-[#eff4ff] data-[highlighted]:text-[#0058be]',
-        'focus:bg-[#eff4ff] focus:text-[#0058be]',
-        disabled && 'text-slate-400',
+        'data-[highlighted]:outline-none data-[highlighted]:bg-[#eff4ff] dark:data-[highlighted]:bg-blue-950/60 data-[highlighted]:text-[#1346a1] dark:data-[highlighted]:text-blue-300',
+        'focus:bg-[#eff4ff] dark:focus:bg-blue-950/60 focus:text-[#1346a1] dark:focus:text-blue-300 text-slate-900 dark:text-slate-100',
+        disabled && 'text-slate-400 dark:text-slate-500',
         className
       )}
       data-value={value}

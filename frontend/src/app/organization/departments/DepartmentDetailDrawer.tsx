@@ -249,7 +249,7 @@ export function DepartmentDetailDrawer({
       {/* 1. Backdrop Overlay: Single even dim tone, NO blur, NO gradient, NO white gap */}
       <div
         onClick={onClose}
-        className="fixed inset-0 bg-slate-950/60 dark:bg-black/70 transition-opacity animate-in fade-in duration-200"
+        className="fixed inset-0 bg-slate-950/40 dark:bg-black/50 transition-opacity animate-in fade-in duration-200"
         aria-hidden="true"
       />
 
