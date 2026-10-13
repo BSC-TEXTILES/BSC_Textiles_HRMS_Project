@@ -892,6 +892,18 @@ async function buildShiftBoard(req: AuthRequest) {
     if (departmentId && e.departmentId !== departmentId) continue;
     if (shiftId && e.shiftId !== shiftId) continue;
     if (e.status && !ROSTER_EMP_STATUSES.has(e.status)) continue;
+
+    // Respect employment lifecycle: ignore employees who joined after this date or exited before it
+    const joinYmd = ymdOfDate(e.joiningDate);
+    if (joinYmd && joinYmd > date) continue;
+    const exitYmd = ymdOfDate(e.exitDate);
+    if (exitYmd && exitYmd < date) continue;
+
+    // A shift board roster strictly schedules employees with an assigned shift
+    const a = attByEmp.get(e.id);
+    const effShift = a?.shiftId || e.shiftId;
+    if (!effShift || !shiftById.has(effShift)) continue;
+
     rosterIds.add(e.id);
   }
   for (const a of attendance) {
@@ -899,6 +911,9 @@ async function buildShiftBoard(req: AuthRequest) {
       const e = empById.get(a.employeeId);
       if (!e || e.departmentId !== departmentId) continue;
     }
+    if (shiftId && a.shiftId !== shiftId) continue;
+    const effShift = a.shiftId || empById.get(a.employeeId)?.shiftId;
+    if (!effShift || !shiftById.has(effShift)) continue;
     rosterIds.add(a.employeeId);
   }
 
