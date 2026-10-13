@@ -182,9 +182,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       timeout: 10000,
     });
 
-    newSocket.on('connect', () => {
-      console.log('[NotificationContext] Realtime connection active');
-    });
+    newSocket.on('connect', () => {});
 
     newSocket.on('notification:new', (data: { notification: Notification }) => {
       if (!data?.notification) return;
@@ -201,9 +199,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    newSocket.on('disconnect', (reason) => {
-      console.log('[NotificationContext] Realtime disconnected:', reason);
-    });
+    newSocket.on('disconnect', () => {});
 
     newSocket.on('connect_error', (err) => {
       console.warn('[NotificationContext] Realtime reconnecting:', err?.message || err);
