@@ -411,6 +411,7 @@ router.get('/floor-hierarchy', authorize('VIEW'), async (req: AuthRequest, res) 
         shortagesCount: storeAbsentSalesmen,
       },
       floors: formattedFloors,
+      sections: sections || [],
       billingSummary: {
         completedBills: completedCount,
         pendingBills: Number(bs.pendingBills || 0),
@@ -462,7 +463,7 @@ router.get('/available-employees', authorize('VIEW'), async (req: AuthRequest, r
       const s = `%${search}%`;
       params.push(s, s, s);
     }
-    query += ' ORDER BY e.fullName ASC LIMIT 50';
+    query += ' ORDER BY e.fullName ASC LIMIT 500';
 
     const [employees]: any = await pool.query(query, params);
     res.json(employees);
@@ -892,6 +893,179 @@ router.delete('/:id', authorize('DELETE'), async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('Delete selling point error:', error);
     res.status(500).json({ error: 'Failed to delete selling point' });
+  }
+});
+
+/**
+ * POST /api/selling-points/sections
+ * Create a new showroom selling section under a floor
+ */
+router.post('/sections', authorize('ADD'), async (req: AuthRequest, res) => {
+  try {
+    const { name, code, locationId, floorId, departmentId } = req.body;
+    if (!name || !locationId || !floorId) {
+      return res.status(400).json({ error: 'Section name, locationId, and floorId are required' });
+    }
+
+    const secCode = (code || `SEC-${name.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`).toUpperCase();
+    const id = genId('sec');
+
+    await pool.query(
+      `INSERT INTO section (id, name, code, locationId, floorId, departmentId, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, NOW(3), NOW(3))`,
+      [id, name, secCode, locationId, floorId, departmentId || null]
+    );
+
+    res.status(201).json({ id, name, code: secCode, locationId, floorId, message: 'Section created successfully' });
+  } catch (error: any) {
+    console.error('Create section error:', error);
+    res.status(500).json({ error: 'Failed to create section', message: error.message });
+  }
+});
+
+/**
+ * POST /api/selling-points/:id/batch-assign
+ * Assign multiple salespeople to a selling point at once
+ */
+router.post('/:id/batch-assign', authorize('ASSIGN'), async (req: AuthRequest, res) => {
+  try {
+    const { employeeIds, isPrimary } = req.body;
+    if (!Array.isArray(employeeIds) || employeeIds.length === 0) {
+      return res.status(400).json({ error: 'employeeIds array is required' });
+    }
+
+    const [spRows]: any = await pool.query('SELECT * FROM sellingpoint WHERE id = ?', [req.params.id]);
+    if (spRows.length === 0) {
+      return res.status(404).json({ error: 'Selling point not found' });
+    }
+
+    let assignedCount = 0;
+    for (const empId of employeeIds) {
+      const assignmentId = genId('esp');
+      if (isPrimary) {
+        await pool.query('UPDATE employeesellingpoint SET isPrimary = 0 WHERE employeeId = ?', [empId]);
+      }
+      await pool.query(`
+        INSERT INTO employeesellingpoint (id, employeeId, sellingPointId, isPrimary, assignedDate, createdAt)
+        VALUES (?, ?, ?, ?, NOW(3), NOW(3))
+        ON DUPLICATE KEY UPDATE isPrimary = VALUES(isPrimary)
+      `, [assignmentId, empId, req.params.id, isPrimary ? 1 : 0]);
+      assignedCount++;
+    }
+
+    res.json({ success: true, count: assignedCount, message: `${assignedCount} employees assigned successfully` });
+  } catch (error: any) {
+    console.error('Batch assign employees error:', error);
+    res.status(500).json({ error: 'Failed to batch assign employees', message: error.message });
+  }
+});
+
+/**
+ * POST /api/selling-points/import-csv
+ * Import selling points / counters from CSV data and automatically assign employees
+ */
+router.post('/import-csv', authorize('ADD'), async (req: AuthRequest, res) => {
+  try {
+    const { locationId, floorId, sectionId, rows } = req.body;
+    if (!locationId) {
+      return res.status(400).json({ error: 'locationId is required' });
+    }
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ error: 'CSV rows array is required' });
+    }
+
+    // Default floor if not specified
+    let targetFloorId = floorId;
+    if (!targetFloorId) {
+      const [floorRows]: any = await pool.query('SELECT id FROM floor WHERE locationId = ? LIMIT 1', [locationId]);
+      targetFloorId = floorRows[0]?.id;
+    }
+
+    // Default section if not specified
+    let targetSectionId = sectionId;
+    if (!targetSectionId) {
+      const [secRows]: any = await pool.query('SELECT id FROM section WHERE locationId = ? LIMIT 1', [locationId]);
+      targetSectionId = secRows[0]?.id;
+    }
+
+    const createdList: any[] = [];
+
+    for (const r of rows) {
+      const name = r.name || r.counterName || r.counter_name;
+      if (!name) continue;
+
+      let code = (r.code || r.counterCode || r.counter_code || `BEL-SP-${Math.floor(100 + Math.random() * 900)}`).toUpperCase();
+      const category = r.category || 'Sales';
+      const targetAmount = Number(r.targetAmount || r.target_amount || 1000000);
+
+      // Section lookup or creation by section name if provided in row
+      let rowSectionId = targetSectionId;
+      if (r.sectionName || r.section_name) {
+        const [matchedSec]: any = await pool.query(
+          'SELECT id FROM section WHERE locationId = ? AND LOWER(name) = ? LIMIT 1',
+          [locationId, (r.sectionName || r.section_name).trim().toLowerCase()]
+        );
+        if (matchedSec.length > 0) {
+          rowSectionId = matchedSec[0].id;
+        } else {
+          // Auto-create the section
+          const newSecId = genId('sec');
+          await pool.query(
+            `INSERT INTO section (id, name, code, locationId, floorId, createdAt, updatedAt)
+             VALUES (?, ?, ?, ?, ?, NOW(3), NOW(3))`,
+            [newSecId, (r.sectionName || r.section_name).trim(), `SEC-${Date.now().toString().slice(-4)}`, locationId, targetFloorId]
+          );
+          rowSectionId = newSecId;
+        }
+      }
+
+      // Check if code exists, if so generate unique
+      const [codeExists]: any = await pool.query('SELECT id FROM sellingpoint WHERE locationId = ? AND code = ?', [locationId, code]);
+      if (codeExists.length > 0) {
+        code = `${code}-${Math.floor(10 + Math.random() * 90)}`;
+      }
+
+      const newSpId = genId('sp');
+      await pool.query(`
+        INSERT INTO sellingpoint (
+          id, name, code, locationId, floorId, sectionId, category, targetAmount, status, createdAt, updatedAt
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(3), NOW(3)
+        )
+      `, [newSpId, name, code, locationId, targetFloorId, rowSectionId, category, targetAmount]);
+
+      // Assign employees if employee codes provided (e.g. "TEST-EMP-001, TEST-EMP-007")
+      const rawCodes = r.employeeCodes || r.employee_codes || r.staffCodes || r.staff_codes || '';
+      if (rawCodes) {
+        const codesList = String(rawCodes).split(/[,;]/).map(c => c.trim()).filter(Boolean);
+        for (const empCode of codesList) {
+          const [matchedEmp]: any = await pool.query(
+            'SELECT id FROM employee WHERE (employeeCode = ? OR id = ? OR fullName = ?) LIMIT 1',
+            [empCode, empCode, empCode]
+          );
+          if (matchedEmp.length > 0) {
+            const espId = genId('esp');
+            await pool.query(`
+              INSERT INTO employeesellingpoint (id, employeeId, sellingPointId, isPrimary, assignedDate, createdAt)
+              VALUES (?, ?, ?, 0, NOW(3), NOW(3))
+              ON DUPLICATE KEY UPDATE isPrimary = VALUES(isPrimary)
+            `, [espId, matchedEmp[0].id, newSpId]);
+          }
+        }
+      }
+
+      createdList.push({ id: newSpId, name, code, category });
+    }
+
+    res.json({
+      success: true,
+      count: createdList.length,
+      createdCounters: createdList,
+      message: `Successfully imported and initialized ${createdList.length} selling point counters`,
+    });
+  } catch (error: any) {
+    console.error('Import CSV selling points error:', error);
+    res.status(500).json({ error: 'Failed to import selling points from CSV', message: error.message });
   }
 });
 
