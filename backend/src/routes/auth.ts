@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../index.js';
