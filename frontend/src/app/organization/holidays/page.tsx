@@ -19,26 +19,55 @@ export default function HolidaysPage() {
     fetchHolidays();
   }, []);
 
+function normalizeDateStr(raw: any): string {
+  if (!raw) return '';
+  if (typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return String(raw).split('T')[0];
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
+  } catch {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+}
+
   const fetchHolidays = async () => {
     try {
       setLoading(true);
       const res = await api.get('/holidays');
       const list = res.data?.holidays || res.data || [];
-      if (list.length > 0) {
-        setHolidays(list);
+      if (Array.isArray(list) && list.length > 0) {
+        const formatted = list.map((item: any) => ({
+          ...item,
+          date: normalizeDateStr(item.date),
+        }));
+
+        // Deduplicate by name and date
+        const map = new Map<string, any>();
+        for (const item of formatted) {
+          const key = `${item.name.trim().toLowerCase()}_${item.date}`;
+          if (!map.has(key)) {
+            map.set(key, item);
+          }
+        }
+        setHolidays(Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date)));
       } else {
         // Fallback Karnataka statutory holiday schedule
         setHolidays([
-          { id: 1, name: 'Makara Sankranti / Pongal', date: '2024-01-15', description: 'Karnataka State Harvest Festival', type: 'MANDATORY' },
-          { id: 2, name: 'Republic Day', date: '2024-01-26', description: 'National Holiday (Full Paid)', type: 'NATIONAL' },
-          { id: 3, name: 'Ugadi (Kannada New Year)', date: '2024-04-09', description: 'Karnataka State Gazetted Festival', type: 'MANDATORY' },
-          { id: 4, name: 'May Day (Labour Day)', date: '2024-05-01', description: 'International Workers Day', type: 'NATIONAL' },
-          { id: 5, name: 'Independence Day', date: '2024-08-15', description: 'National Holiday (Full Paid)', type: 'NATIONAL' },
-          { id: 6, name: 'Ganesh Chaturthi', date: '2024-09-07', description: 'Regional Festival Holiday', type: 'MANDATORY' },
-          { id: 7, name: 'Gandhi Jayanti', date: '2024-10-02', description: 'National Holiday (Full Paid)', type: 'NATIONAL' },
-          { id: 8, name: 'Vijayadashami / Ayudha Puja', date: '2024-10-12', description: 'Textile Machinery Sanctification Puja', type: 'MANDATORY' },
-          { id: 9, name: 'Deepavali / Naraka Chaturdashi', date: '2024-10-31', description: 'Diwali Festive Bonus Day', type: 'MANDATORY' },
-          { id: 10, name: 'Kannada Rajyotsava', date: '2024-11-01', description: 'Karnataka State Formation Day', type: 'STATE' },
+          { id: 1, name: 'Makara Sankranti / Pongal', date: '2026-01-15', description: 'Karnataka State Harvest Festival', type: 'MANDATORY' },
+          { id: 2, name: 'Republic Day', date: '2026-01-26', description: 'National Holiday (Full Paid Gazetted)', type: 'NATIONAL' },
+          { id: 3, name: 'Ugadi (Kannada New Year)', date: '2026-03-19', description: 'Karnataka State Gazetted Festival', type: 'MANDATORY' },
+          { id: 4, name: 'May Day (Labour Day)', date: '2026-05-01', description: 'International Workers Day', type: 'NATIONAL' },
+          { id: 5, name: 'Independence Day', date: '2026-08-15', description: 'National Holiday (Full Paid Gazetted)', type: 'NATIONAL' },
+          { id: 6, name: 'Ganesh Chaturthi', date: '2026-09-14', description: 'Regional Festival Holiday', type: 'MANDATORY' },
+          { id: 7, name: 'Gandhi Jayanti', date: '2026-10-02', description: 'National Holiday (Full Paid Gazetted)', type: 'NATIONAL' },
+          { id: 8, name: 'Vijayadashami / Ayudha Puja', date: '2026-10-19', description: 'Textile Machinery Sanctification Puja', type: 'MANDATORY' },
+          { id: 9, name: 'Deepavali / Naraka Chaturdashi', date: '2026-11-08', description: 'Diwali Festive Bonus Day', type: 'MANDATORY' },
+          { id: 10, name: 'Kannada Rajyotsava', date: '2026-11-01', description: 'Karnataka State Formation Day', type: 'STATE' },
+          { id: 11, name: 'Christmas', date: '2026-12-25', description: 'Statutory Declared Holiday', type: 'NATIONAL' },
         ]);
       }
     } catch (e) {
@@ -59,17 +88,22 @@ export default function HolidaysPage() {
       toast.success('Holiday added successfully!');
       setIsAddModalOpen(false);
       fetchHolidays();
-    } catch (err: any) {
-      setHolidays([
-        ...holidays,
-        {
-          id: Date.now(),
-          name: newHoli.name,
-          date: newHoli.date,
-          description: newHoli.description || 'Statutory Declared Holiday',
-          type: 'MANDATORY',
-        },
-      ]);
+    } catch {
+      const newItem = {
+        id: Date.now(),
+        name: newHoli.name.trim(),
+        date: newHoli.date,
+        description: newHoli.description || 'Statutory Declared Holiday',
+        type: 'MANDATORY',
+      };
+      setHolidays((prev) => {
+        const map = new Map<string, any>();
+        [...prev, newItem].forEach((item) => {
+          const key = `${item.name.trim().toLowerCase()}_${item.date}`;
+          if (!map.has(key)) map.set(key, item);
+        });
+        return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+      });
       toast.success('Holiday declared and added to muster schedule!');
       setIsAddModalOpen(false);
     }
@@ -134,9 +168,11 @@ export default function HolidaysPage() {
         <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-slate-200/80 overflow-hidden">
           <div className="divide-y divide-slate-100">
             {holidays.map((h, i) => {
-              const dt = new Date(h.date);
+              const cleanDate = normalizeDateStr(h.date);
+              const [y, m, dNum] = cleanDate.split('-').map(Number);
+              const dt = new Date(y, m - 1, dNum);
               const monthStr = dt.toLocaleDateString('en-IN', { month: 'short' });
-              const dayNum = dt.getDate();
+              const dayNum = dNum;
               const weekdayStr = dt.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric' });
 
               return (

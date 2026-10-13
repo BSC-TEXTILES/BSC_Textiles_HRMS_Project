@@ -19,9 +19,25 @@ const holidaySchema = z.object({
   }),
 });
 
+// Helper to format holiday dates safely
+function formatHolidayDate(d: Date | string): string {
+  if (!d) return '';
+  if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  const dateObj = new Date(d);
+  if (isNaN(dateObj.getTime())) return String(d).split('T')[0];
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(dateObj);
+  } catch {
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+}
+
 router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
-    const { locationId, startDate, endDate, page = 1, limit = 20 } = req.query;
+    const { locationId, startDate, endDate, page = 1, limit = 100 } = req.query;
     const scopedLocId = getScopedLocationId(req.user, locationId);
 
     const cacheKey = `holidays:${scopedLocId || 'all'}:${startDate || ''}:${endDate || ''}:${page}:${limit}`;
@@ -57,8 +73,24 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
       }),
       prisma.holiday.count({ where }),
     ]);
+
+    const formattedHolidays = holidays.map((h: any) => ({
+      ...h,
+      date: formatHolidayDate(h.date),
+    }));
+
+    // Deduplicate identical holidays by name and date to avoid multiple entries
+    const seen = new Set<string>();
+    const dedupedHolidays: any[] = [];
+    for (const h of formattedHolidays) {
+      const key = `${h.name.trim().toLowerCase()}_${h.date}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        dedupedHolidays.push(h);
+      }
+    }
     
-    const result = { holidays, total, page: Number(page), limit: Number(limit) };
+    const result = { holidays: dedupedHolidays, total: dedupedHolidays.length, page: Number(page), limit: Number(limit) };
     const etag = cacheService.set(cacheKey, result, 60_000);
     res.setHeader('ETag', etag);
     res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=30');
@@ -126,26 +158,53 @@ router.post('/bulk', async (req: AuthRequest, res) => {
           continue;
         }
 
-        const parsedDate = new Date(item.date);
-        if (isNaN(parsedDate.getTime())) {
+        const rawDateStr = String(item.date).split('T')[0];
+        const [y, m, d] = rawDateStr.split(/[-/]/).map(Number);
+        if (!y || !m || !d) {
           errors.push(`Invalid date format for ${item.name}: ${item.date}`);
           continue;
         }
+        const safeDate = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
 
         const targetLocationId = req.user!.role === 'SUPER_ADMIN'
           ? (item.locationId && item.locationId !== 'ALL' ? item.locationId : null)
           : (req.user!.locationId || null);
 
+        const cleanName = String(item.name).trim();
+
+        // Check if already exists (prevent duplicates)
+        const existing = await prisma.holiday.findFirst({
+          where: {
+            name: cleanName,
+            locationId: targetLocationId,
+            date: {
+              gte: new Date(Date.UTC(y, m - 1, d, 0, 0, 0)),
+              lte: new Date(Date.UTC(y, m - 1, d, 23, 59, 59)),
+            },
+          },
+        });
+
+        if (existing) {
+          createdRecords.push({
+            ...existing,
+            date: formatHolidayDate(existing.date),
+          });
+          continue;
+        }
+
         const record = await prisma.holiday.create({
           data: {
-            name: String(item.name).trim(),
-            date: parsedDate,
+            name: cleanName,
+            date: safeDate,
             locationId: targetLocationId,
             departmentId: item.departmentId || null,
             isRecurring: Boolean(item.isRecurring),
           },
         });
-        createdRecords.push(record);
+        createdRecords.push({
+          ...record,
+          date: formatHolidayDate(record.date),
+        });
       } catch (err: any) {
         errors.push(`Failed to insert ${item.name}: ${err.message}`);
       }
@@ -153,7 +212,7 @@ router.post('/bulk', async (req: AuthRequest, res) => {
 
     cacheService.invalidateHolidays();
     return res.status(201).json({
-      message: `Successfully imported ${createdRecords.length} holidays`,
+      message: `Successfully processed ${createdRecords.length} holidays`,
       count: createdRecords.length,
       holidays: createdRecords,
       errors: errors.length > 0 ? errors : undefined,
@@ -179,11 +238,35 @@ router.post('/', async (req: AuthRequest, res) => {
     if (req.user!.role !== 'SUPER_ADMIN' && locationId && locationId !== req.user!.locationId) {
       return res.status(403).json({ error: 'Access denied' });
     }
+
+    const cleanName = String(name).trim();
+    const rawDateStr = String(date).split('T')[0];
+    const [y, m, d] = rawDateStr.split(/[-/]/).map(Number);
+    const safeDate = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+
+    // Check if holiday already exists on this date to prevent duplicate rows
+    const existing = await prisma.holiday.findFirst({
+      where: {
+        name: cleanName,
+        locationId: targetLocationId,
+        date: {
+          gte: new Date(Date.UTC(y, m - 1, d, 0, 0, 0)),
+          lte: new Date(Date.UTC(y, m - 1, d, 23, 59, 59)),
+        },
+      },
+    });
+
+    if (existing) {
+      return res.status(200).json({
+        ...existing,
+        date: formatHolidayDate(existing.date),
+      });
+    }
     
     const holiday = await prisma.holiday.create({
       data: {
-        name,
-        date: new Date(date),
+        name: cleanName,
+        date: safeDate,
         locationId: targetLocationId,
         departmentId,
         isRecurring: isRecurring || false,
@@ -191,7 +274,10 @@ router.post('/', async (req: AuthRequest, res) => {
     });
     
     cacheService.invalidateHolidays();
-    res.status(201).json(holiday);
+    res.status(201).json({
+      ...holiday,
+      date: formatHolidayDate(holiday.date),
+    });
   } catch (error) {
     console.error('Create holiday error:', error);
     res.status(500).json({ error: 'Failed to create holiday' });

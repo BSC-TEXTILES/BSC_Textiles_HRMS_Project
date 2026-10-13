@@ -15,23 +15,53 @@ export interface BscHoliday {
   isRecurring?: boolean;
 }
 
+// Helper to normalize any date string or Date object to YYYY-MM-DD in India / local time
+function normalizeHolidayDate(rawDate: any): string {
+  if (!rawDate) return '';
+  if (typeof rawDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+    return rawDate;
+  }
+  const d = new Date(rawDate);
+  if (isNaN(d.getTime())) {
+    return String(rawDate).split('T')[0];
+  }
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(d);
+  } catch {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+}
+
 // Canonical Karnataka & BSC Textiles Industrial Statutory Holiday Baseline
 const DEFAULT_BSC_HOLIDAYS: BscHoliday[] = [
-  { id: 'h-1', name: 'Makara Sankranti / Pongal', date: '2025-01-15', description: 'Karnataka State Harvest Festival', type: 'MANDATORY' },
-  { id: 'h-2', name: 'Republic Day', date: '2025-01-26', description: 'National Holiday (Full Paid Gazetted)', type: 'NATIONAL' },
-  { id: 'h-3', name: 'Maha Shivaratri', date: '2025-02-26', description: 'State Gazetted Spiritual Festival', type: 'MANDATORY' },
-  { id: 'h-4', name: 'Ugadi (Kannada New Year)', date: '2025-03-30', description: 'Karnataka State Gazetted New Year', type: 'MANDATORY' },
-  { id: 'h-5', name: 'May Day (Labour Day)', date: '2025-05-01', description: 'International Workers & Mill Craftsmen Day', type: 'NATIONAL' },
-  { id: 'h-6', name: 'Bakrid / Eid-ul-Adha', date: '2025-06-07', description: 'Gazetted Public Festival', type: 'MANDATORY' },
-  { id: 'h-7', name: 'Independence Day', date: '2025-08-15', description: 'National Holiday (Full Paid Gazetted)', type: 'NATIONAL' },
-  { id: 'h-8', name: 'Ganesh Chaturthi', date: '2025-08-27', description: 'Regional Festival of Belagavi & Karnataka', type: 'MANDATORY' },
-  { id: 'h-9', name: 'Gandhi Jayanti', date: '2025-10-02', description: 'National Holiday (Full Paid Gazetted)', type: 'NATIONAL' },
-  { id: 'h-10', name: 'Ayudha Puja (Machinery Sanctification)', date: '2025-10-01', description: 'Textile Loom & Machinery Puja (Karnataka Act)', type: 'MANDATORY' },
-  { id: 'h-11', name: 'Vijayadashami (Dussehra)', date: '2025-10-02', description: 'Mysuru & Karnataka State Festival', type: 'MANDATORY' },
-  { id: 'h-12', name: 'Deepavali / Naraka Chaturdashi', date: '2025-10-20', description: 'Diwali Festive Bonus Day for Mill Staff', type: 'MANDATORY' },
-  { id: 'h-13', name: 'Kannada Rajyotsava', date: '2025-11-01', description: 'Karnataka State Formation Day (Mandatory Paid)', type: 'STATE' },
-  { id: 'h-14', name: 'Kanakadasa Jayanti', date: '2025-11-08', description: 'Karnataka State Declared Public Holiday', type: 'STATE' },
-  { id: 'h-15', name: 'Christmas Day', date: '2025-12-25', description: 'National Statutory Declared Holiday', type: 'NATIONAL' },
+  // 2025
+  { id: 'h-25-1', name: 'Makara Sankranti / Pongal', date: '2025-01-15', description: 'Karnataka State Harvest Festival', type: 'MANDATORY' },
+  { id: 'h-25-2', name: 'Republic Day', date: '2025-01-26', description: 'National Holiday (Full Paid Gazetted)', type: 'NATIONAL' },
+  { id: 'h-25-3', name: 'Ugadi (Kannada New Year)', date: '2025-03-30', description: 'Karnataka State Gazetted New Year', type: 'MANDATORY' },
+  { id: 'h-25-4', name: 'May Day (Labour Day)', date: '2025-05-01', description: 'International Workers & Mill Craftsmen Day', type: 'NATIONAL' },
+  { id: 'h-25-5', name: 'Independence Day', date: '2025-08-15', description: 'National Holiday (Full Paid Gazetted)', type: 'NATIONAL' },
+  { id: 'h-25-6', name: 'Ganesh Chaturthi', date: '2025-08-27', description: 'Regional Festival of Belagavi & Karnataka', type: 'MANDATORY' },
+  { id: 'h-25-7', name: 'Ayudha Puja (Machinery Sanctification)', date: '2025-10-01', description: 'Textile Loom & Machinery Puja (Karnataka Act)', type: 'MANDATORY' },
+  { id: 'h-25-8', name: 'Gandhi Jayanti', date: '2025-10-02', description: 'National Holiday (Full Paid Gazetted)', type: 'NATIONAL' },
+  { id: 'h-25-9', name: 'Deepavali / Naraka Chaturdashi', date: '2025-10-20', description: 'Diwali Festive Bonus Day for Mill Staff', type: 'MANDATORY' },
+  { id: 'h-25-10', name: 'Kannada Rajyotsava', date: '2025-11-01', description: 'Karnataka State Formation Day (Mandatory Paid)', type: 'STATE' },
+  { id: 'h-25-11', name: 'Christmas Day', date: '2025-12-25', description: 'National Statutory Declared Holiday', type: 'NATIONAL' },
+
+  // 2026
+  { id: 'h-26-1', name: 'Makara Sankranti / Pongal', date: '2026-01-15', description: 'Karnataka State Harvest Festival', type: 'MANDATORY' },
+  { id: 'h-26-2', name: 'Republic Day', date: '2026-01-26', description: 'National Holiday (Full Paid Gazetted)', type: 'NATIONAL' },
+  { id: 'h-26-3', name: 'Ugadi (Kannada New Year)', date: '2026-03-19', description: 'Karnataka State Gazetted New Year', type: 'MANDATORY' },
+  { id: 'h-26-4', name: 'May Day (Labour Day)', date: '2026-05-01', description: 'International Workers & Mill Craftsmen Day', type: 'NATIONAL' },
+  { id: 'h-26-5', name: 'Independence Day', date: '2026-08-15', description: 'National Holiday (Full Paid Gazetted)', type: 'NATIONAL' },
+  { id: 'h-26-6', name: 'Ganesh Chaturthi', date: '2026-09-14', description: 'Regional Festival of Belagavi & Karnataka', type: 'MANDATORY' },
+  { id: 'h-26-7', name: 'Gandhi Jayanti', date: '2026-10-02', description: 'National Holiday (Full Paid Gazetted)', type: 'NATIONAL' },
+  { id: 'h-26-8', name: 'Ayudha Puja (Machinery Sanctification)', date: '2026-10-19', description: 'Textile Loom & Machinery Puja (Karnataka Act)', type: 'MANDATORY' },
+  { id: 'h-26-9', name: 'Kannada Rajyotsava', date: '2026-11-01', description: 'Karnataka State Formation Day (Mandatory Paid)', type: 'STATE' },
+  { id: 'h-26-10', name: 'Deepavali / Naraka Chaturdashi', date: '2026-11-08', description: 'Diwali Festive Bonus Day for Mill Staff', type: 'MANDATORY' },
+  { id: 'h-26-11', name: 'Christmas Day', date: '2026-12-25', description: 'National Statutory Declared Holiday', type: 'NATIONAL' },
 ];
 
 export function BscHolidaysCalendar() {
@@ -67,13 +97,23 @@ export function BscHolidaysCalendar() {
       const res = await api.get('/holidays?limit=100');
       const list = res.data?.holidays || res.data || [];
       if (Array.isArray(list) && list.length > 0) {
-        // Normalize dates to YYYY-MM-DD
+        // Normalize dates and deduplicate by name + date
         const formatted = list.map((item: any) => ({
           ...item,
-          date: item.date ? item.date.split('T')[0] : '',
+          date: normalizeHolidayDate(item.date),
           type: item.type || 'MANDATORY',
         }));
-        setHolidays(formatted);
+
+        // Strict deduplication map
+        const map = new Map<string, BscHoliday>();
+        for (const item of formatted) {
+          if (!item.date) continue;
+          const key = `${item.name.trim().toLowerCase()}_${item.date}`;
+          if (!map.has(key)) {
+            map.set(key, item);
+          }
+        }
+        setHolidays(Array.from(map.values()));
       } else {
         setHolidays(DEFAULT_BSC_HOLIDAYS);
       }
@@ -115,26 +155,46 @@ export function BscHolidaysCalendar() {
     return `${year}-${m}-${d}`;
   };
 
-  // Holiday map for O(1) lookup
-  const holidayMap = new Map<string, BscHoliday>();
-  holidays.forEach((h) => {
-    if (h.date) {
-      holidayMap.set(h.date, h);
+  // Deduplicate holidays: unique by normalized name and date
+  const deduplicatedHolidays = React.useMemo(() => {
+    const map = new Map<string, BscHoliday>();
+    for (const h of holidays) {
+      if (!h.date) continue;
+      const key = `${h.name.trim().toLowerCase()}_${h.date}`;
+      if (!map.has(key)) {
+        map.set(key, h);
+      }
     }
-  });
+    return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }, [holidays]);
+
+  // Holiday map for O(1) lookup
+  const holidayMap = React.useMemo(() => {
+    const map = new Map<string, BscHoliday>();
+    deduplicatedHolidays.forEach((h) => {
+      if (h.date) {
+        map.set(h.date, h);
+      }
+    });
+    return map;
+  }, [deduplicatedHolidays]);
 
   // Filtered list of holidays
-  const todayStr = new Date().toISOString().split('T')[0];
-  const filteredHolidays = holidays.filter((h) => {
+  const todayStr = React.useMemo(() => normalizeHolidayDate(new Date()), []);
+  const filteredHolidays = React.useMemo(() => {
+    const yearStr = String(currentYear);
+    const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+
     if (filterView === 'UPCOMING') {
-      return h.date >= todayStr;
+      return deduplicatedHolidays.filter((h) => h.date >= todayStr);
     }
     if (filterView === 'MONTH') {
-      const ym = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
-      return h.date.startsWith(ym);
+      return deduplicatedHolidays.filter((h) => h.date.startsWith(monthStr));
     }
-    return true;
-  }).sort((a, b) => a.date.localeCompare(b.date));
+    // 'ALL' -> All Year (all holidays in current viewed calendar year)
+    const inYear = deduplicatedHolidays.filter((h) => h.date.startsWith(yearStr));
+    return inYear.length > 0 ? inYear : deduplicatedHolidays;
+  }, [deduplicatedHolidays, filterView, todayStr, currentYear, currentMonth]);
 
   // 1. Download Sample CSV Template
   const handleDownloadTemplate = () => {
@@ -266,7 +326,7 @@ export function BscHolidaysCalendar() {
       if (fileInputRef.current) fileInputRef.current.value = '';
       fetchHolidays();
     } catch {
-      // Fallback: merge into state for full offline / mock demo reliability
+      // Fallback: merge into state with deduplication
       const newItems = parsedCsvRows.map((r, i) => ({
         id: `csv-${Date.now()}-${i}`,
         name: r.name,
@@ -274,7 +334,14 @@ export function BscHolidaysCalendar() {
         type: r.type,
         description: r.description || 'Uploaded via HR CSV Batch',
       }));
-      setHolidays((prev) => [...prev, ...newItems]);
+      setHolidays((prev) => {
+        const map = new Map<string, BscHoliday>();
+        [...prev, ...newItems].forEach((item) => {
+          const key = `${item.name.trim().toLowerCase()}_${item.date}`;
+          if (!map.has(key)) map.set(key, item);
+        });
+        return Array.from(map.values());
+      });
       toast.success(`Imported ${parsedCsvRows.length} BSC Holidays to Annual Calendar!`);
       setIsUploadModalOpen(false);
       setParsedCsvRows([]);
@@ -297,16 +364,21 @@ export function BscHolidaysCalendar() {
       setNewHoli({ name: '', date: '', type: 'MANDATORY', description: '' });
       fetchHolidays();
     } catch {
-      setHolidays((prev) => [
-        ...prev,
-        {
-          id: `h-single-${Date.now()}`,
-          name: newHoli.name,
-          date: newHoli.date,
-          type: newHoli.type,
-          description: newHoli.description || 'Statutory Declared Holiday',
-        },
-      ]);
+      const newItem = {
+        id: `h-single-${Date.now()}`,
+        name: newHoli.name.trim(),
+        date: newHoli.date,
+        type: newHoli.type,
+        description: newHoli.description || 'Statutory Declared Holiday',
+      };
+      setHolidays((prev) => {
+        const map = new Map<string, BscHoliday>();
+        [...prev, newItem].forEach((item) => {
+          const key = `${item.name.trim().toLowerCase()}_${item.date}`;
+          if (!map.has(key)) map.set(key, item);
+        });
+        return Array.from(map.values());
+      });
       toast.success('BSC Holiday registered into operational roster!');
       setIsAddModalOpen(false);
       setNewHoli({ name: '', date: '', type: 'MANDATORY', description: '' });
@@ -464,12 +536,16 @@ export function BscHolidaysCalendar() {
                 <div className="font-bold text-[#0b1c30] dark:text-slate-100">{selectedHoliday.name}</div>
                 <div className="text-[10px] text-slate-500 dark:text-slate-400">{selectedHoliday.description || 'Statutory Gazetted Holiday'}</div>
                 <div className="text-[10px] text-[#0058be] dark:text-blue-400 font-mono mt-0.5">
-                  {new Date(selectedHoliday.date).toLocaleDateString('en-IN', {
-                    weekday: 'short',
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                  })}
+                  {(() => {
+                    const [sy, sm, sd] = selectedHoliday.date.split('-').map(Number);
+                    const sDate = new Date(sy, sm - 1, sd);
+                    return sDate.toLocaleDateString('en-IN', {
+                      weekday: 'short',
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    });
+                  })()}
                 </div>
               </div>
             </div>
@@ -539,8 +615,9 @@ export function BscHolidaysCalendar() {
             </div>
           ) : (
             filteredHolidays.map((item) => {
-              const d = new Date(item.date);
-              const day = d.getDate();
+              const [y, m, dNum] = item.date.split('-').map(Number);
+              const d = new Date(y, m - 1, dNum);
+              const day = dNum;
               const month = d.toLocaleDateString('en-IN', { month: 'short' }).toUpperCase();
               const weekday = d.toLocaleDateString('en-IN', { weekday: 'short' });
               const isPast = item.date < todayStr;
