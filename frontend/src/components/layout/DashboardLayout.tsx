@@ -81,27 +81,27 @@ function getBadgeClasses(badgeText: string, isActive: boolean) {
   if (isActive) return 'bg-white/20 text-white font-bold';
   switch (badgeText) {
     case 'Live ID':
-      return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800';
+      return 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 font-bold';
     case 'Dossier':
-      return 'bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-300 dark:border-teal-800';
+      return 'bg-teal-500/20 text-teal-300 border border-teal-400/40';
     case 'Settlement':
-      return 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800';
+      return 'bg-amber-500/20 text-amber-300 border border-amber-400/40';
     case 'DigiLocker':
-      return 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-300 dark:border-sky-800';
+      return 'bg-sky-500/20 text-sky-300 border border-sky-400/40';
     case 'UIDAI':
-      return 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300 dark:border-purple-800';
+      return 'bg-purple-500/20 text-purple-300 border border-purple-400/40';
     case 'Scanner':
-      return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800';
+      return 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40';
     case 'Daily':
-      return 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-300 dark:border-blue-800';
+      return 'bg-blue-500/20 text-blue-300 border border-blue-400/40';
     case 'Policy':
-      return 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800';
+      return 'bg-rose-500/20 text-rose-300 border border-rose-400/40';
     case 'SQLite':
-      return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800';
+      return 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40';
     case 'RBAC':
-      return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800';
+      return 'bg-indigo-500/20 text-indigo-300 border border-indigo-400/40';
     default:
-      return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700';
+      return 'bg-white/10 text-blue-100 border border-white/15';
   }
 }
 
@@ -109,11 +109,11 @@ const enterpriseNavigation: NavSectionConfig[] = [
   {
     title: 'Core Operations',
     theme: {
-      color: 'text-blue-700 dark:text-blue-400',
-      dotColor: 'bg-blue-600',
-      activeGradient: 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm shadow-blue-500/25',
-      hoverColor: 'hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50/80 dark:hover:bg-blue-950/40',
-      iconColor: 'text-blue-500/80 dark:text-blue-400/80 group-hover:text-blue-600 dark:group-hover:text-blue-300',
+      color: 'text-sky-300',
+      dotColor: 'bg-sky-400',
+      activeGradient: 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/30 border-l-[3.5px] border-sky-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-sky-300/80 group-hover:text-white',
     },
     items: [
       { title: 'Executive Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -123,11 +123,11 @@ const enterpriseNavigation: NavSectionConfig[] = [
   {
     title: 'Workforce Directory',
     theme: {
-      color: 'text-emerald-700 dark:text-emerald-400',
-      dotColor: 'bg-emerald-600',
-      activeGradient: 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm shadow-emerald-500/25',
-      hoverColor: 'hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-50/80 dark:hover:bg-emerald-950/40',
-      iconColor: 'text-emerald-500/80 dark:text-emerald-400/80 group-hover:text-emerald-600 dark:group-hover:text-emerald-300',
+      color: 'text-emerald-300',
+      dotColor: 'bg-emerald-400',
+      activeGradient: 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/30 border-l-[3.5px] border-emerald-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-emerald-300/80 group-hover:text-white',
     },
     items: [
       { title: 'All Employees', href: '/employees', icon: Users },
@@ -140,11 +140,11 @@ const enterpriseNavigation: NavSectionConfig[] = [
   {
     title: 'KYC & DigiLocker',
     theme: {
-      color: 'text-purple-700 dark:text-purple-400',
-      dotColor: 'bg-purple-600',
-      activeGradient: 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-sm shadow-purple-500/25',
-      hoverColor: 'hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50/80 dark:hover:bg-purple-950/40',
-      iconColor: 'text-purple-500/80 dark:text-purple-400/80 group-hover:text-purple-600 dark:group-hover:text-purple-300',
+      color: 'text-purple-300',
+      dotColor: 'bg-purple-400',
+      activeGradient: 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-md shadow-purple-500/30 border-l-[3.5px] border-purple-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-purple-300/80 group-hover:text-white',
     },
     items: [
       { title: 'KYC Verification', href: '/operations/kyc', icon: ShieldCheck, badge: 'DigiLocker' },
@@ -154,11 +154,11 @@ const enterpriseNavigation: NavSectionConfig[] = [
   {
     title: 'QR Code Attendance',
     theme: {
-      color: 'text-cyan-700 dark:text-cyan-400',
-      dotColor: 'bg-cyan-600',
-      activeGradient: 'bg-gradient-to-r from-cyan-600 to-sky-600 text-white shadow-sm shadow-cyan-500/25',
-      hoverColor: 'hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-cyan-50/80 dark:hover:bg-cyan-950/40',
-      iconColor: 'text-cyan-500/80 dark:text-cyan-400/80 group-hover:text-cyan-600 dark:group-hover:text-cyan-300',
+      color: 'text-cyan-300',
+      dotColor: 'bg-cyan-400',
+      activeGradient: 'bg-gradient-to-r from-cyan-600 to-sky-600 text-white shadow-md shadow-cyan-500/30 border-l-[3.5px] border-cyan-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-cyan-300/80 group-hover:text-white',
     },
     items: [
       { title: 'Digital QR Passes', href: '/attendance/qr-codes', icon: QrCode, badge: 'Live ID' },
@@ -168,11 +168,11 @@ const enterpriseNavigation: NavSectionConfig[] = [
   {
     title: 'Time & Attendance',
     theme: {
-      color: 'text-amber-700 dark:text-amber-400',
-      dotColor: 'bg-amber-600',
-      activeGradient: 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-sm shadow-amber-500/25',
-      hoverColor: 'hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50/80 dark:hover:bg-amber-950/40',
-      iconColor: 'text-amber-500/80 dark:text-amber-400/80 group-hover:text-amber-600 dark:group-hover:text-amber-300',
+      color: 'text-amber-300',
+      dotColor: 'bg-amber-400',
+      activeGradient: 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md shadow-amber-500/30 border-l-[3.5px] border-amber-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-amber-300/80 group-hover:text-white',
     },
     items: [
       { title: 'Biometric Punches', href: '/attendance/punches', icon: Fingerprint },
@@ -188,11 +188,11 @@ const enterpriseNavigation: NavSectionConfig[] = [
   {
     title: 'Payroll Management',
     theme: {
-      color: 'text-[#722F37] dark:text-rose-400',
-      dotColor: 'bg-[#722F37]',
-      activeGradient: 'bg-gradient-to-r from-[#722F37] to-[#991B1B] text-white shadow-sm shadow-rose-900/25',
-      hoverColor: 'hover:text-[#722F37] dark:hover:text-rose-300 hover:bg-rose-50/80 dark:hover:bg-rose-950/40',
-      iconColor: 'text-rose-600/80 dark:text-rose-400/80 group-hover:text-[#722F37] dark:group-hover:text-rose-300',
+      color: 'text-rose-300',
+      dotColor: 'bg-rose-400',
+      activeGradient: 'bg-gradient-to-r from-[#722F37] to-[#991B1B] text-white shadow-md shadow-rose-900/30 border-l-[3.5px] border-rose-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-rose-300/80 group-hover:text-white',
     },
     items: [
       { title: 'Payroll Dashboard', href: '/payroll', icon: Banknote },
@@ -204,11 +204,11 @@ const enterpriseNavigation: NavSectionConfig[] = [
   {
     title: 'Leave & Incentives',
     theme: {
-      color: 'text-fuchsia-700 dark:text-fuchsia-400',
-      dotColor: 'bg-fuchsia-600',
-      activeGradient: 'bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white shadow-sm shadow-fuchsia-500/25',
-      hoverColor: 'hover:text-fuchsia-700 dark:hover:text-fuchsia-300 hover:bg-fuchsia-50/80 dark:hover:bg-fuchsia-950/40',
-      iconColor: 'text-fuchsia-500/80 dark:text-fuchsia-400/80 group-hover:text-fuchsia-600 dark:group-hover:text-fuchsia-300',
+      color: 'text-fuchsia-300',
+      dotColor: 'bg-fuchsia-400',
+      activeGradient: 'bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white shadow-md shadow-fuchsia-500/30 border-l-[3.5px] border-fuchsia-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-fuchsia-300/80 group-hover:text-white',
     },
     items: [
       { title: 'Leave Approvals', href: '/leaves', icon: CalendarClock },
@@ -218,11 +218,11 @@ const enterpriseNavigation: NavSectionConfig[] = [
   {
     title: 'Operations & Audits',
     theme: {
-      color: 'text-indigo-700 dark:text-indigo-400',
-      dotColor: 'bg-indigo-600',
-      activeGradient: 'bg-gradient-to-r from-indigo-600 to-slate-700 text-white shadow-sm shadow-indigo-500/25',
-      hoverColor: 'hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/40',
-      iconColor: 'text-indigo-500/80 dark:text-indigo-400/80 group-hover:text-indigo-600 dark:group-hover:text-indigo-300',
+      color: 'text-indigo-300',
+      dotColor: 'bg-indigo-400',
+      activeGradient: 'bg-gradient-to-r from-indigo-600 to-slate-700 text-white shadow-md shadow-indigo-500/30 border-l-[3.5px] border-indigo-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-indigo-300/80 group-hover:text-white',
     },
     items: [
       { title: 'Face Verification', href: '/operations/face-verification', icon: ScanFace },
@@ -463,22 +463,22 @@ export function DashboardLayout({
       <aside 
         className={`fixed left-0 top-0 h-full ${
           isCollapsed ? 'w-20' : 'w-64'
-        } bg-white dark:bg-[#090f1d] border-r border-slate-200/90 dark:border-[#152038] text-slate-700 dark:text-slate-200 shadow-sm z-50 flex flex-col justify-between overflow-y-auto no-scrollbar hidden lg:flex transition-all duration-200 ease-in-out`}
+        } bg-[#00224d] dark:bg-[#001736] border-r border-[#003882]/80 dark:border-[#002860] text-slate-100 shadow-xl z-50 flex flex-col justify-between overflow-y-auto no-scrollbar hidden lg:flex transition-all duration-200 ease-in-out`}
       >
         <div className="flex flex-col">
           {/* Top Logo Brand Header */}
           <div className={`h-14 flex items-center ${
             isCollapsed ? 'justify-center px-2' : 'px-4'
-          } bg-white dark:bg-[#090f1d] border-b border-slate-200/80 dark:border-[#152038] flex-shrink-0 transition-all`}>
+          } bg-[#001b3d] dark:bg-[#001128] border-b border-[#003882]/80 dark:border-[#002860] flex-shrink-0 transition-all`}>
             <div className={`flex items-center overflow-hidden ${isCollapsed ? '' : 'gap-2.5'}`}>
-              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 p-1 flex items-center justify-center shrink-0 border border-slate-200 dark:border-slate-700 overflow-hidden">
+              <div className="w-8 h-8 rounded-full bg-white/10 dark:bg-white/10 p-1 flex items-center justify-center shrink-0 border border-white/20 dark:border-white/20 overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/images/bsc_logo.png" alt="BSC Textiles" className="w-full h-full object-contain" />
               </div>
               {!isCollapsed && (
                 <div className="flex flex-col leading-tight truncate">
-                  <span className="text-[14px] font-bold tracking-tight text-[#0b1c30] dark:text-white truncate">BSC Textiles</span>
-                  <span className="text-[9px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400">Since 1938</span>
+                  <span className="text-[14px] font-bold tracking-tight text-white truncate">BSC Textiles</span>
+                  <span className="text-[9px] font-semibold tracking-wider uppercase text-blue-200/80">Since 1938</span>
                 </div>
               )}
             </div>
@@ -515,8 +515,8 @@ export function DashboardLayout({
                             isCollapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2'
                           } rounded-xl text-xs transition-all duration-150 ${
                             isActive
-                              ? `${theme.activeGradient} font-semibold shadow-sm`
-                              : `text-slate-600 dark:text-slate-300 ${theme.hoverColor} font-medium`
+                              ? `${theme.activeGradient} font-semibold shadow-md`
+                              : `text-blue-100/85 hover:text-white ${theme.hoverColor} font-medium`
                           }`}
                         >
                           <IconComponent className={`w-4 h-4 flex-shrink-0 transition-all duration-150 ${
@@ -525,7 +525,7 @@ export function DashboardLayout({
                           {!isCollapsed && <span className="truncate flex-1">{item.title}</span>}
                           {!isCollapsed && item.badge && (
                             <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${getBadgeClasses(item.badge, isActive)}`}>
-                              {item.badge === 'Live ID' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block mr-1" />}
+                              {item.badge === 'Live ID' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block mr-1" />}
                               {item.badge}
                             </span>
                           )}
@@ -540,28 +540,28 @@ export function DashboardLayout({
         </div>
 
         {/* Bottom Application Meta & Sign Out */}
-        <div className="p-3 border-t border-slate-200/90 dark:border-[#152038] bg-slate-50/70 dark:bg-[#070d18] space-y-2.5">
+        <div className="p-3 border-t border-[#003882]/80 dark:border-[#002860] bg-[#001b3d]/90 dark:bg-[#001128]/90 space-y-2.5">
           {!isCollapsed ? (
-            <div className="p-3 rounded-xl bg-gradient-to-br from-[#722F37]/10 via-rose-500/5 to-indigo-950/10 dark:from-[#722F37]/30 dark:via-rose-950/20 dark:to-slate-900/60 border border-rose-200/80 dark:border-rose-900/40 shadow-xs relative overflow-hidden group">
-              <div className="absolute top-0 right-0 w-20 h-20 bg-rose-500/10 rounded-full blur-xl pointer-events-none group-hover:bg-rose-500/15 transition-all" />
+            <div className="p-3 rounded-xl bg-white/5 border border-white/10 shadow-xs relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-blue-500/10 rounded-full blur-xl pointer-events-none group-hover:bg-blue-500/20 transition-all" />
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[11.5px] font-bold text-[#722F37] dark:text-rose-300 tracking-tight">
+                <span className="text-[11.5px] font-bold text-white tracking-tight">
                   BSC Textiles Pvt. Ltd.
                 </span>
-                <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-full border border-emerald-300/60 dark:border-emerald-800/60">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-300 bg-emerald-950/80 px-1.5 py-0.5 rounded-full border border-emerald-500/40">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   Live Hub
                 </span>
               </div>
               <div className="flex items-center justify-between text-[10px]">
-                <span className="text-slate-600 dark:text-slate-400 font-medium">Davangere HQ</span>
-                <span className="font-mono font-bold text-amber-800 dark:text-amber-300 bg-amber-100/80 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-300/60 dark:border-amber-800/60">
+                <span className="text-blue-200/80 font-medium">Davangere HQ</span>
+                <span className="font-mono font-bold text-amber-300 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-500/40">
                   HRMS Enterprise v2.4
                 </span>
               </div>
             </div>
           ) : (
-            <div className="text-center py-1.5 px-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 text-[9px] font-bold text-[#722F37] dark:text-rose-300 font-mono shadow-xs" title="BSC Textiles HRMS Enterprise v2.4">
+            <div className="text-center py-1.5 px-1 rounded-lg bg-white/10 border border-white/15 text-[9px] font-bold text-blue-200 font-mono shadow-xs" title="BSC Textiles HRMS Enterprise v2.4">
               v2.4
             </div>
           )}
@@ -570,10 +570,10 @@ export function DashboardLayout({
             onClick={handleSignOut}
             className={`w-full flex items-center justify-center ${
               isCollapsed ? 'p-2' : 'gap-2 px-3 py-2'
-            } rounded-xl text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-900/50 hover:bg-gradient-to-r hover:from-rose-600 hover:to-red-600 hover:text-white hover:border-transparent hover:shadow-md hover:shadow-rose-600/20 active:scale-[0.98] transition-all duration-200 group`}
+            } rounded-xl text-xs font-bold text-rose-200 bg-rose-500/15 border border-rose-400/30 hover:bg-gradient-to-r hover:from-rose-600 hover:to-red-600 hover:text-white hover:border-transparent hover:shadow-md hover:shadow-rose-600/30 active:scale-[0.98] transition-all duration-200 group`}
             title={isCollapsed ? "Sign Out" : undefined}
           >
-            <LogOut className="w-4 h-4 text-rose-600 dark:text-rose-400 group-hover:text-white transition-transform group-hover:-translate-x-0.5" />
+            <LogOut className="w-4 h-4 text-rose-300 group-hover:text-white transition-transform group-hover:-translate-x-0.5" />
             {!isCollapsed && <span>Sign Out</span>}
           </button>
         </div>
@@ -583,24 +583,24 @@ export function DashboardLayout({
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
-          <div className="relative w-64 bg-white dark:bg-[#090f1d] h-full shadow-2xl flex flex-col justify-between overflow-y-auto no-scrollbar z-10 border-r border-slate-200 dark:border-[#152038] text-slate-700 dark:text-slate-200">
+          <div className="relative w-64 bg-[#00224d] dark:bg-[#001736] h-full shadow-2xl flex flex-col justify-between overflow-y-auto no-scrollbar z-10 border-r border-[#003882]/80 text-slate-100">
             <div>
-              <div className="h-14 flex items-center justify-between px-4 bg-white dark:bg-[#090f1d] border-b border-slate-200 dark:border-[#152038]">
+              <div className="h-14 flex items-center justify-between px-4 bg-[#001b3d] dark:bg-[#001128] border-b border-[#003882]/80">
                 <div className="flex items-center gap-2">
                   <Logo variant="icon" size="sm" />
                   <div className="flex flex-col leading-none">
-                    <span className="font-bold text-sm text-[#0b1c30] dark:text-white">BSC Textiles</span>
-                    <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Since 1938</span>
+                    <span className="font-bold text-sm text-white">BSC Textiles</span>
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-blue-200/80">Since 1938</span>
                   </div>
                 </div>
-                <button onClick={() => setMobileMenuOpen(false)} className="p-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-white">
+                <button onClick={() => setMobileMenuOpen(false)} className="p-1 text-blue-200 hover:text-white">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Mobile Theme Toggle */}
-              <div className="p-2.5 mx-3 my-2 rounded-lg bg-slate-50 dark:bg-[#0e172a] border border-slate-200 dark:border-[#1e2d4d] flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Theme</span>
+              <div className="p-2.5 mx-3 my-2 rounded-lg bg-white/5 border border-white/10 flex items-center justify-between">
+                <span className="text-xs font-semibold text-blue-100">Theme</span>
                 <ThemeToggle showLabel={true} size="sm" />
               </div>
 
@@ -625,15 +625,15 @@ export function DashboardLayout({
                               onClick={() => setMobileMenuOpen(false)}
                               className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-all ${
                                 isItemActive 
-                                  ? `${theme.activeGradient} font-semibold shadow-sm` 
-                                  : `text-slate-600 dark:text-slate-300 ${theme.hoverColor} font-medium`
+                                  ? `${theme.activeGradient} font-semibold shadow-md` 
+                                  : `text-blue-100/85 hover:text-white ${theme.hoverColor} font-medium`
                               }`}
                             >
                               <IconComp className={`w-4 h-4 ${isItemActive ? 'text-white' : `${theme.iconColor}`}`} />
                               <span className="flex-1 truncate">{i.title}</span>
                               {i.badge && (
                                 <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${getBadgeClasses(i.badge, isItemActive)}`}>
-                                  {i.badge === 'Live ID' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block mr-1" />}
+                                  {i.badge === 'Live ID' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse inline-block mr-1" />}
                                   {i.badge}
                                 </span>
                               )}
@@ -648,20 +648,20 @@ export function DashboardLayout({
             </div>
 
             {/* Mobile Footer & Sign Out */}
-            <div className="p-3 border-t border-slate-200 dark:border-[#152038] bg-slate-50/70 dark:bg-[#070d18] space-y-2.5">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-[#722F37]/10 via-rose-500/5 to-indigo-950/10 dark:from-[#722F37]/30 dark:via-rose-950/20 dark:to-slate-900/60 border border-rose-200/80 dark:border-rose-900/40 shadow-xs">
+            <div className="p-3 border-t border-[#003882]/80 dark:border-[#002860] bg-[#001b3d]/90 dark:bg-[#001128]/90 space-y-2.5">
+              <div className="p-3 rounded-xl bg-white/5 border border-white/10 shadow-xs">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[11.5px] font-bold text-[#722F37] dark:text-rose-300">
+                  <span className="text-[11.5px] font-bold text-white">
                     BSC Textiles Pvt. Ltd.
                   </span>
-                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-full border border-emerald-300/60 dark:border-emerald-800/60">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-300 bg-emerald-950/80 px-1.5 py-0.5 rounded-full border border-emerald-500/40">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     Live Hub
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-[10px]">
-                  <span className="text-slate-600 dark:text-slate-400 font-medium">Davangere HQ</span>
-                  <span className="font-mono font-bold text-amber-800 dark:text-amber-300 bg-amber-100/80 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-300/60 dark:border-amber-800/60">
+                  <span className="text-blue-200/80 font-medium">Davangere HQ</span>
+                  <span className="font-mono font-bold text-amber-300 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-500/40">
                     HRMS Enterprise v2.4
                   </span>
                 </div>
@@ -669,9 +669,9 @@ export function DashboardLayout({
 
               <button
                 onClick={handleSignOut}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-900/50 hover:bg-gradient-to-r hover:from-rose-600 hover:to-red-600 hover:text-white hover:border-transparent hover:shadow-md hover:shadow-rose-600/20 active:scale-[0.98] transition-all duration-200 group"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-rose-200 bg-rose-500/15 border border-rose-400/30 hover:bg-gradient-to-r hover:from-rose-600 hover:to-red-600 hover:text-white hover:border-transparent hover:shadow-md hover:shadow-rose-600/30 active:scale-[0.98] transition-all duration-200 group"
               >
-                <LogOut className="w-4 h-4 text-rose-600 dark:text-rose-400 group-hover:text-white transition-transform group-hover:-translate-x-0.5" />
+                <LogOut className="w-4 h-4 text-rose-300 group-hover:text-white transition-transform group-hover:-translate-x-0.5" />
                 <span>Sign Out</span>
               </button>
             </div>
