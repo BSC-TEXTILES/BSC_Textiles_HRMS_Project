@@ -1,0 +1,15 @@
+$kind: http-request
+order: 1000
+method: GET
+url: '{{base_url}}/notifications'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Returns notifications data", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.be.an("object");
+      });

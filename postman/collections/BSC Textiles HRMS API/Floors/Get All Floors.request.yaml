@@ -1,0 +1,23 @@
+$kind: http-request
+order: 1000
+method: GET
+url: '{{base_url}}/floors'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Returns valid JSON", function () {
+          pm.response.to.be.json;
+      });
+      pm.test("Response has floors array", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.be.an('object');
+          const floors = json.floors || json.data || json;
+          pm.expect(floors).to.be.an('array');
+          if (Array.isArray(floors) && floors.length > 0) {
+              pm.environment.set('floor_id', floors[0].id);
+          }
+      });

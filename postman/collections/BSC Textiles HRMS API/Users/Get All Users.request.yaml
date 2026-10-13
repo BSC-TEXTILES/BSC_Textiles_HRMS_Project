@@ -1,0 +1,30 @@
+$kind: http-request
+order: 1000
+method: GET
+url: '{{base_url}}/users'
+queryParams:
+  - key: page
+    value: '1'
+  - key: limit
+    value: '20'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Returns valid JSON", function () {
+          pm.response.to.be.json;
+      });
+      pm.test("Response has users array", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.be.an('object');
+          const users = json.users || json.data || json;
+          pm.expect(users).to.be.an('array');
+      });
+      pm.test("Response has pagination fields", function () {
+          const json = pm.response.json();
+          const hasPagination = json.total !== undefined || json.page !== undefined || json.pagination !== undefined || json.meta !== undefined;
+          pm.expect(hasPagination).to.be.true;
+      });

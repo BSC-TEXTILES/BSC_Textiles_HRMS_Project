@@ -1,0 +1,20 @@
+$kind: http-request
+order: 1000
+method: GET
+url: '{{base_url}}/locations'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Returns locations array", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("locations");
+          pm.expect(json.locations).to.be.an("array");
+      });
+      const json = pm.response.json();
+      if (json.locations && json.locations.length > 0) {
+          pm.environment.set("location_id", json.locations[0].id);
+      }

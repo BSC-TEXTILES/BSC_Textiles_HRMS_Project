@@ -1,0 +1,33 @@
+$kind: http-request
+order: 3000
+method: POST
+url: '{{base_url}}/employees'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "fullName": "Test Employee",
+      "employeeCode": "TEST-001",
+      "email": "test.employee@bsctextiles.com",
+      "phone": "9876543210",
+      "locationId": "{{location_id}}",
+      "departmentId": "{{department_id}}",
+      "shiftId": "{{shift_id}}",
+      "joiningDate": "2024-01-01",
+      "designation": "Staff"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Employee created - status 201", function () {
+          pm.response.to.have.status(201);
+      });
+      pm.test("Created employee has ID", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("id");
+          pm.environment.set("new_employee_id", json.id);
+      });

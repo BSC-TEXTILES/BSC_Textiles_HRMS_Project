@@ -1,0 +1,26 @@
+$kind: http-request
+order: 2000
+method: POST
+url: '{{base_url}}/departments'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Test Department",
+      "code": "TEST",
+      "locationId": "{{location_id}}"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Department created - status 201", function () {
+          pm.response.to.have.status(201);
+      });
+      pm.test("Created department has ID", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("id");
+      });

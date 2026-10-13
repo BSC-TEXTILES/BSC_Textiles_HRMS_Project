@@ -1,0 +1,5 @@
+$kind: collection
+name: My First API
+description: |-
+  A beginner-friendly collection to learn Postman.
+  Contains a sample request with test scripts to get you started.

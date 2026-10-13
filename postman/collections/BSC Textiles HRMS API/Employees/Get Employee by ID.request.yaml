@@ -1,0 +1,18 @@
+$kind: http-request
+order: 2000
+method: GET
+url: '{{base_url}}/employees/{{employee_id}}'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Employee has required fields", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("id");
+          pm.expect(json).to.have.property("fullName");
+          pm.expect(json).to.have.property("employeeCode");
+          pm.expect(json).to.have.property("status");
+      });

@@ -1,0 +1,11 @@
+$kind: http-request
+order: 3000
+method: POST
+url: '{{base_url}}/auth/logout'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Logout successful", function () {
+          pm.response.to.have.status(200);
+      });

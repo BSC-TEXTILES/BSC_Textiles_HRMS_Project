@@ -1,0 +1,37 @@
+name: 'BSC HRMS - Local'
+values:
+  - key: base_url
+    value: 'http://localhost:4000/api/v1'
+    enabled: true
+  - key: base_url_root
+    value: 'http://localhost:4000'
+    enabled: true
+  - key: admin_email
+    value: 'admin@bsctextiles.com'
+    enabled: true
+  - key: admin_password
+    value: ''
+    enabled: true
+    secret: true
+  - key: token
+    value: ''
+    enabled: true
+    secret: true
+  - key: employee_id
+    value: ''
+    enabled: true
+  - key: department_id
+    value: ''
+    enabled: true
+  - key: location_id
+    value: ''
+    enabled: true
+  - key: shift_id
+    value: ''
+    enabled: true
+  - key: section_id
+    value: ''
+    enabled: true
+  - key: new_employee_id
+    value: ''
+    enabled: true

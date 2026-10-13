@@ -1,0 +1,29 @@
+$kind: http-request
+order: 1000
+method: GET
+url: '{{base_url}}/sections'
+queryParams:
+  - key: page
+    value: '1'
+  - key: limit
+    value: '20'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Returns sections array", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("sections");
+          pm.expect(json.sections).to.be.an("array");
+      });
+      pm.test("Has pagination", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("total");
+      });
+      const json = pm.response.json();
+      if (json.sections && json.sections.length > 0) {
+          pm.environment.set("section_id", json.sections[0].id);
+      }

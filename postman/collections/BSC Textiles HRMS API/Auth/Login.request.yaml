@@ -1,0 +1,35 @@
+$kind: http-request
+order: 1000
+method: POST
+url: '{{base_url}}/auth/login'
+auth:
+  type: noauth
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "{{admin_email}}",
+      "password": "{{admin_password}}"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Login successful - status 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Response has token", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("token");
+          pm.expect(json.token).to.be.a("string");
+          pm.environment.set("token", json.token);
+      });
+      pm.test("Response has user object", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("user");
+          pm.expect(json.user).to.have.property("id");
+          pm.expect(json.user).to.have.property("email");
+      });

@@ -1,0 +1,28 @@
+$kind: http-request
+order: 2000
+method: POST
+url: '{{base_url}}/leaves'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "employeeId": "{{employee_id}}",
+      "leaveType": "CASUAL",
+      "startDate": "2024-12-01",
+      "endDate": "2024-12-01",
+      "reason": "Personal work"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Leave applied - status 201", function () {
+          pm.response.to.have.status(201);
+      });
+      pm.test("Leave has ID", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("id");
+      });

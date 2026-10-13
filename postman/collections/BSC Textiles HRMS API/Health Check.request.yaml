@@ -1,0 +1,21 @@
+$kind: http-request
+order: 500
+method: GET
+url: '{{base_url_root}}/health'
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Server is healthy - status 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Health response has status field", function () {
+          const json = pm.response.json();
+          pm.expect(json).to.have.property("status");
+          pm.expect(json.status).to.equal("ok");
+      });
+      pm.test("Response time under 1s", function () {
+          pm.expect(pm.response.responseTime).to.be.below(1000);
+      });
