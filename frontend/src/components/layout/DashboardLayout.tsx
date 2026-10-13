@@ -63,14 +63,58 @@ interface NavItem {
   badge?: string;
 }
 
+interface NavSectionTheme {
+  color: string;
+  dotColor: string;
+  activeGradient: string;
+  hoverColor: string;
+  iconColor: string;
+}
+
 interface NavSectionConfig {
   title: string;
+  theme: NavSectionTheme;
   items: NavItem[];
+}
+
+function getBadgeClasses(badgeText: string, isActive: boolean) {
+  if (isActive) return 'bg-white/20 text-white font-bold';
+  switch (badgeText) {
+    case 'Live ID':
+      return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800';
+    case 'Dossier':
+      return 'bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-300 dark:border-teal-800';
+    case 'Settlement':
+      return 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300 dark:border-amber-800';
+    case 'DigiLocker':
+      return 'bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-300 dark:border-sky-800';
+    case 'UIDAI':
+      return 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-300 dark:border-purple-800';
+    case 'Scanner':
+      return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800';
+    case 'Daily':
+      return 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-300 dark:border-blue-800';
+    case 'Policy':
+      return 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-300 dark:border-rose-800';
+    case 'SQLite':
+      return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800';
+    case 'RBAC':
+      return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-300 dark:border-indigo-800';
+    default:
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700';
+  }
 }
 
 const enterpriseNavigation: NavSectionConfig[] = [
   {
     title: 'Core Operations',
+    theme: {
+      color: 'text-blue-700 dark:text-blue-400',
+      dotColor: 'bg-blue-600',
+      activeGradient: 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm shadow-blue-500/25',
+      hoverColor: 'hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50/80 dark:hover:bg-blue-950/40',
+      iconColor: 'text-blue-500/80 dark:text-blue-400/80 group-hover:text-blue-600 dark:group-hover:text-blue-300',
+    },
     items: [
       { title: 'Executive Dashboard', href: '/dashboard', icon: LayoutDashboard },
       { title: 'My Desk Self-Service', href: '/my-desk', icon: UserCheck },
@@ -78,6 +122,13 @@ const enterpriseNavigation: NavSectionConfig[] = [
   },
   {
     title: 'Workforce Directory',
+    theme: {
+      color: 'text-emerald-700 dark:text-emerald-400',
+      dotColor: 'bg-emerald-600',
+      activeGradient: 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm shadow-emerald-500/25',
+      hoverColor: 'hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-50/80 dark:hover:bg-emerald-950/40',
+      iconColor: 'text-emerald-500/80 dark:text-emerald-400/80 group-hover:text-emerald-600 dark:group-hover:text-emerald-300',
+    },
     items: [
       { title: 'All Employees', href: '/employees', icon: Users },
       { title: 'Profile 360 & Dossier', href: '/employees/profile', icon: Contact },
@@ -88,6 +139,13 @@ const enterpriseNavigation: NavSectionConfig[] = [
   },
   {
     title: 'KYC & DigiLocker',
+    theme: {
+      color: 'text-purple-700 dark:text-purple-400',
+      dotColor: 'bg-purple-600',
+      activeGradient: 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-sm shadow-purple-500/25',
+      hoverColor: 'hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50/80 dark:hover:bg-purple-950/40',
+      iconColor: 'text-purple-500/80 dark:text-purple-400/80 group-hover:text-purple-600 dark:group-hover:text-purple-300',
+    },
     items: [
       { title: 'KYC Verification', href: '/operations/kyc', icon: ShieldCheck, badge: 'DigiLocker' },
       { title: 'Digital Document Verification', href: '/employees/profile?tab=documents', icon: FileText, badge: 'UIDAI' },
@@ -95,6 +153,13 @@ const enterpriseNavigation: NavSectionConfig[] = [
   },
   {
     title: 'QR Code Attendance',
+    theme: {
+      color: 'text-cyan-700 dark:text-cyan-400',
+      dotColor: 'bg-cyan-600',
+      activeGradient: 'bg-gradient-to-r from-cyan-600 to-sky-600 text-white shadow-sm shadow-cyan-500/25',
+      hoverColor: 'hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-cyan-50/80 dark:hover:bg-cyan-950/40',
+      iconColor: 'text-cyan-500/80 dark:text-cyan-400/80 group-hover:text-cyan-600 dark:group-hover:text-cyan-300',
+    },
     items: [
       { title: 'Digital QR Passes', href: '/attendance/qr-codes', icon: QrCode, badge: 'Live ID' },
       { title: 'Contactless QR Scanner', href: '/operations/qr-scanner', icon: ScanFace, badge: 'Scanner' },
@@ -102,6 +167,13 @@ const enterpriseNavigation: NavSectionConfig[] = [
   },
   {
     title: 'Time & Attendance',
+    theme: {
+      color: 'text-amber-700 dark:text-amber-400',
+      dotColor: 'bg-amber-600',
+      activeGradient: 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-sm shadow-amber-500/25',
+      hoverColor: 'hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50/80 dark:hover:bg-amber-950/40',
+      iconColor: 'text-amber-500/80 dark:text-amber-400/80 group-hover:text-amber-600 dark:group-hover:text-amber-300',
+    },
     items: [
       { title: 'Biometric Punches', href: '/attendance/punches', icon: Fingerprint },
       { title: 'Digital QR Passes', href: '/attendance/qr-codes', icon: QrCode, badge: 'Daily' },
@@ -115,6 +187,13 @@ const enterpriseNavigation: NavSectionConfig[] = [
   },
   {
     title: 'Payroll Management',
+    theme: {
+      color: 'text-[#722F37] dark:text-rose-400',
+      dotColor: 'bg-[#722F37]',
+      activeGradient: 'bg-gradient-to-r from-[#722F37] to-[#991B1B] text-white shadow-sm shadow-rose-900/25',
+      hoverColor: 'hover:text-[#722F37] dark:hover:text-rose-300 hover:bg-rose-50/80 dark:hover:bg-rose-950/40',
+      iconColor: 'text-rose-600/80 dark:text-rose-400/80 group-hover:text-[#722F37] dark:group-hover:text-rose-300',
+    },
     items: [
       { title: 'Payroll Dashboard', href: '/payroll', icon: Banknote },
       { title: 'Employee Payslips', href: '/payroll/payslips', icon: Receipt },
@@ -124,6 +203,13 @@ const enterpriseNavigation: NavSectionConfig[] = [
   },
   {
     title: 'Leave & Incentives',
+    theme: {
+      color: 'text-fuchsia-700 dark:text-fuchsia-400',
+      dotColor: 'bg-fuchsia-600',
+      activeGradient: 'bg-gradient-to-r from-fuchsia-600 to-pink-600 text-white shadow-sm shadow-fuchsia-500/25',
+      hoverColor: 'hover:text-fuchsia-700 dark:hover:text-fuchsia-300 hover:bg-fuchsia-50/80 dark:hover:bg-fuchsia-950/40',
+      iconColor: 'text-fuchsia-500/80 dark:text-fuchsia-400/80 group-hover:text-fuchsia-600 dark:group-hover:text-fuchsia-300',
+    },
     items: [
       { title: 'Leave Approvals', href: '/leaves', icon: CalendarClock },
       { title: 'Incentive Calculation', href: '/incentives/calculation', icon: Coins },
@@ -131,6 +217,13 @@ const enterpriseNavigation: NavSectionConfig[] = [
   },
   {
     title: 'Operations & Audits',
+    theme: {
+      color: 'text-indigo-700 dark:text-indigo-400',
+      dotColor: 'bg-indigo-600',
+      activeGradient: 'bg-gradient-to-r from-indigo-600 to-slate-700 text-white shadow-sm shadow-indigo-500/25',
+      hoverColor: 'hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50/80 dark:hover:bg-indigo-950/40',
+      iconColor: 'text-indigo-500/80 dark:text-indigo-400/80 group-hover:text-indigo-600 dark:group-hover:text-indigo-300',
+    },
     items: [
       { title: 'Face Verification', href: '/operations/face-verification', icon: ScanFace },
       { title: 'Selling Points & Audits', href: '/operations/selling-points', icon: Store },
@@ -393,67 +486,82 @@ export function DashboardLayout({
 
           {/* Navigation Links */}
           <nav className={`flex flex-col gap-1 ${isCollapsed ? 'px-2 py-3' : 'px-3 py-3'}`}>
-            {visibleNavigation.map((section) => (
-              <div key={section.title} className="mb-2">
-                {!isCollapsed ? (
-                  <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 truncate">
-                    {section.title}
-                  </div>
-                ) : (
-                  <div className="my-1.5 flex justify-center items-center" title={section.title}>
-                    <span className="w-1.5 h-0.5 rounded-full bg-slate-300 dark:bg-slate-700" />
-                  </div>
-                )}
-                <div className="space-y-0.5">
-                  {section.items.map((item) => {
-                    const itemPath = item.href.split('?')[0];
-                    const isActive = pathname === item.href || (item.href !== '/dashboard' && !item.href.includes('?') && pathname.startsWith(itemPath));
-                    const IconComponent = item.icon;
+            {visibleNavigation.map((section) => {
+              const theme = section.theme;
+              return (
+                <div key={section.title} className="mb-2.5">
+                  {!isCollapsed ? (
+                    <div className={`px-3 pt-2 pb-1 text-[10.5px] font-extrabold uppercase tracking-wider ${theme.color} flex items-center gap-1.5 truncate`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${theme.dotColor} shrink-0 shadow-2xs`} />
+                      <span className="truncate">{section.title}</span>
+                    </div>
+                  ) : (
+                    <div className="my-1.5 flex justify-center items-center" title={section.title}>
+                      <span className={`w-2 h-1 rounded-full ${theme.dotColor}`} />
+                    </div>
+                  )}
+                  <div className="space-y-0.5">
+                    {section.items.map((item) => {
+                      const itemPath = item.href.split('?')[0];
+                      const isActive = pathname === item.href || (item.href !== '/dashboard' && !item.href.includes('?') && pathname.startsWith(itemPath));
+                      const IconComponent = item.icon;
 
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        title={isCollapsed ? `${item.title} • ${section.title}` : undefined}
-                        className={`group flex items-center ${
-                          isCollapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2'
-                        } rounded-lg text-xs transition-all ${
-                          isActive
-                            ? 'bg-[#0058be] text-white font-semibold shadow-sm'
-                            : 'text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/60 font-medium'
-                        }`}
-                      >
-                        <IconComponent className={`w-4 h-4 flex-shrink-0 transition-colors ${
-                          isActive ? 'text-white' : 'text-slate-400 dark:text-slate-400 group-hover:text-[#0058be] dark:group-hover:text-white'
-                        }`} />
-                        {!isCollapsed && <span className="truncate flex-1">{item.title}</span>}
-                        {!isCollapsed && item.badge && (
-                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
-                            isActive 
-                              ? 'bg-white/20 text-white' 
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                          }`}>
-                            {item.badge}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          title={isCollapsed ? `${item.title} • ${section.title}` : undefined}
+                          className={`group flex items-center ${
+                            isCollapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2'
+                          } rounded-xl text-xs transition-all duration-150 ${
+                            isActive
+                              ? `${theme.activeGradient} font-semibold shadow-sm`
+                              : `text-slate-600 dark:text-slate-300 ${theme.hoverColor} font-medium`
+                          }`}
+                        >
+                          <IconComponent className={`w-4 h-4 flex-shrink-0 transition-all duration-150 ${
+                            isActive ? 'text-white' : `${theme.iconColor}`
+                          }`} />
+                          {!isCollapsed && <span className="truncate flex-1">{item.title}</span>}
+                          {!isCollapsed && item.badge && (
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${getBadgeClasses(item.badge, isActive)}`}>
+                              {item.badge === 'Live ID' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block mr-1" />}
+                              {item.badge}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </nav>
         </div>
 
         {/* Bottom Application Meta & Sign Out */}
-        <div className="p-3 border-t border-slate-200 dark:border-[#152038] bg-slate-50/50 dark:bg-[#070d18] space-y-2">
+        <div className="p-3 border-t border-slate-200/90 dark:border-[#152038] bg-slate-50/70 dark:bg-[#070d18] space-y-2.5">
           {!isCollapsed ? (
-            <div className="px-3 py-2 bg-slate-100/80 dark:bg-[#0e172a] rounded-lg border border-slate-200 dark:border-[#1e2d4d]">
-              <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">BSC Textiles Pvt. Ltd.</div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">HRMS Enterprise v2.4</div>
+            <div className="p-3 rounded-xl bg-gradient-to-br from-[#722F37]/10 via-rose-500/5 to-indigo-950/10 dark:from-[#722F37]/30 dark:via-rose-950/20 dark:to-slate-900/60 border border-rose-200/80 dark:border-rose-900/40 shadow-xs relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-rose-500/10 rounded-full blur-xl pointer-events-none group-hover:bg-rose-500/15 transition-all" />
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11.5px] font-bold text-[#722F37] dark:text-rose-300 tracking-tight">
+                  BSC Textiles Pvt. Ltd.
+                </span>
+                <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-full border border-emerald-300/60 dark:border-emerald-800/60">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Live Hub
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-slate-600 dark:text-slate-400 font-medium">Davangere HQ</span>
+                <span className="font-mono font-bold text-amber-800 dark:text-amber-300 bg-amber-100/80 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-300/60 dark:border-amber-800/60">
+                  HRMS Enterprise v2.4
+                </span>
+              </div>
             </div>
           ) : (
-            <div className="text-center py-1 text-[9px] font-bold text-slate-400 font-mono" title="BSC HRMS v2.4">
+            <div className="text-center py-1.5 px-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/40 text-[9px] font-bold text-[#722F37] dark:text-rose-300 font-mono shadow-xs" title="BSC Textiles HRMS Enterprise v2.4">
               v2.4
             </div>
           )}
@@ -461,11 +569,11 @@ export function DashboardLayout({
           <button
             onClick={handleSignOut}
             className={`w-full flex items-center justify-center ${
-              isCollapsed ? 'p-2' : 'gap-2 px-3 py-1.5'
-            } rounded-lg text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors`}
+              isCollapsed ? 'p-2' : 'gap-2 px-3 py-2'
+            } rounded-xl text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-900/50 hover:bg-gradient-to-r hover:from-rose-600 hover:to-red-600 hover:text-white hover:border-transparent hover:shadow-md hover:shadow-rose-600/20 active:scale-[0.98] transition-all duration-200 group`}
             title={isCollapsed ? "Sign Out" : undefined}
           >
-            <LogOut className="w-4 h-4 text-slate-400 group-hover:text-red-500" />
+            <LogOut className="w-4 h-4 text-rose-600 dark:text-rose-400 group-hover:text-white transition-transform group-hover:-translate-x-0.5" />
             {!isCollapsed && <span>Sign Out</span>}
           </button>
         </div>
@@ -496,52 +604,74 @@ export function DashboardLayout({
                 <ThemeToggle showLabel={true} size="sm" />
               </div>
 
-              <nav className="p-3 space-y-2">
-                {visibleNavigation.map((sec) => (
-                  <div key={sec.title}>
-                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 truncate">
-                      {sec.title}
+              <nav className="p-3 space-y-2.5">
+                {visibleNavigation.map((sec) => {
+                  const theme = sec.theme;
+                  return (
+                    <div key={sec.title}>
+                      <div className={`px-3 py-1 text-[10.5px] font-extrabold uppercase tracking-wider ${theme.color} flex items-center gap-1.5 truncate`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${theme.dotColor} shrink-0`} />
+                        <span className="truncate">{sec.title}</span>
+                      </div>
+                      <div className="space-y-0.5 mt-1">
+                        {sec.items.map((i) => {
+                          const itemPath = i.href.split('?')[0];
+                          const isItemActive = pathname === i.href || (i.href !== '/dashboard' && !i.href.includes('?') && pathname.startsWith(itemPath));
+                          const IconComp = i.icon;
+                          return (
+                            <Link
+                              key={i.href}
+                              href={i.href}
+                              onClick={() => setMobileMenuOpen(false)}
+                              className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-all ${
+                                isItemActive 
+                                  ? `${theme.activeGradient} font-semibold shadow-sm` 
+                                  : `text-slate-600 dark:text-slate-300 ${theme.hoverColor} font-medium`
+                              }`}
+                            >
+                              <IconComp className={`w-4 h-4 ${isItemActive ? 'text-white' : `${theme.iconColor}`}`} />
+                              <span className="flex-1 truncate">{i.title}</span>
+                              {i.badge && (
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${getBadgeClasses(i.badge, isItemActive)}`}>
+                                  {i.badge === 'Live ID' && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block mr-1" />}
+                                  {i.badge}
+                                </span>
+                              )}
+                            </Link>
+                          );
+                        })}
+                      </div>
                     </div>
-                    {sec.items.map((i) => {
-                      const itemPath = i.href.split('?')[0];
-                      const isItemActive = pathname === i.href || (i.href !== '/dashboard' && !i.href.includes('?') && pathname.startsWith(itemPath));
-                      const IconComp = i.icon;
-                      return (
-                        <Link
-                          key={i.href}
-                          href={i.href}
-                          onClick={() => setMobileMenuOpen(false)}
-                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-all ${
-                            isItemActive 
-                              ? 'bg-[#0058be] text-white font-semibold shadow-sm' 
-                              : 'text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/60'
-                          }`}
-                        >
-                          <IconComp className={`w-4 h-4 ${isItemActive ? 'text-white' : 'text-slate-400 dark:text-slate-400'}`} />
-                          <span className="flex-1 truncate">{i.title}</span>
-                          {i.badge && (
-                            <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
-                              isItemActive
-                                ? 'bg-white/20 text-white'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
-                            }`}>
-                              {i.badge}
-                            </span>
-                          )}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                ))}
+                  );
+                })}
               </nav>
             </div>
 
-            <div className="p-3 border-t border-slate-200 dark:border-[#152038] bg-slate-50/50 dark:bg-[#070d18]">
+            {/* Mobile Footer & Sign Out */}
+            <div className="p-3 border-t border-slate-200 dark:border-[#152038] bg-slate-50/70 dark:bg-[#070d18] space-y-2.5">
+              <div className="p-3 rounded-xl bg-gradient-to-br from-[#722F37]/10 via-rose-500/5 to-indigo-950/10 dark:from-[#722F37]/30 dark:via-rose-950/20 dark:to-slate-900/60 border border-rose-200/80 dark:border-rose-900/40 shadow-xs">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11.5px] font-bold text-[#722F37] dark:text-rose-300">
+                    BSC Textiles Pvt. Ltd.
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded-full border border-emerald-300/60 dark:border-emerald-800/60">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Live Hub
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-slate-600 dark:text-slate-400 font-medium">Davangere HQ</span>
+                  <span className="font-mono font-bold text-amber-800 dark:text-amber-300 bg-amber-100/80 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-300/60 dark:border-amber-800/60">
+                    HRMS Enterprise v2.4
+                  </span>
+                </div>
+              </div>
+
               <button
                 onClick={handleSignOut}
-                className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-900/50 hover:bg-gradient-to-r hover:from-rose-600 hover:to-red-600 hover:text-white hover:border-transparent hover:shadow-md hover:shadow-rose-600/20 active:scale-[0.98] transition-all duration-200 group"
               >
-                <LogOut className="w-4 h-4 text-slate-400 hover:text-red-500" />
+                <LogOut className="w-4 h-4 text-rose-600 dark:text-rose-400 group-hover:text-white transition-transform group-hover:-translate-x-0.5" />
                 <span>Sign Out</span>
               </button>
             </div>
