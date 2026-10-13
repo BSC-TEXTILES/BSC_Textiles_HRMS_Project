@@ -726,7 +726,7 @@ export function DashboardLayout({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by ID (e.g. BSC-4029), Name, Dept..."
-              className="w-full bg-transparent text-xs text-white placeholder:text-white/65 focus:outline-none"
+              className="w-full !bg-transparent !border-none text-xs text-white placeholder:text-white/80 focus:outline-none"
             />
           </div>
         </div>

@@ -609,7 +609,7 @@ export default function EmployeeProfileDossierPage() {
             type="button"
             onClick={() => router.back()}
             aria-label="Go back"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             <span>Back to Workforce Directory</span>
@@ -618,41 +618,41 @@ export default function EmployeeProfileDossierPage() {
 
         {/* LOADING SKELETON */}
         {loading ? (
-          <div className="bg-white rounded-xl border border-slate-200/80 p-4 mb-6 shadow-xs animate-pulse">
+          <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 p-4 mb-6 shadow-xs animate-pulse">
             <div className="flex gap-4 items-start">
-              <div className="w-24 h-24 rounded-xl bg-slate-200 shrink-0"></div>
+              <div className="w-24 h-24 rounded-xl bg-slate-200 dark:bg-slate-800 shrink-0"></div>
               <div className="flex-1 space-y-3">
                 <div className="flex gap-2">
-                  <div className="h-5 w-24 bg-slate-200 rounded"></div>
-                  <div className="h-5 w-32 bg-slate-200 rounded"></div>
-                  <div className="h-5 w-40 bg-slate-200 rounded"></div>
+                  <div className="h-5 w-24 bg-slate-200 dark:bg-slate-800 rounded"></div>
+                  <div className="h-5 w-32 bg-slate-200 dark:bg-slate-800 rounded"></div>
+                  <div className="h-5 w-40 bg-slate-200 dark:bg-slate-800 rounded"></div>
                 </div>
-                <div className="h-6 w-64 bg-slate-200 rounded"></div>
-                <div className="h-4 w-48 bg-slate-200 rounded"></div>
+                <div className="h-6 w-64 bg-slate-200 dark:bg-slate-800 rounded"></div>
+                <div className="h-4 w-48 bg-slate-200 dark:bg-slate-800 rounded"></div>
                 <div className="grid grid-cols-4 gap-4 pt-2">
-                  <div className="h-8 bg-slate-200 rounded"></div>
-                  <div className="h-8 bg-slate-200 rounded"></div>
-                  <div className="h-8 bg-slate-200 rounded"></div>
-                  <div className="h-8 bg-slate-200 rounded"></div>
+                  <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded"></div>
+                  <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded"></div>
+                  <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded"></div>
+                  <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded"></div>
                 </div>
               </div>
             </div>
           </div>
         ) : fetchError ? (
-          <div className="bg-white rounded-xl border border-rose-200 p-6 mb-6 text-center">
+          <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-rose-200 dark:border-rose-900/60 p-6 mb-6 text-center">
             <span className="material-symbols-outlined text-rose-500 text-[36px] mb-2">error</span>
-            <h2 className="text-[15px] font-semibold text-slate-900">Profile Not Found</h2>
-            <p className="text-[13px] text-slate-500 mt-1 mb-4">{fetchError}</p>
+            <h2 className="text-[15px] font-semibold text-slate-900 dark:text-white">Profile Not Found</h2>
+            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-1 mb-4">{fetchError}</p>
             <button
               onClick={() => router.push('/employees')}
-              className="px-4 py-2 bg-[#1346a1] text-white text-[13px] font-medium rounded-lg"
+              className="px-4 py-2 bg-[#1346a1] hover:bg-[#0e3882] text-white text-[13px] font-medium rounded-lg"
             >
               Return to Employees List
             </button>
           </div>
         ) : (
           /* 2. PROFILE SUMMARY CARD (TWO-COLUMN DESKTOP GRID) */
-          <div className="bg-white rounded-xl border border-slate-200/80 p-4 mb-6 shadow-xs">
+          <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 p-4 mb-6 shadow-xs">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
               {/* LEFT COLUMN: AVATAR & IDENTITY BLOCK (lg:col-span-8 xl:col-span-9) */}
               <div className="lg:col-span-8 xl:col-span-9 flex flex-col sm:flex-row items-start gap-4">
@@ -662,11 +662,11 @@ export default function EmployeeProfileDossierPage() {
                     <img
                       src={profilePhoto}
                       alt={`Profile photo of ${emp.fullName}`}
-                      className="w-24 h-24 rounded-xl object-cover bg-slate-100 border border-slate-200 shadow-xs"
+                      className="w-24 h-24 rounded-xl object-cover bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xs"
                     />
                   ) : (
                     <div
-                      className="w-24 h-24 rounded-xl bg-[#fdf2f3] text-[#1346a1] border border-[#f5d0d4] shadow-xs flex items-center justify-center font-semibold text-2xl tracking-wider"
+                      className="w-24 h-24 rounded-xl bg-[#fdf2f3] dark:bg-slate-800 text-[#1346a1] dark:text-blue-300 border border-[#f5d0d4] dark:border-slate-700 shadow-xs flex items-center justify-center font-semibold text-2xl tracking-wider"
                       title={emp.fullName}
                     >
                       {initials}
@@ -681,7 +681,7 @@ export default function EmployeeProfileDossierPage() {
                         onClick={() => fileInputRef.current?.click()}
                         aria-label="Change profile photo"
                         title="Upload profile photo (JPG, PNG, WebP • max 2MB)"
-                        className="w-7 h-7 rounded-full bg-white hover:bg-slate-50 text-slate-700 hover:text-[#1346a1] shadow-sm border border-slate-200 flex items-center justify-center transition-all opacity-100 sm:opacity-90 sm:group-hover:opacity-100 focus:opacity-100 focus:ring-2 focus:ring-[#1346a1]/40"
+                        className="w-7 h-7 rounded-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#1346a1] dark:hover:text-blue-300 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all opacity-100 sm:opacity-90 sm:group-hover:opacity-100 focus:opacity-100 focus:ring-2 focus:ring-[#1346a1]/40"
                       >
                         <span className="material-symbols-outlined text-[16px]">photo_camera</span>
                       </button>
@@ -691,7 +691,7 @@ export default function EmployeeProfileDossierPage() {
                           onClick={() => setIsRemovePhotoConfirmOpen(true)}
                           aria-label="Remove profile photo"
                           title="Remove profile photo"
-                          className="w-7 h-7 rounded-full bg-white hover:bg-rose-50 text-slate-400 hover:text-rose-600 shadow-sm border border-slate-200 flex items-center justify-center transition-all opacity-100 sm:opacity-90 sm:group-hover:opacity-100 focus:opacity-100"
+                          className="w-7 h-7 rounded-full bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all opacity-100 sm:opacity-90 sm:group-hover:opacity-100 focus:opacity-100"
                         >
                           <span className="material-symbols-outlined text-[15px]">delete</span>
                         </button>
@@ -700,7 +700,7 @@ export default function EmployeeProfileDossierPage() {
                   )}
 
                   {photoUploadError && (
-                    <div className="absolute top-full left-0 mt-1 z-10 p-1.5 bg-rose-50 border border-rose-200 rounded text-[11px] text-rose-700 whitespace-nowrap shadow-xs">
+                    <div className="absolute top-full left-0 mt-1 z-10 p-1.5 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded text-[11px] text-rose-700 dark:text-rose-300 whitespace-nowrap shadow-xs">
                       {photoUploadError}
                     </div>
                   )}
@@ -711,7 +711,7 @@ export default function EmployeeProfileDossierPage() {
                   {/* Badges in ONE unified row: ID badge, Status badge, Branch badge */}
                   <div className="flex flex-wrap items-center gap-2 mb-1">
                     {/* Employee ID badge (11-12px, font-medium, uppercase) */}
-                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-medium tracking-wider uppercase border border-slate-200">
+                    <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-[11px] font-medium tracking-wider uppercase border border-slate-200 dark:border-slate-700">
                       {emp.employeeCode}
                     </span>
 
@@ -722,86 +722,86 @@ export default function EmployeeProfileDossierPage() {
                     </span>
 
                     {/* Branch badge */}
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-50 text-slate-600 text-[11px] font-medium border border-slate-200">
-                      <span className="material-symbols-outlined text-[13px] text-[#1346a1]">storefront</span>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 text-[11px] font-medium border border-slate-200 dark:border-slate-700">
+                      <span className="material-symbols-outlined text-[13px] text-[#1346a1] dark:text-blue-400">storefront</span>
                       <span>{emp.location?.name || 'Belagavi Flagship Store (BEL-01)'}</span>
                     </span>
                   </div>
 
                   {/* Employee Name: 22px, weight 600, single line */}
-                  <h1 className="text-[22px] font-semibold text-slate-900 leading-tight truncate">
+                  <h1 className="text-[22px] font-semibold text-slate-900 dark:text-white leading-tight truncate">
                     {emp.fullName}
                   </h1>
 
                   {/* Designation and department: 13px, weight 400, muted */}
                   <p
-                    className="text-[13px] font-normal text-slate-500 mb-3 truncate"
+                    className="text-[13px] font-normal text-slate-500 dark:text-slate-400 mb-3 truncate"
                     title={`${emp.designation} • ${emp.department?.name || 'Bridal & Silk Department'}`}
                   >
                     <span>{emp.designation}</span>
                     <span className="mx-1.5">•</span>
-                    <span className="text-slate-700 font-medium">{emp.department?.name || 'Bridal & Silk Department'}</span>
+                    <span className="text-slate-700 dark:text-slate-300 font-medium">{emp.department?.name || 'Bridal & Silk Department'}</span>
                   </p>
 
                   {/* Meta row: 4-column grid (2x2 on mobile), label above value, no collision, wraps safely */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1 text-slate-700">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1 text-slate-700 dark:text-slate-300">
                     <div className="flex flex-col min-w-0">
-                      <span className="text-[11px] font-medium uppercase text-slate-400 tracking-[0.04em]">
+                      <span className="text-[11px] font-medium uppercase text-slate-400 dark:text-slate-400 tracking-[0.04em]">
                         Reporting Head
                       </span>
-                      <span className="text-[13px] font-medium text-slate-800 break-words leading-snug">
+                      <span className="text-[13px] font-medium text-slate-800 dark:text-slate-100 break-words leading-snug">
                         {emp.managerName || 'Anand Kulkarni'}
                       </span>
                     </div>
 
                     <div className="flex flex-col min-w-0">
-                      <span className="text-[11px] font-medium uppercase text-slate-400 tracking-[0.04em]">
+                      <span className="text-[11px] font-medium uppercase text-slate-400 dark:text-slate-400 tracking-[0.04em]">
                         HR Partner
                       </span>
-                      <span className="text-[13px] font-medium text-slate-800 break-words leading-snug">
+                      <span className="text-[13px] font-medium text-slate-800 dark:text-slate-100 break-words leading-snug">
                         {emp.hrPartner || 'Sunita Deshmukh'}
                       </span>
                     </div>
 
                     <div className="flex flex-col min-w-0">
-                      <span className="text-[11px] font-medium uppercase text-slate-400 tracking-[0.04em]">
+                      <span className="text-[11px] font-medium uppercase text-slate-400 dark:text-slate-400 tracking-[0.04em]">
                         Shift &amp; Cadence
                       </span>
-                      <span className="text-[13px] font-medium text-slate-800 break-words leading-snug">
+                      <span className="text-[13px] font-medium text-slate-800 dark:text-slate-100 break-words leading-snug">
                         {emp.shift?.name || 'Retail A (09:30 – 18:30)'}
                       </span>
                     </div>
 
                     <div className="flex flex-col min-w-0">
-                      <span className="text-[11px] font-medium uppercase text-slate-400 tracking-[0.04em]">
+                      <span className="text-[11px] font-medium uppercase text-slate-400 dark:text-slate-400 tracking-[0.04em]">
                         Tenure
                       </span>
-                      <span className="text-[13px] font-medium text-slate-800 break-words leading-snug">
+                      <span className="text-[13px] font-medium text-slate-800 dark:text-slate-100 break-words leading-snug">
                         {emp.joiningDate} (4y 2m)
                       </span>
                     </div>
                   </div>
 
                   {/* Contact strip: in its own row below identity block, separated by dividers, wraps cleanly */}
-                  <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] font-normal text-slate-700">
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] font-normal text-slate-700 dark:text-slate-300">
                     <div className="inline-flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[15px] text-[#1346a1]">mail</span>
+                      <span className="material-symbols-outlined text-[15px] text-[#1346a1] dark:text-blue-400">mail</span>
                       <span className="break-all">{emp.email}</span>
                     </div>
 
-                    <span className="hidden sm:inline text-slate-300">|</span>
+                    <span className="hidden sm:inline text-slate-300 dark:text-slate-600">|</span>
 
                     <div className="inline-flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[15px] text-[#1346a1]">phone_iphone</span>
+                      <span className="material-symbols-outlined text-[15px] text-[#1346a1] dark:text-blue-400">phone_iphone</span>
                       <span>+91 {emp.phone}</span>
                     </div>
 
-                    <span className="hidden sm:inline text-slate-300">|</span>
+                    <span className="hidden sm:inline text-slate-300 dark:text-slate-600">|</span>
 
                     <div className="inline-flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-[15px] text-rose-500">emergency</span>
-                      <span className="text-slate-600">SOS:</span>
-                      <span className="font-medium text-slate-800">{emp.emergencyContact}</span>
+                      <span className="text-slate-600 dark:text-slate-400">SOS:</span>
+                      <span className="font-medium text-slate-800 dark:text-slate-100">{emp.emergencyContact}</span>
                     </div>
                   </div>
                 </div>
@@ -819,7 +819,7 @@ export default function EmployeeProfileDossierPage() {
                       setIsEditModalOpen(true);
                     }}
                     aria-label="Edit employee profile"
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-[13px] font-medium shadow-xs transition-colors focus:ring-2 focus:ring-[#1346a1]/30"
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-[13px] font-medium shadow-xs transition-colors focus:ring-2 focus:ring-[#1346a1]/30"
                   >
                     <span className="material-symbols-outlined text-[16px]">edit_square</span>
                     <span>Edit Profile</span>
@@ -831,7 +831,7 @@ export default function EmployeeProfileDossierPage() {
                   type="button"
                   onClick={() => router.push('/attendance/corrections')}
                   aria-label="Open log correction"
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 text-[13px] font-medium shadow-xs transition-colors focus:ring-2 focus:ring-[#1346a1]/30"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 text-[13px] font-medium shadow-xs transition-colors focus:ring-2 focus:ring-[#1346a1]/30"
                 >
                   <span className="material-symbols-outlined text-[16px]">more_time</span>
                   <span>Log Correction</span>
@@ -867,7 +867,7 @@ export default function EmployeeProfileDossierPage() {
           <div
             role="tablist"
             aria-label="Employee Dossier Tabs"
-            className="flex items-center gap-1 overflow-x-auto no-scrollbar border-b border-slate-200 pb-0"
+            className="flex items-center gap-1 overflow-x-auto no-scrollbar border-b border-slate-200 dark:border-slate-800 pb-0"
           >
             {tabList.map((tab, idx) => {
               const isActive = activeTab === tab.key;
@@ -884,8 +884,8 @@ export default function EmployeeProfileDossierPage() {
                   type="button"
                   className={`px-3 py-2 text-[13px] whitespace-nowrap border-b-2 transition-all focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30 ${
                     isActive
-                      ? 'border-[#1346a1] text-[#1346a1] font-semibold bg-red-50/30'
-                      : 'border-transparent text-slate-600 hover:text-slate-900 font-medium hover:border-slate-300'
+                      ? 'border-[#1346a1] dark:border-blue-400 text-[#1346a1] dark:text-blue-300 font-semibold bg-blue-50/60 dark:bg-blue-950/40'
+                      : 'border-transparent text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-medium hover:border-slate-300 dark:hover:border-slate-600'
                   }`}
                 >
                   {tab.label}

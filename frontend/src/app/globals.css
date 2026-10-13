@@ -225,14 +225,54 @@ html.dark .bg-emerald-50 {
 
 html.dark .text-blue-700,
 html.dark .text-blue-600,
-html.dark .text-\[\#0058be\] {
+html.dark .text-blue-800,
+html.dark .text-blue-900,
+html.dark .text-\[\#0058be\],
+html.dark .text-\[\#1346a1\],
+html.dark .text-\[\#0e3882\],
+html.dark .text-\[\#003882\],
+html.dark .text-\[\#004ca3\],
+html.dark .text-primary-600,
+html.dark .text-primary-700,
+html.dark .text-primary-800,
+html.dark .text-primary-900 {
   color: #60a5fa !important;
 }
+
+html.dark .hover\:text-\[\#1346a1\]:hover {
+  color: #93c5fd !important;
+}
+
 html.dark .bg-blue-50,
+html.dark .bg-sky-50,
 html.dark .bg-\[\#eff4ff\],
-html.dark .bg-\[\#eff4ff\]\/60 {
+html.dark .bg-\[\#eff4ff\]\/60,
+html.dark .bg-\[\#1346a1\]\/10,
+html.dark .bg-\[\#1346a1\]\/5,
+html.dark .bg-\[\#1346a1\]\/20,
+html.dark .bg-\[\#fdf2f3\] {
   background-color: rgba(30, 58, 138, 0.4) !important;
   border-color: rgba(37, 99, 235, 0.4) !important;
+  color: #93c5fd !important;
+}
+
+html.dark .border-\[\#1346a1\]\/20,
+html.dark .border-\[\#1346a1\]\/30,
+html.dark .border-\[\#f5d0d4\] {
+  border-color: rgba(96, 165, 250, 0.3) !important;
+}
+
+/* Material symbols and icons in dark mode */
+html.dark .material-symbols-outlined,
+html.dark .material-icons {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+html.dark .material-symbols-outlined.text-\[\#1346a1\],
+html.dark .material-icons.text-\[\#1346a1\] {
+  color: #60a5fa !important;
 }
 
 html.dark .text-red-700,
@@ -290,6 +330,15 @@ html.dark textarea {
   border-color: #24345d !important;
 }
 
+/* Allow transparent inputs in search bars and headers */
+html.dark input.bg-transparent,
+html.dark input[type="text"].bg-transparent,
+html.dark select.bg-transparent,
+html.dark textarea.bg-transparent {
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+
 html.dark select option {
   background-color: #0e172a !important;
   color: #ffffff !important;
@@ -304,7 +353,7 @@ html.dark select option:checked {
 
 html.dark input::placeholder,
 html.dark textarea::placeholder {
-  color: #64748b !important;
+  color: #94a3b8 !important;
 }
 
 /* Fullscreen modal and drawer wrappers remain transparent so their backdrop opacity is visible */
