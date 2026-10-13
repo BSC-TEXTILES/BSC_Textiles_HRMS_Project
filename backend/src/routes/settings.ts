@@ -1,9 +1,80 @@
 import { Router } from 'express';
+import { Response, NextFunction } from 'express';
 import { prisma } from '../index.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
+import { AuditService } from '../services/auditService.js';
+import { getUserModuleAccess, accessRank } from '../services/rbacService.js';
 
 const router = Router();
 router.use(authenticate);
+
+/**
+ * Module-level write gate for settings:
+ *  - Unrestricted (legacy) users need CONFIGURE (or SUPER_ADMIN) as before.
+ *  - RBAC-restricted users are checked per module group in the request body:
+ *    biometric fields → BIOMETRIC_POLICY edit, QR fields → QR_SECURITY_POLICY
+ *    edit, break fields → BREAK_POLICIES edit, everything else → legacy CONFIGURE.
+ */
+async function settingsWriteAccess(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+  try {
+    const userAccess = await getUserModuleAccess(req.user.id, req.user.role);
+    if (userAccess.source !== 'rbac') {
+      if (req.user.role === 'SUPER_ADMIN' || req.user.permissions.includes('CONFIGURE')) {
+        return next();
+      }
+      return res.status(403).json({
+        error: 'Forbidden: insufficient permissions',
+        message: 'You do not have permission to change system settings.',
+      });
+    }
+    next();
+  } catch (error) {
+    console.error('Settings write access error:', error);
+    res.status(500).json({ error: 'Failed to verify settings permissions' });
+  }
+}
+
+const GROUP_MODULE: Record<string, string> = {
+  BIOMETRIC: 'BIOMETRIC_POLICY',
+  QR: 'QR_SECURITY_POLICY',
+  BREAK: 'BREAK_POLICIES',
+};
+
+const GROUP_FIELDS: Record<string, string[]> = {
+  BIOMETRIC: ['faceVerificationThreshold'],
+  QR: ['qrDailyTokenEnabled', 'qrOneTimeScan', 'scannerRoles'],
+  BREAK: [
+    'lunchDurationMinutes',
+    'teaDurationMinutes',
+    'maleLunchMinutes',
+    'femaleLunchMinutes',
+    'maleTeaMinutes',
+    'femaleTeaMinutes',
+  ],
+  GENERAL: [
+    'gracePeriodMinutes',
+    'lateThresholdMinutes',
+    'earlyLoginIncentiveEnabled',
+    'earlyLoginRatePerSecond',
+    'earlyLoginMaxDaily',
+    'earlyLoginMaxMonthly',
+    'latePenaltyEnabled',
+    'latePenaltyRatePerSecond',
+    'latePenaltyMaxDaily',
+    'latePenaltyMaxMonthly',
+    'overtimeIncentiveEnabled',
+    'overtimeRatePerSecond',
+    'earlyLogoutPenaltyEnabled',
+    'earlyLogoutRatePerSecond',
+  ],
+};
+
+function groupsPresentIn(body: Record<string, unknown>): string[] {
+  return Object.entries(GROUP_FIELDS)
+    .filter(([, fields]) => fields.some((f) => body[f] !== undefined))
+    .map(([group]) => group);
+}
 
 // Get global and location settings
 router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
@@ -56,9 +127,10 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
   }
 });
 
-// Update settings
-router.put('/', authorize('CONFIGURE'), async (req: AuthRequest, res) => {
+// Update settings (module-level RBAC enforced per field group)
+router.put('/', settingsWriteAccess, async (req: AuthRequest, res) => {
   try {
+    const body = req.body as Record<string, any>;
     const {
       locationId,
       gracePeriodMinutes,
@@ -89,29 +161,92 @@ router.put('/', authorize('CONFIGURE'), async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'Location ID is required' });
     }
 
+    // --- Module-level access evaluation -------------------------------------
+    const userAccess = await getUserModuleAccess(req.user!.id, req.user!.role);
+    const deniedGroups: Array<{ group: string; module: string }> = [];
+
+    if (userAccess.source === 'rbac') {
+      for (const group of groupsPresentIn(body)) {
+        if (group === 'GENERAL') {
+          if (!(req.user!.role === 'SUPER_ADMIN' || req.user!.permissions.includes('CONFIGURE'))) {
+            deniedGroups.push({ group, module: 'GENERAL_SETTINGS' });
+          }
+          continue;
+        }
+        const module = GROUP_MODULE[group];
+        if (accessRank(userAccess.access[module] || 'none') < accessRank('edit')) {
+          deniedGroups.push({ group, module });
+        }
+      }
+
+      if (deniedGroups.length > 0) {
+        AuditService.log({
+          userId: req.user!.id,
+          locationId: targetLocId,
+          action: 'UNAUTHORIZED_MODULE_ATTEMPT',
+          entityType: 'AttendanceRules',
+          entityId: String(targetLocId),
+          ipAddress: req.ip || req.socket.remoteAddress || '127.0.0.1',
+          userAgent: (req.headers['user-agent'] as string) || 'Client',
+          riskScore: 60,
+          tags: ['module-rbac-denied', 'security-alert'],
+          after: { deniedGroups, roles: userAccess.roles },
+        }).catch(() => {});
+
+        return res.status(403).json({
+          error: 'Forbidden: insufficient module access',
+          message: `Your role does not allow editing: ${deniedGroups
+            .map((d) => d.module.replace(/_/g, ' ').toLowerCase())
+            .join(', ')}.`,
+          deniedModules: deniedGroups.map((d) => d.module),
+        });
+      }
+    }
+
+    // Preserve current values for groups that were not sent or not editable so
+    // partial saves never clobber restricted settings with defaults.
+    const current = await prisma.attendanceRules.findUnique({ where: { locationId: targetLocId } });
+
+    const biometricValue =
+      faceVerificationThreshold !== undefined && (userAccess.source !== 'rbac' || accessRank(userAccess.access.BIOMETRIC_POLICY) >= accessRank('edit'))
+        ? Number(faceVerificationThreshold)
+        : Number((current as any)?.faceVerificationThreshold ?? 85);
+
+    const qrValue = (field: string, fallback: any) => {
+      const editable = userAccess.source !== 'rbac' || accessRank(userAccess.access.QR_SECURITY_POLICY) >= accessRank('edit');
+      if (req.body[field] !== undefined && editable) return req.body[field];
+      return (current as any)?.[field] ?? fallback;
+    };
+
+    const breakValue = (field: string, fallback: number) => {
+      const editable = userAccess.source !== 'rbac' || accessRank(userAccess.access.BREAK_POLICIES) >= accessRank('edit');
+      if (req.body[field] !== undefined && editable) return Number(req.body[field]);
+      return Number((current as any)?.[field] ?? fallback);
+    };
+
     const updated = await prisma.attendanceRules.upsert({
       where: { locationId: targetLocId },
       update: {
-        gracePeriodMinutes: Number(gracePeriodMinutes ?? 5),
-        lateThresholdMinutes: Number(lateThresholdMinutes ?? 5),
-        earlyLoginIncentiveEnabled: Boolean(earlyLoginIncentiveEnabled),
-        earlyLoginRatePerSecond: Number(earlyLoginRatePerSecond ?? 1),
-        latePenaltyEnabled: Boolean(latePenaltyEnabled),
-        latePenaltyRatePerSecond: Number(latePenaltyRatePerSecond ?? 1),
-        overtimeIncentiveEnabled: Boolean(overtimeIncentiveEnabled),
-        overtimeRatePerSecond: Number(overtimeRatePerSecond ?? 1.5),
-        earlyLogoutPenaltyEnabled: Boolean(earlyLogoutPenaltyEnabled),
-        earlyLogoutRatePerSecond: Number(earlyLogoutRatePerSecond ?? 1),
-        lunchDurationMinutes: Number(lunchDurationMinutes ?? 100),
-        teaDurationMinutes: Number(teaDurationMinutes ?? 20),
-        maleLunchMinutes: Number(maleLunchMinutes ?? 100),
-        femaleLunchMinutes: Number(femaleLunchMinutes ?? 40),
-        maleTeaMinutes: Number(maleTeaMinutes ?? 20),
-        femaleTeaMinutes: Number(femaleTeaMinutes ?? 15),
-        faceVerificationThreshold: Number(faceVerificationThreshold ?? 85),
-        qrDailyTokenEnabled: Boolean(qrDailyTokenEnabled ?? true),
-        qrOneTimeScan: Boolean(qrOneTimeScan ?? true),
-        scannerRoles: scannerRoles || ['T_SHOP_OWNER', 'TEA_BREAK_MANAGER', 'HR_MANAGER'],
+        gracePeriodMinutes: Number(gracePeriodMinutes ?? (current as any)?.gracePeriodMinutes ?? 5),
+        lateThresholdMinutes: Number(lateThresholdMinutes ?? (current as any)?.lateThresholdMinutes ?? 5),
+        earlyLoginIncentiveEnabled: Boolean(earlyLoginIncentiveEnabled ?? (current as any)?.earlyLoginIncentiveEnabled ?? true),
+        earlyLoginRatePerSecond: Number(earlyLoginRatePerSecond ?? (current as any)?.earlyLoginRatePerSecond ?? 1),
+        latePenaltyEnabled: Boolean(latePenaltyEnabled ?? (current as any)?.latePenaltyEnabled ?? true),
+        latePenaltyRatePerSecond: Number(latePenaltyRatePerSecond ?? (current as any)?.latePenaltyRatePerSecond ?? 1),
+        overtimeIncentiveEnabled: Boolean(overtimeIncentiveEnabled ?? (current as any)?.overtimeIncentiveEnabled ?? true),
+        overtimeRatePerSecond: Number(overtimeRatePerSecond ?? (current as any)?.overtimeRatePerSecond ?? 1.5),
+        earlyLogoutPenaltyEnabled: Boolean(earlyLogoutPenaltyEnabled ?? (current as any)?.earlyLogoutPenaltyEnabled ?? false),
+        earlyLogoutRatePerSecond: Number(earlyLogoutRatePerSecond ?? (current as any)?.earlyLogoutRatePerSecond ?? 1),
+        lunchDurationMinutes: breakValue('lunchDurationMinutes', 100),
+        teaDurationMinutes: breakValue('teaDurationMinutes', 20),
+        maleLunchMinutes: breakValue('maleLunchMinutes', 100),
+        femaleLunchMinutes: breakValue('femaleLunchMinutes', 40),
+        maleTeaMinutes: breakValue('maleTeaMinutes', 20),
+        femaleTeaMinutes: breakValue('femaleTeaMinutes', 15),
+        faceVerificationThreshold: biometricValue,
+        qrDailyTokenEnabled: Boolean(qrValue('qrDailyTokenEnabled', true)),
+        qrOneTimeScan: Boolean(qrValue('qrOneTimeScan', true)),
+        scannerRoles: qrValue('scannerRoles', ['T_SHOP_OWNER', 'TEA_BREAK_MANAGER', 'HR_MANAGER']),
       },
       create: {
         locationId: targetLocId,
@@ -119,13 +254,13 @@ router.put('/', authorize('CONFIGURE'), async (req: AuthRequest, res) => {
         logoutTime: new Date('2024-01-01T18:30:00'),
         gracePeriodMinutes: Number(gracePeriodMinutes ?? 5),
         lateThresholdMinutes: Number(lateThresholdMinutes ?? 5),
-        earlyLoginIncentiveEnabled: Boolean(earlyLoginIncentiveEnabled),
+        earlyLoginIncentiveEnabled: Boolean(earlyLoginIncentiveEnabled ?? true),
         earlyLoginRatePerSecond: Number(earlyLoginRatePerSecond ?? 1),
-        latePenaltyEnabled: Boolean(latePenaltyEnabled),
+        latePenaltyEnabled: Boolean(latePenaltyEnabled ?? true),
         latePenaltyRatePerSecond: Number(latePenaltyRatePerSecond ?? 1),
-        overtimeIncentiveEnabled: Boolean(overtimeIncentiveEnabled),
+        overtimeIncentiveEnabled: Boolean(overtimeIncentiveEnabled ?? true),
         overtimeRatePerSecond: Number(overtimeRatePerSecond ?? 1.5),
-        earlyLogoutPenaltyEnabled: Boolean(earlyLogoutPenaltyEnabled),
+        earlyLogoutPenaltyEnabled: Boolean(earlyLogoutPenaltyEnabled ?? false),
         earlyLogoutRatePerSecond: Number(earlyLogoutRatePerSecond ?? 1),
         lunchDurationMinutes: Number(lunchDurationMinutes ?? 100),
         teaDurationMinutes: Number(teaDurationMinutes ?? 20),
@@ -133,10 +268,10 @@ router.put('/', authorize('CONFIGURE'), async (req: AuthRequest, res) => {
         femaleLunchMinutes: Number(femaleLunchMinutes ?? 40),
         maleTeaMinutes: Number(maleTeaMinutes ?? 20),
         femaleTeaMinutes: Number(femaleTeaMinutes ?? 15),
-        faceVerificationThreshold: Number(faceVerificationThreshold ?? 85),
-        qrDailyTokenEnabled: Boolean(qrDailyTokenEnabled ?? true),
-        qrOneTimeScan: Boolean(qrOneTimeScan ?? true),
-        scannerRoles: scannerRoles || ['T_SHOP_OWNER', 'TEA_BREAK_MANAGER', 'HR_MANAGER'],
+        faceVerificationThreshold: biometricValue,
+        qrDailyTokenEnabled: Boolean(qrValue('qrDailyTokenEnabled', true)),
+        qrOneTimeScan: Boolean(qrValue('qrOneTimeScan', true)),
+        scannerRoles: qrValue('scannerRoles', ['T_SHOP_OWNER', 'TEA_BREAK_MANAGER', 'HR_MANAGER']),
       },
     });
 

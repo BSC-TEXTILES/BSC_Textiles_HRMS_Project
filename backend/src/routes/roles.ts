@@ -451,7 +451,7 @@ router.put('/rbac/users/:userId/roles', requireRoleAdmin, async (req: AuthReques
     if (!targetUser) return res.status(404).json({ error: 'User not found' });
 
     const roles = await prisma.role.findMany();
-    const roleById = new Map((roles || []).map((r: any) => [r.id, r]));
+    const roleById = new Map<string, any>((roles || []).map((r: any) => [r.id, r]));
     const invalid = roleIds.filter((id) => !roleById.has(id));
     if (invalid.length > 0) {
       return res.status(400).json({ error: `Unknown role ids: ${invalid.join(', ')}` });
