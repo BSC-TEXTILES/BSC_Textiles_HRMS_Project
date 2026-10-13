@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { X, Search, Loader2, Check } from 'lucide-react';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import { invalidateMyAccessCache } from '@/lib/rbac';
 
 export interface AssignableRole {
   id: string;
@@ -96,6 +97,7 @@ export function AssignUserRoleModal({
       setSaving(true);
       await api.put(`/roles/rbac/users/${selectedUser.id}/roles`, { roleIds: selectedRoleIds });
       toast.success(`Roles updated for ${selectedUser.fullName || selectedUser.email}`);
+      invalidateMyAccessCache();
       onSaved();
       onClose();
     } catch (err: any) {

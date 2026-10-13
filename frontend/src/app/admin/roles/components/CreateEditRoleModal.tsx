@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { X, ShieldPlus, Loader2 } from 'lucide-react';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
-import type { AccessLevel, RbacModule } from '@/lib/rbac';
+import { invalidateMyAccessCache, type AccessLevel, type RbacModule } from '@/lib/rbac';
 import { PermissionMatrix } from './PermissionMatrix';
 
 export interface RbacRole {
@@ -61,6 +61,7 @@ export function CreateEditRoleModal({ open, role, modules, onClose, onSaved }: C
         await api.post('/roles/rbac/roles', payload);
         toast.success(`Role "${payload.name}" created successfully`);
       }
+      invalidateMyAccessCache();
       onSaved();
       onClose();
     } catch (err: any) {

@@ -13,7 +13,7 @@ import {
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
-import { useMyAccess, canEditModule, canViewModule, RBAC_MODULES, type RbacModule, type AccessLevel } from '@/lib/rbac';
+import { useMyAccess, canEditModule, canViewModule, invalidateMyAccessCache, RBAC_MODULES, type RbacModule, type AccessLevel } from '@/lib/rbac';
 import { CreateEditRoleModal, type RbacRole } from '../roles/components/CreateEditRoleModal';
 import { AssignUserRoleModal } from '../roles/components/AssignUserRoleModal';
 import { PermissionSummary } from '../roles/components/PermissionMatrix';
@@ -197,6 +197,7 @@ export default function AdminSettingsPage() {
       await api.put(`/roles/rbac/users/${selectedUserForAccess.id}/roles`, {
         roleIds: userSelectedRoleIds,
       });
+      invalidateMyAccessCache();
       toast.success(`Role & module access updated for ${selectedUserForAccess.fullName || selectedUserForAccess.email}!`);
       loadRbacData();
     } catch (err: any) {
