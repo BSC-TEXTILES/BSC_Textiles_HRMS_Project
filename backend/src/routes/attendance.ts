@@ -197,6 +197,51 @@ router.post('/corrections/:id/reject', authorize('EDIT'), async (req: AuthReques
   }
 });
 
+/**
+ * PUT /api/attendance/corrections/:id
+ * Update punch regularization request details
+ */
+router.put('/corrections/:id', authorize('EDIT'), async (req: AuthRequest, res) => {
+  try {
+    const {
+      requestedLogin,
+      requestedLogout,
+      reason,
+      status,
+      reviewNote,
+    } = req.body;
+
+    const [rows]: any = await pool.query('SELECT * FROM attendancecorrection WHERE id = ?', [req.params.id]);
+    if (!rows.length) {
+      return res.status(404).json({ error: 'Correction request not found' });
+    }
+
+    await pool.query(
+      `UPDATE attendancecorrection 
+       SET requestedLogin = COALESCE(?, requestedLogin),
+           requestedLogout = COALESCE(?, requestedLogout),
+           reason = COALESCE(?, reason),
+           status = COALESCE(?, status),
+           reviewNote = COALESCE(?, reviewNote),
+           updatedAt = NOW(3)
+       WHERE id = ?`,
+      [
+        requestedLogin ? new Date(requestedLogin) : null,
+        requestedLogout ? new Date(requestedLogout) : null,
+        reason ? reason.trim() : null,
+        status || null,
+        reviewNote || null,
+        req.params.id,
+      ]
+    );
+
+    res.json({ message: 'Punch correction updated successfully', id: req.params.id });
+  } catch (error: any) {
+    console.error('Update punch correction error:', error);
+    res.status(500).json({ error: 'Failed to update punch correction', message: error.message });
+  }
+});
+
 const attendanceSchema = z.object({
   body: z.object({
     employeeId: z.string().min(1),
