@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
@@ -21,24 +21,16 @@ import {
   ScanFace,
   FilterX,
   Contact,
-  FolderLock,
-  AlertCircle,
+  FolderLock
 } from 'lucide-react';
 import { EmployeeQrModal } from '@/components/dashboard/EmployeeQrModal';
-import { TotalWorkforceDrawer } from '@/components/employees/drawers/TotalWorkforceDrawer';
-import { ActiveOnFloorDrawer } from '@/components/employees/drawers/ActiveOnFloorDrawer';
-import { KycComplianceDrawer } from '@/components/employees/drawers/KycComplianceDrawer';
-import { BiometricProfilesDrawer } from '@/components/employees/drawers/BiometricProfilesDrawer';
-import { StoreLocationsDrawer } from '@/components/employees/drawers/StoreLocationsDrawer';
-import { CANONICAL_HUB_STORES } from '@/components/employees/drawers/storeLocationsHelper';
-import { AddEmployeeDialog } from '@/components/employees/AddEmployeeDialog';
 
 import { useSession } from 'next-auth/react';
 
 export default function EmployeesPage() {
   const { data: session, status: authStatus } = useSession();
   const [employees, setEmployees] = useState<any[]>([]);
-  const [locations, setLocations] = useState<any[]>(CANONICAL_HUB_STORES);
+  const [locations, setLocations] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -47,63 +39,33 @@ export default function EmployeesPage() {
   const [selectedStatus, setSelectedStatus] = useState('ACTIVE');
   const [totalCount, setTotalCount] = useState(0);
 
-  // Drawer state management
-  type DrawerType = 'workforce' | 'on-floor' | 'kyc' | 'biometrics' | 'locations' | null;
-  const [activeDrawer, setActiveDrawer] = useState<DrawerType>(null);
-  const [drawerLoading, setDrawerLoading] = useState(false);
-  const [drawerRefreshing, setDrawerRefreshing] = useState(false);
-  const [drawerError, setDrawerError] = useState<string | null>(null);
-
-  // Focus trigger refs for accessible focus restoration on close
-  const card1Ref = useRef<HTMLButtonElement>(null);
-  const card2Ref = useRef<HTMLButtonElement>(null);
-  const card3Ref = useRef<HTMLButtonElement>(null);
-  const card4Ref = useRef<HTMLButtonElement>(null);
-  const card5Ref = useRef<HTMLButtonElement>(null);
-
-  // In-memory cache for drawer workforce data and abort controller for cancellation
-  const drawerDataCacheRef = useRef<Record<string, any[]>>({});
-  const drawerAbortControllerRef = useRef<AbortController | null>(null);
-
-  // Add Employee Dialog
+  // Add Employee Modal
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedQrEmp, setSelectedQrEmp] = useState<any | null>(null);
-  const addEmployeeBtnRef = useRef<HTMLButtonElement>(null);
-  const [filterNotice, setFilterNotice] = useState<string | null>(null);
-
-  const [departmentsLoading, setDepartmentsLoading] = useState(false);
-  const [departmentsError, setDepartmentsError] = useState<string | null>(null);
+  const [newEmp, setNewEmp] = useState({
+    employeeCode: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    gender: 'male',
+    role: 'SALES_EMPLOYEE',
+    locationId: '',
+    departmentId: '',
+    designation: 'Sales Consultant',
+  });
 
   const fetchMetadata = useCallback(async () => {
     try {
-      setDepartmentsLoading(true);
-      setDepartmentsError(null);
       const [locRes, deptRes] = await Promise.all([
         api.get('/locations/all').catch(() => ({ data: [] })),
-        api.get('/departments?limit=100').catch((err) => {
-          setDepartmentsError('Could not load departments');
-          return { data: [] };
-        }),
+        api.get('/departments').catch(() => ({ data: [] })),
       ]);
-      const fetchedLocs = Array.isArray(locRes.data) && locRes.data.length > 0 ? locRes.data : CANONICAL_HUB_STORES;
-      const mergedLocs = CANONICAL_HUB_STORES.map((canonical) => {
-        const found = fetchedLocs.find(
-          (l: any) =>
-            l.code?.toUpperCase() === canonical.code.toUpperCase() ||
-            (canonical.code === 'HUB-HQ' && l.code === 'HUB') ||
-            l.id === canonical.id
-        );
-        return found ? { ...canonical, ...found, code: canonical.code } : canonical;
-      });
-      setLocations(mergedLocs);
+      setLocations(locRes.data || []);
       setDepartments(deptRes.data?.departments || deptRes.data || []);
     } catch (e: any) {
       if (e?.response?.status !== 401 && !e?.isHandled401) {
         console.warn('Metadata fetch error:', e?.message || e);
       }
-      setLocations(CANONICAL_HUB_STORES);
-    } finally {
-      setDepartmentsLoading(false);
     }
   }, []);
 
@@ -138,118 +100,24 @@ export default function EmployeesPage() {
     }
   }, [authStatus, fetchMetadata, fetchEmployees]);
 
-  // Drawer handlers with caching and AbortController cancellation
-  const handleOpenDrawer = (type: DrawerType) => {
-    setActiveDrawer(type);
-    setDrawerError(null);
-
-    // If already cached, instant display
-    if (drawerDataCacheRef.current[type || '']) {
-      return;
-    }
-
-    if (drawerAbortControllerRef.current) {
-      drawerAbortControllerRef.current.abort();
-    }
-    const controller = new AbortController();
-    drawerAbortControllerRef.current = controller;
-
-    setDrawerLoading(true);
-    api.get('/employees?limit=1000', { signal: controller.signal })
-      .then((res) => {
-        if (res?.data?.employees) {
-          drawerDataCacheRef.current[type || ''] = res.data.employees;
-        }
-      })
-      .catch((err) => {
-        if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
-          console.warn('Drawer data fetch error:', err?.message || err);
-        }
-      })
-      .finally(() => {
-        setDrawerLoading(false);
-      });
-  };
-
-  const handleCloseDrawer = () => {
-    if (drawerAbortControllerRef.current) {
-      drawerAbortControllerRef.current.abort();
-      drawerAbortControllerRef.current = null;
-    }
-    setActiveDrawer(null);
-    setDrawerLoading(false);
-    setDrawerError(null);
-  };
-
-  const handleRefreshDrawer = (type: DrawerType) => {
-    if (!type) return;
-    setDrawerRefreshing(true);
-    setDrawerError(null);
-
-    const controller = new AbortController();
-    drawerAbortControllerRef.current = controller;
-
-    api.get('/employees?limit=1000', { signal: controller.signal })
-      .then((res) => {
-        if (res?.data?.employees) {
-          drawerDataCacheRef.current[type] = res.data.employees;
-          toast.success('Drawer records refreshed');
-        }
-      })
-      .catch((err) => {
-        if (err.name !== 'CanceledError' && err.name !== 'AbortError') {
-          setDrawerError('Failed to refresh data. Please retry.');
-        }
-      })
-      .finally(() => {
-        setDrawerRefreshing(false);
-      });
-  };
-
-  useEffect(() => {
-    return () => {
-      if (drawerAbortControllerRef.current) {
-        drawerAbortControllerRef.current.abort();
+  const handleCreateEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (!newEmp.firstName || !newEmp.lastName || !newEmp.email || !newEmp.locationId) {
+        toast.error('Please fill in required fields (Name, Email, Location)');
+        return;
       }
-    };
-  }, []);
-
-  const drawerEmployees = (activeDrawer && drawerDataCacheRef.current[activeDrawer]) || employees;
-  const hqLocation = locations.find((l) => l.code === 'HUB-HQ' || l.code === 'HUB');
-  const nonHqLocations = locations.filter((l) => l.code !== 'HUB-HQ' && l.code !== 'HUB');
-
-  const handleEmployeeCreated = (createdEmp: any) => {
-    // Invalidate drawer cache so drawers will fetch latest records
-    drawerDataCacheRef.current = {};
-    // Refetch workforce records and summary counts
-    fetchEmployees();
-
-    // Check if created employee matches active filters
-    const matchesLoc = !selectedLocation || createdEmp.locationId === selectedLocation;
-    const matchesDept = !selectedDept || createdEmp.departmentId === selectedDept;
-    const matchesSearch =
-      !search ||
-      (createdEmp.fullName?.toLowerCase().includes(search.toLowerCase()) ||
-        createdEmp.employeeCode?.toLowerCase().includes(search.toLowerCase()));
-    const matchesStatus =
-      !selectedStatus || selectedStatus === 'ALL' || createdEmp.status === selectedStatus;
-
-    if (!matchesLoc || !matchesDept || !matchesSearch || !matchesStatus) {
-      const empName = createdEmp.fullName || `${createdEmp.firstName} ${createdEmp.lastName}`.trim();
-      setFilterNotice(
-        `Employee ${empName} added. Note: The new employee is hidden by the current filters.`
-      );
-    } else {
-      setFilterNotice(null);
+      const code = newEmp.employeeCode || `TEST-EMP-${Math.floor(100 + Math.random() * 900)}`;
+      await api.post('/employees', {
+        ...newEmp,
+        employeeCode: code,
+      });
+      toast.success('Employee created successfully!');
+      setIsAddModalOpen(false);
+      fetchEmployees();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Failed to create employee');
     }
-  };
-
-  const handleResetFilters = () => {
-    setSearch('');
-    setSelectedLocation('');
-    setSelectedDept('');
-    setSelectedStatus('ACTIVE');
-    setFilterNotice(null);
   };
 
   const handleExportCSV = () => {
@@ -313,11 +181,8 @@ export default function EmployeesPage() {
               <span>Export CSV</span>
             </button>
             <button
-              ref={addEmployeeBtnRef}
-              type="button"
               onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-1.5 bg-[#722F37] hover:bg-[#5B232A] text-white px-3.5 py-2 rounded-lg text-xs font-bold shadow-xs transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
-              aria-haspopup="dialog"
+              className="flex items-center gap-1.5 bg-[#722F37] hover:bg-[#5B232A] text-white px-3.5 py-2 rounded-lg text-xs font-bold shadow-xs transition-all"
             >
               <UserPlus className="w-4 h-4" />
               <span>+ Add Employee</span>
@@ -327,15 +192,8 @@ export default function EmployeesPage() {
 
         {/* 5 WORKFORCE KPIS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {/* 1. TOTAL WORKFORCE */}
-          <button
-            type="button"
-            ref={card1Ref}
-            onClick={() => handleOpenDrawer('workforce')}
-            aria-label="View details for Total Workforce"
-            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#722F37]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
-          >
-            <div className="flex items-center justify-between mb-1 w-full">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Workforce</span>
               <div className="w-8 h-8 rounded-lg bg-[#722F37]/10 flex items-center justify-center text-[#722F37]">
                 <Users className="w-4 h-4" />
@@ -345,27 +203,15 @@ export default function EmployeesPage() {
               <span className="text-3xl font-bold text-[#18181B]">{totalCount}</span>
               <span className="text-[10px] font-bold text-[#722F37] bg-[#722F37]/10 px-1.5 py-0.5 rounded-full">+3 MTD</span>
             </div>
-            <div className="w-full pt-2 border-t border-slate-100 space-y-1">
-              <div className="flex items-center justify-between text-[11px] text-slate-500">
-                <span>Full-Time Staff</span>
-                <span>•</span>
-                <span>Active Roster</span>
-              </div>
-              <div className="flex items-center justify-end text-[10px] font-bold text-[#722F37]">
-                <span>View details &rarr;</span>
-              </div>
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+              <span>Full-Time Staff</span>
+              <span>•</span>
+              <span>Active Roster</span>
             </div>
-          </button>
+          </div>
 
-          {/* 2. ACTIVE ON-FLOOR */}
-          <button
-            type="button"
-            ref={card2Ref}
-            onClick={() => handleOpenDrawer('on-floor')}
-            aria-label="View details for Active On-Floor"
-            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#722F37]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
-          >
-            <div className="flex items-center justify-between mb-1 w-full">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active On-Floor</span>
               <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-700">
                 <Store className="w-4 h-4" />
@@ -375,26 +221,14 @@ export default function EmployeesPage() {
               <span className="text-3xl font-bold text-[#18181B]">12</span>
               <span className="text-xs text-slate-400">/ {totalCount}</span>
             </div>
-            <div className="w-full pt-2 border-t border-slate-100 space-y-1">
-              <div className="flex items-center justify-between text-[11px] text-slate-500">
-                <span className="text-emerald-700 font-bold">Shift A Active</span>
-                <span>Off-Duty / Roster</span>
-              </div>
-              <div className="flex items-center justify-end text-[10px] font-bold text-[#722F37]">
-                <span>View details &rarr;</span>
-              </div>
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+              <span className="text-emerald-700 font-bold">Shift A Active</span>
+              <span>Off-Duty / Roster</span>
             </div>
-          </button>
+          </div>
 
-          {/* 3. KYC COMPLIANCE */}
-          <button
-            type="button"
-            ref={card3Ref}
-            onClick={() => handleOpenDrawer('kyc')}
-            aria-label="View details for KYC Compliance"
-            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#722F37]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
-          >
-            <div className="flex items-center justify-between mb-1 w-full">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">KYC Compliance</span>
               <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-700">
                 <ShieldCheck className="w-4 h-4" />
@@ -404,26 +238,14 @@ export default function EmployeesPage() {
               <span className="text-3xl font-bold text-[#18181B]">100%</span>
               <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full">Verified</span>
             </div>
-            <div className="w-full pt-2 border-t border-slate-100 space-y-1">
-              <div className="flex items-center justify-between text-[11px] text-slate-500">
-                <span>PF & ESI Linked</span>
-                <span>Aadhaar KYC</span>
-              </div>
-              <div className="flex items-center justify-end text-[10px] font-bold text-[#722F37]">
-                <span>View details &rarr;</span>
-              </div>
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+              <span>PF & ESI Linked</span>
+              <span>Aadhaar KYC</span>
             </div>
-          </button>
+          </div>
 
-          {/* 4. BIOMETRIC PROFILES */}
-          <button
-            type="button"
-            ref={card4Ref}
-            onClick={() => handleOpenDrawer('biometrics')}
-            aria-label="View details for Biometric Profiles"
-            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#722F37]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
-          >
-            <div className="flex items-center justify-between mb-1 w-full">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Biometric Profiles</span>
               <div className="w-8 h-8 rounded-lg bg-[#722F37]/10 flex items-center justify-center text-[#722F37]">
                 <Fingerprint className="w-4 h-4" />
@@ -433,47 +255,28 @@ export default function EmployeesPage() {
               <span className="text-3xl font-bold text-[#18181B]">{totalCount}</span>
               <span className="text-xs text-slate-400">/ {totalCount}</span>
             </div>
-            <div className="w-full pt-2 border-t border-slate-100 space-y-1">
-              <div className="flex items-center justify-between text-[11px] text-slate-500">
-                <span>Face Enrolled</span>
-                <span className="text-[#722F37] font-bold">QR Ready</span>
-              </div>
-              <div className="flex items-center justify-end text-[10px] font-bold text-[#722F37]">
-                <span>View details &rarr;</span>
-              </div>
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+              <span>Face Enrolled</span>
+              <span className="text-[#722F37] font-bold">QR Ready</span>
             </div>
-          </button>
+          </div>
 
-          {/* 5. STORE LOCATIONS */}
-          <button
-            type="button"
-            ref={card5Ref}
-            onClick={() => handleOpenDrawer('locations')}
-            aria-label="View details for Store Locations"
-            className="emp-dir-summary-card text-left bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-[#722F37]/40 hover:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-2"
-          >
-            <div className="flex items-center justify-between mb-1 w-full">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between mb-1">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Store Locations</span>
               <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
                 <Building2 className="w-4 h-4" />
               </div>
             </div>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-[#18181B]">{locations.length}</span>
+              <span className="text-3xl font-bold text-[#18181B]">4</span>
               <span className="text-xs text-slate-400">Hub Stores</span>
             </div>
-            <div className="w-full pt-2 border-t border-slate-100 space-y-1">
-              <div className="flex items-center justify-between text-[11px] text-slate-500">
-                <span>{nonHqLocations.map((l) => l.code).join(' • ')}</span>
-                {hqLocation && (
-                  <span className="text-[#722F37] font-bold">{hqLocation.code}</span>
-                )}
-              </div>
-              <div className="flex items-center justify-end text-[10px] font-bold text-[#722F37]">
-                <span>View details &rarr;</span>
-              </div>
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-500">
+              <span>BEL • DAV • SHI</span>
+              <span className="text-[#722F37] font-bold">HUB-HQ</span>
             </div>
-          </button>
+          </div>
         </div>
 
         {/* SEARCH & FILTERS BAR */}
@@ -545,27 +348,6 @@ export default function EmployeesPage() {
           </div>
         </div>
 
-        {/* Filter Notice when created employee is hidden by active filters */}
-        {filterNotice && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs shadow-2xs"
-          >
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
-              <span>{filterNotice}</span>
-            </div>
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              className="px-2.5 py-1 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition-colors shrink-0"
-            >
-              Clear Filters
-            </button>
-          </div>
-        )}
-
         {/* WORKFORCE MASTER TABLE */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="p-4 border-b border-slate-100 flex items-center justify-between">
@@ -593,28 +375,22 @@ export default function EmployeesPage() {
                     <th className="py-3 px-4">Shift Allotment</th>
                     <th className="py-3 px-4">Biometrics</th>
                     <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4 text-right w-[130px] min-w-[130px] whitespace-nowrap">Actions</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
                   {employees.map((emp) => (
                     <tr key={emp.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3 px-4">
-                        <Link
-                          href={`/employees/profile/${emp.id}`}
-                          aria-label={`View profile for ${emp.fullName || `${emp.firstName} ${emp.lastName}`}`}
-                          className="flex items-center gap-2.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] rounded-lg"
-                        >
-                          <div className="w-8 h-8 rounded-full bg-[#722F37] text-white flex items-center justify-center font-bold text-xs shrink-0 group-hover:opacity-90">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full bg-[#722F37] text-white flex items-center justify-center font-bold text-xs">
                             {emp.firstName?.[0]}{emp.lastName?.[0]}
                           </div>
                           <div>
-                            <div className="font-bold text-[#18181B] group-hover:text-[#722F37] transition-colors">
-                              {emp.fullName || `${emp.firstName} ${emp.lastName}`}
-                            </div>
+                            <div className="font-bold text-[#18181B]">{emp.fullName || `${emp.firstName} ${emp.lastName}`}</div>
                             <div className="text-[10px] font-mono text-slate-400">{emp.employeeCode}</div>
                           </div>
-                        </Link>
+                        </div>
                       </td>
                       <td className="py-3 px-4">
                         <div className="font-medium text-[#18181B]">{emp.designation || 'Sales Consultant'}</div>
@@ -664,11 +440,10 @@ export default function EmployeesPage() {
                           {emp.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4 text-right w-[130px] min-w-[130px] whitespace-nowrap">
+                      <td className="py-3 px-4 text-right">
                         <Link
                           href={`/employees/profile/${emp.id}`}
-                          aria-label={`View profile for ${emp.fullName || `${emp.firstName} ${emp.lastName}`}`}
-                          className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-semibold text-[#722F37] hover:bg-[#722F37]/10 active:bg-[#722F37]/20 rounded-lg border border-[#722F37]/30 transition-colors whitespace-nowrap focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-1"
+                          className="px-2.5 py-1 text-xs font-semibold text-[#722F37] hover:bg-[#722F37]/10 rounded border border-[#722F37]/20 transition-colors"
                         >
                           View Profile
                         </Link>
@@ -682,17 +457,136 @@ export default function EmployeesPage() {
         </div>
 
         {/* CREATE EMPLOYEE MODAL */}
-        <AddEmployeeDialog
-          isOpen={isAddModalOpen}
-          onClose={() => setIsAddModalOpen(false)}
-          onSuccess={handleEmployeeCreated}
-          locations={locations}
-          departments={departments}
-          departmentsLoading={departmentsLoading}
-          departmentsError={departmentsError}
-          onRetryDepartments={fetchMetadata}
-          triggerRef={addEmployeeBtnRef}
-        />
+        {isAddModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-lg w-full p-6 space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <UserPlus className="w-5 h-5 text-[#722F37]" />
+                  <h3 className="font-bold text-base text-[#18181B]">Add Employee</h3>
+                </div>
+                <button
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-600 p-1"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateEmployee} className="space-y-3 text-xs">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">First Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={newEmp.firstName}
+                      onChange={(e) => setNewEmp({ ...newEmp, firstName: e.target.value })}
+                      placeholder="e.g. Ramesh"
+                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-[#722F37]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Last Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={newEmp.lastName}
+                      onChange={(e) => setNewEmp({ ...newEmp, lastName: e.target.value })}
+                      placeholder="e.g. Angadi"
+                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-[#722F37]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Work Email *</label>
+                  <input
+                    type="email"
+                    required
+                    value={newEmp.email}
+                    onChange={(e) => setNewEmp({ ...newEmp, email: e.target.value })}
+                    placeholder="ramesh.angadi@bsctextiles.com"
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs focus:outline-none focus:border-[#722F37]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Store Location *</label>
+                    <select
+                      required
+                      value={newEmp.locationId}
+                      onChange={(e) => setNewEmp({ ...newEmp, locationId: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#722F37]"
+                    >
+                      <option value="">Select Location</option>
+                      {locations.map((l) => (
+                        <option key={l.id} value={l.id}>{l.name} ({l.code})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Department</label>
+                    <select
+                      value={newEmp.departmentId}
+                      onChange={(e) => setNewEmp({ ...newEmp, departmentId: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#722F37]"
+                    >
+                      <option value="">Select Department</option>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Gender</label>
+                    <select
+                      value={newEmp.gender}
+                      onChange={(e) => setNewEmp({ ...newEmp, gender: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#722F37]"
+                    >
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Role</label>
+                    <select
+                      value={newEmp.role}
+                      onChange={(e) => setNewEmp({ ...newEmp, role: e.target.value })}
+                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#722F37]"
+                    >
+                      <option value="SALES_EMPLOYEE">Sales Employee</option>
+                      <option value="FLOOR_MANAGER">Floor Manager</option>
+                      <option value="HR_ADMIN">HR Admin</option>
+                      <option value="CASHIER">Cashier</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddModalOpen(false)}
+                    className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-1.5 text-xs bg-[#722F37] hover:bg-[#5B232A] text-white rounded-lg font-bold shadow-xs transition-colors"
+                  >
+                    Create Employee
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* Employee One-Time QR Pass Modal */}
         {selectedQrEmp && (
@@ -702,110 +596,6 @@ export default function EmployeesPage() {
             employee={selectedQrEmp}
           />
         )}
-
-        {/* 1. TOTAL WORKFORCE DRAWER */}
-        <TotalWorkforceDrawer
-          open={activeDrawer === 'workforce'}
-          onClose={handleCloseDrawer}
-          employees={drawerEmployees}
-          locations={locations}
-          departments={departments}
-          currentLocationId={selectedLocation}
-          currentDeptId={selectedDept}
-          onApplyDirectoryFilter={({ locationId, departmentId }) => {
-            if (locationId !== undefined) setSelectedLocation(locationId);
-            if (departmentId !== undefined) setSelectedDept(departmentId);
-          }}
-          onRefresh={() => handleRefreshDrawer('workforce')}
-          isRefreshing={drawerRefreshing}
-          triggerRef={card1Ref}
-          isLoading={drawerLoading}
-          error={drawerError}
-          onRetry={() => handleOpenDrawer('workforce')}
-        />
-
-        {/* 2. ACTIVE ON-FLOOR DRAWER */}
-        <ActiveOnFloorDrawer
-          open={activeDrawer === 'on-floor'}
-          onClose={handleCloseDrawer}
-          employees={drawerEmployees}
-          locations={locations}
-          departments={departments}
-          currentLocationId={selectedLocation}
-          currentDeptId={selectedDept}
-          onApplyDirectoryFilter={({ locationId, departmentId, status }) => {
-            if (locationId !== undefined) setSelectedLocation(locationId);
-            if (departmentId !== undefined) setSelectedDept(departmentId);
-            if (status !== undefined) setSelectedStatus(status);
-          }}
-          onRefresh={() => handleRefreshDrawer('on-floor')}
-          isRefreshing={drawerRefreshing}
-          triggerRef={card2Ref}
-          isLoading={drawerLoading}
-          error={drawerError}
-          onRetry={() => handleOpenDrawer('on-floor')}
-        />
-
-        {/* 3. KYC COMPLIANCE DRAWER */}
-        <KycComplianceDrawer
-          open={activeDrawer === 'kyc'}
-          onClose={handleCloseDrawer}
-          employees={drawerEmployees}
-          locations={locations}
-          departments={departments}
-          currentLocationId={selectedLocation}
-          currentDeptId={selectedDept}
-          onApplyDirectoryFilter={({ locationId, departmentId }) => {
-            if (locationId !== undefined) setSelectedLocation(locationId);
-            if (departmentId !== undefined) setSelectedDept(departmentId);
-          }}
-          onRefresh={() => handleRefreshDrawer('kyc')}
-          isRefreshing={drawerRefreshing}
-          triggerRef={card3Ref}
-          isLoading={drawerLoading}
-          error={drawerError}
-          onRetry={() => handleOpenDrawer('kyc')}
-        />
-
-        {/* 4. BIOMETRIC PROFILES DRAWER */}
-        <BiometricProfilesDrawer
-          open={activeDrawer === 'biometrics'}
-          onClose={handleCloseDrawer}
-          employees={drawerEmployees}
-          locations={locations}
-          departments={departments}
-          currentLocationId={selectedLocation}
-          currentDeptId={selectedDept}
-          onApplyDirectoryFilter={({ locationId, departmentId }) => {
-            if (locationId !== undefined) setSelectedLocation(locationId);
-            if (departmentId !== undefined) setSelectedDept(departmentId);
-          }}
-          onRefresh={() => handleRefreshDrawer('biometrics')}
-          isRefreshing={drawerRefreshing}
-          triggerRef={card4Ref}
-          isLoading={drawerLoading}
-          error={drawerError}
-          onRetry={() => handleOpenDrawer('biometrics')}
-        />
-
-        {/* 5. STORE LOCATIONS DRAWER */}
-        <StoreLocationsDrawer
-          open={activeDrawer === 'locations'}
-          onClose={handleCloseDrawer}
-          locations={locations}
-          employees={drawerEmployees}
-          currentLocationId={selectedLocation}
-          currentDeptId={selectedDept}
-          onSelectLocation={(locId) => {
-            setSelectedLocation(locId);
-          }}
-          onRefresh={() => handleRefreshDrawer('locations')}
-          isRefreshing={drawerRefreshing}
-          triggerRef={card5Ref}
-          isLoading={drawerLoading}
-          error={drawerError}
-          onRetry={() => handleOpenDrawer('locations')}
-        />
       </div>
     </DashboardLayout>
   );

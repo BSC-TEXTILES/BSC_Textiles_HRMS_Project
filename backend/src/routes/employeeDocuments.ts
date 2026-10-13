@@ -52,8 +52,8 @@ router.get('/dashboard', authorize('VIEW'), async (req: AuthRequest, res) => {
       params.push(scopedLocId, scopedLocId.replace(/^loc_/, '').toUpperCase());
     }
     if (departmentId && departmentId !== 'all') {
-      conditions.push('(e.departmentId = ? OR e.departmentId IN (SELECT d2.id FROM department d2 WHERE d2.code = (SELECT d1.code FROM department d1 WHERE d1.id = ?) OR d2.name = (SELECT d3.name FROM department d3 WHERE d3.id = ?)))');
-      params.push(departmentId, departmentId, departmentId);
+      conditions.push('e.departmentId = ?');
+      params.push(departmentId);
     }
 
     const whereEmp = conditions.join(' AND ');
@@ -164,8 +164,8 @@ router.get('/directory', authorize('VIEW'), async (req: AuthRequest, res) => {
       params.push(scopedLocId, scopedLocId.replace(/^loc_/, '').toUpperCase());
     }
     if (departmentId && departmentId !== 'all') {
-      conditions.push('(e.departmentId = ? OR e.departmentId IN (SELECT d2.id FROM department d2 WHERE d2.code = (SELECT d1.code FROM department d1 WHERE d1.id = ?) OR d2.name = (SELECT d3.name FROM department d3 WHERE d3.id = ?)))');
-      params.push(departmentId, departmentId, departmentId);
+      conditions.push('e.departmentId = ?');
+      params.push(departmentId);
     }
     if (search) {
       const q = `%${String(search).trim()}%`;
@@ -247,25 +247,14 @@ router.get('/directory', authorize('VIEW'), async (req: AuthRequest, res) => {
       };
     });
 
-    let filteredEmployees = mappedEmployees;
-    if (statusFilter === 'COMPLIANT') {
-      filteredEmployees = mappedEmployees.filter((emp: any) => emp.isCompliant);
-    } else if (statusFilter === 'MISSING_REQUIRED') {
-      filteredEmployees = mappedEmployees.filter((emp: any) => emp.requiredPending > 0);
-    } else if (statusFilter === 'HAS_PENDING') {
-      filteredEmployees = mappedEmployees.filter((emp: any) => emp.pendingVerification > 0);
-    } else if (statusFilter === 'HAS_REJECTED') {
-      filteredEmployees = mappedEmployees.filter((emp: any) => emp.rejected > 0);
-    }
-
     res.json({
       success: true,
-      data: filteredEmployees,
+      data: mappedEmployees,
       pagination: {
         page: pageNum,
         limit: pageSize,
-        total: statusFilter && statusFilter !== 'all' ? filteredEmployees.length : totalEmployees,
-        totalPages: Math.ceil((statusFilter && statusFilter !== 'all' ? filteredEmployees.length : totalEmployees) / pageSize)
+        total: totalEmployees,
+        totalPages: Math.ceil(totalEmployees / pageSize)
       }
     });
   } catch (err: any) {
@@ -728,7 +717,7 @@ router.post('/:id/verify', authorize('EDIT'), async (req: AuthRequest, res) => {
  */
 router.get('/verification-queue', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
-    const { locationId, departmentId, status = 'PENDING_VERIFICATION' } = req.query;
+    const { locationId, status = 'PENDING_VERIFICATION' } = req.query;
 
     const conditions: string[] = ['1=1'];
     const params: any[] = [];
@@ -740,10 +729,6 @@ router.get('/verification-queue', authorize('VIEW'), async (req: AuthRequest, re
     if (locationId && locationId !== 'all') {
       conditions.push('e.locationId = ?');
       params.push(locationId);
-    }
-    if (departmentId && departmentId !== 'all') {
-      conditions.push('(e.departmentId = ? OR e.departmentId IN (SELECT d2.id FROM department d2 WHERE d2.code = (SELECT d1.code FROM department d1 WHERE d1.id = ?) OR d2.name = (SELECT d3.name FROM department d3 WHERE d3.id = ?)))');
-      params.push(departmentId, departmentId, departmentId);
     }
 
     const whereClause = conditions.join(' AND ');
@@ -794,7 +779,7 @@ router.get('/verification-queue', authorize('VIEW'), async (req: AuthRequest, re
  */
 router.get('/missing-report', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
-    const { locationId, departmentId } = req.query;
+    const { locationId } = req.query;
     const conditions: string[] = ['1=1'];
     const params: any[] = [];
 
@@ -802,18 +787,12 @@ router.get('/missing-report', authorize('VIEW'), async (req: AuthRequest, res) =
       conditions.push('e.locationId = ?');
       params.push(locationId);
     }
-    if (departmentId && departmentId !== 'all') {
-      conditions.push('(e.departmentId = ? OR e.departmentId IN (SELECT d2.id FROM department d2 WHERE d2.code = (SELECT d1.code FROM department d1 WHERE d1.id = ?) OR d2.name = (SELECT d3.name FROM department d3 WHERE d3.id = ?)))');
-      params.push(departmentId, departmentId, departmentId);
-    }
 
     const whereClause = conditions.join(' AND ');
 
-    const STATUTORY_REQUIRED_CODES = ['AADHAAR_CARD', 'PAN_CARD', 'OFFER_LETTER'];
-    const [allConfigs]: any = await pool.query(`
-      SELECT code, name, category FROM document_type_config WHERE isActive = 1
+    const [requiredConfigs]: any = await pool.query(`
+      SELECT code, name, category FROM document_type_config WHERE isRequired = 1 AND isActive = 1
     `);
-    const requiredConfigs = allConfigs.filter((cfg: any) => STATUTORY_REQUIRED_CODES.includes(cfg.code));
 
     const [employees]: any = await pool.query(`
       SELECT e.id, e.employeeCode, e.fullName, e.designation, d.name as departmentName, l.name as locationName
@@ -853,162 +832,4 @@ router.get('/missing-report', authorize('VIEW'), async (req: AuthRequest, res) =
   }
 });
 
-/**
- * 11. GET /records
- * Detailed documents list and statistics for drawer views
- */
-router.get('/records', authorize('VIEW'), async (req: AuthRequest, res) => {
-  try {
-    const { locationId, departmentId, filterType, search, limit = 500 } = req.query;
-    let scopedLocId = getScopedLocationId(req.user, locationId as string);
-    if (scopedLocId === 'all') scopedLocId = undefined;
-
-    const conditions: string[] = ['1=1'];
-    const params: any[] = [];
-
-    if (scopedLocId) {
-      conditions.push('(e.locationId = ? OR l.code = ?)');
-      params.push(scopedLocId, scopedLocId.replace(/^loc_/, '').toUpperCase());
-    }
-    if (departmentId && departmentId !== 'all') {
-      conditions.push('(e.departmentId = ? OR e.departmentId IN (SELECT d2.id FROM department d2 WHERE d2.code = (SELECT d1.code FROM department d1 WHERE d1.id = ?) OR d2.name = (SELECT d3.name FROM department d3 WHERE d3.id = ?)))');
-      params.push(departmentId, departmentId, departmentId);
-    }
-
-    if (filterType === 'pending') {
-      conditions.push("ed.verificationStatus = 'PENDING_VERIFICATION'");
-    } else if (filterType === 'verified') {
-      conditions.push("ed.verificationStatus = 'VERIFIED'");
-    } else if (filterType === 'rejected') {
-      conditions.push("ed.verificationStatus = 'REJECTED'");
-    } else if (filterType === 'expiring') {
-      conditions.push('ed.expiryDate IS NOT NULL AND ed.expiryDate >= CURDATE() AND ed.expiryDate <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)');
-    } else if (filterType === 'recent') {
-      conditions.push('ed.createdAt >= DATE_SUB(NOW(), INTERVAL 7 DAY)');
-    }
-
-    if (search) {
-      const q = `%${String(search).trim()}%`;
-      conditions.push('(e.fullName LIKE ? OR e.employeeCode LIKE ? OR ed.documentType LIKE ? OR ed.title LIKE ? OR ed.fileName LIKE ? OR ed.uploadedByName LIKE ?)');
-      params.push(q, q, q, q, q, q);
-    }
-
-    const whereClause = conditions.join(' AND ');
-
-    let orderClause = 'ed.createdAt DESC';
-    if (filterType === 'pending') {
-      orderClause = 'ed.createdAt ASC'; // Oldest pending first
-    } else if (filterType === 'expiring') {
-      orderClause = 'ed.expiryDate ASC'; // Soonest expiring first
-    }
-
-    const safeLimit = Math.max(1, Math.min(1000, Number(limit)));
-
-    const [rows]: any = await pool.query(`
-      SELECT 
-        ed.id,
-        ed.employeeId,
-        ed.category,
-        ed.documentType,
-        ed.title,
-        ed.fileName,
-        ed.fileSize,
-        ed.mimeType,
-        ed.version,
-        ed.verificationStatus,
-        ed.rejectionReason,
-        ed.remarks,
-        ed.uploadedById,
-        ed.uploadedByName,
-        ed.uploadedByRole,
-        ed.verifiedById,
-        ed.verifiedByName,
-        ed.verifiedAt,
-        ed.issueDate,
-        ed.expiryDate,
-        ed.createdAt,
-        ed.updatedAt,
-        DATEDIFF(NOW(), ed.createdAt) as daysPending,
-        CASE 
-          WHEN ed.expiryDate IS NOT NULL THEN DATEDIFF(ed.expiryDate, CURDATE())
-          ELSE NULL 
-        END as daysLeft,
-        e.fullName as employeeName,
-        e.employeeCode,
-        e.designation,
-        e.status as employeeStatus,
-        d.id as departmentId,
-        d.name as departmentName,
-        l.id as locationId,
-        l.name as locationName,
-        l.code as locationCode
-      FROM employee_documents ed
-      INNER JOIN employee e ON ed.employeeId = e.id
-      LEFT JOIN department d ON e.departmentId = d.id
-      LEFT JOIN location l ON e.locationId = l.id
-      WHERE ${whereClause}
-      ORDER BY ${orderClause}
-      LIMIT ?
-    `, [...params, safeLimit]);
-
-    // Compute drawer summary metrics
-    let totalStorage = 0;
-    const byType: Record<string, number> = {};
-    const byStatus: Record<string, number> = {};
-    const byVerifier: Record<string, number> = {};
-    const byUploader: Record<string, number> = {};
-    const byReason: Record<string, number> = {};
-    const byDay: Record<string, number> = {};
-    const byHub: Record<string, number> = {};
-
-    for (const row of rows) {
-      totalStorage += Number(row.fileSize || 0);
-
-      const type = row.documentType || 'OTHER';
-      byType[type] = (byType[type] || 0) + 1;
-
-      const status = row.verificationStatus || 'UNKNOWN';
-      byStatus[status] = (byStatus[status] || 0) + 1;
-
-      if (row.verifiedByName) {
-        byVerifier[row.verifiedByName] = (byVerifier[row.verifiedByName] || 0) + 1;
-      }
-      if (row.uploadedByName) {
-        byUploader[row.uploadedByName] = (byUploader[row.uploadedByName] || 0) + 1;
-      }
-      if (row.rejectionReason) {
-        byReason[row.rejectionReason] = (byReason[row.rejectionReason] || 0) + 1;
-      }
-      if (row.locationName) {
-        byHub[row.locationName] = (byHub[row.locationName] || 0) + 1;
-      }
-      if (row.createdAt) {
-        const dayStr = new Date(row.createdAt).toLocaleDateString('en-CA'); // YYYY-MM-DD
-        byDay[dayStr] = (byDay[dayStr] || 0) + 1;
-      }
-    }
-
-    res.json({
-      success: true,
-      total: rows.length,
-      data: rows,
-      summary: {
-        totalFiles: rows.length,
-        totalStorageBytes: totalStorage,
-        byType,
-        byStatus,
-        byVerifier,
-        byUploader,
-        byReason,
-        byDay,
-        byHub
-      }
-    });
-  } catch (err: any) {
-    console.error('Error fetching document drawer records:', err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
 export default router;
-
