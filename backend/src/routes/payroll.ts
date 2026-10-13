@@ -2080,7 +2080,42 @@ router.get('/salary-structures', async (req: AuthRequest, res) => {
       return res.status(403).json({ error: 'Forbidden: Insufficient privileges' });
     }
     const [rows]: any = await pool.query(`SELECT * FROM salary_structure ORDER BY baseSalary ASC`);
-    res.json({ structures: rows });
+    const structures = rows.map((r: any) => {
+      const baseSalary = Number(r.baseSalary || 0);
+      const hraPercent = Number(r.hraPercent || 40);
+      const pfPercent = Number(r.pfPercent || 12);
+      const conveyance = Number(r.conveyance || 0);
+      const medicalAllowance = Number(r.medicalAllowance || 0);
+      const specialAllowance = Number(r.specialAllowance || 0);
+      const totalAllowances = conveyance + medicalAllowance + specialAllowance;
+      const hraAmount = Math.round(baseSalary * (hraPercent / 100));
+      const pfAmount = Math.round(baseSalary * (pfPercent / 100));
+      const ptDeduction = Number(r.ptDeduction || 200);
+      const gross = baseSalary + hraAmount + totalAllowances;
+      const net = gross - pfAmount - ptDeduction;
+
+      return {
+        ...r,
+        name: r.title,
+        title: r.title,
+        cadre: r.cadreGrade,
+        cadreGrade: r.cadreGrade,
+        basicSalary: baseSalary,
+        baseSalary,
+        hraPercent,
+        pfPercent,
+        allowances: totalAllowances,
+        conveyance,
+        medicalAllowance,
+        specialAllowance,
+        ptDeduction,
+        hraAmount,
+        pfAmount,
+        grossEst: gross,
+        netEst: net,
+      };
+    });
+    res.json({ structures });
   } catch (error) {
     console.error('Get salary structures error:', error);
     res.status(500).json({ error: 'Failed to retrieve salary structures' });
@@ -2092,20 +2127,151 @@ router.post('/salary-structures', async (req: AuthRequest, res) => {
     if (!isHrOrAdmin(req.user?.role)) {
       return res.status(403).json({ error: 'Forbidden: Insufficient privileges' });
     }
-    const { title, cadreGrade, baseSalary, hraPercent, conveyance, medicalAllowance, specialAllowance } = req.body;
-    if (!title || !baseSalary) {
+    const {
+      title,
+      name,
+      cadreGrade,
+      cadre,
+      baseSalary,
+      basicSalary,
+      hraPercent,
+      allowances,
+      conveyance,
+      medicalAllowance,
+      specialAllowance,
+      pfPercent,
+      ptDeduction,
+    } = req.body;
+
+    const effTitle = title || name;
+    const effCadre = cadreGrade || cadre || 'CADRE-A';
+    const effBase = baseSalary !== undefined ? Number(baseSalary) : basicSalary !== undefined ? Number(basicSalary) : 0;
+
+    if (!effTitle || !effBase) {
       return res.status(400).json({ error: 'Title and Base Salary are required' });
     }
+
+    const effConveyance = conveyance !== undefined ? Number(conveyance) : 1600;
+    const effMedical = medicalAllowance !== undefined ? Number(medicalAllowance) : 1250;
+    const effSpecial =
+      specialAllowance !== undefined
+        ? Number(specialAllowance)
+        : allowances !== undefined
+        ? Math.max(0, Number(allowances) - (effConveyance + effMedical))
+        : 2000;
+
     const id = `struct-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     await pool.query(`
-      INSERT INTO salary_structure (id, title, cadreGrade, baseSalary, hraPercent, conveyance, medicalAllowance, specialAllowance)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [id, title, cadreGrade || 'CADRE-A', baseSalary, hraPercent || 40, conveyance || 1600, medicalAllowance || 1250, specialAllowance || 2000]);
+      INSERT INTO salary_structure (
+        id, title, cadreGrade, baseSalary, hraPercent, conveyance, medicalAllowance, specialAllowance, pfPercent, ptDeduction, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE')
+    `, [
+      id,
+      effTitle,
+      effCadre,
+      effBase,
+      hraPercent !== undefined ? Number(hraPercent) : 40,
+      effConveyance,
+      effMedical,
+      effSpecial,
+      pfPercent !== undefined ? Number(pfPercent) : 12,
+      ptDeduction !== undefined ? Number(ptDeduction) : 200,
+    ]);
 
     res.status(201).json({ message: 'Salary structure template created successfully', id });
   } catch (error) {
     console.error('Create salary structure error:', error);
     res.status(500).json({ error: 'Failed to create salary structure' });
+  }
+});
+
+router.put('/salary-structures/:id', async (req: AuthRequest, res) => {
+  try {
+    if (!isHrOrAdmin(req.user?.role)) {
+      return res.status(403).json({ error: 'Forbidden: Insufficient privileges' });
+    }
+    const { id } = req.params;
+    const {
+      title,
+      name,
+      cadreGrade,
+      cadre,
+      baseSalary,
+      basicSalary,
+      hraPercent,
+      allowances,
+      conveyance,
+      medicalAllowance,
+      specialAllowance,
+      pfPercent,
+      ptDeduction,
+      status,
+    } = req.body;
+
+    const effTitle = title || name;
+    const effCadre = cadreGrade || cadre;
+    const effBase = baseSalary !== undefined ? Number(baseSalary) : basicSalary !== undefined ? Number(basicSalary) : 0;
+
+    if (!effTitle || !effBase) {
+      return res.status(400).json({ error: 'Title and Base Salary are required' });
+    }
+
+    const effConveyance = conveyance !== undefined ? Number(conveyance) : 1600;
+    const effMedical = medicalAllowance !== undefined ? Number(medicalAllowance) : 1250;
+    const effSpecial =
+      specialAllowance !== undefined
+        ? Number(specialAllowance)
+        : allowances !== undefined
+        ? Math.max(0, Number(allowances) - (effConveyance + effMedical))
+        : 2000;
+
+    await pool.query(
+      `UPDATE salary_structure SET
+        title = ?,
+        cadreGrade = ?,
+        baseSalary = ?,
+        hraPercent = ?,
+        conveyance = ?,
+        medicalAllowance = ?,
+        specialAllowance = ?,
+        pfPercent = ?,
+        ptDeduction = ?,
+        status = COALESCE(?, status),
+        updatedAt = NOW()
+      WHERE id = ?`,
+      [
+        effTitle,
+        effCadre || 'CADRE-A',
+        effBase,
+        hraPercent !== undefined ? Number(hraPercent) : 40,
+        effConveyance,
+        effMedical,
+        effSpecial,
+        pfPercent !== undefined ? Number(pfPercent) : 12,
+        ptDeduction !== undefined ? Number(ptDeduction) : 200,
+        status || 'ACTIVE',
+        id,
+      ]
+    );
+
+    res.json({ message: 'Salary structure updated successfully', id });
+  } catch (error) {
+    console.error('Update salary structure error:', error);
+    res.status(500).json({ error: 'Failed to update salary structure' });
+  }
+});
+
+router.delete('/salary-structures/:id', async (req: AuthRequest, res) => {
+  try {
+    if (!isHrOrAdmin(req.user?.role)) {
+      return res.status(403).json({ error: 'Forbidden: Insufficient privileges' });
+    }
+    const { id } = req.params;
+    await pool.query(`DELETE FROM salary_structure WHERE id = ?`, [id]);
+    res.json({ message: 'Salary structure deleted successfully', id });
+  } catch (error) {
+    console.error('Delete salary structure error:', error);
+    res.status(500).json({ error: 'Failed to delete salary structure' });
   }
 });
 
