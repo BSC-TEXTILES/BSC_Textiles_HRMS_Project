@@ -29,6 +29,189 @@ router.use('/late-fines', lateFineRoutes);
 router.use(authenticate);
 
 /**
+ * GET /api/attendance/monthly-matrix
+ * Get monthly attendance register matrix with full days of month and database synced records
+ */
+router.get('/monthly-matrix', authorize('VIEW'), async (req: AuthRequest, res) => {
+  try {
+    const year = Number(req.query.year) || new Date().getFullYear();
+    const month = Number(req.query.month) || (new Date().getMonth() + 1); // 1-12
+    const locationId = req.query.locationId as string;
+    const search = (req.query.search as string || '').trim().toLowerCase();
+
+    // Determine days in this specific month
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const startDateStr = `${year}-${String(month).padStart(2, '0')}-01`;
+    const endDateStr = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
+
+    // Query employees
+    let empQuery = `
+      SELECT e.id, e.employeeCode, e.fullName, e.role, e.designation, e.locationId, e.departmentId, e.shiftId,
+             l.name as locationName, d.name as departmentName
+      FROM employee e
+      LEFT JOIN location l ON e.locationId = l.id
+      LEFT JOIN department d ON e.departmentId = d.id
+      WHERE e.status = 'ACTIVE'
+    `;
+    const empParams: any[] = [];
+    if (locationId && locationId !== 'ALL') {
+      empQuery += ` AND (e.locationId = ? OR l.code = ?)`;
+      empParams.push(locationId, locationId);
+    }
+    if (search) {
+      empQuery += ` AND (LOWER(e.fullName) LIKE ? OR LOWER(e.employeeCode) LIKE ? OR LOWER(e.role) LIKE ?)`;
+      const term = `%${search}%`;
+      empParams.push(term, term, term);
+    }
+    empQuery += ` ORDER BY e.fullName ASC LIMIT 100`;
+
+    const [employees]: any = await pool.query(empQuery, empParams);
+
+    // Query all existing attendance records for this month
+    const [attRows]: any = await pool.query(
+      `SELECT id, employeeId, DATE_FORMAT(attendanceDate, '%Y-%m-%d') as attDate,
+              DAY(attendanceDate) as dayNum, actualLogin, actualLogout, status, notes
+       FROM attendance
+       WHERE attendanceDate >= ? AND attendanceDate <= ?`,
+      [startDateStr, endDateStr]
+    );
+
+    // Group by employeeId and dayNum
+    const matrix: Record<string, Record<number, any>> = {};
+    for (const row of attRows) {
+      if (!matrix[row.employeeId]) {
+        matrix[row.employeeId] = {};
+      }
+      let code = 'P';
+      if (row.status === 'WEEKLY_OFF') code = 'WO';
+      else if (row.status === 'LATE') code = 'L';
+      else if (row.status === 'ABSENT') code = 'A';
+      else if (row.notes?.includes('Earned Leave') || row.notes?.includes('EL')) code = 'EL';
+      else if (row.notes?.includes('Half Day') || row.notes?.includes('HD')) code = 'HD';
+      else if (row.notes?.includes('On Duty') || row.notes?.includes('OD')) code = 'OD';
+
+      matrix[row.employeeId][row.dayNum] = {
+        id: row.id,
+        date: row.attDate,
+        code,
+        status: row.status,
+        actualLogin: row.actualLogin ? new Date(row.actualLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null,
+        actualLogout: row.actualLogout ? new Date(row.actualLogout).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null,
+        notes: row.notes || '',
+      };
+    }
+
+    res.json({
+      year,
+      month,
+      daysInMonth,
+      startDate: startDateStr,
+      endDate: endDateStr,
+      employees,
+      matrix,
+    });
+  } catch (error: any) {
+    console.error('Monthly matrix error:', error);
+    res.status(500).json({ error: 'Failed to retrieve monthly matrix', message: error.message });
+  }
+});
+
+/**
+ * PUT /api/attendance/update-day
+ * Directly updates an employee's attendance status & timings for a specific day in the database
+ */
+router.put('/update-day', authorize('EDIT'), async (req: AuthRequest, res) => {
+  try {
+    const { employeeId, date, code, inTime, outTime, notes } = req.body;
+    if (!employeeId || !date) {
+      return res.status(400).json({ error: 'employeeId and date are required' });
+    }
+
+    // Get employee details
+    const [empRows]: any = await pool.query('SELECT id, locationId, shiftId FROM employee WHERE id = ?', [employeeId]);
+    if (!empRows.length) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    const emp = empRows[0];
+
+    // Map muster code to valid status enum
+    let dbStatus = 'PRESENT';
+    let noteText = notes || '';
+    if (code === 'WO') {
+      dbStatus = 'WEEKLY_OFF';
+    } else if (code === 'L') {
+      dbStatus = 'LATE';
+    } else if (code === 'A') {
+      dbStatus = 'ABSENT';
+    } else if (code === 'EL') {
+      dbStatus = 'PRESENT';
+      noteText = noteText ? `${noteText} [Earned Leave]` : '[Earned Leave]';
+    } else if (code === 'HD') {
+      dbStatus = 'PRESENT';
+      noteText = noteText ? `${noteText} [Half Day]` : '[Half Day]';
+    } else if (code === 'OD') {
+      dbStatus = 'PRESENT';
+      noteText = noteText ? `${noteText} [On Duty]` : '[On Duty]';
+    }
+
+    // Format timestamps
+    let loginDt: Date | null = null;
+    let logoutDt: Date | null = null;
+    if (inTime && inTime.trim()) {
+      const parsedIn = new Date(`${date}T${inTime.includes(':') && inTime.length <= 5 ? inTime + ':00' : inTime}`);
+      if (!isNaN(parsedIn.getTime())) loginDt = parsedIn;
+    }
+    if (outTime && outTime.trim()) {
+      const parsedOut = new Date(`${date}T${outTime.includes(':') && outTime.length <= 5 ? outTime + ':00' : outTime}`);
+      if (!isNaN(parsedOut.getTime())) logoutDt = parsedOut;
+    }
+
+    const id = `att_${employeeId}_${date.replace(/-/g, '')}`;
+
+    await pool.query(
+      `INSERT INTO attendance (
+        id, employeeId, locationId, shiftId, attendanceDate, actualLogin, actualLogout, status, notes, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))
+      ON DUPLICATE KEY UPDATE
+        actualLogin = COALESCE(VALUES(actualLogin), actualLogin),
+        actualLogout = COALESCE(VALUES(actualLogout), actualLogout),
+        status = VALUES(status),
+        notes = VALUES(notes),
+        updatedAt = NOW(3)`,
+      [
+        id,
+        employeeId,
+        emp.locationId,
+        emp.shiftId || null,
+        date,
+        loginDt,
+        logoutDt,
+        dbStatus,
+        noteText,
+      ]
+    );
+
+    res.json({
+      success: true,
+      message: `Attendance for ${date} updated in database successfully`,
+      record: {
+        id,
+        employeeId,
+        date,
+        code: code || 'P',
+        status: dbStatus,
+        inTime,
+        outTime,
+        notes: noteText,
+      },
+    });
+  } catch (error: any) {
+    console.error('Update day attendance error:', error);
+    res.status(500).json({ error: 'Failed to update attendance in database', message: error.message });
+  }
+});
+
+/**
  * GET /api/attendance/corrections
  * Fetch punch regularization requests
  */
