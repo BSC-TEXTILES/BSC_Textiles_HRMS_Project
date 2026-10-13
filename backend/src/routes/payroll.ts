@@ -475,9 +475,9 @@ router.get('/load-or-calculate', async (req: AuthRequest, res) => {
           netPayable: Number(item.netPay || item.totalPayable || 18782.50),
           salaryAdvance: Number(item.salaryAdvance || 0),
           loanAdvance: Number(item.loanAdvance || 0),
-          employerPf: Number(item.employerPf || Math.round(Number(item.basicSalary || 12000) * 0.12)),
-          employerEsi: Number(item.employerEsi || Math.round(Number(item.grossSalary || 20375.50) * 0.0325)),
-          ctc: Number(item.ctc || 22478.00),
+          employerPf: item.employerPf !== null && item.employerPf !== undefined ? Number(item.employerPf) : Math.round(Number(item.basicSalary || 12000) * 0.12),
+          employerEsi: item.employerEsi !== null && item.employerEsi !== undefined ? Number(item.employerEsi) : (Number(item.grossSalary || 0) <= 21000 ? Math.round(Number(item.grossSalary || 0) * 0.0325) : 0),
+          ctc: item.ctc !== null && item.ctc !== undefined ? Number(item.ctc) : Math.round(Number(item.grossSalary || 0) + Number(item.employerPf || 0) + Number(item.employerEsi || 0)),
           earningsConfig: parsedEarnings || [
             { id: 'basic', label: 'BASIC PAY', amount: Number(item.basicSalary || 12000), enabled: true },
             { id: 'hra', label: 'HRA', amount: Number(item.hra || 4000), enabled: true },
