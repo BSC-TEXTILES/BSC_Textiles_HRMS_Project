@@ -77,6 +77,7 @@ export function BscHolidaysCalendar() {
   const [parsedCsvRows, setParsedCsvRows] = useState<any[]>([]);
   const [csvError, setCsvError] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [newlyAddedIds, setNewlyAddedIds] = useState<Set<string | number>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // New Single Holiday Form State
@@ -181,6 +182,22 @@ export function BscHolidaysCalendar() {
 
   // Filtered list of holidays
   const todayStr = React.useMemo(() => normalizeHolidayDate(new Date()), []);
+
+  // Nearest upcoming statutory holiday
+  const nextHoliday = React.useMemo(() => {
+    return deduplicatedHolidays.find((h) => h.date >= todayStr) || null;
+  }, [deduplicatedHolidays, todayStr]);
+
+  // Days remaining until next holiday
+  const daysUntilNext = React.useMemo(() => {
+    if (!nextHoliday) return null;
+    const [ny, nm, nd] = nextHoliday.date.split('-').map(Number);
+    const target = new Date(ny, nm - 1, nd).getTime();
+    const [ty, tm, td] = todayStr.split('-').map(Number);
+    const current = new Date(ty, tm - 1, td).getTime();
+    return Math.round((target - current) / (1000 * 60 * 60 * 24));
+  }, [nextHoliday, todayStr]);
+
   const filteredHolidays = React.useMemo(() => {
     const yearStr = String(currentYear);
     const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
@@ -320,6 +337,15 @@ export function BscHolidaysCalendar() {
         })),
       });
 
+      if (Array.isArray(res.data?.holidays)) {
+        const ids = res.data.holidays.map((h: any) => h.id).filter(Boolean);
+        setNewlyAddedIds((prev) => {
+          const next = new Set(prev);
+          ids.forEach((id: any) => next.add(id));
+          return next;
+        });
+      }
+
       toast.success(res.data?.message || `Imported ${parsedCsvRows.length} BSC Holidays!`);
       setIsUploadModalOpen(false);
       setParsedCsvRows([]);
@@ -334,6 +360,11 @@ export function BscHolidaysCalendar() {
         type: r.type,
         description: r.description || 'Uploaded via HR CSV Batch',
       }));
+      setNewlyAddedIds((prev) => {
+        const next = new Set(prev);
+        newItems.forEach((i) => next.add(i.id));
+        return next;
+      });
       setHolidays((prev) => {
         const map = new Map<string, BscHoliday>();
         [...prev, ...newItems].forEach((item) => {
@@ -358,7 +389,10 @@ export function BscHolidaysCalendar() {
       return;
     }
     try {
-      await api.post('/holidays', newHoli);
+      const res = await api.post('/holidays', newHoli);
+      if (res.data?.id) {
+        setNewlyAddedIds((prev) => new Set(prev).add(res.data.id));
+      }
       toast.success('BSC Holiday added successfully!');
       setIsAddModalOpen(false);
       setNewHoli({ name: '', date: '', type: 'MANDATORY', description: '' });
@@ -371,6 +405,7 @@ export function BscHolidaysCalendar() {
         type: newHoli.type,
         description: newHoli.description || 'Statutory Declared Holiday',
       };
+      setNewlyAddedIds((prev) => new Set(prev).add(newItem.id));
       setHolidays((prev) => {
         const map = new Map<string, BscHoliday>();
         [...prev, newItem].forEach((item) => {
@@ -495,6 +530,7 @@ export function BscHolidaysCalendar() {
             const holiday = holidayMap.get(dateStr);
             const isToday = dateStr === todayStr;
             const isSelected = selectedHoliday?.date === dateStr;
+            const isNext = nextHoliday?.date === dateStr;
 
             return (
               <button
@@ -509,18 +545,24 @@ export function BscHolidaysCalendar() {
                 }}
                 className={`relative h-7 w-7 mx-auto rounded-lg flex items-center justify-center text-[11px] font-medium transition-all ${
                   holiday
-                    ? 'bg-[#0058be] text-white font-bold shadow-xs hover:bg-[#00479e] cursor-pointer ring-2 ring-[#0058be]/20 scale-105'
+                    ? isNext
+                      ? 'bg-gradient-to-tr from-[#0058be] to-blue-600 text-white font-extrabold shadow-md ring-2 ring-emerald-400 dark:ring-emerald-400 scale-110 z-10'
+                      : 'bg-[#0058be] text-white font-bold shadow-xs hover:bg-[#00479e] cursor-pointer ring-2 ring-[#0058be]/20 scale-105'
                     : isToday
                     ? 'bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-400 font-bold border border-[#0058be]/40'
                     : isSelected
                     ? 'bg-slate-200 dark:bg-slate-700 text-[#0b1c30] dark:text-slate-100 font-bold'
                     : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
-                title={holiday ? `${holiday.name} (${holiday.type || 'Holiday'})` : dateStr}
+                title={holiday ? `${holiday.name} (${holiday.type || 'Holiday'})${isNext ? ' - Next Holiday!' : ''}` : dateStr}
               >
                 <span>{dayNum}</span>
                 {holiday && (
-                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400 border border-white" />
+                  <span
+                    className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${
+                      isNext ? 'bg-emerald-400 ring-2 ring-emerald-400/50 animate-pulse' : 'bg-amber-400'
+                    }`}
+                  />
                 )}
               </button>
             );
@@ -562,6 +604,37 @@ export function BscHolidaysCalendar() {
 
       {/* FILTER TABS & HOLIDAYS ROSTER LIST */}
       <div className="p-3 bg-slate-50/50 dark:bg-slate-900/40">
+        {/* Next Statutory Holiday Spotlight Banner */}
+        {nextHoliday && (
+          <div
+            onClick={() => setSelectedHoliday(nextHoliday)}
+            className="mb-2.5 p-2 px-2.5 rounded-lg bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-blue-500/5 dark:from-blue-500/20 dark:via-indigo-500/20 dark:to-transparent border border-blue-200/80 dark:border-blue-800/80 hover:border-blue-400 dark:hover:border-blue-600 transition-all cursor-pointer flex items-center justify-between gap-2 shadow-xs group"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="flex h-2 w-2 relative shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-[11px] font-bold text-[#0b1c30] dark:text-slate-100 truncate">
+                Next Holiday:{' '}
+                <span className="text-[#0058be] dark:text-blue-400 font-black group-hover:underline">
+                  {nextHoliday.name}
+                </span>
+              </span>
+            </div>
+            <div className="shrink-0 flex items-center gap-1 text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-white/80 dark:bg-blue-900/60 border border-blue-200 dark:border-blue-700/60 px-2 py-0.5 rounded-full shadow-2xs">
+              <span className="material-symbols-outlined text-[12px] text-blue-500">schedule</span>
+              <span>
+                {daysUntilNext === 0
+                  ? 'Today'
+                  : daysUntilNext === 1
+                  ? 'Tomorrow'
+                  : `in ${daysUntilNext} days`}
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1 bg-white dark:bg-[#0c1424] p-0.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs text-[10px] font-semibold">
             <button
@@ -622,14 +695,20 @@ export function BscHolidaysCalendar() {
               const weekday = d.toLocaleDateString('en-IN', { weekday: 'short' });
               const isPast = item.date < todayStr;
               const isToday = item.date === todayStr;
+              const isNextUpcoming = !isToday && nextHoliday && item.date === nextHoliday.date && item.name === nextHoliday.name;
+              const isNewlyAdded = newlyAddedIds.has(item.id) || (item as any).isNew;
 
               return (
                 <div
                   key={item.id}
                   onClick={() => setSelectedHoliday(item)}
-                  className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                  className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-3 relative overflow-hidden ${
                     isToday
-                      ? 'bg-amber-50/80 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 ring-1 ring-amber-300 shadow-xs'
+                      ? 'bg-amber-50/90 dark:bg-amber-950/40 border-amber-300 dark:border-amber-700 ring-1 ring-amber-300 shadow-xs'
+                      : isNextUpcoming
+                      ? 'bg-gradient-to-r from-blue-50/90 via-indigo-50/50 to-white dark:from-blue-950/50 dark:via-indigo-950/30 dark:to-[#0c1424] border-blue-400 dark:border-blue-500 ring-2 ring-blue-500/25 shadow-xs'
+                      : isNewlyAdded
+                      ? 'bg-emerald-50/90 dark:bg-emerald-950/40 border-emerald-400 dark:border-emerald-600 ring-2 ring-emerald-400/25 shadow-xs'
                       : isPast
                       ? 'bg-white/80 dark:bg-[#0c1424]/80 border-slate-200/60 dark:border-slate-800 opacity-70 hover:opacity-100'
                       : 'bg-white dark:bg-[#0c1424] border-slate-200/80 dark:border-slate-800 hover:border-[#0058be]/50 dark:hover:border-blue-500/50 hover:shadow-xs'
@@ -638,9 +717,13 @@ export function BscHolidaysCalendar() {
                   <div className="flex items-center gap-2.5 min-w-0">
                     {/* Date Block */}
                     <div
-                      className={`w-10 h-11 rounded-lg flex flex-col items-center justify-center shrink-0 font-bold border ${
+                      className={`w-10 h-11 rounded-lg flex flex-col items-center justify-center shrink-0 font-bold border transition-colors ${
                         isToday
-                          ? 'bg-amber-500 text-white border-amber-600'
+                          ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                          : isNextUpcoming
+                          ? 'bg-[#0058be] text-white border-blue-700 shadow-xs ring-1 ring-blue-400/40'
+                          : isNewlyAdded
+                          ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
                           : isPast
                           ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
                           : 'bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 border-[#dce9ff] dark:border-blue-900/50'
@@ -651,7 +734,23 @@ export function BscHolidaysCalendar() {
                     </div>
 
                     <div className="min-w-0">
-                      <div className="text-xs font-bold text-[#0b1c30] dark:text-slate-100 truncate">{item.name}</div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-[#0b1c30] dark:text-slate-100 truncate">
+                          {item.name}
+                        </span>
+                        {isNextUpcoming && (
+                          <span className="inline-flex items-center gap-0.5 text-[8.5px] font-extrabold px-1.5 py-0.5 rounded-full bg-blue-600 text-white uppercase tracking-wider shrink-0 shadow-2xs">
+                            <span className="material-symbols-outlined text-[10px]">auto_awesome</span>
+                            <span>Next</span>
+                          </span>
+                        )}
+                        {isNewlyAdded && (
+                          <span className="inline-flex items-center gap-0.5 text-[8.5px] font-extrabold px-1.5 py-0.5 rounded-full bg-emerald-600 text-white uppercase tracking-wider shrink-0 shadow-2xs">
+                            <span className="material-symbols-outlined text-[10px]">verified</span>
+                            <span>New</span>
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
                         {weekday} • {item.description || 'Gazetted Karnataka Holiday'}
                       </div>
@@ -670,11 +769,15 @@ export function BscHolidaysCalendar() {
                     >
                       {item.type || 'MANDATORY'}
                     </span>
-                    {isToday && (
+                    {isToday ? (
                       <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/80 px-1 rounded">
                         Today!
                       </span>
-                    )}
+                    ) : isNextUpcoming && daysUntilNext !== null ? (
+                      <span className="text-[9.5px] font-extrabold text-blue-600 dark:text-blue-400">
+                        {daysUntilNext === 0 ? 'Today' : daysUntilNext === 1 ? 'Tomorrow' : `in ${daysUntilNext} days`}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
               );
