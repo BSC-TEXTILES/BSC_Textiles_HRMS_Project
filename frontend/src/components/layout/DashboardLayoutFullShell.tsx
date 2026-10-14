@@ -391,22 +391,17 @@ export function DashboardLayoutFullShell({
 
   return (
     <div className="min-h-screen bg-[#f4f6fa] dark:bg-[#070c18] text-[#0b1c30] dark:text-slate-100 font-sans antialiased transition-colors duration-200">
-      {/* Pending Navigation Progress Bar (under header) */}
-      {pendingPath && (
-        <div className="fixed top-14 left-0 right-0 h-0.5 bg-[#0058be] z-50 animate-pulse" />
-      )}
-
       {/* SIDEBAR (Desktop - Stays mounted across all routes) */}
       <aside 
         className={`fixed left-0 top-0 h-full ${
-          isCollapsed ? 'w-20' : 'w-64'
-        } bg-white dark:bg-[#090f1d] border-r border-slate-200/90 dark:border-[#152038] text-slate-700 dark:text-slate-200 shadow-sm dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)] z-50 flex flex-col justify-between overflow-y-auto no-scrollbar hidden lg:flex transition-all duration-200 ease-in-out`}
+          isCollapsed ? 'w-20' : 'w-72'
+        } bg-white dark:bg-[#090f1d] border-r border-slate-200/80 dark:border-[#152038] text-slate-700 dark:text-slate-200 shadow-sm dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)] z-50 flex flex-col justify-between overflow-y-auto no-scrollbar hidden lg:flex transition-all duration-200 ease-in-out`}
       >
         <div className="flex flex-col">
           {/* Top Logo Brand Header */}
           <div className={`h-14 flex items-center ${
             isCollapsed ? 'justify-center px-2' : 'px-4'
-          } bg-white dark:bg-[#090f1d] border-b border-slate-200/80 dark:border-[#152038] flex-shrink-0 transition-all`}>
+          } bg-white dark:bg-[#090f1d] border-b border-slate-100 dark:border-slate-800/40 flex-shrink-0 transition-all`}>
             <div className={`flex items-center overflow-hidden ${isCollapsed ? '' : 'gap-2.5'}`}>
               <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 p-1 flex items-center justify-center shrink-0 shadow-xs border border-slate-200/60 dark:border-slate-700/60 overflow-hidden">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -573,8 +568,8 @@ export function DashboardLayoutFullShell({
 
       {/* TOP HEADER (Fixed - Stays mounted across all routes) */}
       <header className={`fixed top-0 left-0 ${
-        isCollapsed ? 'lg:left-20' : 'lg:left-64'
-      } right-0 h-14 bg-white dark:bg-[#090f1d] border-b border-slate-200/80 dark:border-[#152038] shadow-xs dark:shadow-[0_1px_4px_rgba(0,0,0,0.2)] z-40 flex items-center justify-between px-4 lg:px-6 transition-all duration-200 ease-in-out`}>
+        isCollapsed ? 'lg:left-20' : 'lg:left-72'
+      } right-0 h-14 bg-white dark:bg-[#090f1d] border-b border-slate-100 dark:border-slate-800/40 shadow-xs dark:shadow-[0_1px_4px_rgba(0,0,0,0.2)] z-40 flex items-center justify-between px-4 lg:px-6 transition-all duration-200 ease-in-out`}>
         <div className="flex items-center gap-3 flex-1 max-w-2xl">
           {/* Mobile Drawer Trigger */}
           <button
@@ -739,7 +734,7 @@ export function DashboardLayoutFullShell({
           </div>
 
           {/* User Profile Capsule with Interactive Dropdown */}
-          <div className="relative pl-2 border-l border-slate-200 dark:border-[#1f2d4e]">
+          <div className="relative pl-1">
             <button
               onClick={() => {
                 setProfileMenuOpen(!profileMenuOpen);
@@ -824,7 +819,7 @@ export function DashboardLayoutFullShell({
 
       {/* MAIN VIEWPORT CONTAINER */}
       <main className={`${
-        isCollapsed ? 'lg:pl-20' : 'lg:pl-64'
+        isCollapsed ? 'lg:pl-20' : 'lg:pl-72'
       } pt-14 min-h-screen bg-[#f4f6fa] dark:bg-[#070c18] transition-all duration-200 ease-in-out`}>
         <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-5 lg:p-6 space-y-5">
           {children}
