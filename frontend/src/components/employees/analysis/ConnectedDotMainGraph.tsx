@@ -41,6 +41,7 @@ interface ConnectedDotMainGraphProps {
   loading: boolean;
   onPointClick: (date: string, metricKey?: string) => void;
   selectedDate?: string | null;
+  onClearDate?: () => void;
 }
 
 interface SeriesToggle {
@@ -57,6 +58,7 @@ export function ConnectedDotMainGraph({
   loading,
   onPointClick,
   selectedDate,
+  onClearDate,
 }: ConnectedDotMainGraphProps) {
   const [seriesConfig, setSeriesConfig] = useState<SeriesToggle[]>([
     {
@@ -199,8 +201,20 @@ export function ConnectedDotMainGraph({
         {/* Selected date indicator */}
         {selectedDate && (
           <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 rounded-xl text-xs text-[#1346a1] dark:text-blue-300">
-            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-            <span>Drill-down active for: <strong>{selectedDate}</strong></span>
+            <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
+            <span>
+              Drill-down active for: <strong>{selectedDate}</strong>
+            </span>
+            {onClearDate && (
+              <button
+                type="button"
+                onClick={onClearDate}
+                aria-label="Clear drill-down date"
+                className="ml-1.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-white dark:bg-slate-800 border border-blue-300 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors cursor-pointer text-slate-700 dark:text-slate-200 shadow-2xs"
+              >
+                Clear
+              </button>
+            )}
           </div>
         )}
       </div>

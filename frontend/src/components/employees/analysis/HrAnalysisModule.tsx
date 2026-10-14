@@ -6,16 +6,9 @@ import toast from 'react-hot-toast';
 import {
   BarChart3,
   Calendar,
-  Filter,
   RefreshCw,
   RotateCcw,
   Clock,
-  MapPin,
-  Building2,
-  Users,
-  ChevronDown,
-  Layers,
-  Sparkles,
   AlertCircle,
 } from 'lucide-react';
 import { SummaryCardGrid, SummaryCounts, SummaryComparison } from './SummaryCardGrid';
@@ -25,7 +18,7 @@ import { LocationComparisonSection } from './LocationComparisonSection';
 import { PunctualitySection } from './PunctualitySection';
 import { EmployeeActivityDeepDive } from './EmployeeActivityDeepDive';
 import { LongTermHistorySection } from './LongTermHistorySection';
-import { DrillDownRecordsTable } from './DrillDownRecordsTable';
+import { AnalysisKpiDrawer } from './AnalysisKpiDrawer';
 
 interface LocationItem {
   id: string;
@@ -78,29 +71,39 @@ export function HrAnalysisModule({
   const [deptBreakdown, setDeptBreakdown] = useState<any[]>([]);
   const [statusBreakdown, setStatusBreakdown] = useState<any[]>([]);
 
-  // Drill-down state
-  const [drillDownCategory, setDrillDownCategory] = useState<string>('all');
-  const [drillDownTitle, setDrillDownTitle] = useState<string>('All Workforce Staff');
+  // Connected-dot trend drill-down date state
   const [drillDownTargetDate, setDrillDownTargetDate] = useState<string>('');
-  const [drillDownRows, setDrillDownRows] = useState<any[]>([]);
-  const [drillDownTotal, setDrillDownTotal] = useState<number>(0);
-  const [drillDownPage, setDrillDownPage] = useState<number>(1);
-  const [drillDownTotalPages, setDrillDownTotalPages] = useState<number>(1);
-  const [drillDownSearch, setDrillDownSearch] = useState<string>('');
-  const [drillDownLoading, setDrillDownLoading] = useState<boolean>(false);
-  const [showDrillDown, setShowDrillDown] = useState<boolean>(false);
+
+  // KPI Drawer states
+  const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
+  const [activeDrawerCategory, setActiveDrawerCategory] = useState<string | null>(null);
+  const [activeDrawerTitle, setActiveDrawerTitle] = useState<string>('');
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   // Loading & refresh management
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [autoRefresh, setAutoRefresh] = useState<boolean>(false);
+  const [autoRefreshTick, setAutoRefreshTick] = useState<number>(0);
+  const [isDocumentVisible, setIsDocumentVisible] = useState<boolean>(true);
   const [lastUpdated, setLastUpdated] = useState<string>('');
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Cancellation controller ref to cancel obsolete in-flight requests on rapid filter changes
+  // Cancellation controller ref
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Load locations and departments metadata once
+  // Track page visibility for auto-refresh pausing
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsDocumentVisible(document.visibilityState === 'visible');
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
+  // Load locations and departments metadata once, with deduplication for departments
   useEffect(() => {
     let active = true;
     const loadMeta = async () => {
@@ -118,13 +121,23 @@ export function HrAnalysisModule({
               name: l.name,
             }))
           );
-          const depts = deptRes.data?.departments || deptRes.data || [];
-          setDepartments(
-            depts.map((d: any) => ({
-              id: d.id,
-              name: d.name,
-            }))
-          );
+
+          // Deduplicate departments by department name across store hubs
+          const rawDepts = deptRes.data?.departments || deptRes.data || [];
+          const seenNames = new Set<string>();
+          const uniqueDepts: DepartmentItem[] = [];
+
+          for (const d of rawDepts) {
+            const trimmedName = (d.name || '').trim();
+            if (trimmedName && !seenNames.has(trimmedName.toLowerCase())) {
+              seenNames.add(trimmedName.toLowerCase());
+              uniqueDepts.push({
+                id: d.id,
+                name: trimmedName,
+              });
+            }
+          }
+          setDepartments(uniqueDepts);
         }
       } catch (err) {
         console.warn('Metadata load error:', err);
@@ -145,13 +158,16 @@ export function HrAnalysisModule({
         p.append('startDate', customStartDate);
         p.append('endDate', customEndDate);
       }
+      if (drillDownTargetDate) {
+        p.append('date', drillDownTargetDate);
+      }
       if (locationId && locationId !== 'all') p.append('locationId', locationId);
       if (departmentId && departmentId !== 'all') p.append('departmentId', departmentId);
       if (employeeStatus && employeeStatus !== 'ALL') p.append('status', employeeStatus);
       if (selectedEmployeeId) p.append('employeeId', selectedEmployeeId);
       return p.toString();
     },
-    [preset, customStartDate, customEndDate, locationId, departmentId, employeeStatus, selectedEmployeeId]
+    [preset, customStartDate, customEndDate, drillDownTargetDate, locationId, departmentId, employeeStatus, selectedEmployeeId]
   );
 
   // Main data fetch function
@@ -198,7 +214,9 @@ export function HrAnalysisModule({
         setDeptBreakdown(historyRes.data?.departmentBreakdown || []);
         setStatusBreakdown(historyRes.data?.statusBreakdown || []);
 
-        setLastUpdated(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        const now = new Date();
+        const time24IST = now.toLocaleTimeString('en-GB', { hour12: false }) + ' IST';
+        setLastUpdated(time24IST);
       } catch (err: any) {
         if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
           return;
@@ -214,79 +232,47 @@ export function HrAnalysisModule({
     [buildQuery]
   );
 
-  // Fetch drill-down records
-  const fetchDrillDownRecords = useCallback(async () => {
-    try {
-      setDrillDownLoading(true);
-      const p = new URLSearchParams();
-      p.append('category', drillDownCategory);
-      if (drillDownTargetDate) p.append('date', drillDownTargetDate);
-      if (locationId && locationId !== 'all') p.append('locationId', locationId);
-      if (departmentId && departmentId !== 'all') p.append('departmentId', departmentId);
-      if (employeeStatus && employeeStatus !== 'ALL') p.append('status', employeeStatus);
-      if (drillDownSearch) p.append('search', drillDownSearch);
-      p.append('page', String(drillDownPage));
-      p.append('limit', '15');
-
-      const res = await api.get(`/analysis/drilldown?${p.toString()}`);
-      setDrillDownRows(res.data?.rows || []);
-      setDrillDownTotal(res.data?.total || 0);
-      setDrillDownTotalPages(res.data?.totalPages || 1);
-    } catch (err) {
-      console.warn('Drilldown fetch error:', err);
-    } finally {
-      setDrillDownLoading(false);
-    }
-  }, [drillDownCategory, drillDownTargetDate, locationId, departmentId, employeeStatus, drillDownSearch, drillDownPage]);
-
   // Trigger main data load on filter changes
   useEffect(() => {
     fetchAnalysisData();
   }, [fetchAnalysisData]);
 
-  // Auto-refresh timer (every 30 seconds if enabled)
+  // Auto-refresh timer (every 30 seconds if enabled and document is visible)
   useEffect(() => {
-    if (!autoRefresh) return;
+    if (!autoRefresh || !isDocumentVisible) return;
     const interval = setInterval(() => {
       fetchAnalysisData(true);
+      setAutoRefreshTick((t) => t + 1);
     }, 30000);
     return () => clearInterval(interval);
-  }, [autoRefresh, fetchAnalysisData]);
+  }, [autoRefresh, isDocumentVisible, fetchAnalysisData]);
 
-  // Trigger drill-down data load when category, search, page or target date changes
-  useEffect(() => {
-    if (showDrillDown) {
-      fetchDrillDownRecords();
+  // Handler when user clicks any of the 14 Summary Cards -> opens Drawer
+  const handleCardClick = (category: string, title: string, triggerEl?: HTMLElement) => {
+    if (triggerEl) {
+      triggerRef.current = triggerEl;
     }
-  }, [showDrillDown, fetchDrillDownRecords]);
+    setActiveDrawerCategory(category);
+    setActiveDrawerTitle(title);
+    setDrawerOpen(true);
+  };
 
-  // Handler when user clicks a Summary Card
-  const handleCardClick = (category: string, title: string) => {
-    setDrillDownCategory(category);
-    setDrillDownTitle(title);
-    setDrillDownTargetDate(new Date().toISOString().slice(0, 10));
-    setDrillDownPage(1);
-    setShowDrillDown(true);
-
-    // Smooth scroll into drill-down table
-    setTimeout(() => {
-      const el = document.getElementById('drilldown-table-section');
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+  // Handler when user closes the KPI Drawer
+  const handleCloseDrawer = () => {
+    setDrawerOpen(false);
+    setActiveDrawerCategory(null);
   };
 
   // Handler when user clicks a dot on the Main Graph
   const handleGraphPointClick = (date: string) => {
-    setDrillDownCategory('all');
-    setDrillDownTitle(`Workforce Punch & Login Records on ${date}`);
     setDrillDownTargetDate(date);
-    setDrillDownPage(1);
-    setShowDrillDown(true);
+    toast.success(`Date filter set to ${date}`);
+  };
 
-    setTimeout(() => {
-      const el = document.getElementById('drilldown-table-section');
-      if (el) el.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+  // Handler to clear date drill-down
+  const handleClearDrillDownDate = () => {
+    setDrillDownTargetDate('');
+    toast.success('Restored range view');
   };
 
   // Reset all filters
@@ -294,44 +280,58 @@ export function HrAnalysisModule({
     setPreset('30d');
     setCustomStartDate('');
     setCustomEndDate('');
+    setDrillDownTargetDate('');
     setLocationId('all');
     setDepartmentId('all');
     setEmployeeStatus('ALL');
     setSelectedEmployeeId('');
-    setDrillDownSearch('');
-    setShowDrillDown(false);
     toast.success('Analysis filters reset');
   };
+
+  // Resolved location and department display names for drawer header summary
+  const activeLocationName =
+    locationId === 'all'
+      ? 'All Retail Hubs (BEL, DAV, SHI)'
+      : locations.find((l) => l.id === locationId)?.name || 'Store Hub';
+
+  const activeDepartmentName =
+    departmentId === 'all'
+      ? 'All Departments'
+      : departments.find((d) => d.id === departmentId)?.name || 'Department';
 
   return (
     <div className={`space-y-6 ${className}`}>
       {/* 1. Header & Filter Toolbar */}
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+        {/* Header Title & Top Controls */}
+        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+          {/* Left Block: Title, subtitle, badge */}
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <span className="p-2 rounded-xl bg-gradient-to-tr from-[#1346a1] to-sky-600 text-white shadow-xs">
                 <BarChart3 className="w-5 h-5" />
               </span>
               <div>
-                <h1 className="text-lg font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                  <span>HR Workforce Analysis & Connected-Dot Telemetry</span>
-                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                    HR Workforce Analysis & Connected-Dot Telemetry
+                  </h1>
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
                     Live Records
                   </span>
-                </h1>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   Real-time database analytics for logins, punches, punctuality, and staff activity across stores
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Quick Refresh & Auto-Refresh Toggle */}
-          <div className="flex items-center gap-3">
+          {/* Right Group: Updated at, Auto-Refresh toggle, Refresh button */}
+          <div className="flex items-center gap-2.5 shrink-0">
             {lastUpdated && (
-              <span className="text-[11px] text-slate-400 flex items-center gap-1">
-                <Clock className="w-3 h-3" />
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1 font-medium mr-1 whitespace-nowrap">
+                <Clock className="w-3.5 h-3.5 text-slate-400" />
                 Updated at {lastUpdated}
               </span>
             )}
@@ -339,13 +339,17 @@ export function HrAnalysisModule({
             <button
               type="button"
               onClick={() => setAutoRefresh(!autoRefresh)}
-              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+              className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer border ${
                 autoRefresh
-                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-300'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-200'
+                  ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                  : 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-100'
               }`}
             >
-              <span className={`w-2 h-2 rounded-full ${autoRefresh ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'}`} />
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  autoRefresh ? 'bg-emerald-500 animate-ping' : 'bg-slate-400'
+                }`}
+              />
               <span>Auto-Refresh (30s)</span>
             </button>
 
@@ -361,39 +365,44 @@ export function HrAnalysisModule({
           </div>
         </div>
 
-        {/* Filters Toolbar */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Preset Buttons */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl text-xs font-medium">
-            {[
-              { id: 'today', label: 'Today' },
-              { id: '7d', label: '7 Days' },
-              { id: '30d', label: '30 Days' },
-              { id: '90d', label: '90 Days' },
-              { id: 'this_month', label: 'This Month' },
-              { id: 'prev_month', label: 'Prev Month' },
-              { id: 'all', label: 'All History' },
-              { id: 'custom', label: 'Custom' },
-            ].map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setPreset(t.id)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                  preset === t.id
-                    ? 'bg-white dark:bg-slate-700 text-[#1346a1] dark:text-white shadow-2xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
+        {/* Filter Rows */}
+        <div className="space-y-3">
+          {/* Row 1: Segmented Range Tabs (horizontally scrollable container) */}
+          <div className="overflow-x-auto pb-1 scrollbar-none">
+            <div className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl text-xs font-medium min-w-max">
+              {[
+                { id: 'today', label: 'Today' },
+                { id: '7d', label: '7 Days' },
+                { id: '30d', label: '30 Days' },
+                { id: '90d', label: '90 Days' },
+                { id: 'this_month', label: 'This Month' },
+                { id: 'prev_month', label: 'Prev Month' },
+                { id: 'all', label: 'All History' },
+                { id: 'custom', label: 'Custom' },
+              ].map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => {
+                    setPreset(t.id);
+                    setDrillDownTargetDate('');
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    preset === t.id
+                      ? 'bg-[#1346a1] text-white shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Custom Date Range Picker */}
           {preset === 'custom' && (
-            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 p-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
-              <Calendar className="w-3.5 h-3.5 text-slate-400 ml-1.5" />
+            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-xs w-fit">
+              <Calendar className="w-3.5 h-3.5 text-slate-400 ml-1.5 shrink-0" />
               <input
                 type="date"
                 value={customStartDate}
@@ -410,61 +419,74 @@ export function HrAnalysisModule({
             </div>
           )}
 
-          {/* Location Filter */}
-          <div className="flex items-center gap-1.5">
-            <select
-              value={locationId}
-              onChange={(e) => setLocationId(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-100 font-semibold focus:outline-none focus:border-[#1346a1]"
-            >
-              <option value="all">All Retail Hubs (BEL, DAV, SHI)</option>
-              {locations.map((loc) => (
-                <option key={loc.id} value={loc.id}>
-                  {loc.name} ({loc.code})
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Row 2: Store hubs dropdown, Departments dropdown, Statuses dropdown, reset icon button */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-1 items-center">
+            {/* Hubs Dropdown */}
+            <div>
+              <select
+                id="analysis-filter-hub"
+                aria-label="Filter by store hub"
+                value={locationId}
+                onChange={(e) => setLocationId(e.target.value)}
+                className="w-full h-9 px-3 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-[#1346a1]"
+              >
+                <option value="all">All Retail Hubs (BEL, DAV, SHI)</option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name} ({loc.code})
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Department Filter */}
-          <div className="flex items-center gap-1.5">
-            <select
-              value={departmentId}
-              onChange={(e) => setDepartmentId(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-100 font-semibold focus:outline-none focus:border-[#1346a1]"
-            >
-              <option value="all">All Departments</option>
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.name}
-                </option>
-              ))}
-            </select>
-          </div>
+            {/* Department Dropdown (deduplicated) */}
+            <div>
+              <select
+                id="analysis-filter-department"
+                aria-label="Filter by department"
+                value={departmentId}
+                onChange={(e) => setDepartmentId(e.target.value)}
+                className="w-full h-9 px-3 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-[#1346a1]"
+              >
+                <option value="all">All Departments</option>
+                {departments.map((dept) => (
+                  <option key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-          {/* Status Filter */}
-          <div className="flex items-center gap-1.5">
-            <select
-              value={employeeStatus}
-              onChange={(e) => setEmployeeStatus(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-100 font-semibold focus:outline-none focus:border-[#1346a1]"
-            >
-              <option value="ALL">All Employment Statuses</option>
-              <option value="ACTIVE">Active Staff Only</option>
-              <option value="PROBATION">Probation Only</option>
-              <option value="INACTIVE">Inactive / Separated</option>
-            </select>
-          </div>
+            {/* Employment Status Dropdown */}
+            <div>
+              <select
+                id="analysis-filter-status"
+                aria-label="Filter by employment status"
+                value={employeeStatus}
+                onChange={(e) => setEmployeeStatus(e.target.value)}
+                className="w-full h-9 px-3 text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-100 font-medium focus:outline-none focus:border-[#1346a1]"
+              >
+                <option value="ALL">All Employment Statuses</option>
+                <option value="ACTIVE">Active Staff Only</option>
+                <option value="PROBATION">Probation Only</option>
+                <option value="INACTIVE">Inactive / Separated</option>
+              </select>
+            </div>
 
-          {/* Reset Filters */}
-          <button
-            type="button"
-            onClick={handleResetFilters}
-            className="p-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-            title="Reset Filters"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
+            {/* Reset Icon Button with Tooltip */}
+            <div className="flex items-center justify-end">
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="h-9 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1.5 text-xs font-semibold shrink-0 cursor-pointer"
+                title="Reset filters"
+                aria-label="Reset filters"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset filters</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -485,13 +507,15 @@ export function HrAnalysisModule({
         </div>
       )}
 
-      {/* 2. Top Summary Cards (14 KPIs) */}
+      {/* 2. Top Summary Cards (14 KPIs - Clickable with Drawer Integration) */}
       <SummaryCardGrid
         counts={summaryCounts}
         comparison={summaryComparison}
         loading={loading}
         onCardClick={handleCardClick}
-        selectedCategory={showDrillDown ? drillDownCategory : undefined}
+        selectedCategory={drawerOpen ? activeDrawerCategory : null}
+        preset={preset}
+        selectedDate={drillDownTargetDate || null}
       />
 
       {/* 3. Main Connected-Dot Graph Visualization */}
@@ -499,36 +523,11 @@ export function HrAnalysisModule({
         points={timelinePoints}
         loading={loading}
         onPointClick={handleGraphPointClick}
-        selectedDate={showDrillDown ? drillDownTargetDate : null}
+        selectedDate={drillDownTargetDate || null}
+        onClearDate={handleClearDrillDownDate}
       />
 
-      {/* 4. Interactive Drill-Down Table (When Activated) */}
-      {showDrillDown && (
-        <DrillDownRecordsTable
-          category={drillDownCategory}
-          categoryTitle={drillDownTitle}
-          targetDate={drillDownTargetDate}
-          rows={drillDownRows}
-          total={drillDownTotal}
-          page={drillDownPage}
-          limit={15}
-          totalPages={drillDownTotalPages}
-          loading={drillDownLoading}
-          search={drillDownSearch}
-          onSearchChange={(s) => {
-            setDrillDownSearch(s);
-            setDrillDownPage(1);
-          }}
-          onPageChange={setDrillDownPage}
-          onClose={() => setShowDrillDown(false)}
-          onSelectEmployee={(empId) => {
-            setSelectedEmployeeId(empId);
-            window.scrollTo({ top: 900, behavior: 'smooth' });
-          }}
-        />
-      )}
-
-      {/* 5. Hourly Distribution and Location Breakdown Row */}
+      {/* 4. Hourly Distribution and Location Breakdown Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <HourlyLoginDistributionChart
           hourlyData={hourlyData}
@@ -544,7 +543,7 @@ export function HrAnalysisModule({
         />
       </div>
 
-      {/* 6. Late Arrival & Punctuality Analytics */}
+      {/* 5. Late Arrival & Punctuality Analytics */}
       <PunctualitySection
         trend={punctualityTrend}
         repeatOffenders={repeatOffenders}
@@ -552,7 +551,7 @@ export function HrAnalysisModule({
         onSelectEmployee={(empId) => setSelectedEmployeeId(empId)}
       />
 
-      {/* 7. Employee-Wise Individual Activity Deep-Dive */}
+      {/* 6. Employee-Wise Individual Activity Deep-Dive */}
       <EmployeeActivityDeepDive
         selectedEmployeeId={selectedEmployeeId}
         onSelectEmployee={(id) => setSelectedEmployeeId(id)}
@@ -563,13 +562,35 @@ export function HrAnalysisModule({
         }}
       />
 
-      {/* 8. Long-Term HR History & Tenure Progression */}
+      {/* 7. Long-Term HR History & Tenure Progression */}
       <LongTermHistorySection
         joiningTrend={joiningTrend}
         departmentBreakdown={deptBreakdown}
         statusBreakdown={statusBreakdown}
         loading={loading}
       />
+
+      {/* 8. Full Viewport Slide-over KPI Drawer */}
+      {activeDrawerCategory && (
+        <AnalysisKpiDrawer
+          open={drawerOpen}
+          onClose={handleCloseDrawer}
+          category={activeDrawerCategory}
+          title={activeDrawerTitle}
+          preset={preset}
+          date={drillDownTargetDate || null}
+          customStartDate={customStartDate || undefined}
+          customEndDate={customEndDate || undefined}
+          locationId={locationId}
+          departmentId={departmentId}
+          employeeStatus={employeeStatus}
+          locations={locations}
+          departments={departments}
+          triggerRef={triggerRef}
+          onClearDrillDownDate={handleClearDrillDownDate}
+          autoRefreshTick={autoRefreshTick}
+        />
+      )}
     </div>
   );
 }

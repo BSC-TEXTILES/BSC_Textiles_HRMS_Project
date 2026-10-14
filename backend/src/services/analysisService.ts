@@ -8,6 +8,7 @@ export interface AnalysisFilterOptions {
   departmentId?: string;
   employeeId?: string;
   status?: string;
+  date?: string;
 }
 
 export interface DateRange {
@@ -32,7 +33,10 @@ export function resolveDateRange(options: AnalysisFilterOptions, minAvailableDat
   let start = todayStr;
   let end = todayStr;
 
-  if (options.startDate && options.endDate && preset === 'custom') {
+  if (options.date) {
+    start = options.date.slice(0, 10);
+    end = options.date.slice(0, 10);
+  } else if (options.startDate && options.endDate && preset === 'custom') {
     start = options.startDate.slice(0, 10);
     end = options.endDate.slice(0, 10);
   } else {
@@ -130,13 +134,17 @@ export class AnalysisService {
       params.push(options.locationId);
     }
     if (options.departmentId && options.departmentId !== 'all') {
-      sql += ` AND ${prefix}.departmentId = ?`;
-      params.push(options.departmentId);
+      sql += ` AND (${prefix}.departmentId = ? OR ${prefix}.departmentId IN (SELECT d2.id FROM department d2 WHERE d2.name = (SELECT d3.name FROM department d3 WHERE d3.id = ?)))`;
+      params.push(options.departmentId, options.departmentId);
     }
     if (options.employeeId) {
       const empCol = prefix === 'e' ? 'id' : 'employeeId';
       sql += ` AND ${prefix}.${empCol} = ?`;
       params.push(options.employeeId);
+    }
+    if (options.status && options.status !== 'ALL' && prefix === 'e') {
+      sql += ` AND ${prefix}.status = ?`;
+      params.push(options.status);
     }
     return sql;
   }
@@ -361,6 +369,55 @@ export class AnalysisService {
     const failedLoginEvents = Number(periodLoginRows[0]?.failedEvents || 0);
     const uniqueEmployeesLoggedIn = Number(periodLoginRows[0]?.uniqueEmployees || 0);
 
+    // Period approved leaves
+    const periodLeaveParams: any[] = [range.endDate, range.startDate];
+    let periodLeaveSql = `
+      SELECT COUNT(DISTINCT lr.employeeId) as c
+      FROM leaverequest lr
+      LEFT JOIN employee e ON lr.employeeId = e.id
+      WHERE lr.status = 'APPROVED'
+        AND lr.startDate <= ? AND lr.endDate >= ?
+    `;
+    if (options.locationId && options.locationId !== 'all') {
+      periodLeaveSql += ` AND (lr.locationId = ? OR e.locationId = ?)`;
+      periodLeaveParams.push(options.locationId, options.locationId);
+    }
+    if (options.departmentId && options.departmentId !== 'all') {
+      periodLeaveSql += ` AND (e.departmentId = ? OR e.departmentId IN (SELECT d2.id FROM department d2 WHERE d2.name = (SELECT d3.name FROM department d3 WHERE d3.id = ?)))`;
+      periodLeaveParams.push(options.departmentId, options.departmentId);
+    }
+    if (options.employeeId) {
+      periodLeaveSql += ` AND lr.employeeId = ?`;
+      periodLeaveParams.push(options.employeeId);
+    }
+    const [periodLeaveRows]: any = await pool.query(periodLeaveSql, periodLeaveParams);
+    const periodLeaveCount = Number(periodLeaveRows[0]?.c || 0);
+
+    // Period auth sessions
+    const periodSessParams: any[] = [range.startDate, range.endDate];
+    let periodSessSql = `
+      SELECT COUNT(*) as c
+      FROM session s
+      LEFT JOIN user u ON s.userId = u.id
+      LEFT JOIN employee e ON u.employeeId = e.id
+      WHERE DATE(CONVERT_TZ(s.createdAt, '+00:00', '+05:30')) >= ?
+        AND DATE(CONVERT_TZ(s.createdAt, '+00:00', '+05:30')) <= ?
+    `;
+    if (options.locationId && options.locationId !== 'all') {
+      periodSessSql += ` AND (s.locationId = ? OR e.locationId = ?)`;
+      periodSessParams.push(options.locationId, options.locationId);
+    }
+    if (options.departmentId && options.departmentId !== 'all') {
+      periodSessSql += ` AND (e.departmentId = ? OR e.departmentId IN (SELECT d2.id FROM department d2 WHERE d2.name = (SELECT d3.name FROM department d3 WHERE d3.id = ?)))`;
+      periodSessParams.push(options.departmentId, options.departmentId);
+    }
+    if (options.employeeId) {
+      periodSessSql += ` AND (e.id = ? OR u.employeeId = ?)`;
+      periodSessParams.push(options.employeeId, options.employeeId);
+    }
+    const [periodSessRows]: any = await pool.query(periodSessSql, periodSessParams);
+    const periodSessionsCount = Number(periodSessRows[0]?.c || 0);
+
     // 8. Previous period comparison stats
     const prevAttParams: any[] = [range.prevStartDate, range.prevEndDate];
     let prevAttSql = `
@@ -446,6 +503,14 @@ export class AnalysisService {
         totalLoginEvents,
         failedLoginEvents,
         uniqueEmployeesLoggedIn,
+        // Range-based equivalents
+        loggedInPeriod: uniqueEmployeesLoggedIn,
+        notLoggedInPeriod: Math.max(0, activeEmployees - uniqueEmployeesLoggedIn),
+        markedPresentPeriod: periodPresentCount,
+        absentPeriod: Number(periodAttRows[0]?.absentCount || 0),
+        lateArrivalsPeriod: periodLateCount,
+        onLeavePeriod: periodLeaveCount,
+        totalSessionsPeriod: periodSessionsCount,
       },
       comparison: {
         attendanceRateChange: Number((averageAttendanceRate - prevAttendanceRate).toFixed(1)),
@@ -1265,12 +1330,15 @@ export class AnalysisService {
   }
 
   /**
-   * 8. Drill-Down Filtered Employee List
+   * 8. Drill-Down Filtered Employee and Telemetry List for all 14 KPI Cards
    * Supports clicking cards, dots, or status filters with pagination and full details
    */
   public static async getDrillDown(params: {
-    category?: string; // 'logged_in_today' | 'not_logged_in_today' | 'currently_active' | 'present_today' | 'absent_today' | 'late_today' | 'on_leave_today' | 'all'
+    category?: string;
     date?: string;
+    startDate?: string;
+    endDate?: string;
+    preset?: string;
     locationId?: string;
     departmentId?: string;
     status?: string;
@@ -1279,55 +1347,519 @@ export class AnalysisService {
     limit?: number;
   }) {
     const todayStr = new Date(Date.now() + 5.5 * 3600 * 1000).toISOString().slice(0, 10);
-    const targetDate = params.date ? params.date.slice(0, 10) : todayStr;
+    let targetStartDate = todayStr;
+    let targetEndDate = todayStr;
+
+    if (params.date) {
+      targetStartDate = params.date.slice(0, 10);
+      targetEndDate = params.date.slice(0, 10);
+    } else {
+      const range = resolveDateRange({
+        preset: params.preset || '30d',
+        startDate: params.startDate,
+        endDate: params.endDate,
+      });
+      targetStartDate = range.startDate;
+      targetEndDate = range.endDate;
+    }
+
     const page = Math.max(1, Number(params.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(params.limit) || 20));
     const offset = (page - 1) * limit;
 
-    const queryParams: any[] = [];
-    let whereClauses: string[] = ['1=1'];
+    const maskIp = (ip?: string | null): string => {
+      if (!ip) return '—';
+      if (ip === '127.0.0.1' || ip === '::1') return '127.0.***.***';
+      const parts = ip.split('.');
+      if (parts.length === 4) {
+        return `${parts[0]}.${parts[1]}.***.***`;
+      }
+      return ip.slice(0, Math.min(6, ip.length)) + '***';
+    };
 
-    if (params.locationId && params.locationId !== 'all') {
-      whereClauses.push(`e.locationId = ?`);
-      queryParams.push(params.locationId);
-    }
-    if (params.departmentId && params.departmentId !== 'all') {
-      whereClauses.push(`e.departmentId = ?`);
-      queryParams.push(params.departmentId);
-    }
-    if (params.status && params.status !== 'ALL') {
-      whereClauses.push(`e.status = ?`);
-      queryParams.push(params.status);
-    }
-    if (params.search) {
-      whereClauses.push(`(e.fullName LIKE ? OR e.employeeCode LIKE ? OR e.email LIKE ? OR e.designation LIKE ?)`);
-      const term = `%${params.search}%`;
-      queryParams.push(term, term, term, term);
-    }
+    const parseDevice = (ua?: string | null): string => {
+      if (!ua) return 'Desktop / Browser';
+      const u = ua.toLowerCase();
+      if (u.includes('mobile') || u.includes('android') || u.includes('iphone')) return 'Mobile Web';
+      if (u.includes('tablet') || u.includes('ipad')) return 'Tablet Web';
+      if (u.includes('electron')) return 'Desktop Client';
+      if (u.includes('chrome')) return 'Chrome / Desktop';
+      if (u.includes('firefox')) return 'Firefox / Desktop';
+      if (u.includes('safari')) return 'Safari / Desktop';
+      return 'Web Browser';
+    };
 
-    // Category-specific filters
+    const formatDate = (d: any): string | null => {
+      if (!d) return null;
+      try {
+        return new Date(d).toISOString().slice(0, 10);
+      } catch {
+        return String(d);
+      }
+    };
+
+    const formatTime = (d: any): string | null => {
+      if (!d) return null;
+      try {
+        return new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }) + ' IST';
+      } catch {
+        return String(d);
+      }
+    };
+
     const category = params.category || 'all';
 
-    if (category === 'logged_in_today') {
+    // Helper to build standard employee filter clauses
+    const buildEmpWhere = (eAlias = 'e') => {
+      const clauses: string[] = ['1=1'];
+      const p: any[] = [];
+      if (params.locationId && params.locationId !== 'all') {
+        clauses.push(`${eAlias}.locationId = ?`);
+        p.push(params.locationId);
+      }
+      if (params.departmentId && params.departmentId !== 'all') {
+        clauses.push(`(${eAlias}.departmentId = ? OR ${eAlias}.departmentId IN (SELECT d2.id FROM department d2 WHERE d2.name = (SELECT d3.name FROM department d3 WHERE d3.id = ?)))`);
+        p.push(params.departmentId, params.departmentId);
+      }
+      if (params.status && params.status !== 'ALL') {
+        clauses.push(`${eAlias}.status = ?`);
+        p.push(params.status);
+      }
+      if (params.search) {
+        clauses.push(`(${eAlias}.fullName LIKE ? OR ${eAlias}.employeeCode LIKE ? OR ${eAlias}.email LIKE ? OR ${eAlias}.designation LIKE ?)`);
+        const term = `%${params.search}%`;
+        p.push(term, term, term, term);
+      }
+      return { sql: clauses.join(' AND '), params: p };
+    };
+
+    // 1. ATTENDANCE RATE BREAKDOWN
+    if (category === 'attendance_rate') {
+      const scope = buildEmpWhere('e');
+      const rateSql = `
+        SELECT loc.name as hubName, loc.code as hubCode, dept.name as departmentName,
+               COUNT(a.id) as totalRecords,
+               SUM(CASE WHEN a.status IN ('PRESENT', 'FACE_VERIFIED', 'OVERTIME') OR (a.actualLogin IS NOT NULL AND a.status != 'ABSENT') THEN 1 ELSE 0 END) as presentCount
+        FROM attendance a
+        INNER JOIN employee e ON a.employeeId = e.id
+        LEFT JOIN location loc ON e.locationId = loc.id
+        LEFT JOIN department dept ON e.departmentId = dept.id
+        WHERE a.attendanceDate >= ? AND a.attendanceDate <= ?
+          AND ${scope.sql}
+        GROUP BY loc.id, loc.name, loc.code, dept.id, dept.name
+        ORDER BY loc.name ASC, dept.name ASC
+      `;
+      const [rateRows]: any = await pool.query(rateSql, [targetStartDate, targetEndDate, ...scope.params]);
+      
+      let overallPresent = 0;
+      let overallRecorded = 0;
+      const formattedRows = rateRows.map((r: any) => {
+        const recorded = Number(r.totalRecords || 0);
+        const present = Number(r.presentCount || 0);
+        overallRecorded += recorded;
+        overallPresent += present;
+        const rate = recorded > 0 ? Number(((present / recorded) * 100).toFixed(1)) : 0;
+        return {
+          id: `${r.hubCode}-${r.departmentName}`,
+          hub: `${r.hubName || 'Store'} (${r.hubCode || 'HUB'})`,
+          department: r.departmentName || 'General',
+          present,
+          recorded,
+          rate: `${rate}%`,
+        };
+      });
+
+      const overallRate = overallRecorded > 0 ? Number(((overallPresent / overallRecorded) * 100).toFixed(1)) : 0;
+      const pagedRows = formattedRows.slice(offset, offset + limit);
+
+      return {
+        total: formattedRows.length,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(formattedRows.length / limit)),
+        category,
+        targetDate: params.date || targetStartDate,
+        startDate: targetStartDate,
+        endDate: targetEndDate,
+        summary: {
+          numerator: overallPresent,
+          denominator: overallRecorded,
+          rate: `${overallRate}%`,
+        },
+        breakdowns: {},
+        rows: pagedRows,
+      };
+    }
+
+    // 2. SESSIONS (All Auth Sessions Opened in Range)
+    if (category === 'sessions' || category === 'sessions_today' || category === 'total-sessions') {
+      const scopeParams: any[] = [targetStartDate, targetEndDate];
+      let sessWhere = `DATE(CONVERT_TZ(s.createdAt, '+00:00', '+05:30')) >= ? AND DATE(CONVERT_TZ(s.createdAt, '+00:00', '+05:30')) <= ?`;
+      if (params.locationId && params.locationId !== 'all') {
+        sessWhere += ` AND (s.locationId = ? OR e.locationId = ?)`;
+        scopeParams.push(params.locationId, params.locationId);
+      }
+      if (params.departmentId && params.departmentId !== 'all') {
+        sessWhere += ` AND (e.departmentId = ? OR e.departmentId IN (SELECT d2.id FROM department d2 WHERE d2.name = (SELECT d3.name FROM department d3 WHERE d3.id = ?)))`;
+        scopeParams.push(params.departmentId, params.departmentId);
+      }
+      if (params.search) {
+        sessWhere += ` AND (e.fullName LIKE ? OR e.employeeCode LIKE ? OR u.email LIKE ? OR s.id LIKE ?)`;
+        const term = `%${params.search}%`;
+        scopeParams.push(term, term, term, term);
+      }
+
+      const countSql = `
+        SELECT COUNT(*) as total,
+               SUM(CASE WHEN s.revoked = 0 AND s.expiresAt > NOW() THEN 1 ELSE 0 END) as activeSessions,
+               SUM(CASE WHEN s.revoked = 1 THEN 1 ELSE 0 END) as revokedSessions,
+               SUM(CASE WHEN s.revoked = 0 AND s.expiresAt <= NOW() THEN 1 ELSE 0 END) as expiredSessions
+        FROM session s
+        LEFT JOIN user u ON s.userId = u.id
+        LEFT JOIN employee e ON u.employeeId = e.id
+        WHERE ${sessWhere}
+      `;
+      const [countRows]: any = await pool.query(countSql, scopeParams);
+      const total = Number(countRows[0]?.total || 0);
+
+      const rowsSql = `
+        SELECT s.id as sessionId, s.createdAt as startTime, s.lastActivityAt, s.expiresAt, s.revoked, s.revokedAt,
+               s.userAgent, s.ipAddress,
+               COALESCE(e.id, u.employeeId, u.id) as id,
+               COALESCE(e.employeeCode, '—') as employeeCode,
+               COALESCE(e.fullName, u.fullName, u.email) as fullName
+        FROM session s
+        LEFT JOIN user u ON s.userId = u.id
+        LEFT JOIN employee e ON u.employeeId = e.id
+        WHERE ${sessWhere}
+        ORDER BY s.createdAt DESC
+        LIMIT ? OFFSET ?
+      `;
+      const [rows]: any = await pool.query(rowsSql, [...scopeParams, limit, offset]);
+
+      return {
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+        category,
+        targetDate: params.date || targetStartDate,
+        startDate: targetStartDate,
+        endDate: targetEndDate,
+        summary: {
+          totalSessions: total,
+          activeSessions: Number(countRows[0]?.activeSessions || 0),
+          endedSessions: Number(countRows[0]?.revokedSessions || 0) + Number(countRows[0]?.expiredSessions || 0),
+        },
+        breakdowns: {},
+        rows: rows.map((r: any) => {
+          const isRevoked = Number(r.revoked) === 1;
+          const isExpired = !isRevoked && new Date(r.expiresAt).getTime() <= Date.now();
+          const sessStatus = isRevoked ? 'Ended' : isExpired ? 'Expired' : 'Active';
+          const startMs = new Date(r.startTime).getTime();
+          const endMs = isRevoked && r.revokedAt ? new Date(r.revokedAt).getTime() : isExpired ? new Date(r.expiresAt).getTime() : Date.now();
+          const diffMins = Math.max(1, Math.round((endMs - startMs) / 60000));
+
+          return {
+            id: r.id,
+            sessionId: String(r.sessionId).slice(0, 8),
+            employeeCode: r.employeeCode,
+            fullName: r.fullName,
+            startTime: formatTime(r.startTime),
+            endTime: isRevoked || isExpired ? formatTime(r.revokedAt || r.expiresAt) : 'Live Now',
+            duration: `${diffMins} mins`,
+            status: sessStatus,
+            deviceType: parseDevice(r.userAgent),
+            ipAddress: maskIp(r.ipAddress),
+          };
+        }),
+      };
+    }
+
+    // 3. TOTAL LOGIN EVENTS (Login Attempts in Range)
+    if (category === 'login_events' || category === 'total_login_events' || category === 'login-events-period') {
+      const scopeParams: any[] = [targetStartDate, targetEndDate];
+      let laWhere = `DATE(CONVERT_TZ(la.createdAt, '+00:00', '+05:30')) >= ? AND DATE(CONVERT_TZ(la.createdAt, '+00:00', '+05:30')) <= ?`;
+      if (params.locationId && params.locationId !== 'all') {
+        laWhere += ` AND (la.locationId = ? OR e.locationId = ? OR u.locationId = ?)`;
+        scopeParams.push(params.locationId, params.locationId, params.locationId);
+      }
+      if (params.departmentId && params.departmentId !== 'all') {
+        laWhere += ` AND (e.departmentId = ? OR e.departmentId IN (SELECT d2.id FROM department d2 WHERE d2.name = (SELECT d3.name FROM department d3 WHERE d3.id = ?)))`;
+        scopeParams.push(params.departmentId, params.departmentId);
+      }
+      if (params.search) {
+        laWhere += ` AND (e.fullName LIKE ? OR e.employeeCode LIKE ? OR la.email LIKE ? OR la.failureReason LIKE ?)`;
+        const term = `%${params.search}%`;
+        scopeParams.push(term, term, term, term);
+      }
+
+      const countSql = `
+        SELECT COUNT(*) as total,
+               SUM(CASE WHEN la.success = 1 THEN 1 ELSE 0 END) as successCount,
+               SUM(CASE WHEN la.success = 0 THEN 1 ELSE 0 END) as failureCount
+        FROM login_attempt la
+        LEFT JOIN user u ON la.userId = u.id
+        LEFT JOIN employee e ON (u.employeeId = e.id OR e.email = la.email)
+        WHERE ${laWhere}
+      `;
+      const [countRows]: any = await pool.query(countSql, scopeParams);
+      const total = Number(countRows[0]?.total || 0);
+
+      // Breakdown of failure reasons
+      const reasonSql = `
+        SELECT COALESCE(NULLIF(la.failureReason, ''), 'Invalid Credentials') as reason, COUNT(*) as c
+        FROM login_attempt la
+        LEFT JOIN user u ON la.userId = u.id
+        LEFT JOIN employee e ON (u.employeeId = e.id OR e.email = la.email)
+        WHERE ${laWhere} AND la.success = 0
+        GROUP BY reason
+      `;
+      const [reasonRows]: any = await pool.query(reasonSql, scopeParams);
+
+      const rowsSql = `
+        SELECT la.id as eventId, la.createdAt as eventTime, la.success, la.failureReason,
+               la.userAgent, la.ipAddress,
+               COALESCE(e.id, u.employeeId, u.id) as id,
+               COALESCE(e.employeeCode, '—') as employeeCode,
+               COALESCE(e.fullName, la.email) as fullName
+        FROM login_attempt la
+        LEFT JOIN user u ON la.userId = u.id
+        LEFT JOIN employee e ON (u.employeeId = e.id OR e.email = la.email)
+        WHERE ${laWhere}
+        ORDER BY la.createdAt DESC
+        LIMIT ? OFFSET ?
+      `;
+      const [rows]: any = await pool.query(rowsSql, [...scopeParams, limit, offset]);
+
+      return {
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+        category,
+        targetDate: params.date || targetStartDate,
+        startDate: targetStartDate,
+        endDate: targetEndDate,
+        summary: {
+          totalEvents: total,
+          successCount: Number(countRows[0]?.successCount || 0),
+          failureCount: Number(countRows[0]?.failureCount || 0),
+          failureReasons: reasonRows.map((r: any) => ({ reason: r.reason, count: Number(r.c) })),
+        },
+        breakdowns: {
+          failureReasons: reasonRows.map((r: any) => ({ reason: r.reason, count: Number(r.c) })),
+        },
+        rows: rows.map((r: any) => ({
+          id: r.id,
+          eventId: r.eventId,
+          eventTime: `${formatDate(r.eventTime)} ${formatTime(r.eventTime)}`,
+          employeeCode: r.employeeCode,
+          fullName: r.fullName,
+          result: Number(r.success) === 1 ? 'Success' : 'Failed',
+          failureReason: Number(r.success) === 1 ? '—' : (r.failureReason || 'Invalid Credentials'),
+          deviceType: parseDevice(r.userAgent),
+          ipAddress: maskIp(r.ipAddress),
+        })),
+      };
+    }
+
+    // 4. ATTENDANCE RECORDS (All Attendance Records in Range)
+    if (category === 'attendance_records' || category === 'att-records-period') {
+      const scopeParams: any[] = [targetStartDate, targetEndDate];
+      let attWhere = `a.attendanceDate >= ? AND a.attendanceDate <= ?`;
+      if (params.locationId && params.locationId !== 'all') {
+        attWhere += ` AND (a.locationId = ? OR e.locationId = ?)`;
+        scopeParams.push(params.locationId, params.locationId);
+      }
+      if (params.departmentId && params.departmentId !== 'all') {
+        attWhere += ` AND (e.departmentId = ? OR e.departmentId IN (SELECT d2.id FROM department d2 WHERE d2.name = (SELECT d3.name FROM department d3 WHERE d3.id = ?)))`;
+        scopeParams.push(params.departmentId, params.departmentId);
+      }
+      if (params.search) {
+        attWhere += ` AND (e.fullName LIKE ? OR e.employeeCode LIKE ? OR a.status LIKE ?)`;
+        const term = `%${params.search}%`;
+        scopeParams.push(term, term, term);
+      }
+
+      const countSql = `
+        SELECT COUNT(*) as total,
+               SUM(CASE WHEN a.status IN ('PRESENT', 'FACE_VERIFIED', 'OVERTIME') OR (a.actualLogin IS NOT NULL AND a.status != 'ABSENT') THEN 1 ELSE 0 END) as presentCount,
+               SUM(CASE WHEN a.status = 'LATE' OR a.lateLoginSeconds > 0 THEN 1 ELSE 0 END) as lateCount,
+               SUM(CASE WHEN a.status = 'ABSENT' THEN 1 ELSE 0 END) as absentCount
+        FROM attendance a
+        INNER JOIN employee e ON a.employeeId = e.id
+        WHERE ${attWhere}
+      `;
+      const [countRows]: any = await pool.query(countSql, scopeParams);
+      const total = Number(countRows[0]?.total || 0);
+
+      const rowsSql = `
+        SELECT a.id as attendanceId, a.attendanceDate, a.actualLogin, a.actualLogout, a.status, a.faceVerified,
+               e.id as id, e.employeeCode, e.fullName,
+               loc.name as locationName, loc.code as locationCode,
+               sh.name as shiftName
+        FROM attendance a
+        INNER JOIN employee e ON a.employeeId = e.id
+        LEFT JOIN location loc ON (a.locationId = loc.id OR e.locationId = loc.id)
+        LEFT JOIN shift sh ON (a.shiftId = sh.id OR e.shiftId = sh.id)
+        WHERE ${attWhere}
+        ORDER BY a.attendanceDate DESC, e.employeeCode ASC
+        LIMIT ? OFFSET ?
+      `;
+      const [rows]: any = await pool.query(rowsSql, [...scopeParams, limit, offset]);
+
+      return {
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+        category,
+        targetDate: params.date || targetStartDate,
+        startDate: targetStartDate,
+        endDate: targetEndDate,
+        summary: {
+          totalRecords: total,
+          presentCount: Number(countRows[0]?.presentCount || 0),
+          lateCount: Number(countRows[0]?.lateCount || 0),
+          absentCount: Number(countRows[0]?.absentCount || 0),
+        },
+        breakdowns: {},
+        rows: rows.map((r: any) => ({
+          id: r.id,
+          attendanceId: r.attendanceId,
+          date: formatDate(r.attendanceDate),
+          employeeCode: r.employeeCode,
+          fullName: r.fullName,
+          locationName: r.locationName || 'Karnataka Store',
+          locationCode: r.locationCode || 'BEL',
+          shiftName: r.shiftName || 'General Shift',
+          punchIn: r.actualLogin ? formatTime(r.actualLogin) : '—',
+          punchOut: r.actualLogout ? formatTime(r.actualLogout) : '—',
+          source: Number(r.faceVerified) === 1 ? 'Face Terminal' : 'Biometric Terminal',
+          status: r.status,
+        })),
+      };
+    }
+
+    // 5. ON APPROVED LEAVE IN RANGE
+    if (category === 'on_leave' || category === 'on_leave_today' || category === 'leave_date') {
+      const scopeParams: any[] = [targetEndDate, targetStartDate];
+      let leaveWhere = `lr.status = 'APPROVED' AND lr.startDate <= ? AND lr.endDate >= ?`;
+      if (params.locationId && params.locationId !== 'all') {
+        leaveWhere += ` AND (lr.locationId = ? OR e.locationId = ?)`;
+        scopeParams.push(params.locationId, params.locationId);
+      }
+      if (params.departmentId && params.departmentId !== 'all') {
+        leaveWhere += ` AND (e.departmentId = ? OR e.departmentId IN (SELECT d2.id FROM department d2 WHERE d2.name = (SELECT d3.name FROM department d3 WHERE d3.id = ?)))`;
+        scopeParams.push(params.departmentId, params.departmentId);
+      }
+      if (params.search) {
+        leaveWhere += ` AND (e.fullName LIKE ? OR e.employeeCode LIKE ? OR lr.leaveType LIKE ?)`;
+        const term = `%${params.search}%`;
+        scopeParams.push(term, term, term);
+      }
+
+      const countSql = `
+        SELECT COUNT(*) as total
+        FROM leaverequest lr
+        INNER JOIN employee e ON lr.employeeId = e.id
+        WHERE ${leaveWhere}
+      `;
+      const [countRows]: any = await pool.query(countSql, scopeParams);
+      const total = Number(countRows[0]?.total || 0);
+
+      // Leave type breakdown
+      const typeSql = `
+        SELECT lr.leaveType, COUNT(*) as c
+        FROM leaverequest lr
+        INNER JOIN employee e ON lr.employeeId = e.id
+        WHERE ${leaveWhere}
+        GROUP BY lr.leaveType
+      `;
+      const [typeRows]: any = await pool.query(typeSql, scopeParams);
+
+      const rowsSql = `
+        SELECT lr.id as leaveId, lr.leaveType, lr.startDate, lr.endDate, lr.days,
+               e.id as id, e.employeeCode, e.fullName,
+               loc.name as locationName, loc.code as locationCode,
+               dept.name as departmentName,
+               COALESCE(rev.fullName, rev.email, 'HR Operations') as approvedBy
+        FROM leaverequest lr
+        INNER JOIN employee e ON lr.employeeId = e.id
+        LEFT JOIN user rev ON lr.reviewedById = rev.id
+        LEFT JOIN location loc ON (lr.locationId = loc.id OR e.locationId = loc.id)
+        LEFT JOIN department dept ON e.departmentId = dept.id
+        WHERE ${leaveWhere}
+        ORDER BY lr.startDate DESC
+        LIMIT ? OFFSET ?
+      `;
+      const [rows]: any = await pool.query(rowsSql, [...scopeParams, limit, offset]);
+
+      return {
+        total,
+        page,
+        limit,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+        category,
+        targetDate: params.date || targetStartDate,
+        startDate: targetStartDate,
+        endDate: targetEndDate,
+        summary: {
+          onLeaveCount: total,
+          byLeaveType: typeRows.map((r: any) => ({ type: r.leaveType, count: Number(r.c) })),
+        },
+        breakdowns: {
+          byLeaveType: typeRows.map((r: any) => ({ type: r.leaveType, count: Number(r.c) })),
+        },
+        rows: rows.map((r: any) => ({
+          id: r.id,
+          leaveId: r.leaveId,
+          employeeCode: r.employeeCode,
+          fullName: r.fullName,
+          departmentName: r.departmentName || '—',
+          locationName: r.locationName || '—',
+          locationCode: r.locationCode || '—',
+          leaveType: r.leaveType,
+          from: formatDate(r.startDate),
+          to: formatDate(r.endDate),
+          days: r.days || 1,
+          approvedBy: r.approvedBy,
+        })),
+      };
+    }
+
+    // 6. DEFAULT EMPLOYEE-CENTRIC CATEGORIES (Total, Active, Inactive, LoggedIn, NotLoggedIn, Live, Present, Absent, Late)
+    const empScope = buildEmpWhere('e');
+    const whereClauses: string[] = [empScope.sql];
+    const queryParams: any[] = [...empScope.params];
+
+    if (category === 'active_workforce' || category === 'active-emp') {
+      whereClauses.push(`e.status IN ('ACTIVE', 'PROBATION')`);
+    } else if (category === 'inactive_exited' || category === 'inactive-emp' || category === 'inactive') {
+      whereClauses.push(`e.status NOT IN ('ACTIVE', 'PROBATION')`);
+    } else if (category === 'logged_in' || category === 'logged_in_today' || category === 'logged-in-today') {
       whereClauses.push(`EXISTS (
         SELECT 1 FROM login_attempt la
         LEFT JOIN user u ON la.userId = u.id
         WHERE (u.employeeId = e.id OR la.email = e.email)
           AND la.success = 1
-          AND DATE(CONVERT_TZ(la.createdAt, '+00:00', '+05:30')) = ?
+          AND DATE(CONVERT_TZ(la.createdAt, '+00:00', '+05:30')) >= ?
+          AND DATE(CONVERT_TZ(la.createdAt, '+00:00', '+05:30')) <= ?
       )`);
-      queryParams.push(targetDate);
-    } else if (category === 'not_logged_in_today') {
+      queryParams.push(targetStartDate, targetEndDate);
+    } else if (category === 'not_logged_in' || category === 'not_logged_in_today' || category === 'not-logged-in-today') {
       whereClauses.push(`e.status = 'ACTIVE'`);
       whereClauses.push(`NOT EXISTS (
         SELECT 1 FROM login_attempt la
         LEFT JOIN user u ON la.userId = u.id
         WHERE (u.employeeId = e.id OR la.email = e.email)
           AND la.success = 1
-          AND DATE(CONVERT_TZ(la.createdAt, '+00:00', '+05:30')) = ?
+          AND DATE(CONVERT_TZ(la.createdAt, '+00:00', '+05:30')) >= ?
+          AND DATE(CONVERT_TZ(la.createdAt, '+00:00', '+05:30')) <= ?
       )`);
-      queryParams.push(targetDate);
-    } else if (category === 'currently_active') {
+      queryParams.push(targetStartDate, targetEndDate);
+    } else if (category === 'currently_active' || category === 'currently-active') {
       whereClauses.push(`EXISTS (
         SELECT 1 FROM session s
         INNER JOIN user u ON s.userId = u.id
@@ -1335,79 +1867,254 @@ export class AnalysisService {
           AND s.revoked = 0
           AND s.expiresAt > NOW()
       )`);
-    } else if (category === 'present_today' || category === 'present_date') {
+    } else if (category === 'present' || category === 'present_today' || category === 'present_date' || category === 'marked-present') {
       whereClauses.push(`EXISTS (
         SELECT 1 FROM attendance a
         WHERE a.employeeId = e.id
-          AND a.attendanceDate = ?
+          AND a.attendanceDate >= ? AND a.attendanceDate <= ?
           AND (a.status IN ('PRESENT', 'FACE_VERIFIED', 'OVERTIME') OR (a.actualLogin IS NOT NULL AND a.status != 'ABSENT'))
       )`);
-      queryParams.push(targetDate);
-    } else if (category === 'absent_today' || category === 'absent_date') {
+      queryParams.push(targetStartDate, targetEndDate);
+    } else if (category === 'absent' || category === 'absent_today' || category === 'absent_date') {
       whereClauses.push(`EXISTS (
         SELECT 1 FROM attendance a
         WHERE a.employeeId = e.id
-          AND a.attendanceDate = ?
+          AND a.attendanceDate >= ? AND a.attendanceDate <= ?
           AND a.status = 'ABSENT'
       )`);
-      queryParams.push(targetDate);
-    } else if (category === 'late_today' || category === 'late_date') {
+      queryParams.push(targetStartDate, targetEndDate);
+    } else if (category === 'late' || category === 'late_today' || category === 'late_date') {
       whereClauses.push(`EXISTS (
         SELECT 1 FROM attendance a
         WHERE a.employeeId = e.id
-          AND a.attendanceDate = ?
+          AND a.attendanceDate >= ? AND a.attendanceDate <= ?
           AND (a.status = 'LATE' OR a.lateLoginSeconds > 0)
       )`);
-      queryParams.push(targetDate);
-    } else if (category === 'on_leave_today' || category === 'leave_date') {
-      whereClauses.push(`EXISTS (
-        SELECT 1 FROM leaverequest lr
-        WHERE lr.employeeId = e.id
-          AND lr.status = 'APPROVED'
-          AND ? >= lr.startDate AND ? <= lr.endDate
-      )`);
-      queryParams.push(targetDate, targetDate);
+      queryParams.push(targetStartDate, targetEndDate);
     }
 
     const whereSql = whereClauses.join(' AND ');
 
     // Count query
-    const countSql = `
-      SELECT COUNT(*) as total
-      FROM employee e
-      WHERE ${whereSql}
-    `;
+    const countSql = `SELECT COUNT(*) as total FROM employee e WHERE ${whereSql}`;
     const [countRows]: any = await pool.query(countSql, queryParams);
     const total = Number(countRows[0]?.total || 0);
 
-    // Rows query
+    // Compute specific summary strip metrics based on category
+    let summary: any = {};
+    let breakdowns: any = {};
+
+    if (category === 'total_employees' || category === 'total-emp' || category === 'all') {
+      const [sumRows]: any = await pool.query(`
+        SELECT
+          COUNT(*) as total,
+          SUM(CASE WHEN e.status = 'ACTIVE' THEN 1 ELSE 0 END) as active,
+          SUM(CASE WHEN e.status = 'PROBATION' THEN 1 ELSE 0 END) as probation,
+          SUM(CASE WHEN e.status NOT IN ('ACTIVE', 'PROBATION') THEN 1 ELSE 0 END) as exited
+        FROM employee e WHERE ${empScope.sql}
+      `, empScope.params);
+
+      const [hubRows]: any = await pool.query(`
+        SELECT loc.name, loc.code, COUNT(e.id) as count
+        FROM employee e
+        LEFT JOIN location loc ON e.locationId = loc.id
+        WHERE ${empScope.sql}
+        GROUP BY loc.id, loc.name, loc.code
+      `, empScope.params);
+
+      const [deptRows]: any = await pool.query(`
+        SELECT dept.name, COUNT(e.id) as count
+        FROM employee e
+        LEFT JOIN department dept ON e.departmentId = dept.id
+        WHERE ${empScope.sql}
+        GROUP BY dept.name
+      `, empScope.params);
+
+      summary = {
+        total: Number(sumRows[0]?.total || 0),
+        active: Number(sumRows[0]?.active || 0),
+        probation: Number(sumRows[0]?.probation || 0),
+        exited: Number(sumRows[0]?.exited || 0),
+      };
+      breakdowns = {
+        byHub: hubRows.map((r: any) => ({ name: r.name || 'Store', code: r.code || 'HUB', count: Number(r.count) })),
+        byDept: deptRows.map((r: any) => ({ name: r.name || 'General', count: Number(r.count) })),
+      };
+    } else if (category === 'active_workforce' || category === 'active-emp') {
+      const [actSum]: any = await pool.query(`
+        SELECT
+          COUNT(*) as total,
+          SUM(CASE WHEN e.status = 'ACTIVE' THEN 1 ELSE 0 END) as active,
+          SUM(CASE WHEN e.status = 'PROBATION' THEN 1 ELSE 0 END) as probation
+        FROM employee e
+        WHERE e.status IN ('ACTIVE', 'PROBATION') AND ${empScope.sql}
+      `, empScope.params);
+
+      const [hubRows]: any = await pool.query(`
+        SELECT loc.name, loc.code, COUNT(e.id) as count
+        FROM employee e
+        LEFT JOIN location loc ON e.locationId = loc.id
+        WHERE e.status IN ('ACTIVE', 'PROBATION') AND ${empScope.sql}
+        GROUP BY loc.id, loc.name, loc.code
+      `, empScope.params);
+
+      const [shiftRows]: any = await pool.query(`
+        SELECT COALESCE(sh.name, 'General Shift') as shiftName, COUNT(e.id) as count
+        FROM employee e
+        LEFT JOIN shift sh ON e.shiftId = sh.id
+        WHERE e.status IN ('ACTIVE', 'PROBATION') AND ${empScope.sql}
+        GROUP BY shiftName
+      `, empScope.params);
+
+      summary = {
+        active: Number(actSum[0]?.active || 0),
+        probation: Number(actSum[0]?.probation || 0),
+        onFloor: Number(actSum[0]?.total || 0),
+      };
+      breakdowns = {
+        byHub: hubRows.map((r: any) => ({ name: r.name || 'Store', code: r.code || 'HUB', count: Number(r.count) })),
+        byShift: shiftRows.map((r: any) => ({ name: r.shiftName, count: Number(r.count) })),
+      };
+    } else if (category === 'inactive_exited' || category === 'inactive-emp' || category === 'inactive') {
+      const [exitSum]: any = await pool.query(`
+        SELECT
+          COUNT(*) as exitedCount,
+          SUM(CASE WHEN e.status = 'RESIGNED' THEN 1 ELSE 0 END) as resigned,
+          SUM(CASE WHEN e.status = 'TERMINATED' THEN 1 ELSE 0 END) as terminated,
+          SUM(CASE WHEN e.status NOT IN ('RESIGNED', 'TERMINATED') THEN 1 ELSE 0 END) as other
+        FROM employee e
+        WHERE e.status NOT IN ('ACTIVE', 'PROBATION') AND ${empScope.sql}
+      `, empScope.params);
+
+      summary = {
+        exitedCount: Number(exitSum[0]?.exitedCount || 0),
+        resigned: Number(exitSum[0]?.resigned || 0),
+        terminated: Number(exitSum[0]?.terminated || 0),
+        other: Number(exitSum[0]?.other || 0),
+      };
+      breakdowns = {
+        byExitType: [
+          { type: 'Resignation', count: Number(exitSum[0]?.resigned || 0) },
+          { type: 'Termination', count: Number(exitSum[0]?.terminated || 0) },
+          { type: 'Other', count: Number(exitSum[0]?.other || 0) },
+        ],
+      };
+    } else if (category === 'currently_active' || category === 'currently-active') {
+      const [activeSum]: any = await pool.query(`
+        SELECT COUNT(DISTINCT s.userId) as liveCount,
+               SUM(CASE WHEN s.expiresAt <= NOW() + INTERVAL 15 MINUTE THEN 1 ELSE 0 END) as expiringSoon
+        FROM session s
+        INNER JOIN user u ON s.userId = u.id
+        LEFT JOIN employee e ON u.employeeId = e.id
+        WHERE s.revoked = 0 AND s.expiresAt > NOW() AND ${empScope.sql}
+      `, empScope.params);
+
+      summary = {
+        liveCount: Number(activeSum[0]?.liveCount || 0),
+        expiringWithin15Min: Number(activeSum[0]?.expiringSoon || 0),
+      };
+    } else if (category === 'present' || category === 'present_today' || category === 'present_date' || category === 'marked-present') {
+      const [presSum]: any = await pool.query(`
+        SELECT COUNT(*) as presentCount,
+               SUM(CASE WHEN a.faceVerified = 1 THEN 1 ELSE 0 END) as faceCount,
+               SUM(CASE WHEN a.faceVerified = 0 THEN 1 ELSE 0 END) as biometricCount
+        FROM attendance a
+        INNER JOIN employee e ON a.employeeId = e.id
+        WHERE a.attendanceDate >= ? AND a.attendanceDate <= ?
+          AND (a.status IN ('PRESENT', 'FACE_VERIFIED', 'OVERTIME') OR (a.actualLogin IS NOT NULL AND a.status != 'ABSENT'))
+          AND ${empScope.sql}
+      `, [targetStartDate, targetEndDate, ...empScope.params]);
+
+      summary = {
+        presentCount: Number(presSum[0]?.presentCount || 0),
+        verificationMethods: {
+          Face: Number(presSum[0]?.faceCount || 0),
+          RFID: Number(presSum[0]?.biometricCount || 0),
+          QR: 0,
+          Manual: 0,
+        },
+      };
+    } else if (category === 'late' || category === 'late_today' || category === 'late_date') {
+      const [lateSum]: any = await pool.query(`
+        SELECT COUNT(*) as lateCount,
+               AVG(a.lateLoginSeconds) as avgLateSec,
+               MAX(a.lateLoginSeconds) as maxLateSec
+        FROM attendance a
+        INNER JOIN employee e ON a.employeeId = e.id
+        WHERE a.attendanceDate >= ? AND a.attendanceDate <= ?
+          AND (a.status = 'LATE' OR a.lateLoginSeconds > 0)
+          AND ${empScope.sql}
+      `, [targetStartDate, targetEndDate, ...empScope.params]);
+
+      const avgMins = Math.round(Number(lateSum[0]?.avgLateSec || 0) / 60);
+      const maxMins = Math.round(Number(lateSum[0]?.maxLateSec || 0) / 60);
+
+      summary = {
+        lateCount: Number(lateSum[0]?.lateCount || 0),
+        avgMinutesLate: avgMins,
+        longestDelay: `${maxMins} mins`,
+      };
+    }
+
+    // Rows Query for Employee-Centric Cards
     const rowsSql = `
       SELECT e.id, e.employeeCode, e.fullName, e.email, e.phone, e.designation, e.role,
-             e.status, e.joiningDate as hireDate, e.joiningDate, e.locationId, e.departmentId, e.shiftId,
+             e.status, e.employmentType, e.joiningDate, e.confirmationDate, e.exitDate,
              loc.name as locationName, loc.code as locationCode,
              dept.name as departmentName,
              sh.name as shiftName,
              att.status as attendanceStatus,
-             att.actualLogin, att.actualLogout, att.lateLoginSeconds,
-             (SELECT COUNT(*) FROM login_attempt la
-              LEFT JOIN user u ON la.userId = u.id
-              WHERE (u.employeeId = e.id OR la.email = e.email)
-                AND la.success = 1
-                AND DATE(CONVERT_TZ(la.createdAt, '+00:00', '+05:30')) = ?) as loginsToday,
-             (SELECT COUNT(*) FROM session s
-              INNER JOIN user u ON s.userId = u.id
-              WHERE u.employeeId = e.id AND s.revoked = 0 AND s.expiresAt > NOW()) as activeSessions
+             att.actualLogin, att.actualLogout, att.lateLoginSeconds, att.faceVerified, att.scheduledLogin,
+             (SELECT COUNT(*) FROM user u WHERE u.employeeId = e.id) as userAccountCount,
+             (SELECT MIN(la.createdAt) FROM login_attempt la LEFT JOIN user u ON la.userId = u.id
+              WHERE (u.employeeId = e.id OR la.email = e.email) AND la.success = 1
+                AND DATE(CONVERT_TZ(la.createdAt, '+00:00', '+05:30')) >= ?
+                AND DATE(CONVERT_TZ(la.createdAt, '+00:00', '+05:30')) <= ?) as firstLoginTime,
+             (SELECT MAX(la.createdAt) FROM login_attempt la LEFT JOIN user u ON la.userId = u.id
+              WHERE (u.employeeId = e.id OR la.email = e.email) AND la.success = 1
+                AND DATE(CONVERT_TZ(la.createdAt, '+00:00', '+05:30')) >= ?
+                AND DATE(CONVERT_TZ(la.createdAt, '+00:00', '+05:30')) <= ?) as lastLoginTime,
+             (SELECT COUNT(*) FROM login_attempt la LEFT JOIN user u ON la.userId = u.id
+              WHERE (u.employeeId = e.id OR la.email = e.email) AND la.success = 1
+                AND DATE(CONVERT_TZ(la.createdAt, '+00:00', '+05:30')) >= ?
+                AND DATE(CONVERT_TZ(la.createdAt, '+00:00', '+05:30')) <= ?) as loginCount,
+             (SELECT la.userAgent FROM login_attempt la LEFT JOIN user u ON la.userId = u.id
+              WHERE (u.employeeId = e.id OR la.email = e.email) AND la.success = 1
+              ORDER BY la.createdAt DESC LIMIT 1) as recentUserAgent,
+             (SELECT la.ipAddress FROM login_attempt la LEFT JOIN user u ON la.userId = u.id
+              WHERE (u.employeeId = e.id OR la.email = e.email) AND la.success = 1
+              ORDER BY la.createdAt DESC LIMIT 1) as recentIpAddress,
+             (SELECT s.createdAt FROM session s INNER JOIN user u ON s.userId = u.id
+              WHERE u.employeeId = e.id AND s.revoked = 0 AND s.expiresAt > NOW()
+              ORDER BY s.createdAt DESC LIMIT 1) as sessionStart,
+             (SELECT s.lastActivityAt FROM session s INNER JOIN user u ON s.userId = u.id
+              WHERE u.employeeId = e.id AND s.revoked = 0 AND s.expiresAt > NOW()
+              ORDER BY s.createdAt DESC LIMIT 1) as sessionLastActivity,
+             (SELECT s.expiresAt FROM session s INNER JOIN user u ON s.userId = u.id
+              WHERE u.employeeId = e.id AND s.revoked = 0 AND s.expiresAt > NOW()
+              ORDER BY s.createdAt DESC LIMIT 1) as sessionExpiresAt,
+             (SELECT s.userAgent FROM session s INNER JOIN user u ON s.userId = u.id
+              WHERE u.employeeId = e.id AND s.revoked = 0 AND s.expiresAt > NOW()
+              ORDER BY s.createdAt DESC LIMIT 1) as sessionUserAgent
       FROM employee e
       LEFT JOIN location loc ON e.locationId = loc.id
       LEFT JOIN department dept ON e.departmentId = dept.id
       LEFT JOIN shift sh ON e.shiftId = sh.id
-      LEFT JOIN attendance att ON (att.employeeId = e.id AND att.attendanceDate = ?)
+      LEFT JOIN attendance att ON (att.employeeId = e.id AND att.attendanceDate >= ? AND att.attendanceDate <= ?)
       WHERE ${whereSql}
       ORDER BY e.employeeCode ASC
       LIMIT ? OFFSET ?
     `;
 
-    const fullQueryParams = [targetDate, targetDate, ...queryParams, limit, offset];
+    const fullQueryParams = [
+      targetStartDate, targetEndDate,
+      targetStartDate, targetEndDate,
+      targetStartDate, targetEndDate,
+      targetStartDate, targetEndDate,
+      ...queryParams,
+      limit,
+      offset,
+    ];
     const [rows]: any = await pool.query(rowsSql, fullQueryParams);
 
     return {
@@ -1416,29 +2123,59 @@ export class AnalysisService {
       limit,
       totalPages: Math.max(1, Math.ceil(total / limit)),
       category,
-      targetDate,
-      rows: rows.map((r: any) => ({
-        id: r.id,
-        employeeCode: r.employeeCode,
-        fullName: r.fullName,
-        email: r.email,
-        phone: r.phone,
-        designation: r.designation || '—',
-        role: r.role,
-        status: r.status,
-        hireDate: r.hireDate ? new Date(r.hireDate).toISOString().slice(0, 10) : null,
-        locationName: r.locationName || '—',
-        locationCode: r.locationCode || '—',
-        departmentName: r.departmentName || '—',
-        shiftName: r.shiftName || '—',
-        attendanceStatus: r.attendanceStatus || 'UNRECORDED',
-        actualLogin: r.actualLogin ? new Date(r.actualLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null,
-        actualLogout: r.actualLogout ? new Date(r.actualLogout).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null,
-        isLate: Number(r.lateLoginSeconds || 0) > 0 || r.attendanceStatus === 'LATE',
-        lateMinutes: Math.round(Number(r.lateLoginSeconds || 0) / 60),
-        loginsToday: Number(r.loginsToday || 0),
-        isOnline: Number(r.activeSessions || 0) > 0,
-      })),
+      targetDate: params.date || targetStartDate,
+      startDate: targetStartDate,
+      endDate: targetEndDate,
+      summary,
+      breakdowns,
+      rows: rows.map((r: any) => {
+        const joinDate = r.joiningDate ? new Date(r.joiningDate) : null;
+        const daysSinceJoin = joinDate ? Math.max(0, Math.floor((Date.now() - joinDate.getTime()) / (86400 * 1000))) : null;
+
+        return {
+          id: r.id,
+          employeeCode: r.employeeCode,
+          fullName: r.fullName,
+          email: r.email,
+          phone: r.phone,
+          designation: r.designation || '—',
+          role: r.role,
+          status: r.status,
+          hireDate: formatDate(r.joiningDate),
+          joiningDate: formatDate(r.joiningDate),
+          daysSinceJoining: daysSinceJoin !== null ? `${daysSinceJoin} days` : '—',
+          locationName: r.locationName || '—',
+          locationCode: r.locationCode || '—',
+          departmentName: r.departmentName || '—',
+          shiftName: r.shiftName || 'General Shift',
+          shiftStart: r.scheduledLogin ? formatTime(r.scheduledLogin) : '09:00 IST',
+          employmentType: r.employmentType || 'Full-time Regular',
+          probationEndDate: r.confirmationDate ? formatDate(r.confirmationDate) : (r.status === 'PROBATION' ? 'In Probation' : 'Confirmed'),
+          hasLoginAccount: Number(r.userAccountCount || 0) > 0 ? 'Yes' : 'No',
+          loginAccountStatus: Number(r.userAccountCount || 0) > 0 ? 'Active Account' : 'No Login Credentials',
+          exitType: r.status === 'RESIGNED' ? 'Resignation' : (r.status === 'TERMINATED' ? 'Termination' : (r.status === 'INACTIVE' ? 'Separated' : '—')),
+          exitDate: formatDate(r.exitDate) || '—',
+          settlementStatus: r.status === 'RESIGNED' ? 'Pending Clearance' : (r.status === 'TERMINATED' ? 'Completed' : '—'),
+          firstLoginTime: formatTime(r.firstLoginTime) || '—',
+          lastLoginTime: formatTime(r.lastLoginTime) || '—',
+          loginCount: Number(r.loginCount || 0),
+          deviceType: parseDevice(r.sessionUserAgent || r.recentUserAgent),
+          ipAddress: maskIp(r.recentIpAddress),
+          sessionStart: formatTime(r.sessionStart) || '—',
+          lastActivity: formatTime(r.sessionLastActivity) || '—',
+          expiresAt: formatTime(r.sessionExpiresAt) || '—',
+          actualLogin: r.actualLogin ? formatTime(r.actualLogin) : null,
+          punchInTime: r.actualLogin ? formatTime(r.actualLogin) : '—',
+          actualLogout: r.actualLogout ? formatTime(r.actualLogout) : null,
+          verificationMethod: Number(r.faceVerified) === 1 ? 'Face Recognition' : 'RFID / Biometric',
+          attendanceStatus: r.attendanceStatus || 'UNRECORDED',
+          isLate: Number(r.lateLoginSeconds || 0) > 0 || r.attendanceStatus === 'LATE',
+          minutesLate: Math.round(Number(r.lateLoginSeconds || 0) / 60),
+          lastPunchDate: formatDate(r.actualLogin) || 'None in Range',
+          leaveStatus: r.attendanceStatus === 'ON_LEAVE' ? 'Approved Leave' : 'No Approved Leave',
+        };
+      }),
     };
   }
 }
+
