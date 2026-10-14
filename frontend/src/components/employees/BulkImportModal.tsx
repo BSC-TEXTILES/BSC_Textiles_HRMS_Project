@@ -43,6 +43,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
   // File & Mode states
   const [file, setFile] = useState<File | null>(null);
   const [csvContent, setCsvContent] = useState<string>('');
+  const [fileBase64, setFileBase64] = useState<string>('');
   const [mode, setMode] = useState<ImportMode>('upsert');
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -72,6 +73,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
   const handleResetImport = () => {
     setFile(null);
     setCsvContent('');
+    setFileBase64('');
     setPreviewData(null);
     setExecutionResult(null);
     setRowStatusFilter('all');
@@ -86,10 +88,30 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
     onClose();
   };
 
-  // Download Sample CSV Template directly from backend schema
-  const handleDownloadTemplate = async () => {
+  // Download Formatted Excel (.xlsx) Template
+  const handleDownloadExcelTemplate = async () => {
     try {
-      const res = await api.get('/employees/import/template', { responseType: 'blob' });
+      const res = await api.get('/employees/import/template/excel', { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'bsc_textiles_employee_import_template.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success('Downloaded formatted Excel template (.xlsx)!');
+    } catch (err: any) {
+      console.error('Error downloading Excel template:', err);
+      toast.error('Failed to download Excel template file');
+    }
+  };
+
+  // Download Plain CSV (.csv) Template
+  const handleDownloadCsvTemplate = async () => {
+    try {
+      const res = await api.get('/employees/import/template/csv', { responseType: 'blob' });
       const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -99,17 +121,23 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      toast.success('Downloaded live CSV template!');
+      toast.success('Downloaded clean CSV template (.csv)!');
     } catch (err: any) {
-      console.error('Error downloading template:', err);
-      toast.error('Failed to download template file');
+      console.error('Error downloading CSV template:', err);
+      toast.error('Failed to download CSV template file');
     }
   };
 
-  // Read file into text
+  // Legacy fallback
+  const handleDownloadTemplate = handleDownloadExcelTemplate;
+
+  // Read file into text or base64
   const processUploadedFile = (selectedFile: File) => {
-    if (!selectedFile.name.toLowerCase().endsWith('.csv')) {
-      toast.error('Please select a valid CSV (.csv) file.');
+    const isCsv = selectedFile.name.toLowerCase().endsWith('.csv');
+    const isExcel = selectedFile.name.toLowerCase().endsWith('.xlsx') || selectedFile.name.toLowerCase().endsWith('.xls');
+
+    if (!isCsv && !isExcel) {
+      toast.error('Please select a valid Excel (.xlsx) or CSV (.csv) file.');
       return;
     }
     if (selectedFile.size > 5 * 1024 * 1024) {
@@ -122,16 +150,32 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
     setExecutionResult(null);
     setPreviewPage(1);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = String(e.target?.result || '');
-      setCsvContent(text);
-      toast.success(`Loaded "${selectedFile.name}" (${(selectedFile.size / 1024).toFixed(1)} KB)`);
-    };
-    reader.onerror = () => {
-      toast.error('Could not read file content');
-    };
-    reader.readAsText(selectedFile, 'UTF-8');
+    if (isExcel) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = String(e.target?.result || '');
+        const base64 = dataUrl.split(',')[1] || '';
+        setFileBase64(base64);
+        setCsvContent('');
+        toast.success(`Loaded Excel "${selectedFile.name}" (${(selectedFile.size / 1024).toFixed(1)} KB)`);
+      };
+      reader.onerror = () => {
+        toast.error('Could not read Excel file content');
+      };
+      reader.readAsDataURL(selectedFile);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = String(e.target?.result || '');
+        setCsvContent(text);
+        setFileBase64('');
+        toast.success(`Loaded CSV "${selectedFile.name}" (${(selectedFile.size / 1024).toFixed(1)} KB)`);
+      };
+      reader.onerror = () => {
+        toast.error('Could not read file content');
+      };
+      reader.readAsText(selectedFile, 'UTF-8');
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -160,8 +204,8 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
 
   // Validate and generate Preview
   const handleValidatePreview = async () => {
-    if (!csvContent || !file) {
-      toast.error('Please select or drop a CSV file first');
+    if (!file || (!csvContent && !fileBase64)) {
+      toast.error('Please select or drop a CSV or Excel file first');
       return;
     }
 
@@ -169,6 +213,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
       setValidating(true);
       const res = await api.post('/employees/import/preview', {
         csv: csvContent,
+        fileBase64: fileBase64 || undefined,
         fileName: file.name,
         mode,
       });
@@ -186,12 +231,13 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
 
   // Commit and Execute Import
   const handleExecuteImport = async () => {
-    if (!csvContent || !file) return;
+    if (!file || (!csvContent && !fileBase64)) return;
 
     try {
       setExecuting(true);
       const res = await api.post('/employees/import/execute', {
         csv: csvContent,
+        fileBase64: fileBase64 || undefined,
         fileName: file.name,
         mode,
       });
@@ -436,30 +482,76 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
           {/* TAB 1: UPLOAD & IMPORT */}
           {activeTab === 'import' && (
             <div className="space-y-6">
-              {/* Top Banner: Download Template Action */}
-              <div className="p-4 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              {/* Top Banner: Download Template Actions */}
+              <div className="p-4 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/80 dark:border-blue-900/60 flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/50 text-[#1346a1] dark:text-blue-300 flex items-center justify-center shrink-0 mt-0.5">
-                    <FileSpreadsheet className="w-4 h-4" />
+                  <div className="w-9 h-9 rounded-xl bg-[#1346a1] text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                    <FileSpreadsheet className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-xs font-bold text-slate-900 dark:text-white">
-                      Download Official CSV Template
+                    <h3 className="text-xs font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <span>Official Bulk Employee Templates</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                        Auto-Fitted & Formatted
+                      </span>
                     </h3>
                     <p className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
-                      Contains exact supported column headers, mandatory field definitions, and illustrative sample records for BEL, DAV, and SHI stores.
+                      Download pre-formatted templates with exact 49 columns, full header labels, text-formatted phone numbers (no scientific notation), and active Karnataka Hubs (BEL, DAV, SHI).
                     </p>
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleDownloadTemplate}
-                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[#1346a1] hover:bg-[#0e357e] text-white flex items-center justify-center gap-1.5 shadow-xs transition-all shrink-0 cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download Sample CSV Template</span>
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleDownloadExcelTemplate}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[#1346a1] hover:bg-[#0e357e] text-white flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer ring-1 ring-white/20"
+                    title="Download Excel workbook with auto-fit columns, colors, and instructions sheet"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-300" />
+                    <span>Download Excel Template (.xlsx)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDownloadCsvTemplate}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                    title="Download raw CSV file"
+                  >
+                    <Download className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Plain CSV (.csv)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Format & Store Guide Card */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 text-xs">
+                <div>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 block mb-1">
+                    📍 Mandatory Columns
+                  </span>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    <strong className="text-slate-700 dark:text-slate-300">location_code</strong> (all rows)<br />
+                    <strong className="text-slate-700 dark:text-slate-300">first_name, last_name, joining_date</strong> (new staff)
+                  </p>
+                </div>
+                <div>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 block mb-1">
+                    🏢 Karnataka Store Hubs
+                  </span>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    <code className="px-1 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-bold">BEL</code> Belagavi Head Store<br />
+                    <code className="px-1 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-bold">DAV</code> Davanagere Mega Store<br />
+                    <code className="px-1 py-0.5 rounded bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 font-bold">SHI</code> Shivamogga Flagship
+                  </p>
+                </div>
+                <div>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 block mb-1">
+                    ✨ ID Auto-Allocation
+                  </span>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Leave <strong className="text-slate-700 dark:text-slate-300">employee_id</strong> blank to auto-generate official sequential IDs (<code className="text-blue-600 dark:text-blue-400 font-mono">BSC-EMP-XXXX</code>).
+                  </p>
+                </div>
               </div>
 
               {/* Execution Success / Result Banner */}
@@ -619,13 +711,13 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
                   {/* Drag and Drop Zone */}
                   <div>
                     <label className="text-xs font-extrabold text-slate-900 dark:text-white block mb-2">
-                      2. Choose or Drop CSV File
+                      2. Choose or Drop Excel (.xlsx) or CSV (.csv) File
                     </label>
 
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".csv,text/csv,application/vnd.ms-excel"
+                      accept=".xlsx,.xls,.csv,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                       onChange={handleFileChange}
                       className="hidden"
                     />
@@ -646,10 +738,10 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
                           <UploadCloud className="w-6 h-6" />
                         </div>
                         <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200">
-                          Drag and drop employee CSV file here
+                          Drag and drop employee Excel (.xlsx) or CSV (.csv) file here
                         </h4>
                         <p className="text-xs text-slate-500 mt-1 mb-3">
-                          Standard UTF-8 CSV supported (Excel exports supported, max 5 MB, up to 5,000 rows)
+                          Formatted Excel workbooks (.xlsx) and standard UTF-8 CSV supported (max 5 MB, up to 5,000 rows)
                         </p>
                         <button
                           type="button"
@@ -669,7 +761,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
                               {file.name}
                             </h4>
                             <p className="text-[11px] text-slate-500">
-                              {(file.size / 1024).toFixed(1)} KB • CSV Document
+                              {(file.size / 1024).toFixed(1)} KB • {file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls') ? 'Excel Workbook (.xlsx)' : 'CSV Document (.csv)'}
                             </p>
                           </div>
                         </div>

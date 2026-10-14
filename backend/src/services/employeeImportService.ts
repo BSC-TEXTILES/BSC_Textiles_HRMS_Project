@@ -19,6 +19,7 @@
  *    failure rolls the whole batch back so no half-imported state survives.
  */
 import crypto from 'node:crypto';
+import ExcelJS from 'exceljs';
 import { prisma, pool } from '../db.js';
 import {
   parseCsv,
@@ -344,10 +345,10 @@ export async function buildTemplateCsv(): Promise<string> {
     employment_type: 'FULL_TIME',
     employment_status: 'ACTIVE',
     mobile_number: '+91 98450 12345',
-    alternate_mobile_number: '9845012346',
+    alternate_mobile_number: '+91 98450 12346',
     email: 'anitha.naik@bsctextiles.in',
     emergency_contact_name: 'Raghavendra Naik',
-    emergency_contact_number: '9845012399',
+    emergency_contact_number: '+91 98450 12399',
     current_address: '45 Tilakwadi Main Road, Belagavi',
     permanent_address: 'House 12, Hukkeri, Belagavi',
     city: 'Belagavi',
@@ -395,11 +396,11 @@ export async function buildTemplateCsv(): Promise<string> {
     role: 'FLOOR_MANAGER',
     employment_type: 'FULL_TIME',
     employment_status: 'ACTIVE',
-    mobile_number: '98860 55521',
+    mobile_number: '+91 98860 55521',
     alternate_mobile_number: '',
     email: 'manoj.kulkarni@bsctextiles.in',
     emergency_contact_name: 'Sunita Kulkarni',
-    emergency_contact_number: '9886055599',
+    emergency_contact_number: '+91 98860 55599',
     current_address: '22 Saraswathi Nagar, Davanagere',
     permanent_address: '22 Saraswathi Nagar, Davanagere',
     city: 'Davanagere',
@@ -447,11 +448,11 @@ export async function buildTemplateCsv(): Promise<string> {
     role: 'HR_EXECUTIVE',
     employment_type: 'CONTRACT',
     employment_status: 'ON_LEAVE',
-    mobile_number: '+919876543210',
+    mobile_number: '+91 98765 43210',
     alternate_mobile_number: '',
     email: 'shruthi.patil@bsctextiles.in',
     emergency_contact_name: 'Ganesh Patil',
-    emergency_contact_number: '9876543211',
+    emergency_contact_number: '+91 98765 43211',
     current_address: '7 Shivaji Road, Shivamogga',
     permanent_address: '7 Shivaji Road, Shivamogga',
     city: 'Shivamogga',
@@ -499,7 +500,7 @@ export async function buildTemplateCsv(): Promise<string> {
     '# MANDATORY for every row        : location_code',
     '# MANDATORY for NEW employees    : first_name, last_name, joining_date',
     '# Optional matching key          : employee_id (matches an existing employee;',
-    "#   leave blank to create a new employee — an ID such as ${IMPORT_COLUMNS[0].example} is generated for you)",
+    `#   leave blank to create a new employee — an ID such as ${IMPORT_COLUMNS[0].example} is generated for you)`,
     `# Accepted locations             : ${await locationLegend()}`,
     '# Accepted departments           : SALES, OPS, HR, FIN, INV, CS (by code or name)',
     '# Accepted shifts                : GENERAL, MORNING, EVENING, NIGHT (by code or name)',
@@ -515,6 +516,371 @@ export async function buildTemplateCsv(): Promise<string> {
   // The legend is appended as raw '#' comment lines (not CSV fields) so it
   // stays human-readable in any editor and is skipped by the importer.
   return `${toCsv(rows)}\r\n${legend.join('\r\n')}`;
+}
+
+/**
+ * Build a professionally styled Microsoft Excel (.xlsx) workbook.
+ *
+ * Includes:
+ *  - Sheet 1 ("Employee Import Data"): Royal Cobalt Blue header (#1346A1), white text,
+ *    auto-fitted column widths, frozen top row, explicit text formatting on all cells
+ *    (preventing scientific notation on phone numbers and codes).
+ *  - Sheet 2 ("📘 Instructions & Guidelines"): Complete field lookup guide, accepted store
+ *    hub codes (BEL, DAV, SHI), department codes, shifts, roles, and mandatory rules.
+ */
+export async function buildTemplateExcel(): Promise<Buffer> {
+  const policy = await getEmployeeIdPolicy().catch(() => null);
+  const previewId = (n: number) =>
+    policy ? `${policy.prefix}${String(n).padStart(policy.padding, '0')}` : `BSC-EMP-${String(n).padStart(4, '0')}`;
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'BSC Textiles HRMS Platform';
+  workbook.lastModifiedBy = 'BSC Textiles HRMS Platform';
+  workbook.created = new Date();
+  workbook.modified = new Date();
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // SHEET 1: Data Entry Grid
+  // ───────────────────────────────────────────────────────────────────────────
+  const sheet = workbook.addWorksheet('Employee Import Data', {
+    views: [{ state: 'frozen', ySplit: 1, xSplit: 0 }],
+    properties: { defaultRowHeight: 22 },
+  });
+
+  // Calculate clean, wide columns so no header is cut off
+  sheet.columns = IMPORT_COLUMNS.map((col) => {
+    const rawLen = Math.max(col.key.length, col.label.length);
+    const colWidth = Math.min(Math.max(rawLen + 6, 18), 38);
+    return {
+      header: col.key,
+      key: col.key,
+      width: colWidth,
+    };
+  });
+
+  // Style Header Row (Row 1)
+  const headerRow = sheet.getRow(1);
+  headerRow.height = 30;
+  headerRow.eachCell((cell) => {
+    cell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1346A1' }, // Royal Cobalt Blue
+    };
+    cell.font = {
+      name: 'Segoe UI',
+      size: 10,
+      bold: true,
+      color: { argb: 'FFFFFFFF' },
+    };
+    cell.alignment = {
+      vertical: 'middle',
+      horizontal: 'left',
+      wrapText: false,
+    };
+    cell.border = {
+      top: { style: 'medium', color: { argb: 'FF0E357E' } },
+      bottom: { style: 'medium', color: { argb: 'FF0E357E' } },
+      left: { style: 'thin', color: { argb: 'FF2563EB' } },
+      right: { style: 'thin', color: { argb: 'FF2563EB' } },
+    };
+  });
+
+  // Sample data records
+  const sample1: Record<string, string> = {
+    employee_id: '',
+    employee_code: '',
+    first_name: 'Anitha',
+    middle_name: 'Raghavendra',
+    last_name: 'Naik',
+    full_name: '',
+    designation: 'Sales Executive',
+    role: 'SALES_EMPLOYEE',
+    employment_type: 'FULL_TIME',
+    employment_status: 'ACTIVE',
+    mobile_number: '+91 98450 12345',
+    alternate_mobile_number: '+91 98450 12346',
+    email: 'anitha.naik@bsctextiles.in',
+    emergency_contact_name: 'Raghavendra Naik',
+    emergency_contact_number: '+91 98450 12399',
+    current_address: '45 Tilakwadi Main Road, Belagavi',
+    permanent_address: 'House 12, Hukkeri, Belagavi',
+    city: 'Belagavi',
+    state: 'Karnataka',
+    pincode: '590006',
+    location_code: 'BEL',
+    location_name: 'Belagavi Head Store',
+    department: 'SALES',
+    floor: 'Ground Floor',
+    section: 'Silk Sarees',
+    shift_id: 'GENERAL',
+    shift_name: '',
+    reporting_manager_employee_id: '',
+    joining_date: '2026-01-15',
+    confirmation_date: '2026-07-15',
+    employee_category: 'STAFF',
+    date_of_birth: '1996-04-12',
+    gender: 'FEMALE',
+    payroll_employee_code: 'PAY-0036',
+    pf_applicable: 'TRUE',
+    uan_number: '101234567890',
+    esi_applicable: 'FALSE',
+    esi_number: '',
+    bank_account_reference: 'XXXX4819',
+    ifsc_code: 'SBIN0001248',
+    pan_number: 'ABZPP4912K',
+    aadhaar_verification_status: 'VERIFIED',
+    biometric_enrollment_status: 'NOT_ENROLLED',
+    biometric_device_employee_id: '',
+    qr_pass_status: 'NONE',
+    attendance_eligibility: 'TRUE',
+    employee_photo_reference: '',
+    employee_document_status: 'PENDING',
+    remarks: 'Sample 1: New employee — leave employee_id blank to auto-generate',
+  };
+
+  const sample2: Record<string, string> = {
+    employee_id: previewId(37),
+    employee_code: '',
+    first_name: 'Manoj',
+    middle_name: '',
+    last_name: 'Kulkarni',
+    full_name: '',
+    designation: 'Floor Supervisor',
+    role: 'FLOOR_MANAGER',
+    employment_type: 'FULL_TIME',
+    employment_status: 'ACTIVE',
+    mobile_number: '+91 98860 55521',
+    alternate_mobile_number: '',
+    email: 'manoj.kulkarni@bsctextiles.in',
+    emergency_contact_name: 'Sunita Kulkarni',
+    emergency_contact_number: '+91 98860 55599',
+    current_address: '22 Saraswathi Nagar, Davanagere',
+    permanent_address: '22 Saraswathi Nagar, Davanagere',
+    city: 'Davanagere',
+    state: 'Karnataka',
+    pincode: '577004',
+    location_code: 'DAV',
+    location_name: 'Davanagere Mega Store',
+    department: 'OPS',
+    floor: 'First Floor',
+    section: 'Mens Wear',
+    shift_id: '',
+    shift_name: 'Evening Shift',
+    reporting_manager_employee_id: '',
+    joining_date: '15/03/2024',
+    confirmation_date: '15/09/2024',
+    employee_category: 'STAFF',
+    date_of_birth: '1990-11-02',
+    gender: 'MALE',
+    payroll_employee_code: '',
+    pf_applicable: 'YES',
+    uan_number: '',
+    esi_applicable: 'NO',
+    esi_number: '',
+    bank_account_reference: '',
+    ifsc_code: '',
+    pan_number: '',
+    aadhaar_verification_status: 'PENDING',
+    biometric_enrollment_status: 'ENROLLED',
+    biometric_device_employee_id: 'BIO-0037',
+    qr_pass_status: 'ISSUED',
+    attendance_eligibility: 'TRUE',
+    employee_photo_reference: '',
+    employee_document_status: 'COMPLETE',
+    remarks: 'Sample 2: Existing employee updated by employee_id',
+  };
+
+  const sample3: Record<string, string> = {
+    employee_id: '',
+    employee_code: '1402',
+    first_name: 'Shruthi',
+    middle_name: '',
+    last_name: 'Patil',
+    full_name: 'Shruthi Patil',
+    designation: 'HR Executive',
+    role: 'HR_EXECUTIVE',
+    employment_type: 'CONTRACT',
+    employment_status: 'ON_LEAVE',
+    mobile_number: '+91 98765 43210',
+    alternate_mobile_number: '',
+    email: 'shruthi.patil@bsctextiles.in',
+    emergency_contact_name: 'Ganesh Patil',
+    emergency_contact_number: '+91 98765 43211',
+    current_address: '7 Shivaji Road, Shivamogga',
+    permanent_address: '7 Shivaji Road, Shivamogga',
+    city: 'Shivamogga',
+    state: 'Karnataka',
+    pincode: '577201',
+    location_code: 'SHI',
+    location_name: 'Shivamogga Flagship',
+    department: 'HR',
+    floor: '0',
+    section: '',
+    shift_id: 'MORNING',
+    shift_name: '',
+    reporting_manager_employee_id: '',
+    joining_date: '2025-06-01',
+    confirmation_date: '',
+    employee_category: 'STAFF',
+    date_of_birth: '1998-07-23',
+    gender: 'FEMALE',
+    payroll_employee_code: '',
+    pf_applicable: 'TRUE',
+    uan_number: '',
+    esi_applicable: 'TRUE',
+    esi_number: '',
+    bank_account_reference: '',
+    ifsc_code: '',
+    pan_number: '',
+    aadhaar_verification_status: 'NOT_VERIFIED',
+    biometric_enrollment_status: 'NOT_ENROLLED',
+    biometric_device_employee_id: '',
+    qr_pass_status: 'NONE',
+    attendance_eligibility: 'FALSE',
+    employee_photo_reference: '',
+    employee_document_status: 'PENDING',
+    remarks: 'Sample 3: Legacy code match, new official ID assigned',
+  };
+
+  const sampleRows = [sample1, sample2, sample3];
+  sampleRows.forEach((s, idx) => {
+    const rowValues = IMPORT_COLUMNS.map((col) => s[col.key] ?? '');
+    const addedRow = sheet.addRow(rowValues);
+    addedRow.height = 22;
+    addedRow.eachCell((cell) => {
+      cell.font = { name: 'Segoe UI', size: 10 };
+      // Explicit text format: Excel will NEVER turn numbers into scientific notation (e.g. 9.85E+09)
+      cell.numFmt = '@';
+      cell.alignment = { vertical: 'middle', horizontal: 'left' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        bottom: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+        right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      };
+      if (idx % 2 === 1) {
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF8FAFC' },
+        };
+      }
+    });
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // SHEET 2: Instructions & Lookup Codes (The formatted "side" guide)
+  // ───────────────────────────────────────────────────────────────────────────
+  const guideSheet = workbook.addWorksheet('📘 Instructions & Guidelines', {
+    views: [{ state: 'normal' }],
+  });
+  guideSheet.getColumn(1).width = 24;
+  guideSheet.getColumn(2).width = 32;
+  guideSheet.getColumn(3).width = 45;
+  guideSheet.getColumn(4).width = 38;
+
+  // Banner
+  const titleRow = guideSheet.addRow(['BSC TEXTILES — BULK WORKFORCE IMPORT SPECIFICATION']);
+  titleRow.height = 36;
+  guideSheet.mergeCells('A1:D1');
+  const titleCell = guideSheet.getCell('A1');
+  titleCell.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF1346A1' },
+  };
+  titleCell.font = { name: 'Segoe UI', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+  titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+
+  guideSheet.addRow([]);
+
+  // Section 1: Overview
+  const sec1 = guideSheet.addRow(['1. CORE IMPORT RULES & WORKFLOW']);
+  sec1.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF1346A1' } };
+  guideSheet.addRow(['Rule', 'Requirement', 'Description', 'Notes']);
+  const s1Header = guideSheet.lastRow!;
+  s1Header.font = { bold: true };
+  guideSheet.addRow(['Mandatory for ALL rows', 'location_code', 'Store retail hub code (e.g. BEL, DAV, SHI)', 'Rows outside authorized hub are rejected']);
+  guideSheet.addRow(['Mandatory for NEW staff', 'first_name, last_name, joining_date', 'Basic identity and date of joining', 'Required when employee_id is left blank']);
+  guideSheet.addRow(['Auto ID Allocation', 'employee_id blank', 'System automatically allocates next sequential ID', 'Format: BSC-EMP-XXXX sequential counter']);
+  guideSheet.addRow(['Updates & Upserts', 'employee_id or legacy employee_code', 'Matches existing employee record to update', 'Blank cells preserve existing values']);
+  guideSheet.addRow(['Phone Numbers', 'mobile_number, emergency_contact_number', '10 digits (e.g. 9845012345 or +91 98450 12345)', 'Stored as exact text to prevent scientific notation']);
+
+  guideSheet.addRow([]);
+
+  // Section 2: Store Locations
+  const sec2 = guideSheet.addRow(['2. KARNATAKA STORE HUBS (location_code)']);
+  sec2.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF1346A1' } };
+  guideSheet.addRow(['Location Code', 'Store Location Name', 'Region / State', 'Status']);
+  guideSheet.lastRow!.font = { bold: true };
+  guideSheet.addRow(['BEL', 'Belagavi Head Store', 'Belagavi, Karnataka', 'ACTIVE']);
+  guideSheet.addRow(['DAV', 'Davanagere Mega Store', 'Davanagere, Karnataka', 'ACTIVE']);
+  guideSheet.addRow(['SHI', 'Shivamogga Flagship', 'Shivamogga, Karnataka', 'ACTIVE']);
+
+  guideSheet.addRow([]);
+
+  // Section 3: Departments & Shifts
+  const sec3 = guideSheet.addRow(['3. DEPARTMENTS, SHIFTS & FLOORS']);
+  sec3.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF1346A1' } };
+  guideSheet.addRow(['Category', 'Accepted Codes / Values', 'Description', 'Example']);
+  guideSheet.lastRow!.font = { bold: true };
+  guideSheet.addRow(['Departments', 'SALES, OPS, HR, FIN, INV, CS', 'Retail, Operations, HR, Finance, Inventory, Support', 'SALES']);
+  guideSheet.addRow(['Shifts', 'GENERAL, MORNING, EVENING, NIGHT', 'Assigned work shift', 'GENERAL']);
+  guideSheet.addRow(['Floors', 'Ground Floor, First Floor, Second Floor, Third Floor (or 0, 1, 2, 3)', 'Store floor location', 'Ground Floor']);
+
+  guideSheet.addRow([]);
+
+  // Section 4: Valid Roles
+  const sec4 = guideSheet.addRow(['4. WORKFORCE ROLES (role)']);
+  sec4.font = { name: 'Segoe UI', size: 11, bold: true, color: { argb: 'FF1346A1' } };
+  guideSheet.addRow(['Role Code', 'Title / Function', 'Access Level', 'Example']);
+  guideSheet.lastRow!.font = { bold: true };
+  VALID_ROLES.forEach((r) => {
+    guideSheet.addRow([r, r.replace(/_/g, ' '), 'Workforce Role', r]);
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(buffer as any);
+}
+
+/**
+ * Convert an uploaded Excel workbook buffer into standard RFC 4180 CSV text.
+ * Reads the first worksheet and preserves text formatting so phone numbers and
+ * employee codes are never parsed into scientific notation.
+ */
+export async function excelToCsv(buffer: Buffer): Promise<string> {
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer as any);
+  const worksheet = workbook.getWorksheet(1);
+  if (!worksheet) {
+    throw new Error('The uploaded Excel workbook contains no active worksheets.');
+  }
+
+  const rows: string[][] = [];
+  worksheet.eachRow({ includeEmpty: false }, (row) => {
+    const rowValues: string[] = [];
+    const cellCount = row.cellCount;
+    for (let c = 1; c <= cellCount; c++) {
+      const cell = row.getCell(c);
+      let val = '';
+      if (cell.value !== null && cell.value !== undefined) {
+        if (typeof cell.value === 'object' && 'text' in cell.value) {
+          val = String(cell.value.text);
+        } else if (cell.value instanceof Date) {
+          val = cell.value.toISOString().slice(0, 10);
+        } else {
+          val = String(cell.value);
+        }
+      }
+      rowValues.push(val);
+    }
+    if (rowValues.some((v) => v.trim() !== '')) {
+      rows.push(rowValues);
+    }
+  });
+
+  return toCsv(rows, { guardFormulas: false });
 }
 
 async function locationLegend(): Promise<string> {
