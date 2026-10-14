@@ -1035,13 +1035,53 @@ async function buildShiftBoard(req: AuthRequest) {
   const shiftId = req.query.shiftId && req.query.shiftId !== 'all' ? String(req.query.shiftId) : null;
   const scopeLocId = await resolveBoardScope(req.user, req.query.locationId);
 
+  let targetDeptIds: Set<string> | null = null;
+  if (departmentId) {
+    targetDeptIds = new Set([departmentId]);
+    if (!scopeLocId) {
+      const deptRecord = await prisma.department.findUnique({ where: { id: departmentId } }).catch(() => null);
+      if (deptRecord) {
+        const matchingDepts = await prisma.department.findMany({
+          where: {
+            OR: [
+              { code: deptRecord.code },
+              { name: deptRecord.name },
+            ],
+          },
+          select: { id: true },
+        }).catch(() => []);
+        for (const md of matchingDepts) targetDeptIds.add(md.id);
+      }
+    }
+  }
+
+  let targetShiftIds: Set<string> | null = null;
+  if (shiftId) {
+    targetShiftIds = new Set([shiftId]);
+    if (!scopeLocId) {
+      const shiftRecord = await prisma.shift.findUnique({ where: { id: shiftId } }).catch(() => null);
+      if (shiftRecord) {
+        const matchingShifts = await prisma.shift.findMany({
+          where: {
+            OR: [
+              { code: shiftRecord.code },
+              { name: shiftRecord.name },
+            ],
+          },
+          select: { id: true },
+        }).catch(() => []);
+        for (const ms of matchingShifts) targetShiftIds.add(ms.id);
+      }
+    }
+  }
+
   const [locations, shifts, employees, attendance, weeklyOffRules, holidays, breakRows, leaveRows, correctionRows] =
     await Promise.all([
       prisma.location.findMany({ select: { id: true, name: true, code: true } }).catch(() => []),
       prisma.shift.findMany({
         where: {
           ...(scopeLocId ? { locationId: scopeLocId } : {}),
-          ...(shiftId ? { id: shiftId } : { status: 'ACTIVE' }),
+          ...(targetShiftIds ? { id: { in: Array.from(targetShiftIds) } } : { status: 'ACTIVE' }),
         },
         orderBy: { startTime: 'asc' },
       }) as Promise<any[]>,
@@ -1053,7 +1093,7 @@ async function buildShiftBoard(req: AuthRequest) {
         where: {
           attendanceDate: date,
           ...(scopeLocId ? { locationId: scopeLocId } : {}),
-          ...(shiftId ? { shiftId } : {}),
+          ...(targetShiftIds ? { shiftId: { in: Array.from(targetShiftIds) } } : {}),
         },
         include: { shift: true, location: true },
       }) as Promise<any[]>,
@@ -1121,8 +1161,10 @@ async function buildShiftBoard(req: AuthRequest) {
   // snapshot on this date (covers transfers and exits for historical dates).
   const rosterIds = new Set<string>();
   for (const e of employees) {
-    if (departmentId && e.departmentId !== departmentId) continue;
-    if (shiftId && e.shiftId !== shiftId) continue;
+    if (targetDeptIds && (!e.departmentId || !targetDeptIds.has(e.departmentId))) continue;
+    const a = attByEmp.get(e.id);
+    const effShift = a?.shiftId || e.shiftId;
+    if (targetShiftIds && (!effShift || !targetShiftIds.has(effShift))) continue;
     if (e.status && !ROSTER_EMP_STATUSES.has(e.status)) continue;
 
     // Respect employment lifecycle: ignore employees who joined after this date or exited before it
@@ -1132,19 +1174,17 @@ async function buildShiftBoard(req: AuthRequest) {
     if (exitYmd && exitYmd < date) continue;
 
     // A shift board roster strictly schedules employees with an assigned shift
-    const a = attByEmp.get(e.id);
-    const effShift = a?.shiftId || e.shiftId;
     if (!effShift || !shiftById.has(effShift)) continue;
 
     rosterIds.add(e.id);
   }
   for (const a of attendance) {
-    if (departmentId) {
+    if (targetDeptIds) {
       const e = empById.get(a.employeeId);
-      if (!e || e.departmentId !== departmentId) continue;
+      if (!e || !e.departmentId || !targetDeptIds.has(e.departmentId)) continue;
     }
-    if (shiftId && a.shiftId !== shiftId) continue;
     const effShift = a.shiftId || empById.get(a.employeeId)?.shiftId;
+    if (targetShiftIds && (!effShift || !targetShiftIds.has(effShift))) continue;
     if (!effShift || !shiftById.has(effShift)) continue;
     rosterIds.add(a.employeeId);
   }

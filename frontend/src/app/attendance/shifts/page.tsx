@@ -31,9 +31,40 @@ function ymdOf(d: Date): string {
 
 function hmOf(iso?: string | null): string {
   if (!iso) return '—';
+  if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(iso)) {
+    const parts = iso.split(':');
+    const h = Number(parts[0]);
+    const m = Number(parts[1]);
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return '—';
+  if (isNaN(d.getTime())) return iso;
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Canonical list of departments in required exact order */
+const CANONICAL_DEPARTMENTS = [
+  'Customer Service & Billing',
+  'Finance & Accounts',
+  'Human Resources',
+  'Inventory & Logistics',
+  'Sales & Retail',
+  'Store Operations',
+] as const;
+
+interface DepartmentOption {
+  id: string;
+  name: string;
+  disabled?: boolean;
+}
+
+interface ShiftOption {
+  id: string;
+  name: string;
+  timeRange?: string;
+  noRosterInHub?: boolean;
 }
 
 export default function ShiftsRosterPage() {
@@ -94,33 +125,33 @@ export default function ShiftsRosterPage() {
     };
   }, []);
 
+  const [shiftsLoading, setShiftsLoading] = useState(true);
+  const [shiftsError, setShiftsError] = useState<string | null>(null);
+  const [deptsLoading, setDeptsLoading] = useState(true);
+  const [deptsError, setDeptsError] = useState<string | null>(null);
+
+  const [shiftDropdownOpen, setShiftDropdownOpen] = useState(false);
+  const [shiftHighlightedIndex, setShiftHighlightedIndex] = useState(-1);
+  const shiftContainerRef = useRef<HTMLDivElement>(null);
+  const shiftTriggerRef = useRef<HTMLButtonElement>(null);
+
+  /* ---------------- reference data ---------------- */
+
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const params: any = { limit: 100 };
-        if (selectedLocation && selectedLocation !== 'all') params.locationId = selectedLocation;
-        const res = await api.get('/departments', { params });
-        if (cancelled) return;
-        setDepartments(res.data?.departments || []);
-      } catch (e) {
-        console.error(e);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedLocation]);
+    if (!session) return;
+    setSelectedLocation((cur) => {
+      if (cur) return cur;
+      if (canViewAllHubs || !userLocationId) return 'all';
+      return userLocationId;
+    });
+  }, [session, canViewAllHubs, userLocationId]);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const params: any = { limit: 100 };
-        if (selectedLocation && selectedLocation !== 'all') params.locationId = selectedLocation;
-        const res = await api.get('/shifts', { params });
-        if (cancelled) return;
-        setShifts(res.data?.shifts || []);
+        const res = await api.get('/locations/all');
+        if (!cancelled) setLocations(res.data || []);
       } catch (e) {
         console.error(e);
       }
@@ -128,7 +159,246 @@ export default function ShiftsRosterPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedLocation, isAddModalOpen]);
+  }, []);
+
+  const fetchDepartments = useCallback(async () => {
+    setDeptsLoading(true);
+    setDeptsError(null);
+    try {
+      const res = await api.get('/departments', { params: { limit: 100 } });
+      setDepartments(res.data?.departments || []);
+    } catch (err: any) {
+      console.error('Failed to load departments:', err);
+      setDeptsError('Could not load departments');
+    } finally {
+      setDeptsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDepartments();
+  }, [fetchDepartments]);
+
+  const fetchShifts = useCallback(async () => {
+    setShiftsLoading(true);
+    setShiftsError(null);
+    try {
+      const res = await api.get('/shifts', { params: { limit: 100 } });
+      setShifts(res.data?.shifts || []);
+    } catch (err: any) {
+      console.error('Failed to load shifts:', err);
+      setShiftsError('Could not load shifts');
+    } finally {
+      setShiftsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchShifts();
+  }, [fetchShifts]);
+
+  /* ---------------- memoized canonical dropdown options ---------------- */
+
+  const departmentOptions = useMemo<DepartmentOption[]>(() => {
+    const options: DepartmentOption[] = [
+      { id: 'all', name: 'All Departments', disabled: false },
+    ];
+
+    for (const canonicalName of CANONICAL_DEPARTMENTS) {
+      // Find matching department in current hub if specified, otherwise across any hub
+      let match = departments.find(
+        (d) =>
+          d.name?.trim().toLowerCase() === canonicalName.toLowerCase() &&
+          (selectedLocation && selectedLocation !== 'all' ? d.locationId === selectedLocation : true)
+      );
+      if (!match) {
+        match = departments.find((d) => d.name?.trim().toLowerCase() === canonicalName.toLowerCase());
+      }
+
+      if (match) {
+        options.push({
+          id: match.id,
+          name: canonicalName,
+          disabled: false,
+        });
+      } else {
+        if (process.env.NODE_ENV !== 'production' && !deptsLoading && departments.length > 0) {
+          console.warn(`Department "${canonicalName}" is missing from master list.`);
+        }
+        options.push({
+          id: `missing-${canonicalName}`,
+          name: `${canonicalName} (Not available)`,
+          disabled: true,
+        });
+      }
+    }
+
+    return options;
+  }, [departments, selectedLocation, deptsLoading]);
+
+  const uniqueShiftOptions = useMemo<ShiftOption[]>(() => {
+    const options: ShiftOption[] = [
+      { id: 'all', name: 'All Shifts' },
+    ];
+
+    // Group shifts by canonical code or name
+    const groups = new Map<string, any[]>();
+    for (const s of shifts) {
+      const key = (s.code?.trim().toUpperCase() || s.name?.trim().toLowerCase());
+      if (!key) continue;
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+      groups.get(key)!.push(s);
+    }
+
+    // Preserve the canonical standard order: MORNING, GENERAL, EVENING, NIGHT, then custom batches
+    const STANDARD_KEYS = ['MORNING', 'GENERAL', 'EVENING', 'NIGHT'];
+    const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+      const idxA = STANDARD_KEYS.indexOf(a);
+      const idxB = STANDARD_KEYS.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+    for (const key of sortedKeys) {
+      const list = groups.get(key) || [];
+      const activeList = list.filter((s) => s.status !== 'INACTIVE');
+      const targetList = activeList.length > 0 ? activeList : list;
+
+      let chosen = targetList.find(
+        (s) => (selectedLocation && selectedLocation !== 'all' ? s.locationId === selectedLocation : true)
+      );
+      const existsInSelectedHub = Boolean(chosen);
+      if (!chosen) {
+        chosen = targetList[0];
+      }
+      if (!chosen) continue;
+
+      const start = hmOf(chosen.startTime);
+      const end = hmOf(chosen.endTime);
+      const timeRange = start !== '—' && end !== '—' ? `${start} – ${end}${chosen.overnight ? ' (+1d)' : ''}` : undefined;
+      const noRosterInHub = Boolean(selectedLocation && selectedLocation !== 'all' && !existsInSelectedHub);
+
+      options.push({
+        id: chosen.id,
+        name: chosen.name,
+        timeRange,
+        noRosterInHub,
+      });
+    }
+
+    return options;
+  }, [shifts, selectedLocation]);
+
+  // If selected shift is no longer available, reset to 'all' with toast notice
+  useEffect(() => {
+    if (shiftsLoading) return;
+    if (selectedShift !== 'all') {
+      const exists = shifts.some((s) => s.id === selectedShift);
+      if (!exists && shifts.length > 0) {
+        setSelectedShift('all');
+        toast('Selected shift is no longer available. Reset to All Shifts.', { id: 'shift-reset-toast' });
+      }
+    }
+  }, [shifts, selectedShift, shiftsLoading]);
+
+  // Synchronize department selection when switching location hubs
+  useEffect(() => {
+    if (deptsLoading || selectedDept === 'all') return;
+    const currentDeptObj = departments.find((d) => d.id === selectedDept);
+    if (!currentDeptObj) return;
+
+    const code = currentDeptObj.code?.trim().toUpperCase();
+    const name = currentDeptObj.name?.trim().toLowerCase();
+
+    const matchInLoc = departments.find(
+      (d) =>
+        (d.code?.trim().toUpperCase() === code || d.name?.trim().toLowerCase() === name) &&
+        (selectedLocation === 'all' ? true : d.locationId === selectedLocation)
+    );
+
+    if (matchInLoc && matchInLoc.id !== selectedDept) {
+      setSelectedDept(matchInLoc.id);
+    }
+  }, [selectedLocation, selectedDept, departments, deptsLoading]);
+
+  // Synchronize shift selection when switching location hubs
+  useEffect(() => {
+    if (shiftsLoading || selectedShift === 'all') return;
+    const currentShiftObj = shifts.find((s) => s.id === selectedShift);
+    if (!currentShiftObj) return;
+
+    const code = currentShiftObj.code?.trim().toUpperCase();
+    const name = currentShiftObj.name?.trim().toLowerCase();
+
+    const matchInLoc = shifts.find(
+      (s) =>
+        (s.code?.trim().toUpperCase() === code || s.name?.trim().toLowerCase() === name) &&
+        (selectedLocation === 'all' ? true : s.locationId === selectedLocation)
+    );
+
+    if (matchInLoc && matchInLoc.id !== selectedShift) {
+      setSelectedShift(matchInLoc.id);
+    }
+  }, [selectedLocation, selectedShift, shifts, shiftsLoading]);
+
+  // Click outside to close shift listbox
+  useEffect(() => {
+    if (!shiftDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (shiftContainerRef.current && !shiftContainerRef.current.contains(e.target as Node)) {
+        setShiftDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [shiftDropdownOpen]);
+
+  const handleShiftKeyDown = (e: React.KeyboardEvent) => {
+    if (shiftsLoading) return;
+    if (!shiftDropdownOpen) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        setShiftDropdownOpen(true);
+        const selIdx = uniqueShiftOptions.findIndex((o) => o.id === selectedShift);
+        setShiftHighlightedIndex(selIdx >= 0 ? selIdx : 0);
+      }
+      return;
+    }
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setShiftHighlightedIndex((prev) => (prev + 1) % uniqueShiftOptions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setShiftHighlightedIndex((prev) => (prev - 1 + uniqueShiftOptions.length) % uniqueShiftOptions.length);
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      const highlighted = uniqueShiftOptions[shiftHighlightedIndex];
+      if (highlighted) {
+        setSelectedShift(highlighted.id);
+      }
+      setShiftDropdownOpen(false);
+      shiftTriggerRef.current?.focus();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setShiftDropdownOpen(false);
+      shiftTriggerRef.current?.focus();
+    } else if (e.key === 'Tab') {
+      setShiftDropdownOpen(false);
+    }
+  };
+
+  const selectedShiftLabel = useMemo(() => {
+    if (selectedShift === 'all') return 'All Shifts';
+    const found = uniqueShiftOptions.find((o) => o.id === selectedShift);
+    if (found) return found.name;
+    const match = shifts.find((s) => s.id === selectedShift);
+    return match?.name || 'All Shifts';
+  }, [selectedShift, uniqueShiftOptions, shifts]);
 
   /* ---------------- board data ---------------- */
 
@@ -190,6 +460,7 @@ export default function ShiftsRosterPage() {
       });
       toast.success('Shift created successfully!');
       setIsAddModalOpen(false);
+      await fetchShifts();
       fetchBoard({ bustCache: true });
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Failed to create shift');
@@ -439,33 +710,149 @@ export default function ShiftsRosterPage() {
         {/* Detail Drill-down Filters (Department / Shift / Status / Date) */}
         <div className="bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
-            <label htmlFor="fsr-dept" className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Department</label>
+            <label htmlFor="fsr-dept" className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              Department
+            </label>
             <select
               id="fsr-dept"
+              aria-label="Filter by department"
               value={selectedDept}
               onChange={(e) => setSelectedDept(e.target.value)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#0b1c30] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]/40 cursor-pointer"
+              disabled={deptsLoading}
+              className="h-[34px] px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#0b1c30] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]/40 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <option value="all">All Departments</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
+              {deptsLoading ? (
+                <option value="all">Loading…</option>
+              ) : (
+                departmentOptions.map((d) => (
+                  <option key={d.id} value={d.id} disabled={d.disabled}>
+                    {d.name}
+                  </option>
+                ))
+              )}
             </select>
+            {deptsError && (
+              <div className="flex items-center gap-1 text-[11px] text-red-600 font-medium">
+                <span>Could not load departments</span>
+                <button
+                  type="button"
+                  onClick={() => fetchDepartments()}
+                  className="underline font-bold hover:text-red-700"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label htmlFor="fsr-shift" className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Shift</label>
-            <select
+          <div ref={shiftContainerRef} className="relative flex flex-col gap-1">
+            <label htmlFor="fsr-shift" className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              Shift
+            </label>
+            <button
+              ref={shiftTriggerRef}
+              type="button"
               id="fsr-shift"
-              value={selectedShift}
-              onChange={(e) => setSelectedShift(e.target.value)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#0b1c30] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]/40 cursor-pointer"
+              role="combobox"
+              aria-label="Filter by shift"
+              aria-expanded={shiftDropdownOpen}
+              aria-haspopup="listbox"
+              aria-controls="fsr-shift-listbox"
+              aria-activedescendant={
+                shiftDropdownOpen && shiftHighlightedIndex >= 0
+                  ? `shift-opt-${uniqueShiftOptions[shiftHighlightedIndex]?.id || 'all'}`
+                  : undefined
+              }
+              onClick={() => {
+                if (shiftsLoading) return;
+                setShiftDropdownOpen((prev) => !prev);
+                if (!shiftDropdownOpen) {
+                  const selIdx = uniqueShiftOptions.findIndex((o) => o.id === selectedShift);
+                  setShiftHighlightedIndex(selIdx >= 0 ? selIdx : 0);
+                }
+              }}
+              onKeyDown={handleShiftKeyDown}
+              disabled={shiftsLoading}
+              className="h-[34px] px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#0b1c30] dark:text-white flex items-center justify-between gap-2 min-w-[170px] focus:outline-none focus:ring-2 focus:ring-[#1346a1]/40 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <option value="all">All Shifts</option>
-              {shifts.map((s) => (
-                <option key={s.id} value={s.id}>{s.name} ({s.code || '—'})</option>
-              ))}
-            </select>
+              <span className="truncate">{shiftsLoading ? 'Loading…' : selectedShiftLabel}</span>
+              <span className={`material-symbols-outlined text-[18px] text-slate-400 transition-transform ${shiftDropdownOpen ? 'rotate-180' : ''}`}>
+                expand_more
+              </span>
+            </button>
+
+            {shiftDropdownOpen && (
+              <ul
+                id="fsr-shift-listbox"
+                role="listbox"
+                aria-label="Filter by shift"
+                tabIndex={-1}
+                className="absolute left-0 top-[calc(100%+4px)] z-50 w-64 max-h-64 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0e172a] p-1 shadow-lg focus:outline-none"
+              >
+                {uniqueShiftOptions.map((opt, idx) => {
+                  const isSelected = selectedShift === opt.id;
+                  const isHighlighted = shiftHighlightedIndex === idx;
+                  return (
+                    <li
+                      key={opt.id}
+                      id={`shift-opt-${opt.id}`}
+                      role="option"
+                      aria-selected={isSelected}
+                      aria-label={
+                        opt.id === 'all'
+                          ? 'All shifts'
+                          : `${opt.name}, ${opt.timeRange || ''}${opt.noRosterInHub ? ', No roster in this hub' : ''}`.trim()
+                      }
+                      onClick={() => {
+                        setSelectedShift(opt.id);
+                        setShiftDropdownOpen(false);
+                        shiftTriggerRef.current?.focus();
+                      }}
+                      onMouseEnter={() => setShiftHighlightedIndex(idx)}
+                      className={`flex flex-col gap-0.5 px-3 py-2 rounded-md cursor-pointer text-left transition-colors ${
+                        isHighlighted ? 'bg-slate-100 dark:bg-slate-800' : ''
+                      } ${
+                        isSelected
+                          ? 'bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 font-bold'
+                          : 'text-[#0b1c30] dark:text-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-xs font-semibold">{opt.name}</span>
+                        {opt.noRosterInHub && (
+                          <span className="text-[10px] text-slate-400 font-normal italic">
+                            No roster in this hub
+                          </span>
+                        )}
+                        {isSelected && (
+                          <span className="material-symbols-outlined text-[16px] text-[#0058be] dark:text-blue-400">
+                            check
+                          </span>
+                        )}
+                      </div>
+                      {opt.timeRange && (
+                        <span className="text-[11px] text-slate-400 dark:text-slate-400 font-mono font-normal">
+                          {opt.timeRange}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+
+            {shiftsError && (
+              <div className="flex items-center gap-1 text-[11px] text-red-600 font-medium">
+                <span>Could not load shifts</span>
+                <button
+                  type="button"
+                  onClick={() => fetchShifts()}
+                  className="underline font-bold hover:text-red-700"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-1">
