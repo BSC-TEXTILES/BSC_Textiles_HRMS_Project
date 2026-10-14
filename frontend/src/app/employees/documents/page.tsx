@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import { DocumentMetricDrawer, DocumentDrawerType } from '@/components/employees/documents/drawers/DocumentMetricDrawer';
 import {
   FolderLock,
   Folder,
@@ -41,6 +42,22 @@ import {
   Trash2
 } from 'lucide-react';
 
+interface CanonicalDepartmentOption {
+  id: string;
+  name: string;
+  code: string;
+  available: boolean;
+}
+
+const ORDERED_CANONICAL_DEPARTMENTS: readonly { name: string; code: string }[] = [
+  { name: 'Customer Service & Billing', code: 'CS' },
+  { name: 'Finance & Accounts', code: 'FIN' },
+  { name: 'Human Resources', code: 'HR' },
+  { name: 'Inventory & Logistics', code: 'INV' },
+  { name: 'Sales & Retail', code: 'SALES' },
+  { name: 'Store Operations', code: 'OPS' },
+] as const;
+
 export default function EmployeeDocumentsPage() {
   // Navigation & View Mode
   const [viewMode, setViewMode] = useState<'directory' | 'folders' | 'verification' | 'missing'>('directory');
@@ -54,6 +71,8 @@ export default function EmployeeDocumentsPage() {
   // Metadata
   const [locations, setLocations] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
+  const [deptLoading, setDeptLoading] = useState<boolean>(true);
+  const [deptError, setDeptError] = useState<string | null>(null);
   const [docTypes, setDocTypes] = useState<any[]>([]);
   const [docTypesGrouped, setDocTypesGrouped] = useState<Record<string, any[]>>({});
 
@@ -100,6 +119,31 @@ export default function EmployeeDocumentsPage() {
     remarks: ''
   });
 
+  // 9 Summary KPI Drawers State & Handlers
+  const [activeDrawer, setActiveDrawer] = useState<DocumentDrawerType | null>(null);
+  const cardRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  const handleOpenDrawer = useCallback((type: DocumentDrawerType) => {
+    setActiveDrawer(type);
+  }, []);
+
+  const handleNavigateTab = useCallback((tab: 'directory' | 'folders' | 'verification' | 'missing', filters?: { statusFilter?: string }) => {
+    setViewMode(tab);
+    if (filters?.statusFilter) {
+      setStatusFilter(filters.statusFilter);
+    }
+  }, []);
+
+  const handleDownloadDocument = useCallback((doc: any) => {
+    if (!doc?.id) return;
+    const link = document.createElement('a');
+    link.href = `/api/employees/documents/${doc.id}/download`;
+    link.download = doc.fileName || 'document.pdf';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }, []);
+
   // Upload Form State
   const [uploadForm, setUploadForm] = useState({
     employeeId: '',
@@ -115,17 +159,30 @@ export default function EmployeeDocumentsPage() {
     file: null as { base64: string; name: string; size: number } | null
   });
 
+  // Load departments once per page visit and cache in state
+  const loadDepartments = useCallback(async () => {
+    try {
+      setDeptLoading(true);
+      setDeptError(null);
+      const res = await api.get('/departments?limit=100');
+      setDepartments(res.data?.departments || []);
+    } catch (err: any) {
+      console.error('Failed to load departments:', err);
+      setDeptError('Could not load departments');
+    } finally {
+      setDeptLoading(false);
+    }
+  }, []);
+
   // Load Filter Options & Document Types
   useEffect(() => {
     const loadInitData = async () => {
       try {
-        const [locRes, deptRes, typesRes] = await Promise.all([
+        const [locRes, typesRes] = await Promise.all([
           api.get('/locations/all').catch(() => ({ data: [] })),
-          api.get('/departments').catch(() => ({ data: { departments: [] } })),
           api.get('/employees/documents/types').catch(() => ({ data: { data: [], grouped: {} } }))
         ]);
         setLocations(locRes.data || []);
-        setDepartments(deptRes.data?.departments || []);
         if (typesRes.data?.data) {
           setDocTypes(typesRes.data.data);
           setDocTypesGrouped(typesRes.data.grouped || {});
@@ -135,7 +192,8 @@ export default function EmployeeDocumentsPage() {
       }
     };
     loadInitData();
-  }, []);
+    loadDepartments();
+  }, [loadDepartments]);
 
   // Fetch Dashboard Metrics
   const fetchDashboardMetrics = useCallback(async () => {
@@ -188,6 +246,7 @@ export default function EmployeeDocumentsPage() {
     try {
       const params = new URLSearchParams();
       if (selectedLocation && selectedLocation !== 'all') params.append('locationId', selectedLocation);
+      if (selectedDept && selectedDept !== 'all') params.append('departmentId', selectedDept);
       const res = await api.get(`/employees/documents/verification-queue?${params.toString()}`);
       if (res.data?.success) {
         setVerificationQueue(res.data.data || []);
@@ -195,13 +254,14 @@ export default function EmployeeDocumentsPage() {
     } catch (err) {
       console.error('Failed to load verification queue:', err);
     }
-  }, [selectedLocation]);
+  }, [selectedLocation, selectedDept]);
 
   // Fetch Missing Report
   const fetchMissingReport = useCallback(async () => {
     try {
       const params = new URLSearchParams();
       if (selectedLocation && selectedLocation !== 'all') params.append('locationId', selectedLocation);
+      if (selectedDept && selectedDept !== 'all') params.append('departmentId', selectedDept);
       const res = await api.get(`/employees/documents/missing-report?${params.toString()}`);
       if (res.data?.success) {
         setMissingReport(res.data.data || []);
@@ -209,7 +269,7 @@ export default function EmployeeDocumentsPage() {
     } catch (err) {
       console.error('Failed to load missing documents report:', err);
     }
-  }, [selectedLocation]);
+  }, [selectedLocation, selectedDept]);
 
   useEffect(() => {
     fetchDashboardMetrics();
@@ -221,6 +281,93 @@ export default function EmployeeDocumentsPage() {
       fetchMissingReport();
     }
   }, [fetchDashboardMetrics, fetchDirectory, fetchVerificationQueue, fetchMissingReport, viewMode]);
+
+  // Canonical de-duplicated department list (exactly 6 departments in fixed order, each appearing once)
+  const departmentOptions: CanonicalDepartmentOption[] = useMemo(() => {
+    if (!departments || departments.length === 0) return [];
+
+    return ORDERED_CANONICAL_DEPARTMENTS.map((canonical) => {
+      // Find all department rows matching this canonical department code or name
+      const matchingRows = departments.filter((d: any) =>
+        (d.code && d.code.toUpperCase() === canonical.code.toUpperCase()) ||
+        (d.name && d.name.trim().toLowerCase() === canonical.name.trim().toLowerCase())
+      );
+
+      if (matchingRows.length === 0) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn(`[Employee Documents] Department "${canonical.name}" (${canonical.code}) is missing from master list.`);
+        }
+        return {
+          id: '',
+          name: canonical.name,
+          code: canonical.code,
+          available: false,
+        };
+      }
+
+      // If a specific store hub / branch is selected, prioritize that hub's unique departmentId
+      let targetRow = matchingRows[0];
+      if (selectedLocation && selectedLocation !== 'all') {
+        const hubRow = matchingRows.find((d: any) => d.locationId === selectedLocation);
+        if (hubRow) {
+          targetRow = hubRow;
+        }
+      }
+
+      return {
+        id: targetRow.id,
+        name: canonical.name,
+        code: canonical.code,
+        available: true,
+      };
+    });
+  }, [departments, selectedLocation]);
+
+  // Handle Location filter change
+  const handleLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newLocation = e.target.value;
+    setSelectedLocation(newLocation);
+    setPagination(prev => ({ ...prev, page: 1 }));
+
+    // If a specific department is currently selected, preserve that department selection for the new hub
+    if (selectedDept !== 'all') {
+      const currentOpt = departmentOptions.find(opt => opt.id === selectedDept);
+      if (currentOpt) {
+        const matchingRows = departments.filter((d: any) =>
+          (d.code && d.code.toUpperCase() === currentOpt.code.toUpperCase()) ||
+          (d.name && d.name.trim().toLowerCase() === currentOpt.name.trim().toLowerCase())
+        );
+
+        let targetId = '';
+        if (newLocation !== 'all') {
+          const hubRow = matchingRows.find((d: any) => d.locationId === newLocation);
+          if (hubRow) targetId = hubRow.id;
+          else if (matchingRows.length > 0) targetId = matchingRows[0].id;
+        } else if (matchingRows.length > 0) {
+          targetId = matchingRows[0].id;
+        }
+
+        if (targetId) {
+          setSelectedDept(targetId);
+        } else {
+          setSelectedDept('all');
+          toast(`Department "${currentOpt.name}" is not available, reset to All Departments.`);
+        }
+      }
+    }
+  };
+
+  // Handle Department filter change
+  const handleDeptChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedDept(e.target.value);
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
+
+  // Handle Compliance filter change
+  const handleStatusFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setStatusFilter(e.target.value);
+    setPagination(prev => ({ ...prev, page: 1 }));
+  };
 
   // Open Employee Dossier
   const handleOpenDossier = async (empId: string) => {
@@ -476,51 +623,185 @@ export default function EmployeeDocumentsPage() {
 
         {/* 9 SUMMARY KPI CARDS */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2.5">
-          <div className="bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Total Employees</span>
-            <div className="text-xl font-black text-slate-900 dark:text-white mt-1">{dashboardMetrics.totalEmployees}</div>
-            <span className="text-[10px] text-slate-400">Karnataka Scope</span>
-          </div>
-          <div className="bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">With Documents</span>
-            <div className="text-xl font-black text-blue-600 dark:text-blue-400 mt-1">{dashboardMetrics.employeesWithDocuments}</div>
-            <span className="text-[10px] text-slate-400">Active dossiers</span>
-          </div>
-          <div className="bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/20 dark:bg-amber-950/10 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase">Missing Required</span>
-            <div className="text-xl font-black text-amber-700 dark:text-amber-400 mt-1">{dashboardMetrics.employeesWithMissingRequired}</div>
-            <span className="text-[10px] text-amber-600">Action needed</span>
-          </div>
-          <div className="bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-purple-200 dark:border-purple-900/40 bg-purple-50/20 dark:bg-purple-950/10 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-purple-700 dark:text-purple-400 uppercase">Total Documents</span>
-            <div className="text-xl font-black text-purple-700 dark:text-purple-400 mt-1">{dashboardMetrics.totalDocuments}</div>
-            <span className="text-[10px] text-purple-600">Files stored</span>
-          </div>
-          <div className="bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-orange-200 dark:border-orange-900/40 bg-orange-50/20 dark:bg-orange-950/10 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-orange-700 dark:text-orange-400 uppercase">Pending Review</span>
-            <div className="text-xl font-black text-orange-700 dark:text-orange-400 mt-1">{dashboardMetrics.documentsPendingVerification}</div>
-            <span className="text-[10px] text-orange-600">HR queue</span>
-          </div>
-          <div className="bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/20 dark:bg-emerald-950/10 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase">Verified</span>
-            <div className="text-xl font-black text-emerald-700 dark:text-emerald-400 mt-1">{dashboardMetrics.documentsVerified}</div>
-            <span className="text-[10px] text-emerald-600">Approved</span>
-          </div>
-          <div className="bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-rose-200 dark:border-rose-900/40 bg-rose-50/20 dark:bg-rose-950/10 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-rose-700 dark:text-rose-400 uppercase">Rejected</span>
-            <div className="text-xl font-black text-rose-700 dark:text-rose-400 mt-1">{dashboardMetrics.documentsRejected}</div>
-            <span className="text-[10px] text-rose-600">Clarification</span>
-          </div>
-          <div className="bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Expiring Soon</span>
-            <div className="text-xl font-black text-slate-800 dark:text-slate-100 mt-1">{dashboardMetrics.documentsExpiringSoon}</div>
-            <span className="text-[10px] text-slate-400">&lt; 30 days</span>
-          </div>
-          <div className="bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Recently Added</span>
-            <div className="text-xl font-black text-indigo-600 dark:text-indigo-400 mt-1">{dashboardMetrics.recentlyUploaded}</div>
-            <span className="text-[10px] text-slate-400">Past 7 days</span>
-          </div>
+          {/* 1. TOTAL EMPLOYEES */}
+          <button
+            type="button"
+            ref={(el) => { cardRefs.current['total-employees'] = el; }}
+            onClick={() => handleOpenDrawer('total-employees')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenDrawer('total-employees'); } }}
+            aria-label="View details for Total Employees"
+            className="emp-doc-card group text-left bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between cursor-pointer hover:border-slate-400 dark:hover:border-slate-600 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#722F37] focus:ring-offset-2 dark:focus:ring-offset-[#1A1D24] min-h-[118px]"
+          >
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Employees</span>
+              <div className="text-xl font-black text-slate-900 dark:text-white mt-1">{dashboardMetrics.totalEmployees}</div>
+              <span className="text-[10px] text-slate-400 block mt-0.5">Karnataka Scope</span>
+            </div>
+            <div className="mt-2.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[10px] font-semibold text-[#722F37] dark:text-[#E88E9B] group-hover:underline">
+              <span>View details</span>
+              <span aria-hidden="true" className="group-hover:translate-x-0.5 transition-transform">→</span>
+            </div>
+          </button>
+
+          {/* 2. WITH DOCUMENTS */}
+          <button
+            type="button"
+            ref={(el) => { cardRefs.current['with-documents'] = el; }}
+            onClick={() => handleOpenDrawer('with-documents')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenDrawer('with-documents'); } }}
+            aria-label="View details for With Documents"
+            className="emp-doc-card group text-left bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between cursor-pointer hover:border-blue-400 dark:hover:border-blue-600 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#722F37] focus:ring-offset-2 dark:focus:ring-offset-[#1A1D24] min-h-[118px]"
+          >
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">With Documents</span>
+              <div className="text-xl font-black text-blue-600 dark:text-blue-400 mt-1">{dashboardMetrics.employeesWithDocuments}</div>
+              <span className="text-[10px] text-slate-400 block mt-0.5">Active dossiers</span>
+            </div>
+            <div className="mt-2.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[10px] font-semibold text-blue-600 dark:text-blue-400 group-hover:underline">
+              <span>View details</span>
+              <span aria-hidden="true" className="group-hover:translate-x-0.5 transition-transform">→</span>
+            </div>
+          </button>
+
+          {/* 3. MISSING REQUIRED */}
+          <button
+            type="button"
+            ref={(el) => { cardRefs.current['missing-required'] = el; }}
+            onClick={() => handleOpenDrawer('missing-required')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenDrawer('missing-required'); } }}
+            aria-label="View details for Missing Required"
+            className="emp-doc-card group text-left bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/20 dark:bg-amber-950/10 flex flex-col justify-between cursor-pointer hover:border-amber-400 dark:hover:border-amber-600 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#722F37] focus:ring-offset-2 dark:focus:ring-offset-[#1A1D24] min-h-[118px]"
+          >
+            <div>
+              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">Missing Required</span>
+              <div className="text-xl font-black text-amber-700 dark:text-amber-400 mt-1">{dashboardMetrics.employeesWithMissingRequired}</div>
+              <span className="text-[10px] text-amber-600 block mt-0.5">Action needed</span>
+            </div>
+            <div className="mt-2.5 pt-1.5 border-t border-amber-200/60 dark:border-amber-900/40 flex items-center justify-between text-[10px] font-semibold text-amber-700 dark:text-amber-400 group-hover:underline">
+              <span>View details</span>
+              <span aria-hidden="true" className="group-hover:translate-x-0.5 transition-transform">→</span>
+            </div>
+          </button>
+
+          {/* 4. TOTAL DOCUMENTS */}
+          <button
+            type="button"
+            ref={(el) => { cardRefs.current['total-documents'] = el; }}
+            onClick={() => handleOpenDrawer('total-documents')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenDrawer('total-documents'); } }}
+            aria-label="View details for Total Documents"
+            className="emp-doc-card group text-left bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-purple-200 dark:border-purple-900/40 bg-purple-50/20 dark:bg-purple-950/10 flex flex-col justify-between cursor-pointer hover:border-purple-400 dark:hover:border-purple-600 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#722F37] focus:ring-offset-2 dark:focus:ring-offset-[#1A1D24] min-h-[118px]"
+          >
+            <div>
+              <span className="text-[10px] font-bold text-purple-700 dark:text-purple-400 uppercase tracking-wider">Total Documents</span>
+              <div className="text-xl font-black text-purple-700 dark:text-purple-400 mt-1">{dashboardMetrics.totalDocuments}</div>
+              <span className="text-[10px] text-purple-600 block mt-0.5">Files stored</span>
+            </div>
+            <div className="mt-2.5 pt-1.5 border-t border-purple-200/60 dark:border-purple-900/40 flex items-center justify-between text-[10px] font-semibold text-purple-700 dark:text-purple-400 group-hover:underline">
+              <span>View details</span>
+              <span aria-hidden="true" className="group-hover:translate-x-0.5 transition-transform">→</span>
+            </div>
+          </button>
+
+          {/* 5. PENDING REVIEW */}
+          <button
+            type="button"
+            ref={(el) => { cardRefs.current['pending-review'] = el; }}
+            onClick={() => handleOpenDrawer('pending-review')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenDrawer('pending-review'); } }}
+            aria-label="View details for Pending Review"
+            className="emp-doc-card group text-left bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-orange-200 dark:border-orange-900/40 bg-orange-50/20 dark:bg-orange-950/10 flex flex-col justify-between cursor-pointer hover:border-orange-400 dark:hover:border-orange-600 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#722F37] focus:ring-offset-2 dark:focus:ring-offset-[#1A1D24] min-h-[118px]"
+          >
+            <div>
+              <span className="text-[10px] font-bold text-orange-700 dark:text-orange-400 uppercase tracking-wider">Pending Review</span>
+              <div className="text-xl font-black text-orange-700 dark:text-orange-400 mt-1">{dashboardMetrics.documentsPendingVerification}</div>
+              <span className="text-[10px] text-orange-600 block mt-0.5">HR queue</span>
+            </div>
+            <div className="mt-2.5 pt-1.5 border-t border-orange-200/60 dark:border-orange-900/40 flex items-center justify-between text-[10px] font-semibold text-orange-700 dark:text-orange-400 group-hover:underline">
+              <span>View details</span>
+              <span aria-hidden="true" className="group-hover:translate-x-0.5 transition-transform">→</span>
+            </div>
+          </button>
+
+          {/* 6. VERIFIED */}
+          <button
+            type="button"
+            ref={(el) => { cardRefs.current['verified'] = el; }}
+            onClick={() => handleOpenDrawer('verified')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenDrawer('verified'); } }}
+            aria-label="View details for Verified"
+            className="emp-doc-card group text-left bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/20 dark:bg-emerald-950/10 flex flex-col justify-between cursor-pointer hover:border-emerald-400 dark:hover:border-emerald-600 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#722F37] focus:ring-offset-2 dark:focus:ring-offset-[#1A1D24] min-h-[118px]"
+          >
+            <div>
+              <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Verified</span>
+              <div className="text-xl font-black text-emerald-700 dark:text-emerald-400 mt-1">{dashboardMetrics.documentsVerified}</div>
+              <span className="text-[10px] text-emerald-600 block mt-0.5">Approved</span>
+            </div>
+            <div className="mt-2.5 pt-1.5 border-t border-emerald-200/60 dark:border-emerald-900/40 flex items-center justify-between text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 group-hover:underline">
+              <span>View details</span>
+              <span aria-hidden="true" className="group-hover:translate-x-0.5 transition-transform">→</span>
+            </div>
+          </button>
+
+          {/* 7. REJECTED */}
+          <button
+            type="button"
+            ref={(el) => { cardRefs.current['rejected'] = el; }}
+            onClick={() => handleOpenDrawer('rejected')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenDrawer('rejected'); } }}
+            aria-label="View details for Rejected"
+            className="emp-doc-card group text-left bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-rose-200 dark:border-rose-900/40 bg-rose-50/20 dark:bg-rose-950/10 flex flex-col justify-between cursor-pointer hover:border-rose-400 dark:hover:border-rose-600 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#722F37] focus:ring-offset-2 dark:focus:ring-offset-[#1A1D24] min-h-[118px]"
+          >
+            <div>
+              <span className="text-[10px] font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wider">Rejected</span>
+              <div className="text-xl font-black text-rose-700 dark:text-rose-400 mt-1">{dashboardMetrics.documentsRejected}</div>
+              <span className="text-[10px] text-rose-600 block mt-0.5">Clarification</span>
+            </div>
+            <div className="mt-2.5 pt-1.5 border-t border-rose-200/60 dark:border-rose-900/40 flex items-center justify-between text-[10px] font-semibold text-rose-700 dark:text-rose-400 group-hover:underline">
+              <span>View details</span>
+              <span aria-hidden="true" className="group-hover:translate-x-0.5 transition-transform">→</span>
+            </div>
+          </button>
+
+          {/* 8. EXPIRING SOON */}
+          <button
+            type="button"
+            ref={(el) => { cardRefs.current['expiring-soon'] = el; }}
+            onClick={() => handleOpenDrawer('expiring-soon')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenDrawer('expiring-soon'); } }}
+            aria-label="View details for Expiring Soon"
+            className="emp-doc-card group text-left bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between cursor-pointer hover:border-slate-400 dark:hover:border-slate-600 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#722F37] focus:ring-offset-2 dark:focus:ring-offset-[#1A1D24] min-h-[118px]"
+          >
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Expiring Soon</span>
+              <div className="text-xl font-black text-slate-800 dark:text-slate-100 mt-1">{dashboardMetrics.documentsExpiringSoon}</div>
+              <span className="text-[10px] text-slate-400 block mt-0.5">&lt; 30 days</span>
+            </div>
+            <div className="mt-2.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[10px] font-semibold text-slate-600 dark:text-slate-400 group-hover:underline">
+              <span>View details</span>
+              <span aria-hidden="true" className="group-hover:translate-x-0.5 transition-transform">→</span>
+            </div>
+          </button>
+
+          {/* 9. RECENTLY ADDED */}
+          <button
+            type="button"
+            ref={(el) => { cardRefs.current['recently-added'] = el; }}
+            onClick={() => handleOpenDrawer('recently-added')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOpenDrawer('recently-added'); } }}
+            aria-label="View details for Recently Added"
+            className="emp-doc-card group text-left bg-white dark:bg-[#1A1D24] p-3 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col justify-between cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-600 hover:shadow-md transition-all focus:outline-none focus:ring-2 focus:ring-[#722F37] focus:ring-offset-2 dark:focus:ring-offset-[#1A1D24] min-h-[118px]"
+          >
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Recently Added</span>
+              <div className="text-xl font-black text-indigo-600 dark:text-indigo-400 mt-1">{dashboardMetrics.recentlyUploaded}</div>
+              <span className="text-[10px] text-slate-400 block mt-0.5">Past 7 days</span>
+            </div>
+            <div className="mt-2.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 group-hover:underline">
+              <span>View details</span>
+              <span aria-hidden="true" className="group-hover:translate-x-0.5 transition-transform">→</span>
+            </div>
+          </button>
         </div>
 
         {/* VIEW MODE TABS & FILTERS BAR */}
@@ -590,10 +871,17 @@ export default function EmployeeDocumentsPage() {
           {/* Location & Department Filters */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Store Hub / Branch</label>
+              <label htmlFor="hub-filter-select" className="text-[10px] font-bold text-slate-400 uppercase">
+                Store Hub / Branch
+              </label>
               <select
+                id="hub-filter-select"
+                aria-label="Store Hub / Branch"
                 value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
+                onChange={(e) => {
+                  setSelectedLocation(e.target.value);
+                  setPagination((prev) => ({ ...prev, page: 1 }));
+                }}
                 className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
               >
                 <option value="all">All Karnataka Hubs</option>
@@ -604,10 +892,17 @@ export default function EmployeeDocumentsPage() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Department</label>
+              <label htmlFor="dept-filter-select" className="text-[10px] font-bold text-slate-400 uppercase">
+                Department
+              </label>
               <select
+                id="dept-filter-select"
+                aria-label="Department"
                 value={selectedDept}
-                onChange={(e) => setSelectedDept(e.target.value)}
+                onChange={(e) => {
+                  setSelectedDept(e.target.value);
+                  setPagination((prev) => ({ ...prev, page: 1 }));
+                }}
                 className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
               >
                 <option value="all">All Departments</option>
@@ -618,10 +913,17 @@ export default function EmployeeDocumentsPage() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase">Compliance Filter</label>
+              <label htmlFor="compliance-filter-select" className="text-[10px] font-bold text-slate-400 uppercase">
+                Compliance Filter
+              </label>
               <select
+                id="compliance-filter-select"
+                aria-label="Compliance Filter"
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPagination((prev) => ({ ...prev, page: 1 }));
+                }}
                 className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/80 text-xs text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
               >
                 <option value="all">All Employees</option>
@@ -1513,7 +1815,37 @@ export default function EmployeeDocumentsPage() {
             </div>
           </div>
         )}
+
+        {/* MODAL 5: 9 SUMMARY KPI DETAIL DRAWER */}
+        <DocumentMetricDrawer
+          drawerType={activeDrawer}
+          onClose={() => setActiveDrawer(null)}
+          locationId={selectedLocation}
+          departmentId={selectedDept}
+          complianceFilter={statusFilter}
+          locations={locations}
+          departments={departments}
+          onNavigateTab={handleNavigateTab}
+          onPreviewDoc={(doc) => setPreviewDoc(doc)}
+          onDownloadDoc={handleDownloadDocument}
+          onVerifyDoc={(doc, action) =>
+            setVerifyModal({
+              isOpen: true,
+              doc,
+              action: action || 'VERIFY',
+              reason: '',
+              remarks: ''
+            })
+          }
+          onReplaceDoc={(doc) => {
+            setReplaceDoc(doc);
+            setReplaceReason('');
+            setReplaceFile(null);
+          }}
+          triggerRef={{ current: activeDrawer ? cardRefs.current[activeDrawer] || null : null }}
+        />
       </div>
     </DashboardLayout>
   );
 }
+

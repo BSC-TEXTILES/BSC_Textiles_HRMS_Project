@@ -48,13 +48,23 @@ router.post('/login', authCriticalLimiter, validate(schemas.login), async (req: 
         include: { employee: true },
       });
     } else {
-      // Find employee by employee code
-      const emp = await prisma.employee.findFirst({
+      // Find employee by employee code (supporting case variations)
+      let emp = await prisma.employee.findFirst({
         where: { employeeCode: identifier },
       });
+      if (!emp && identifier !== identifier.toUpperCase()) {
+        emp = await prisma.employee.findFirst({
+          where: { employeeCode: identifier.toUpperCase() },
+        });
+      }
       if (emp) {
         user = await prisma.user.findFirst({
-          where: { employeeId: emp.id },
+          where: {
+            OR: [
+              { employeeId: emp.id },
+              ...(emp.email ? [{ email: emp.email.toLowerCase() }] : []),
+            ],
+          },
           include: { employee: true },
         });
       }

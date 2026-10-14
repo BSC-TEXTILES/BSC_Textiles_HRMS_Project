@@ -33,7 +33,9 @@ export const schemas = {
         .trim()
         .min(1, 'Email or Employee Code is required')
         .refine(
-          (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val) || /^(EMP|BSC|TEST)-[A-Z0-9-]+$/i.test(val),
+          (val) =>
+            /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val) ||
+            /^[A-Za-z0-9_-]{1,50}$/.test(val),
           'Invalid email or employee code format'
         ),
       password: z.string().min(1, 'Password is required'),
