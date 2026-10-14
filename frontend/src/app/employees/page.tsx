@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
@@ -26,6 +26,7 @@ import {
   Eye,
   BarChart3,
   UploadCloud,
+  RefreshCw,
 } from 'lucide-react';
 import { HrAnalysisModule } from '@/components/employees/analysis/HrAnalysisModule';
 import { EmployeeQrModal } from '@/components/dashboard/EmployeeQrModal';
@@ -83,6 +84,31 @@ export default function EmployeesPage() {
 
   const [departmentsLoading, setDepartmentsLoading] = useState(false);
   const [departmentsError, setDepartmentsError] = useState<string | null>(null);
+
+  // Deduplicate department options so repeated hub names never appear multiple times
+  const departmentOptions: Array<{ name: string; id: string }> = useMemo(() => {
+    const relevantDepts = selectedLocation
+      ? departments.filter((d) => d.locationId === selectedLocation)
+      : departments;
+
+    const seen = new Set<string>();
+    const options: Array<{ name: string; id: string }> = [];
+
+    for (const d of relevantDepts) {
+      const name = (d.name || '').trim();
+      const norm = name.toLowerCase();
+      if (name && !seen.has(norm)) {
+        seen.add(norm);
+        const allMatchingIds = relevantDepts
+          .filter((item) => (item.name || '').trim().toLowerCase() === norm)
+          .map((item) => item.id)
+          .join(',');
+        options.push({ name, id: selectedLocation ? d.id : allMatchingIds });
+      }
+    }
+
+    return options.sort((a, b) => a.name.localeCompare(b.name));
+  }, [departments, selectedLocation]);
 
   const fetchMetadata = useCallback(async () => {
     try {
@@ -547,7 +573,10 @@ export default function EmployeesPage() {
             {/* Location Filter */}
             <select
               value={selectedLocation}
-              onChange={(e) => setSelectedLocation(e.target.value)}
+              onChange={(e) => {
+                setSelectedLocation(e.target.value);
+                setSelectedDept('');
+              }}
               className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-100 font-medium focus:outline-none focus:border-[#1346a1]"
             >
               <option value="">All Locations</option>
@@ -559,18 +588,32 @@ export default function EmployeesPage() {
             </select>
 
             {/* Department Filter */}
-            <select
-              value={selectedDept}
-              onChange={(e) => setSelectedDept(e.target.value)}
-              className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-100 font-medium focus:outline-none focus:border-[#1346a1]"
-            >
-              <option value="">All Departments</option>
-              {departments.map((dept) => (
-                <option key={dept.id} value={dept.id}>
-                  {dept.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-1">
+              <select
+                value={selectedDept}
+                onChange={(e) => setSelectedDept(e.target.value)}
+                disabled={departmentsLoading}
+                className="px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-100 font-medium focus:outline-none focus:border-[#1346a1] disabled:opacity-50"
+              >
+                <option value="">All Departments</option>
+                {departmentOptions.map((dept) => (
+                  <option key={dept.name} value={dept.id}>
+                    {dept.name}
+                  </option>
+                ))}
+              </select>
+              {departmentsError && (
+                <button
+                  type="button"
+                  onClick={fetchMetadata}
+                  className="p-1.5 text-rose-600 hover:text-rose-700 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 rounded-lg border border-rose-200 dark:border-rose-800 transition-colors"
+                  title="Could not load departments. Click to retry."
+                  aria-label="Retry loading departments"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
 
             {/* Status Filter */}
             <select
