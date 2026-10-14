@@ -11,7 +11,7 @@ import { BscHolidaysCalendar } from '@/components/dashboard/BscHolidaysCalendar'
 import { KarnatakaHubsCardSection } from '@/components/dashboard/KarnatakaHubsCardSection';
 import { ExecutiveShiftFilter, type ShiftOptionItem } from '@/components/dashboard/ExecutiveShiftFilter';
 import { ExecutiveDeptFilter, type DeptOptionItem } from '@/components/dashboard/ExecutiveDeptFilter';
-import type { CreatedBatchResult } from '@/components/dashboard/CreateCustomShiftModal';
+import { CreateCustomShiftModal, type CreatedBatchResult } from '@/components/dashboard/CreateCustomShiftModal';
 import api from '@/lib/api';
 
 // Dynamically import heavy modals to eliminate ~5MB from the initial critical JS bundle
@@ -96,69 +96,14 @@ const DEFAULT_HUBS = [
   { id: 'BLY', code: 'BLY', name: 'Bellary Hub (BLY-04)' },
 ];
 
-const DEFAULT_DEPTS: DeptOptionItem[] = [
-  { id: 'CS', name: 'Customer Service & Billing', code: 'CS' },
-  { id: 'FIN', name: 'Finance & Accounts', code: 'FIN' },
-  { id: 'HR', name: 'Human Resources', code: 'HR' },
-  { id: 'INV', name: 'Inventory & Logistics', code: 'INV' },
-  { id: 'SALES', name: 'Sales & Retail', code: 'SALES' },
-  { id: 'OPS', name: 'Store Operations', code: 'OPS' },
+const DEFAULT_DEPTS = [
+  { id: 'SALES', name: 'Sales & Retail' },
+  { id: 'OPS', name: 'Store Operations' },
+  { id: 'HR', name: 'Human Resources' },
+  { id: 'FIN', name: 'Finance & Accounts' },
+  { id: 'INV', name: 'Inventory & Logistics' },
+  { id: 'CS', name: 'Customer Service & Billing' },
 ];
-
-function processDepartments(rawDepts: any[], isAllHubs: boolean): DeptOptionItem[] {
-  if (!Array.isArray(rawDepts) || rawDepts.length === 0) return [];
-
-  // Filter out inactive departments if status is present
-  const activeDepts = rawDepts.filter((d: any) =>
-    d.status ? d.status === 'ACTIVE' : true
-  );
-
-  // Group by canonical department key (code if available, otherwise trimmed uppercase name)
-  const map = new Map<
-    string,
-    {
-      code?: string;
-      name: string;
-      ids: string[];
-      locations: Set<string>;
-    }
-  >();
-
-  for (const d of activeDepts) {
-    const key = (d.code || d.name || '').trim().toUpperCase();
-    if (!key) continue;
-
-    const existing = map.get(key);
-    if (!existing) {
-      map.set(key, {
-        code: d.code,
-        name: d.name,
-        ids: d.id ? [d.id] : [],
-        locations: new Set(d.locationId ? [d.locationId] : []),
-      });
-    } else {
-      if (d.id && !existing.ids.includes(d.id)) {
-        existing.ids.push(d.id);
-      }
-      if (d.locationId) {
-        existing.locations.add(d.locationId);
-      }
-    }
-  }
-
-  // Map to DeptOptionItem list
-  const items: DeptOptionItem[] = Array.from(map.values()).map((g) => ({
-    id: isAllHubs ? g.ids.join(',') : g.ids[0] || g.code || g.name,
-    name: g.name,
-    code: g.code,
-    hubCount: g.locations.size,
-  }));
-
-  // Sort alphabetically by department name
-  items.sort((a, b) => a.name.localeCompare(b.name));
-
-  return items;
-}
 
 const DEFAULT_SHIFTS: ShiftOptionItem[] = [
   { id: 'MORNING', name: 'Morning Shift', timeRange: '09:00 – 18:00', staffCount: 24 },
@@ -176,7 +121,7 @@ function parseShiftTime(timeVal: any): string {
     if (!isNaN(d.getTime())) {
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     }
-  } catch {}
+  } catch { }
   return String(timeVal).slice(0, 5);
 }
 
@@ -303,7 +248,32 @@ function processShifts(rawShifts: any[], isAllHubs: boolean): ShiftOptionItem[] 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedHub, setSelectedHub] = useState('all');
+  const [selectedHub, setSelectedHubState] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('bsc_selected_hub') || 'all';
+    }
+    return 'all';
+  });
+
+  const setSelectedHub = useCallback((hub: string) => {
+    setSelectedHubState(hub);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('bsc_selected_hub', hub);
+      window.dispatchEvent(new CustomEvent('bsc:hub-changed-external', { detail: { hub } }));
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleHeaderHub = (e: any) => {
+      if (e?.detail?.hub) {
+        setSelectedHubState(e.detail.hub);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('bsc:hub-changed', handleHeaderHub);
+      return () => window.removeEventListener('bsc:hub-changed', handleHeaderHub);
+    }
+  }, []);
   const [selectedDept, setSelectedDept] = useState('all');
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().slice(0, 10));
   const [selectedShift, setSelectedShift] = useState('all');
@@ -314,16 +284,19 @@ export default function DashboardPage() {
   const [shiftNotice, setShiftNotice] = useState<string | null>(null);
   const [createBatchModalOpen, setCreateBatchModalOpen] = useState(false);
   const shiftCacheRef = useRef<Record<string, ShiftOptionItem[]>>({});
-  const [deptOptions, setDeptOptions] = useState<DeptOptionItem[]>(DEFAULT_DEPTS);
-  const [deptsLoading, setDeptsLoading] = useState(false);
-  const [deptsError, setDeptsError] = useState<string | null>(null);
-  const [deptNotice, setDeptNotice] = useState<string | null>(null);
-  const deptCacheRef = useRef<Record<string, DeptOptionItem[]>>({});
+  const [deptOptions, setDeptOptions] = useState<Array<{ id: string; name: string }>>(DEFAULT_DEPTS);
   const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null);
   const [selectedKpiMetric, setSelectedKpiMetric] = useState<MetricDetailType>(null);
   const [recentPunches, setRecentPunches] = useState<PunchRecord[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [filterAnimationKey, setFilterAnimationKey] = useState(0);
+  const [searchDrawerOpen, setSearchDrawerOpen] = useState(false);
+  const [searchDrawerQuery, setSearchDrawerQuery] = useState('');
+  const [searchDrawerResults, setSearchDrawerResults] = useState<SearchResultsData>({
+    employees: [],
+    departments: [],
+    hubs: [],
+  });
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -332,7 +305,7 @@ export default function DashboardPage() {
       // Build comprehensive filter query parameters for backend
       const qp = new URLSearchParams();
       if (selectedHub !== 'all') qp.set('locationId', selectedHub);
-      if (selectedDept !== 'all' && selectedDept !== 'ALL') qp.set('departmentId', selectedDept);
+      if (selectedDept !== 'all') qp.set('departmentId', selectedDept);
       if (selectedShift !== 'all') qp.set('shiftId', selectedShift);
       if (selectedDate) qp.set('date', selectedDate);
       const qs = qp.toString() ? `?${qp.toString()}` : '';
@@ -557,74 +530,22 @@ export default function DashboardPage() {
     loadShiftOptions(selectedHub);
   }, [selectedHub, loadShiftOptions]);
 
-  // Load department options dynamically with caching and duplicate removal
-  const loadDeptOptions = useCallback(
-    async (hub: string, force = false) => {
-      if (!force && deptCacheRef.current[hub]) {
-        setDeptOptions(deptCacheRef.current[hub]);
-        return;
-      }
-
-      try {
-        setDeptsLoading(true);
-        setDeptsError(null);
-        const loc = hub !== 'all' ? `&locationId=${hub}` : '';
-        const deptRes = await api.get(`/departments?limit=100${loc}`).catch(() => ({ data: null }));
-        const dList = deptRes.data?.departments || deptRes.data || [];
-        const processed = processDepartments(dList, hub === 'all');
-        const finalList = processed.length > 0 ? processed : DEFAULT_DEPTS;
-
-        deptCacheRef.current[hub] = finalList;
-        setDeptOptions(finalList);
-
-        // Verify that current selected department still exists in newly loaded options
-        setSelectedDept((prevDept) => {
-          if (prevDept === 'all' || prevDept === 'ALL') return 'all';
-          const match = finalList.find((d) => d.id === prevDept);
-          if (match) return prevDept;
-
-          // If exact ID not found, check if a department with matching name exists
-          const prevObj = deptOptions.find((o) => o.id === prevDept);
-          const nameMatch = finalList.find(
-            (d) => prevObj && d.name.toLowerCase() === prevObj.name.toLowerCase()
-          );
-          if (nameMatch) return nameMatch.id;
-
-          // Reset to All Departments and show short notice
-          setDeptNotice("Department selection reset to 'All Departments' for the selected hub.");
-          return 'all';
-        });
-      } catch {
-        setDeptsError('Could not load departments');
-        if (!deptCacheRef.current[hub]) {
-          setDeptOptions(DEFAULT_DEPTS);
-        }
-      } finally {
-        setDeptsLoading(false);
-      }
-    },
-    [deptOptions]
-  );
-
-  // Load departments whenever selectedHub changes (cached in memory)
-  useEffect(() => {
-    loadDeptOptions(selectedHub);
-  }, [selectedHub, loadDeptOptions]);
-
-  // Auto-dismiss department notice
-  useEffect(() => {
-    if (!deptNotice) return;
-    const timer = setTimeout(() => setDeptNotice(null), 4500);
-    return () => clearTimeout(timer);
-  }, [deptNotice]);
-
-  // Load location options dynamically from backend once per page load
+  // Load department and location options dynamically from backend
   useEffect(() => {
     let ignore = false;
-    const loadLocations = async () => {
+    const loadDeptsAndLocs = async () => {
       try {
-        const locRes = await api.get('/locations/all').catch(() => ({ data: null }));
+        const loc = selectedHub !== 'all' ? `&locationId=${selectedHub}` : '';
+        const [deptRes, locRes] = await Promise.all([
+          api.get(`/departments?limit=100${loc}`).catch(() => ({ data: null })),
+          api.get('/locations/all').catch(() => ({ data: null })),
+        ]);
         if (!ignore) {
+          const dList = deptRes.data?.departments || deptRes.data || [];
+          if (Array.isArray(dList) && dList.length > 0) {
+            setDeptOptions(dList.map((d: any) => ({ id: d.id, name: d.name })));
+          }
+
           const lList = locRes.data;
           if (Array.isArray(lList) && lList.length > 0) {
             setHubOptions([
@@ -638,14 +559,16 @@ export default function DashboardPage() {
           }
         }
       } catch {
-        // keep default hubs
+        if (!ignore) {
+          setDeptOptions(DEFAULT_DEPTS);
+        }
       }
     };
-    loadLocations();
+    loadDeptsAndLocs();
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [selectedHub]);
 
   const handleBatchCreated = (newBatch: CreatedBatchResult) => {
     // Invalidate shift caches
@@ -691,7 +614,7 @@ export default function DashboardPage() {
 
   const activeFilterCount =
     (selectedHub !== 'all' ? 1 : 0) +
-    (selectedDept !== 'all' && selectedDept !== 'ALL' ? 1 : 0) +
+    (selectedDept !== 'all' ? 1 : 0) +
     (selectedShift !== 'all' ? 1 : 0) +
     (selectedDate !== new Date().toISOString().slice(0, 10) ? 1 : 0);
 
@@ -730,7 +653,21 @@ export default function DashboardPage() {
   const eveningShift = shiftOptions.find((s) => s.name.toLowerCase().includes('evening'));
 
   return (
-    <DashboardLayout activeShiftLabel={activeShiftHeaderLabel}>
+    <DashboardLayout
+      activeShiftLabel={activeShiftHeaderLabel}
+      headerSearchSlot={
+        <ExecutiveHeaderSearch
+          onSelectDept={(deptId) => setSelectedDept(deptId)}
+          onSelectHub={(hubId) => setSelectedHub(hubId)}
+          onOpenSearchDrawer={(q, r) => {
+            setSearchDrawerQuery(q);
+            setSearchDrawerResults(r);
+            setSearchDrawerOpen(true);
+          }}
+          selectedHubId={selectedHub}
+        />
+      }
+    >
       <div className="flex flex-col w-full gap-5">
         {/* TOP HEADER & CONTROLS BANNER */}
         <div className="flex flex-col gap-4 bg-white dark:bg-[#0e172a] p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
@@ -743,7 +680,7 @@ export default function DashboardPage() {
                 </span>
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-[#eff4ff] dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[11px] font-medium border border-slate-200 dark:border-slate-700">
                   <span className="material-symbols-outlined text-[13px] text-[#0058be] dark:text-blue-400">verified</span>
-                  Since 1938 • FY 2024-25 Q3
+                  Since 1938 • FY 2026-27 Q3
                 </span>
               </div>
               <div className="flex items-center gap-3 mt-0.5">
@@ -811,28 +748,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Department Reset Notice */}
-          {deptNotice && (
-            <div
-              role="status"
-              aria-live="polite"
-              className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-xs text-[#0058be] dark:text-blue-300 animate-pop-in"
-            >
-              <div className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-[16px]">info</span>
-                <span>{deptNotice}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDeptNotice(null)}
-                className="p-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors"
-                aria-label="Dismiss department notice"
-              >
-                <span className="material-symbols-outlined text-[14px]">close</span>
-              </button>
-            </div>
-          )}
-
           {/* Filter & Terminal Connectivity Bar */}
           <div className="flex flex-col gap-3 pt-3 bg-[#eff4ff]/60 dark:bg-[#131f38]/60 p-3.5 rounded-xl border border-slate-200/60 dark:border-slate-800 transition-all">
             <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
@@ -854,15 +769,23 @@ export default function DashboardPage() {
                   </select>
                 </div>
 
-                {/* Department Filter (Custom Accessible Listbox with Built-in "All Departments" First) */}
-                <ExecutiveDeptFilter
-                  selectedDeptId={selectedDept}
-                  onSelectDept={(id) => setSelectedDept(id)}
-                  deptOptions={deptOptions}
-                  loading={deptsLoading}
-                  error={deptsError}
-                  onRetry={() => loadDeptOptions(selectedHub, true)}
-                />
+                {/* Department Filter */}
+                <div className="flex items-center gap-1.5 bg-white dark:bg-[#0c1424] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs text-xs group hover:border-[#0058be] dark:hover:border-blue-500 transition-colors">
+                  <span className="material-symbols-outlined text-slate-400 text-[16px] group-hover:scale-110 transition-transform">category</span>
+                  <span className="text-[10px] uppercase text-slate-400 font-bold">Dept:</span>
+                  <select
+                    value={selectedDept}
+                    onChange={(e) => setSelectedDept(e.target.value)}
+                    className="bg-transparent font-semibold text-xs text-[#0b1c30] dark:text-slate-100 focus:outline-none cursor-pointer pr-1"
+                  >
+                    <option value="all" className="dark:bg-[#0c1424]">All Departments</option>
+                    {deptOptions.map((d) => (
+                      <option key={d.id} value={d.id} className="dark:bg-[#0c1424]">
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
                 {/* Date Filter with Quick Today/Yesterday toggles */}
                 <div className="flex items-center gap-1.5 bg-white dark:bg-[#0c1424] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs text-xs group hover:border-[#0058be] dark:hover:border-blue-500 transition-colors">
@@ -880,12 +803,10 @@ export default function DashboardPage() {
                     <button
                       type="button"
                       onClick={() => handleSetQuickDate('today')}
-                      aria-label="Set date to Today"
-                      className={`px-1.5 py-0.5 text-[10px] font-bold rounded transition-colors ${
-                        selectedDate === new Date().toISOString().slice(0, 10)
+                      className={`px-1.5 py-0.5 text-[10px] font-bold rounded transition-colors ${selectedDate === new Date().toISOString().slice(0, 10)
                           ? 'bg-[#0058be] text-white dark:bg-blue-600'
                           : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                      }`}
+                        }`}
                       title="Set to Today"
                     >
                       Today
@@ -927,10 +848,8 @@ export default function DashboardPage() {
                 </div>
                 <button
                   onClick={handleManualSync}
-                  aria-label="Sync Live Biometric Feeds"
-                  className={`flex items-center justify-center p-2 rounded-lg bg-white dark:bg-[#0c1424] text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 ${
-                    syncing || loading ? 'animate-spin text-[#0058be]' : ''
-                  }`}
+                  className={`flex items-center justify-center p-2 rounded-lg bg-white dark:bg-[#0c1424] text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-all active:scale-95 ${syncing || loading ? 'animate-spin text-[#0058be]' : ''
+                    }`}
                   title="Sync Live Biometric Feeds"
                 >
                   <span className="material-symbols-outlined text-[18px]">sync</span>
@@ -961,7 +880,7 @@ export default function DashboardPage() {
                   </span>
                 )}
 
-                {selectedDept !== 'all' && selectedDept !== 'ALL' && (
+                {selectedDept !== 'all' && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-white dark:bg-slate-800 text-[#0058be] dark:text-blue-400 border border-blue-200 dark:border-blue-900 shadow-xs animate-pop-in">
                     <span>Dept: {deptOptions.find(d => d.id === selectedDept)?.name || selectedDept}</span>
                     <button
@@ -1039,278 +958,269 @@ export default function DashboardPage() {
               selectedHub={selectedHub}
               onSelectHub={setSelectedHub}
               selectedShiftLabel={selectedShift !== 'all' ? activeShiftName : undefined}
-              selectedDeptLabel={
-                selectedDept !== 'all' && selectedDept !== 'ALL'
-                  ? deptOptions.find((d) => d.id === selectedDept)?.name
-                  : undefined
-              }
             />
 
-        {/* SECTION 3: RECENT BIOMETRIC TERMINAL PUNCHES LEDGER */}
-        <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">fingerprint</span>
-              <div>
-                <h2 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Live Biometric & IoT Terminal Punch Ledger</h2>
-                <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                  {recentPunches.length} punch records • {selectedHub !== 'all' ? (HUB_LABELS[selectedHub] || selectedHub) : 'Karnataka Hubs'} • {selectedDate}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Link
-                href="/attendance/punches"
-                className="px-3 py-1.5 text-xs font-semibold text-[#0058be] dark:text-blue-400 bg-[#eff4ff] dark:bg-blue-950/60 hover:bg-[#dce9ff] dark:hover:bg-blue-900/60 rounded-lg transition-colors border border-[#dce9ff] dark:border-blue-900/50"
-              >
-                Open Terminal Console
-              </Link>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto no-scrollbar">
-            {recentPunches.length === 0 ? (
-              <div className="py-12 px-4 flex flex-col items-center justify-center text-center gap-2.5 animate-pop-in">
-                <div className="w-12 h-12 rounded-full bg-[#eff4ff] dark:bg-slate-800 flex items-center justify-center text-[#0058be] dark:text-blue-400">
-                  <span className="material-symbols-outlined text-[24px]">search_off</span>
+            {/* SECTION 3: RECENT BIOMETRIC TERMINAL PUNCHES LEDGER */}
+            <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
+              <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">fingerprint</span>
+                  <div>
+                    <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Live Biometric & IoT Terminal Punch Ledger</h3>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      {recentPunches.length} punch records • {selectedHub !== 'all' ? (HUB_LABELS[selectedHub] || selectedHub) : 'Karnataka Hubs'} • {selectedDate}
+                    </p>
+                  </div>
                 </div>
-                <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-200">No punches found for the selected filter combination</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
-                  There are no attendance records matching this specific Hub, Department, Date, or Shift criteria.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleResetFilters}
-                  className="mt-1 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-[#0058be] dark:bg-blue-600 hover:bg-blue-700 transition-colors shadow-xs"
-                >
-                  Reset All Filters
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/attendance/punches"
+                    className="px-3 py-1.5 text-xs font-semibold text-[#0058be] dark:text-blue-400 bg-[#eff4ff] dark:bg-blue-950/60 hover:bg-[#dce9ff] dark:hover:bg-blue-900/60 rounded-lg transition-colors border border-[#dce9ff] dark:border-blue-900/50"
+                  >
+                    Open Terminal Console
+                  </Link>
+                </div>
               </div>
-            ) : (
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#eff4ff]/60 dark:bg-[#111c33] text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 tracking-wider">
-                  <tr>
-                    <th className="py-3 px-4">Employee</th>
-                    <th className="py-3 px-4">Store Hub & Terminal</th>
-                    <th className="py-3 px-4">Scheduled</th>
-                    <th className="py-3 px-4">Actual Punch</th>
-                    <th className="py-3 px-4">Biometric Verification</th>
-                    <th className="py-3 px-4">Status & Incentive</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  {recentPunches.map((punch, idx) => (
-                    <tr key={`${punch.id || idx}-${idx}`} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-7 h-7 rounded-full bg-[#131b2e] dark:bg-blue-600 text-white flex items-center justify-center font-bold text-[10px]">
-                            {punch.employeeName.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                          </div>
-                          <div>
-                            <div className="font-bold text-[#0b1c30] dark:text-slate-100">{punch.employeeName}</div>
-                            <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{punch.employeeCode}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="font-medium text-[#0b1c30] dark:text-slate-200">{punch.locationName}</div>
-                        <div className="text-[10px] text-slate-400 dark:text-slate-500">{punch.terminal}</div>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400">
-                        {punch.scheduledTime}
-                      </td>
-                      <td className="py-3 px-4 font-mono font-bold text-[#0b1c30] dark:text-slate-100">
-                        {punch.actualTime}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="inline-flex items-center gap-1 text-[11px] text-[#0058be] dark:text-blue-400 font-medium bg-[#eff4ff] dark:bg-blue-950/60 px-2 py-0.5 rounded border border-[#dce9ff] dark:border-blue-900/50">
-                          <span className="material-symbols-outlined text-[13px]">verified</span>
-                          {punch.method}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                            punch.status === 'EARLY' ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' :
-                            punch.status === 'LATE' ? 'bg-red-50 dark:bg-red-950/80 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800' :
-                            'bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                          }`}>
-                            {punch.status}
-                          </span>
-                          {punch.incentive && (
-                            <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                              {punch.incentive}
+
+              <div className="overflow-x-auto no-scrollbar">
+                {recentPunches.length === 0 ? (
+                  <div className="py-12 px-4 flex flex-col items-center justify-center text-center gap-2.5 animate-pop-in">
+                    <div className="w-12 h-12 rounded-full bg-[#eff4ff] dark:bg-slate-800 flex items-center justify-center text-[#0058be] dark:text-blue-400">
+                      <span className="material-symbols-outlined text-[24px]">search_off</span>
+                    </div>
+                    <h4 className="text-sm font-bold text-[#0b1c30] dark:text-slate-200">No punches found for the selected filter combination</h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
+                      There are no attendance records matching this specific Hub, Department, Date, or Shift criteria.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleResetFilters}
+                      className="mt-1 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-[#0058be] dark:bg-blue-600 hover:bg-blue-700 transition-colors shadow-xs"
+                    >
+                      Reset All Filters
+                    </button>
+                  </div>
+                ) : (
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-[#eff4ff]/60 dark:bg-[#111c33] text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 tracking-wider">
+                      <tr>
+                        <th className="py-3 px-4">Employee</th>
+                        <th className="py-3 px-4">Store Hub & Terminal</th>
+                        <th className="py-3 px-4">Scheduled</th>
+                        <th className="py-3 px-4">Actual Punch</th>
+                        <th className="py-3 px-4">Biometric Verification</th>
+                        <th className="py-3 px-4">Status & Incentive</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
+                      {recentPunches.map((punch, idx) => (
+                        <tr key={`${punch.id || idx}-${idx}`} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-7 h-7 rounded-full bg-[#131b2e] dark:bg-blue-600 text-white flex items-center justify-center font-bold text-[10px]">
+                                {punch.employeeName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                              </div>
+                              <div>
+                                <div className="font-bold text-[#0b1c30] dark:text-slate-100">{punch.employeeName}</div>
+                                <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{punch.employeeCode}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-medium text-[#0b1c30] dark:text-slate-200">{punch.locationName}</div>
+                            <div className="text-[10px] text-slate-400 dark:text-slate-500">{punch.terminal}</div>
+                          </td>
+                          <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400">
+                            {punch.scheduledTime}
+                          </td>
+                          <td className="py-3 px-4 font-mono font-bold text-[#0b1c30] dark:text-slate-100">
+                            {punch.actualTime}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="inline-flex items-center gap-1 text-[11px] text-[#0058be] dark:text-blue-400 font-medium bg-[#eff4ff] dark:bg-blue-950/60 px-2 py-0.5 rounded border border-[#dce9ff] dark:border-blue-900/50">
+                              <span className="material-symbols-outlined text-[13px]">verified</span>
+                              {punch.method}
                             </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-
-        {/* SECTION 4: FLOOR SHIFT ALLOCATION & ROSTER SUMMARY */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="bg-white dark:bg-[#0e172a] p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Floor Shifts Overview</h2>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-400">3 Shift Windows</span>
-              </div>
-              <div className="space-y-3">
-                <div
-                  onClick={() => {
-                    if (morningShift) {
-                      setSelectedShift(selectedShift === morningShift.id ? 'all' : morningShift.id);
-                    }
-                  }}
-                  className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                    selectedShift !== 'all' && (selectedShift === morningShift?.id || activeShiftName.toLowerCase().includes('morning'))
-                      ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 ring-1 ring-blue-400'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
-                  }`}
-                  title="Click to filter by Morning Shift"
-                >
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="font-semibold text-[#0b1c30] dark:text-slate-200">Shift A (Morning Floor)</span>
-                    <span className="font-mono text-slate-500 dark:text-slate-400">09:00 - 18:00 (24 Staff)</span>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
-                    <div className="bg-[#0058be] h-2 rounded-full" style={{ width: '92%' }} />
-                  </div>
-                </div>
-                <div
-                  onClick={() => {
-                    if (generalShift) {
-                      setSelectedShift(selectedShift === generalShift.id ? 'all' : generalShift.id);
-                    }
-                  }}
-                  className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                    selectedShift !== 'all' && (selectedShift === generalShift?.id || activeShiftName.toLowerCase().includes('general'))
-                      ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 ring-1 ring-emerald-400'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
-                  }`}
-                  title="Click to filter by General Shift"
-                >
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="font-semibold text-[#0b1c30] dark:text-slate-200">Shift B (General Floor)</span>
-                    <span className="font-mono text-slate-500 dark:text-slate-400">09:30 - 18:30 (8 Staff)</span>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
-                    <div className="bg-emerald-500 h-2 rounded-full" style={{ width: '100%' }} />
-                  </div>
-                </div>
-                <div
-                  onClick={() => {
-                    if (eveningShift) {
-                      setSelectedShift(selectedShift === eveningShift.id ? 'all' : eveningShift.id);
-                    }
-                  }}
-                  className={`p-2 rounded-lg border transition-all cursor-pointer ${
-                    selectedShift !== 'all' && (selectedShift === eveningShift?.id || activeShiftName.toLowerCase().includes('evening'))
-                      ? 'bg-amber-50/70 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 ring-1 ring-amber-400'
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
-                  }`}
-                  title="Click to filter by Evening Shift"
-                >
-                  <div className="flex justify-between text-xs mb-1">
-                    <span className="font-semibold text-[#0b1c30] dark:text-slate-200">Shift C (Evening Cashier)</span>
-                    <span className="font-mono text-slate-500 dark:text-slate-400">12:00 - 21:00 (3 Staff)</span>
-                  </div>
-                  <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
-                    <div className="bg-amber-500 h-2 rounded-full" style={{ width: '100%' }} />
-                  </div>
-                </div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${punch.status === 'EARLY' ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' :
+                                  punch.status === 'LATE' ? 'bg-red-50 dark:bg-red-950/80 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800' :
+                                    'bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                                }`}>
+                                {punch.status}
+                              </span>
+                              {punch.incentive && (
+                                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                                  {punch.incentive}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
-            <Link
-              href="/attendance/shifts"
-              className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs font-semibold text-[#0058be] dark:text-blue-400 hover:underline flex items-center justify-between"
-            >
-              <span>Manage Shift Rosters</span>
-              <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-            </Link>
-          </div>
 
-          <div className="bg-white dark:bg-[#0e172a] p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Break Compliance Policy</h2>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">Audit Grade</span>
+            {/* SECTION 4: FLOOR SHIFT ALLOCATION & ROSTER SUMMARY */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="bg-white dark:bg-[#0e172a] p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Floor Shifts Overview</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-400">3 Shift Windows</span>
+                  </div>
+                  <div className="space-y-3">
+                    <div
+                      onClick={() => {
+                        if (morningShift) {
+                          setSelectedShift(selectedShift === morningShift.id ? 'all' : morningShift.id);
+                        }
+                      }}
+                      className={`p-2 rounded-lg border transition-all cursor-pointer ${selectedShift !== 'all' && (selectedShift === morningShift?.id || activeShiftName.toLowerCase().includes('morning'))
+                          ? 'bg-blue-50/70 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800 ring-1 ring-blue-400'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
+                        }`}
+                      title="Click to filter by Morning Shift"
+                    >
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="font-semibold text-[#0b1c30] dark:text-slate-200">Shift A (Morning Floor)</span>
+                        <span className="font-mono text-slate-500 dark:text-slate-400">09:00 - 18:00 (24 Staff)</span>
+                      </div>
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+                        <div className="bg-[#0058be] h-2 rounded-full" style={{ width: '92%' }} />
+                      </div>
+                    </div>
+                    <div
+                      onClick={() => {
+                        if (generalShift) {
+                          setSelectedShift(selectedShift === generalShift.id ? 'all' : generalShift.id);
+                        }
+                      }}
+                      className={`p-2 rounded-lg border transition-all cursor-pointer ${selectedShift !== 'all' && (selectedShift === generalShift?.id || activeShiftName.toLowerCase().includes('general'))
+                          ? 'bg-emerald-50/70 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 ring-1 ring-emerald-400'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
+                        }`}
+                      title="Click to filter by General Shift"
+                    >
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="font-semibold text-[#0b1c30] dark:text-slate-200">Shift B (General Floor)</span>
+                        <span className="font-mono text-slate-500 dark:text-slate-400">09:30 - 18:30 (8 Staff)</span>
+                      </div>
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+                        <div className="bg-emerald-500 h-2 rounded-full" style={{ width: '100%' }} />
+                      </div>
+                    </div>
+                    <div
+                      onClick={() => {
+                        if (eveningShift) {
+                          setSelectedShift(selectedShift === eveningShift.id ? 'all' : eveningShift.id);
+                        }
+                      }}
+                      className={`p-2 rounded-lg border transition-all cursor-pointer ${selectedShift !== 'all' && (selectedShift === eveningShift?.id || activeShiftName.toLowerCase().includes('evening'))
+                          ? 'bg-amber-50/70 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 ring-1 ring-amber-400'
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-800/40 border-transparent'
+                        }`}
+                      title="Click to filter by Evening Shift"
+                    >
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="font-semibold text-[#0b1c30] dark:text-slate-200">Shift C (Evening Cashier)</span>
+                        <span className="font-mono text-slate-500 dark:text-slate-400">12:00 - 21:00 (3 Staff)</span>
+                      </div>
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+                        <div className="bg-amber-500 h-2 rounded-full" style={{ width: '100%' }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <Link
+                  href="/attendance/shifts"
+                  className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs font-semibold text-[#0058be] dark:text-blue-400 hover:underline flex items-center justify-between"
+                >
+                  <span>Manage Shift Rosters</span>
+                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                </Link>
               </div>
-              <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
-                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60">
-                  <span>Male Lunch Limit:</span>
-                  <span className="font-bold text-[#0b1c30] dark:text-slate-100">45 Mins (Zero Tolerance)</span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60">
-                  <span>Female Lunch Limit:</span>
-                  <span className="font-bold text-[#0b1c30] dark:text-slate-100">45 Mins</span>
-                </div>
-                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60">
-                  <span>Tea Break (Morning/Eve):</span>
-                  <span className="font-bold text-[#0b1c30] dark:text-slate-100">20 Mins Allowed</span>
-                </div>
-              </div>
-            </div>
-            <Link
-              href="/attendance/breaks"
-              className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs font-semibold text-[#0058be] dark:text-blue-400 hover:underline flex items-center justify-between"
-            >
-              <span>Open Lunch & Break Monitor</span>
-              <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-            </Link>
-          </div>
 
-          <div className="bg-white dark:bg-[#0e172a] p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Instant Quick Links</h2>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">HR Tools</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="bg-white dark:bg-[#0e172a] p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Break Compliance Policy</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300">Audit Grade</span>
+                  </div>
+                  <div className="space-y-2 text-xs text-slate-600 dark:text-slate-300">
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60">
+                      <span>Male Lunch Limit:</span>
+                      <span className="font-bold text-[#0b1c30] dark:text-slate-100">45 Mins (Zero Tolerance)</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60">
+                      <span>Female Lunch Limit:</span>
+                      <span className="font-bold text-[#0b1c30] dark:text-slate-100">45 Mins</span>
+                    </div>
+                    <div className="flex items-center justify-between p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60">
+                      <span>Tea Break (Morning/Eve):</span>
+                      <span className="font-bold text-[#0b1c30] dark:text-slate-100">20 Mins Allowed</span>
+                    </div>
+                  </div>
+                </div>
                 <Link
-                  href="/payroll"
-                  className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-[#0058be] dark:hover:border-blue-500 hover:bg-[#eff4ff] dark:hover:bg-slate-800/60 transition-all flex flex-col items-center justify-center text-center gap-1 group"
+                  href="/attendance/breaks"
+                  className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-xs font-semibold text-[#0058be] dark:text-blue-400 hover:underline flex items-center justify-between"
                 >
-                  <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">payments</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#0058be] dark:group-hover:text-blue-400">Payroll Ledger</span>
-                </Link>
-                <Link
-                  href="/operations/face-verification"
-                  className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-[#0058be] dark:hover:border-blue-500 hover:bg-[#eff4ff] dark:hover:bg-slate-800/60 transition-all flex flex-col items-center justify-center text-center gap-1 group"
-                >
-                  <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">shield</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#0058be] dark:group-hover:text-blue-400">Face Verify</span>
-                </Link>
-                <Link
-                  href="/admin/audit-logs"
-                  className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-[#0058be] dark:hover:border-blue-500 hover:bg-[#eff4ff] dark:hover:bg-slate-800/60 transition-all flex flex-col items-center justify-center text-center gap-1 group"
-                >
-                  <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">rule</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#0058be] dark:group-hover:text-blue-400">Audit Logs</span>
-                </Link>
-                <Link
-                  href="/my-desk"
-                  className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-[#0058be] dark:hover:border-blue-500 hover:bg-[#eff4ff] dark:hover:bg-slate-800/60 transition-all flex flex-col items-center justify-center text-center gap-1 group"
-                >
-                  <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">person</span>
-                  <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#0058be] dark:group-hover:text-blue-400">My Desk</span>
+                  <span>Open Lunch & Break Monitor</span>
+                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
                 </Link>
               </div>
-            </div>
-            <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 dark:text-slate-500 text-center">
-              BSC Textiles Workforce v2.0 • Karnataka Regional Network
+
+              <div className="bg-white dark:bg-[#0e172a] p-5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Instant Quick Links</h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">HR Tools</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <Link
+                      href="/payroll"
+                      className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-[#0058be] dark:hover:border-blue-500 hover:bg-[#eff4ff] dark:hover:bg-slate-800/60 transition-all flex flex-col items-center justify-center text-center gap-1 group"
+                    >
+                      <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">payments</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#0058be] dark:group-hover:text-blue-400">Payroll Ledger</span>
+                    </Link>
+                    <Link
+                      href="/operations/face-verification"
+                      className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-[#0058be] dark:hover:border-blue-500 hover:bg-[#eff4ff] dark:hover:bg-slate-800/60 transition-all flex flex-col items-center justify-center text-center gap-1 group"
+                    >
+                      <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">shield</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#0058be] dark:group-hover:text-blue-400">Face Verify</span>
+                    </Link>
+                    <Link
+                      href="/admin/audit-logs"
+                      className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-[#0058be] dark:hover:border-blue-500 hover:bg-[#eff4ff] dark:hover:bg-slate-800/60 transition-all flex flex-col items-center justify-center text-center gap-1 group"
+                    >
+                      <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">rule</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#0058be] dark:group-hover:text-blue-400">Audit Logs</span>
+                    </Link>
+                    <Link
+                      href="/my-desk"
+                      className="p-3 rounded-lg border border-slate-200 dark:border-slate-800 hover:border-[#0058be] dark:hover:border-blue-500 hover:bg-[#eff4ff] dark:hover:bg-slate-800/60 transition-all flex flex-col items-center justify-center text-center gap-1 group"
+                    >
+                      <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">person</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 group-hover:text-[#0058be] dark:group-hover:text-blue-400">My Desk</span>
+                    </Link>
+                  </div>
+                </div>
+                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-400 dark:text-slate-500 text-center">
+                  BSC Textiles Workforce v2.0 • Karnataka Regional Network
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  </div>
 
       {/* Card drill-down detail modal */}
       {activeMetric && (
@@ -1354,6 +1264,17 @@ export default function DashboardPage() {
         initialHubId={selectedHub}
         existingShiftNames={shiftOptions.map((s) => s.name)}
         onSuccess={handleBatchCreated}
+      />
+
+      {/* Executive Header Search Results Slide-over Drawer */}
+      <ExecutiveSearchResultsDrawer
+        isOpen={searchDrawerOpen}
+        onClose={() => setSearchDrawerOpen(false)}
+        query={searchDrawerQuery}
+        results={searchDrawerResults}
+        onSelectDept={(deptId) => setSelectedDept(deptId)}
+        onSelectHub={(hubId) => setSelectedHub(hubId)}
+        selectedHubId={selectedHub}
       />
     </DashboardLayout>
   );

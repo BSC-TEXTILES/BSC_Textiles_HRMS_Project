@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 import { 
   ArrowLeft, 
   Router, 
@@ -9,17 +9,19 @@ import {
   Camera, 
   Wrench, 
   CheckCircle2, 
-  Activity, 
   Wifi, 
-  ShieldCheck, 
   Sparkles, 
   RefreshCw, 
   X,
   Server,
   Zap,
-  Info
+  AlertTriangle,
+  AlertCircle,
+  Network
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+export type ActiveSummaryCard = 'terminals' | 'packetLoss' | 'latency' | 'topology' | null;
 
 interface TerminalDevice {
   id: string;
@@ -51,6 +53,9 @@ interface TerminalsApiResponse {
     packetLossGraph: Array<{ time: string; lossPct: number; latency: number }>;
     latencyDistribution: Array<{ bucket: string; count: number; color: string }>;
     hubsSummary: Array<{ hub: string; terminals: number; status: string }>;
+    packetsSent?: number;
+    packetsReceived?: number;
+    packetsDropped?: number;
   };
 }
 
@@ -71,6 +76,7 @@ export function TerminalsDetail({
   const [maintenanceStates, setMaintenanceStates] = useState<Record<string, boolean>>({});
   const [lastRefreshedSec, setLastRefreshedSec] = useState(0);
   const [isMounted, setIsMounted] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<ActiveSummaryCard>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -148,7 +154,37 @@ export function TerminalsDetail({
     }
   };
 
+  const handleCardClick = (card: ActiveSummaryCard) => {
+    setSelectedCard(prev => (prev === card ? null : card));
+  };
+
+  const handleCardKeyDown = (e: React.KeyboardEvent, card: ActiveSummaryCard) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleCardClick(card);
+    }
+  };
+
   if (!open) return null;
+
+  // Derived metrics for synchronized details
+  const terminalsList = data?.terminals || [];
+  const latencies = terminalsList.map(t => t.latency).filter(l => typeof l === 'number');
+  const minLatency = latencies.length > 0 ? Math.min(...latencies) : null;
+  const maxLatency = latencies.length > 0 ? Math.max(...latencies) : null;
+  const avgLatency = data?.networkMetrics?.averageLatencyMs ?? 18;
+  const avgPacketLoss = data?.networkMetrics?.averagePacketLossPct ?? 0;
+
+  const acceptableLossThreshold = 1.0;
+  const exceedingLossTerminals = terminalsList.filter(
+    t => typeof t.packetLoss === 'number' && t.packetLoss > acceptableLossThreshold
+  );
+
+  const slaStatus = avgLatency < 50 ? 'Healthy' : avgLatency <= 100 ? 'Warning' : 'Degraded';
+
+  const degradedOrDisconnected = terminalsList.filter(
+    t => t.status === 'OFFLINE' || (typeof t.latency === 'number' && t.latency > 100)
+  );
 
   return (
     <div className="flex flex-col h-full bg-[#f8fafc] text-slate-800">
@@ -181,6 +217,7 @@ export function TerminalsDetail({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close modal"
             className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
           >
             <X className="w-5 h-5" />
@@ -201,217 +238,1081 @@ export function TerminalsDetail({
           </div>
         ) : (
           <>
-            {/* KPI Metrics Strip */}
+            {/* KPI Metrics Strip - Interactive Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Terminals</span>
+              {/* Card 1: Active Terminals */}
+              <button
+                type="button"
+                onClick={() => handleCardClick('terminals')}
+                onKeyDown={(e) => handleCardKeyDown(e, 'terminals')}
+                aria-pressed={selectedCard === 'terminals'}
+                className={`p-4 rounded-xl border text-left cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-[#0058be]/40 ${
+                  selectedCard === 'terminals'
+                    ? 'bg-blue-50/40 border-[#0058be] ring-2 ring-[#0058be] shadow-sm'
+                    : 'bg-white border-slate-200 shadow-xs hover:border-slate-300 hover:shadow-sm'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Terminals</span>
+                  {selectedCard === 'terminals' && (
+                    <span className="text-[9px] font-bold text-[#0058be] bg-blue-100/70 px-1.5 py-0.5 rounded">Selected</span>
+                  )}
+                </div>
                 <div className="text-2xl font-bold text-[#0b1c30] mt-1 flex items-center gap-2">
-                  8 / 8 Online
+                  {data?.networkMetrics?.onlineTerminals ?? 8} / {data?.networkMetrics?.totalTerminals ?? 8} Online
                   <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
                     All Up
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1">100% Karnataka Hub Coverage</div>
-              </div>
+              </button>
 
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Packet Loss Rate</span>
-                <div className="text-2xl font-bold text-emerald-600 mt-1">0.00%</div>
+              {/* Card 2: Packet Loss Rate */}
+              <button
+                type="button"
+                onClick={() => handleCardClick('packetLoss')}
+                onKeyDown={(e) => handleCardKeyDown(e, 'packetLoss')}
+                aria-pressed={selectedCard === 'packetLoss'}
+                className={`p-4 rounded-xl border text-left cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-[#0058be]/40 ${
+                  selectedCard === 'packetLoss'
+                    ? 'bg-blue-50/40 border-[#0058be] ring-2 ring-[#0058be] shadow-sm'
+                    : 'bg-white border-slate-200 shadow-xs hover:border-slate-300 hover:shadow-sm'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Packet Loss Rate</span>
+                  {selectedCard === 'packetLoss' && (
+                    <span className="text-[9px] font-bold text-[#0058be] bg-blue-100/70 px-1.5 py-0.5 rounded">Selected</span>
+                  )}
+                </div>
+                <div className="text-2xl font-bold text-emerald-600 mt-1">
+                  {data?.networkMetrics?.averagePacketLossPct != null ? `${data.networkMetrics.averagePacketLossPct.toFixed(2)}%` : '0.00%'}
+                </div>
                 <div className="text-[11px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>Zero dropped frames across VPN mesh</span>
                 </div>
-              </div>
+              </button>
 
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Average Network Latency</span>
-                <div className="text-2xl font-bold text-[#0058be] mt-1">18ms</div>
+              {/* Card 3: Average Network Latency */}
+              <button
+                type="button"
+                onClick={() => handleCardClick('latency')}
+                onKeyDown={(e) => handleCardKeyDown(e, 'latency')}
+                aria-pressed={selectedCard === 'latency'}
+                className={`p-4 rounded-xl border text-left cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-[#0058be]/40 ${
+                  selectedCard === 'latency'
+                    ? 'bg-blue-50/40 border-[#0058be] ring-2 ring-[#0058be] shadow-sm'
+                    : 'bg-white border-slate-200 shadow-xs hover:border-slate-300 hover:shadow-sm'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Average Network Latency</span>
+                  {selectedCard === 'latency' && (
+                    <span className="text-[9px] font-bold text-[#0058be] bg-blue-100/70 px-1.5 py-0.5 rounded">Selected</span>
+                  )}
+                </div>
+                <div className="text-2xl font-bold text-[#0058be] mt-1">
+                  {data?.networkMetrics?.averageLatencyMs != null ? `${data.networkMetrics.averageLatencyMs}ms` : '18ms'}
+                </div>
                 <div className="text-[11px] text-slate-500 mt-1">Edge response &lt; 50ms SLA</div>
-              </div>
+              </button>
 
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hub Topology Status</span>
-                <div className="text-2xl font-bold text-slate-700 mt-1">3 Store Hubs</div>
+              {/* Card 4: Hub Topology Status */}
+              <button
+                type="button"
+                onClick={() => handleCardClick('topology')}
+                onKeyDown={(e) => handleCardKeyDown(e, 'topology')}
+                aria-pressed={selectedCard === 'topology'}
+                className={`p-4 rounded-xl border text-left cursor-pointer transition-all focus:outline-none focus:ring-2 focus:ring-[#0058be]/40 ${
+                  selectedCard === 'topology'
+                    ? 'bg-blue-50/40 border-[#0058be] ring-2 ring-[#0058be] shadow-sm'
+                    : 'bg-white border-slate-200 shadow-xs hover:border-slate-300 hover:shadow-sm'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Hub Topology Status</span>
+                  {selectedCard === 'topology' && (
+                    <span className="text-[9px] font-bold text-[#0058be] bg-blue-100/70 px-1.5 py-0.5 rounded">Selected</span>
+                  )}
+                </div>
+                <div className="text-2xl font-bold text-slate-700 mt-1">
+                  {data?.networkMetrics?.hubsSummary?.length ?? 3} Store Hubs
+                </div>
                 <div className="text-[11px] text-slate-500 mt-1">4 BEL • 2 DAV • 2 SHI</div>
-              </div>
+              </button>
             </div>
 
-            {/* Network Metrics Visualizations (Packet Loss + Latency Distribution) */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* Packet Loss Graph */}
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                      <Wifi className="w-4 h-4 text-emerald-600" />
-                      Packet Loss Stream (Real-Time 0.00% Target)
-                    </h3>
-                    <p className="text-[11px] text-slate-400">Zero degradation detected over fiber & 4G failover channels</p>
+            {/* If a card is selected: Focused Detail View */}
+            {selectedCard !== null ? (
+              <div className="space-y-4 animate-in fade-in duration-150">
+                {/* Navigation bar to return to default Network Health overview */}
+                <div className="flex items-center justify-between bg-white px-4 py-2.5 rounded-xl border border-slate-200 shadow-xs">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-slate-400 font-medium">Focused View:</span>
+                    <span className="font-bold text-[#0058be]">
+                      {selectedCard === 'terminals' && 'Active Terminals Status & Inventory'}
+                      {selectedCard === 'packetLoss' && 'Packet Loss Rate & Stream Diagnostics'}
+                      {selectedCard === 'latency' && 'Average Network Latency & SLA Distribution'}
+                      {selectedCard === 'topology' && 'Hub Topology & Mesh Connection Status'}
+                    </span>
+                    <span className="text-slate-300 hidden sm:inline">•</span>
+                    <span className="text-[11px] text-slate-500 hidden sm:inline">
+                      Click the card again or use the button to return
+                    </span>
                   </div>
-                  <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
-                    Optimal
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCard(null)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-[#0058be] bg-blue-50 hover:bg-blue-100 border border-blue-200/60 transition-colors"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Back to Overview</span>
+                  </button>
                 </div>
 
-                <div className="h-36 w-full pt-3">
-                  {isMounted && (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={data?.networkMetrics?.packetLossGraph || []} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="latencyGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
-                            <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
-                          </linearGradient>
-                        </defs>
-                        <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                        <YAxis domain={[0, 5]} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" />
-                        <Tooltip />
-                        <Area type="monotone" dataKey="lossPct" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#latencyGradient)" />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
-              </div>
+                {/* DETAIL 1: ACTIVE TERMINALS */}
+                {selectedCard === 'terminals' && (
+                  <div className="space-y-4">
+                    {/* Summary Strip */}
+                    <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+                      <div>
+                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                          <Server className="w-4 h-4 text-[#0058be]" />
+                          Terminal-Level Hardware Telemetry
+                        </h3>
+                        <p className="text-[11px] text-slate-400">
+                          Real-time ping, uptime, IP addresses, and daily punch ingestion
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 text-[11px]">
+                          {data?.networkMetrics?.onlineTerminals ?? 8} Online
+                        </span>
+                        <span className="px-2.5 py-1 rounded-md bg-slate-50 text-slate-600 font-semibold border border-slate-200 text-[11px]">
+                          {data?.networkMetrics?.offlineTerminals ?? 0} Offline
+                        </span>
+                        <span className="px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 font-semibold border border-amber-200 text-[11px]">
+                          {data?.networkMetrics?.maintenanceTerminals ?? 0} Maintenance
+                        </span>
+                      </div>
+                    </div>
 
-              {/* Latency Distribution Chart */}
-              <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                  <div>
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-[#0058be]" />
-                      Latency Distribution (All 8 Terminals)
-                    </h3>
-                    <p className="text-[11px] text-slate-400">Green range: &lt;50ms response ensures seamless facial unlock</p>
+                    {/* Terminal List Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {terminalsList.map((term, idx) => {
+                        const isMaintenance = maintenanceStates[term.id];
+                        const isOnline = term.status === 'ONLINE';
+                        const latencyColor =
+                          term.latency < 50
+                            ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
+                            : term.latency < 100
+                            ? 'text-amber-600 bg-amber-50 border-amber-200'
+                            : 'text-red-600 bg-red-50 border-red-200';
+
+                        return (
+                          <div
+                            key={`${term.id || idx}-${idx}`}
+                            className={`p-4 rounded-xl border bg-white shadow-xs space-y-3 transition-all hover:shadow-md ${
+                              isMaintenance ? 'border-amber-300 bg-amber-50/20' : 'border-slate-200'
+                            }`}
+                          >
+                            {/* Card Header with ID, Name, and Status */}
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span
+                                    className={`w-2 h-2 rounded-full ${
+                                      isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'
+                                    }`}
+                                  />
+                                  <span className="text-xs font-bold text-[#0b1c30]">{term.code}</span>
+                                  <span className="text-[10px] text-slate-400 font-mono">({term.id || 'Not available'})</span>
+                                </div>
+                                <h4 className="text-xs font-bold text-slate-800 line-clamp-1 mt-0.5">{term.name}</h4>
+                                <span className="text-[10px] text-slate-500 block">{term.location || 'Not available'}</span>
+                              </div>
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${latencyColor}`}>
+                                {term.latency != null ? `${term.latency}ms` : 'Not available'}
+                              </span>
+                            </div>
+
+                            {/* Detailed Specs Grid */}
+                            <div className="grid grid-cols-2 gap-2 text-[10px] bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                              <div>
+                                <span className="text-slate-400 block">Status:</span>
+                                <span
+                                  className={`font-semibold ${
+                                    isOnline ? 'text-emerald-700' : 'text-red-600'
+                                  }`}
+                                >
+                                  {isMaintenance ? 'MAINTENANCE' : term.status || 'Not available'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block">IP Address:</span>
+                                <span className="font-mono font-semibold text-slate-700">
+                                  {term.ipAddress || 'Not available'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block">Last Heartbeat:</span>
+                                <span className="font-semibold text-slate-700">
+                                  {term.heartbeat || 'Not available'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-slate-400 block">Uptime:</span>
+                                <span className="font-semibold text-emerald-700">
+                                  {term.uptime != null ? `${term.uptime}%` : 'Not available'}
+                                </span>
+                              </div>
+                              <div className="col-span-2">
+                                <span className="text-slate-400 block">Punches Logged Today:</span>
+                                <span className="font-semibold text-[#0058be]">
+                                  {term.punchesRecordedToday != null
+                                    ? `${term.punchesRecordedToday} events`
+                                    : 'Not available'}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Firmware & Badges */}
+                            <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-100">
+                              <span className="text-slate-500 font-mono">
+                                {term.firmwareVersion || 'Not available'}
+                              </span>
+                              {term.updateAvailable && (
+                                <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-bold border border-purple-200 flex items-center gap-1">
+                                  <Sparkles className="w-2.5 h-2.5" />
+                                  Update Available
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="grid grid-cols-3 gap-1 pt-1">
+                              <button
+                                onClick={() => handleRestart(term)}
+                                title="Restart Terminal"
+                                className="flex items-center justify-center gap-1 py-1 px-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition-colors"
+                              >
+                                <RotateCcw className="w-3 h-3 text-[#0058be]" />
+                                <span>Restart</span>
+                              </button>
+                              <button
+                                onClick={() => setSelectedCameraTerminal(term)}
+                                title="View Live Camera Feed"
+                                className="flex items-center justify-center gap-1 py-1 px-1.5 rounded bg-blue-50 hover:bg-blue-100 text-[#0058be] text-[10px] font-bold transition-colors"
+                              >
+                                <Camera className="w-3 h-3" />
+                                <span>Cam</span>
+                              </button>
+                              <button
+                                onClick={() => handleToggleMaintenance(term)}
+                                title="Toggle Maintenance Mode"
+                                className={`flex items-center justify-center gap-1 py-1 px-1.5 rounded text-[10px] font-bold transition-colors ${
+                                  isMaintenance
+                                    ? 'bg-amber-600 text-white'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                }`}
+                              >
+                                <Wrench className="w-3 h-3" />
+                                <span>{isMaintenance ? 'Active' : 'Maint'}</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <span className="px-2 py-0.5 rounded bg-blue-50 text-[#0058be] text-[10px] font-bold border border-blue-200">
-                    Avg 18ms
-                  </span>
-                </div>
+                )}
 
-                <div className="h-36 w-full pt-3">
-                  {isMounted && (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={data?.networkMetrics?.latencyDistribution || []} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
-                        <XAxis dataKey="bucket" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                        <Tooltip />
-                        <Bar dataKey="count" fill="#0058be" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* 8 Terminal Health Cards Grid */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
-                  <Server className="w-4 h-4 text-[#0058be]" />
-                  Edge Terminal Inventory & Telemetry (8 Units)
-                </h3>
-                <span className="text-[11px] text-slate-400">Firmware Auto-Sync Enabled</span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {data?.terminals.map((term, idx) => {
-                  const isMaintenance = maintenanceStates[term.id];
-                  const latencyColor =
-                    term.latency < 50
-                      ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
-                      : term.latency < 100
-                      ? 'text-amber-600 bg-amber-50 border-amber-200'
-                      : 'text-red-600 bg-red-50 border-red-200';
-
-                  return (
+                {/* DETAIL 2: PACKET LOSS RATE */}
+                {selectedCard === 'packetLoss' && (
+                  <div className="space-y-4">
+                    {/* Threshold Alert / SLA Status Banner */}
                     <div
-                      key={`${term.id || idx}-${idx}`}
-                      className={`p-4 rounded-xl border bg-white shadow-xs space-y-3 transition-all hover:shadow-md ${
-                        isMaintenance ? 'border-amber-300 bg-amber-50/20' : 'border-slate-200'
+                      className={`p-4 rounded-xl border flex items-center justify-between text-xs ${
+                        exceedingLossTerminals.length === 0
+                          ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                          : 'bg-red-50 border-red-200 text-red-900'
                       }`}
                     >
-                      {/* Card Header */}
-                      <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        {exceedingLossTerminals.length === 0 ? (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+                        )}
                         <div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                            <span className="text-xs font-bold text-[#0b1c30]">{term.code}</span>
-                          </div>
-                          <h4 className="text-xs font-bold text-slate-800 line-clamp-1 mt-0.5">{term.name}</h4>
-                          <span className="text-[10px] text-slate-400">{term.location}</span>
+                          <span className="font-bold text-sm block">
+                            {exceedingLossTerminals.length === 0
+                              ? 'Zero Packet Loss Detected — Network Optimal'
+                              : `${exceedingLossTerminals.length} Terminal(s) Exceeding Packet Loss Threshold`}
+                          </span>
+                          <span className="text-[11px] opacity-80">
+                            {exceedingLossTerminals.length === 0
+                              ? 'All 8 edge biometric terminals comply with the < 1.00% packet-loss SLA. Zero dropped frames.'
+                              : `Degraded terminals: ${exceedingLossTerminals.map(t => `${t.code} (${t.packetLoss}%)`).join(', ')}`}
+                          </span>
                         </div>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${latencyColor}`}>
-                          {term.latency}ms
+                      </div>
+                      <span
+                        className={`px-3 py-1 rounded-full font-bold text-xs border ${
+                          exceedingLossTerminals.length === 0
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : 'bg-red-100 text-red-800 border-red-300'
+                        }`}
+                      >
+                        {exceedingLossTerminals.length === 0 ? 'SLA Compliant' : 'Threshold Exceeded'}
+                      </span>
+                    </div>
+
+                    {/* Packet Transmission Metrics Strip */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Overall Packet Loss
+                        </span>
+                        <div className="text-2xl font-bold text-emerald-600 mt-1">
+                          {avgPacketLoss != null ? `${avgPacketLoss.toFixed(2)}%` : '0.00%'}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1">Fleet average loss</div>
+                      </div>
+
+                      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Packets Sent
+                        </span>
+                        <div className="text-2xl font-bold text-[#0b1c30] mt-1">
+                          {data?.networkMetrics?.packetsSent != null
+                            ? data.networkMetrics.packetsSent.toLocaleString()
+                            : 'Not available'}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1">Total ping packets transmitted</div>
+                      </div>
+
+                      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Packets Received
+                        </span>
+                        <div className="text-2xl font-bold text-emerald-600 mt-1">
+                          {data?.networkMetrics?.packetsReceived != null
+                            ? data.networkMetrics.packetsReceived.toLocaleString()
+                            : 'Not available'}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1">Telemetry responses acknowledged</div>
+                      </div>
+
+                      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Packets Dropped
+                        </span>
+                        <div className="text-2xl font-bold text-slate-700 mt-1">
+                          {data?.networkMetrics?.packetsDropped != null
+                            ? data.networkMetrics.packetsDropped.toLocaleString()
+                            : 'Not available'}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1">Acceptable SLA limit: 0</div>
+                      </div>
+                    </div>
+
+                    {/* Packet Loss Trend Graph */}
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div>
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                            <Wifi className="w-4 h-4 text-emerald-600" />
+                            Packet Loss Trend &amp; Telemetry Stream
+                          </h3>
+                          <p className="text-[11px] text-slate-400">
+                            Time-series packet loss percentage sampled across VPN mesh
+                          </p>
+                        </div>
+                        <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+                          Target: 0.00%
                         </span>
                       </div>
 
-                      {/* Device Specs & Vital stats */}
-                      <div className="grid grid-cols-2 gap-2 text-[10px] bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                        <div>
-                          <span className="text-slate-400 block">IP Address:</span>
-                          <span className="font-mono font-semibold text-slate-700">{term.ipAddress}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block">Heartbeat:</span>
-                          <span className="font-semibold text-slate-700">{term.heartbeat}</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block">Uptime Today:</span>
-                          <span className="font-semibold text-emerald-700">{term.uptime}%</span>
-                        </div>
-                        <div>
-                          <span className="text-slate-400 block">Punches Logged:</span>
-                          <span className="font-semibold text-[#0058be]">{term.punchesRecordedToday}</span>
-                        </div>
-                      </div>
-
-                      {/* Firmware & Badges */}
-                      <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-100">
-                        <span className="text-slate-500 font-mono">{term.firmwareVersion}</span>
-                        {term.updateAvailable && (
-                          <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-bold border border-purple-200 flex items-center gap-1">
-                            <Sparkles className="w-2.5 h-2.5" />
-                            Update Available
-                          </span>
+                      <div className="h-44 w-full pt-3">
+                        {isMounted && (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart
+                              data={data?.networkMetrics?.packetLossGraph || []}
+                              margin={{ top: 5, right: 10, left: -25, bottom: 0 }}
+                            >
+                              <defs>
+                                <linearGradient id="packetLossDetailGradient" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                                  <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                                </linearGradient>
+                              </defs>
+                              <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                              <YAxis domain={[0, 5]} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" />
+                              <Tooltip />
+                              <Area
+                                type="monotone"
+                                dataKey="lossPct"
+                                stroke="#10b981"
+                                strokeWidth={2.5}
+                                fillOpacity={1}
+                                fill="url(#packetLossDetailGradient)"
+                              />
+                            </AreaChart>
+                          </ResponsiveContainer>
                         )}
                       </div>
 
-                      {/* Quick Actions Buttons */}
-                      <div className="grid grid-cols-3 gap-1 pt-1">
-                        <button
-                          onClick={() => handleRestart(term)}
-                          title="Restart Terminal"
-                          className="flex items-center justify-center gap-1 py-1 px-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition-colors"
-                        >
-                          <RotateCcw className="w-3 h-3 text-[#0058be]" />
-                          <span>Restart</span>
-                        </button>
-                        <button
-                          onClick={() => setSelectedCameraTerminal(term)}
-                          title="View Live Camera Feed"
-                          className="flex items-center justify-center gap-1 py-1 px-1.5 rounded bg-blue-50 hover:bg-blue-100 text-[#0058be] text-[10px] font-bold transition-colors"
-                        >
-                          <Camera className="w-3 h-3" />
-                          <span>Cam</span>
-                        </button>
-                        <button
-                          onClick={() => handleToggleMaintenance(term)}
-                          title="Toggle Maintenance Mode"
-                          className={`flex items-center justify-center gap-1 py-1 px-1.5 rounded text-[10px] font-bold transition-colors ${
-                            isMaintenance
-                              ? 'bg-amber-600 text-white'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }`}
-                        >
-                          <Wrench className="w-3 h-3" />
-                          <span>{isMaintenance ? 'Active' : 'Maint'}</span>
-                        </button>
+                      {/* Time points strip */}
+                      <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-3 sm:grid-cols-6 gap-2 text-center text-xs">
+                        {(data?.networkMetrics?.packetLossGraph || []).map((pt, i) => (
+                          <div key={i} className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                            <span className="text-[10px] text-slate-400 block">{pt.time}</span>
+                            <span className="font-bold text-emerald-700 text-xs">{pt.lossPct.toFixed(2)}% loss</span>
+                            <span className="text-[10px] text-slate-500 block">{pt.latency}ms</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  );
-                })}
+
+                    {/* Per-Terminal Packet Loss Table */}
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                      <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                          <Network className="w-4 h-4 text-[#0058be]" />
+                          Per-Terminal Packet Loss Diagnostics (8 Units)
+                        </h3>
+                        <span className="text-[11px] text-slate-400">Acceptable SLA Threshold: &le; 1.00%</span>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                            <tr>
+                              <th className="px-4 py-3">Terminal</th>
+                              <th className="px-4 py-3">Location &amp; IP</th>
+                              <th className="px-4 py-3">Packet Loss</th>
+                              <th className="px-4 py-3">Threshold Status</th>
+                              <th className="px-4 py-3">Latency</th>
+                              <th className="px-4 py-3">Heartbeat</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {terminalsList.map((term, i) => {
+                              const exceeds = typeof term.packetLoss === 'number' && term.packetLoss > acceptableLossThreshold;
+                              return (
+                                <tr key={term.id || i} className="hover:bg-slate-50/70 transition-colors">
+                                  <td className="px-4 py-3 font-semibold text-slate-800">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-mono font-bold text-[#0058be]">{term.code}</span>
+                                      <span className="text-slate-500 font-normal">— {term.name}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 text-slate-500">
+                                    <div>{term.location || 'Not available'}</div>
+                                    <span className="font-mono text-[10px] text-slate-400">{term.ipAddress || 'Not available'}</span>
+                                  </td>
+                                  <td className="px-4 py-3 font-mono font-bold text-slate-800">
+                                    {term.packetLoss != null ? `${term.packetLoss.toFixed(2)}%` : 'Not available'}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    {exceeds ? (
+                                      <span className="px-2 py-0.5 rounded bg-red-50 text-red-700 text-[10px] font-bold border border-red-200 inline-flex items-center gap-1">
+                                        <AlertTriangle className="w-3 h-3" />
+                                        Exceeds Threshold (&gt; 1.0%)
+                                      </span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200 inline-flex items-center gap-1">
+                                        <CheckCircle2 className="w-3 h-3" />
+                                        Within SLA (&le; 1.0%)
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-3 font-mono text-slate-700">
+                                    {term.latency != null ? `${term.latency}ms` : 'Not available'}
+                                  </td>
+                                  <td className="px-4 py-3 text-slate-500">
+                                    {term.heartbeat || 'Not available'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* DETAIL 3: AVERAGE NETWORK LATENCY */}
+                {selectedCard === 'latency' && (
+                  <div className="space-y-4">
+                    {/* SLA Status Banner */}
+                    <div
+                      className={`p-4 rounded-xl border flex items-center justify-between text-xs ${
+                        slaStatus === 'Healthy'
+                          ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                          : slaStatus === 'Warning'
+                          ? 'bg-amber-50 border-amber-200 text-amber-900'
+                          : 'bg-red-50 border-red-200 text-red-900'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        {slaStatus === 'Healthy' ? (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                        ) : slaStatus === 'Warning' ? (
+                          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+                        )}
+                        <div>
+                          <span className="font-bold text-sm block">
+                            Network Latency SLA Status: {slaStatus}
+                          </span>
+                          <span className="text-[11px] opacity-80">
+                            {slaStatus === 'Healthy'
+                              ? 'Edge facial biometric verification SLA requires round-trip latency < 50ms. Current average is 18ms.'
+                              : slaStatus === 'Warning'
+                              ? 'Fleet latency is approaching warning threshold (50ms - 100ms).'
+                              : 'Network latency degraded beyond 100ms SLA target.'}
+                          </span>
+                        </div>
+                      </div>
+                      <span
+                        className={`px-3 py-1 rounded-full font-bold text-xs border ${
+                          slaStatus === 'Healthy'
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : slaStatus === 'Warning'
+                            ? 'bg-amber-100 text-amber-800 border-amber-300'
+                            : 'bg-red-100 text-red-800 border-red-300'
+                        }`}
+                      >
+                        {slaStatus === 'Healthy' ? '< 50ms Compliant' : `${avgLatency}ms Status`}
+                      </span>
+                    </div>
+
+                    {/* Latency Stats Strip */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Overall Average Latency
+                        </span>
+                        <div className="text-2xl font-bold text-[#0058be] mt-1">
+                          {avgLatency != null ? `${avgLatency}ms` : '18ms'}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1">Across all 8 edge nodes</div>
+                      </div>
+
+                      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Minimum Latency
+                        </span>
+                        <div className="text-2xl font-bold text-emerald-600 mt-1">
+                          {minLatency != null ? `${minLatency}ms` : 'Not available'}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1">Fastest terminal response</div>
+                      </div>
+
+                      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          Maximum Latency
+                        </span>
+                        <div className="text-2xl font-bold text-slate-700 mt-1">
+                          {maxLatency != null ? `${maxLatency}ms` : 'Not available'}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1">Highest terminal response</div>
+                      </div>
+
+                      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          SLA Threshold
+                        </span>
+                        <div className="text-2xl font-bold text-slate-700 mt-1">&lt; 50ms</div>
+                        <div className="text-[11px] text-emerald-700 font-semibold mt-1">
+                          Sub-second face unlock SLA
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Latency Distribution Visualization */}
+                    <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+                      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                        <div>
+                          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-[#0058be]" />
+                            Latency Distribution &amp; Trend Histogram
+                          </h3>
+                          <p className="text-[11px] text-slate-400">
+                            Breakdown of terminals by response latency bucket
+                          </p>
+                        </div>
+                        <span className="px-2 py-0.5 rounded bg-blue-50 text-[#0058be] text-[10px] font-bold border border-blue-200">
+                          Avg {avgLatency}ms
+                        </span>
+                      </div>
+
+                      <div className="h-44 w-full pt-3">
+                        {isMounted && (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={data?.networkMetrics?.latencyDistribution || []}
+                              margin={{ top: 5, right: 10, left: -25, bottom: 0 }}
+                            >
+                              <XAxis dataKey="bucket" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                              <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                              <Tooltip />
+                              <Bar dataKey="count" fill="#0058be" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        )}
+                      </div>
+
+                      {/* Bucket summary pills */}
+                      <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-xs">
+                        {(data?.networkMetrics?.latencyDistribution || []).map((b, i) => (
+                          <div key={i} className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                            <span className="text-[10px] text-slate-400 block truncate">{b.bucket}</span>
+                            <span className="font-bold text-slate-800 text-sm">{b.count} Terminals</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Per-Terminal Current Latency List */}
+                    <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+                      <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                          <Server className="w-4 h-4 text-[#0058be]" />
+                          Per-Terminal Current Latency (8 Units)
+                        </h3>
+                        <span className="text-[11px] text-slate-400">Target: &lt; 50ms Edge Response</span>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
+                            <tr>
+                              <th className="px-4 py-3">Terminal</th>
+                              <th className="px-4 py-3">Location &amp; IP</th>
+                              <th className="px-4 py-3">Current Latency</th>
+                              <th className="px-4 py-3">SLA Health Category</th>
+                              <th className="px-4 py-3">Variance vs Avg ({avgLatency}ms)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {terminalsList.map((term, i) => {
+                              const diff = term.latency - avgLatency;
+                              const diffText = diff > 0 ? `+${diff}ms` : `${diff}ms`;
+                              const category =
+                                term.latency < 50
+                                  ? { label: 'Optimal (< 50ms)', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+                                  : term.latency <= 100
+                                  ? { label: 'Warning (50-100ms)', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
+                                  : { label: 'Degraded (> 100ms)', cls: 'bg-red-50 text-red-700 border-red-200' };
+
+                              return (
+                                <tr key={term.id || i} className="hover:bg-slate-50/70 transition-colors">
+                                  <td className="px-4 py-3 font-semibold text-slate-800">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-mono font-bold text-[#0058be]">{term.code}</span>
+                                      <span className="text-slate-500 font-normal">— {term.name}</span>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 text-slate-500">
+                                    <div>{term.location || 'Not available'}</div>
+                                    <span className="font-mono text-[10px] text-slate-400">{term.ipAddress || 'Not available'}</span>
+                                  </td>
+                                  <td className="px-4 py-3 font-mono font-bold text-slate-800">
+                                    {term.latency != null ? `${term.latency}ms` : 'Not available'}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${category.cls}`}>
+                                      {category.label}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 font-mono text-[11px] text-slate-500">
+                                    {term.latency != null ? diffText : 'Not available'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* DETAIL 4: HUB TOPOLOGY STATUS */}
+                {selectedCard === 'topology' && (
+                  <div className="space-y-4">
+                    {/* Topology Overview & Mesh Connection Diagnostics */}
+                    <div
+                      className={`p-4 rounded-xl border flex items-center justify-between text-xs ${
+                        degradedOrDisconnected.length === 0
+                          ? 'bg-emerald-50/70 border-emerald-200 text-emerald-900'
+                          : 'bg-amber-50 border-amber-200 text-amber-900'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        {degradedOrDisconnected.length === 0 ? (
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                        )}
+                        <div>
+                          <span className="font-bold text-sm block">
+                            {degradedOrDisconnected.length === 0
+                              ? 'All 3 Regional Hubs & Mesh Links Healthy'
+                              : `${degradedOrDisconnected.length} Degraded or Disconnected Link(s) Detected`}
+                          </span>
+                          <span className="text-[11px] opacity-80">
+                            {degradedOrDisconnected.length === 0
+                              ? 'Zero disconnected or degraded connections across Karnataka edge hubs. Full mesh routing active.'
+                              : `Degraded connection points: ${degradedOrDisconnected.map(t => `${t.code} (${t.location})`).join(', ')}`}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="px-3 py-1 rounded-full font-bold text-xs bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        {data?.networkMetrics?.hubsSummary?.length ?? 3} Hubs Active
+                      </span>
+                    </div>
+
+                    {/* Hub Topology Cards with Terminal-to-Hub Relationships */}
+                    <div className="space-y-4">
+                      {(data?.networkMetrics?.hubsSummary || []).map((hub, hubIdx) => {
+                        // Match terminals connected to this hub based on code prefix or hub name
+                        const hubTerminals = terminalsList.filter(t => {
+                          if (hub.hub.includes('BEL') || hub.hub.toLowerCase().includes('belagavi')) {
+                            return t.code.startsWith('BEL');
+                          }
+                          if (hub.hub.includes('DAV') || hub.hub.toLowerCase().includes('davanagere')) {
+                            return t.code.startsWith('DAV');
+                          }
+                          if (hub.hub.includes('SHI') || hub.hub.toLowerCase().includes('shivamogga')) {
+                            return t.code.startsWith('SHI');
+                          }
+                          return t.location.toLowerCase().includes(hub.hub.toLowerCase().slice(0, 4));
+                        });
+
+                        const onlineCount = hubTerminals.filter(t => t.status === 'ONLINE').length;
+                        const offlineCount = hubTerminals.filter(t => t.status === 'OFFLINE').length;
+                        const maintCount = hubTerminals.filter(t => maintenanceStates[t.id]).length;
+
+                        return (
+                          <div key={hubIdx} className="bg-white rounded-xl border border-slate-200 shadow-xs p-5 space-y-4">
+                            {/* Hub Header */}
+                            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-[#eff4ff] text-[#0058be] flex items-center justify-center font-bold">
+                                  <Router className="w-5 h-5" />
+                                </div>
+                                <div>
+                                  <h4 className="text-sm font-bold text-[#0b1c30]">{hub.hub}</h4>
+                                  <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                                    <span>{hubTerminals.length} Connected Terminals</span>
+                                    <span>•</span>
+                                    <span className="text-emerald-700 font-semibold">{onlineCount} Online</span>
+                                    <span>•</span>
+                                    <span>{offlineCount} Offline</span>
+                                    {maintCount > 0 && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="text-amber-700 font-semibold">{maintCount} Maintenance</span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1">
+                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                  <span>{hub.status || 'All Online'}</span>
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Terminal-to-Hub Relationships */}
+                            <div>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">
+                                Connected Edge Terminal Nodes ({hubTerminals.length})
+                              </span>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {hubTerminals.map((term, tIdx) => {
+                                  const isMaint = maintenanceStates[term.id];
+                                  const isDisconnected = term.status === 'OFFLINE';
+                                  const isDegraded = term.latency > 50;
+
+                                  const linkState = isDisconnected
+                                    ? { label: 'Disconnected Link', cls: 'text-red-700 bg-red-50 border-red-200' }
+                                    : isDegraded
+                                    ? { label: 'Degraded Link', cls: 'text-amber-700 bg-amber-50 border-amber-200' }
+                                    : { label: 'Active Link (Optimal)', cls: 'text-emerald-700 bg-emerald-50 border-emerald-200' };
+
+                                  return (
+                                    <div
+                                      key={term.id || tIdx}
+                                      className={`p-3 rounded-lg border text-xs space-y-2 bg-slate-50/60 ${
+                                        isMaint ? 'border-amber-300 bg-amber-50/20' : 'border-slate-200'
+                                      }`}
+                                    >
+                                      <div className="flex items-start justify-between">
+                                        <div>
+                                          <div className="flex items-center gap-1.5">
+                                            <span
+                                              className={`w-2 h-2 rounded-full ${
+                                                term.status === 'ONLINE' ? 'bg-emerald-500' : 'bg-red-500'
+                                              }`}
+                                            />
+                                            <span className="font-bold text-[#0b1c30]">{term.code}</span>
+                                            <span className="text-[10px] font-mono text-slate-400">({term.id || 'Not available'})</span>
+                                          </div>
+                                          <h5 className="font-medium text-slate-700 mt-0.5 line-clamp-1">{term.name}</h5>
+                                          <span className="text-[10px] text-slate-400">{term.location || 'Not available'}</span>
+                                        </div>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${linkState.cls}`}>
+                                          {linkState.label}
+                                        </span>
+                                      </div>
+
+                                      <div className="grid grid-cols-3 gap-2 text-[10px] bg-white p-2 rounded border border-slate-100">
+                                        <div>
+                                          <span className="text-slate-400 block">IP:</span>
+                                          <span className="font-mono font-semibold text-slate-700">{term.ipAddress || 'Not available'}</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-slate-400 block">Latency:</span>
+                                          <span className="font-mono font-semibold text-[#0058be]">
+                                            {term.latency != null ? `${term.latency}ms` : 'Not available'}
+                                          </span>
+                                        </div>
+                                        <div>
+                                          <span className="text-slate-400 block">Punches:</span>
+                                          <span className="font-semibold text-slate-700">
+                                            {term.punchesRecordedToday != null ? term.punchesRecordedToday : 'Not available'}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      {/* Quick Actions */}
+                                      <div className="flex items-center justify-end gap-1 pt-1">
+                                        <button
+                                          onClick={() => handleRestart(term)}
+                                          className="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition-colors"
+                                        >
+                                          Restart
+                                        </button>
+                                        <button
+                                          onClick={() => setSelectedCameraTerminal(term)}
+                                          className="px-2 py-0.5 rounded bg-blue-50 hover:bg-blue-100 text-[#0058be] text-[10px] font-bold transition-colors"
+                                        >
+                                          Cam
+                                        </button>
+                                        <button
+                                          onClick={() => handleToggleMaintenance(term)}
+                                          className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${
+                                            isMaint ? 'bg-amber-600 text-white' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                          }`}
+                                        >
+                                          {isMaint ? 'Active' : 'Maint'}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
+            ) : (
+              /* DEFAULT OVERVIEW (Network Visualizations + 8 Terminal Inventory Cards) */
+              <>
+                {/* Network Metrics Visualizations (Packet Loss + Latency Distribution) */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Packet Loss Graph */}
+                  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                          <Wifi className="w-4 h-4 text-emerald-600" />
+                          Packet Loss Stream (Real-Time 0.00% Target)
+                        </h3>
+                        <p className="text-[11px] text-slate-400">Zero degradation detected over fiber &amp; 4G failover channels</p>
+                      </div>
+                      <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
+                        Optimal
+                      </span>
+                    </div>
+
+                    <div className="h-36 w-full pt-3">
+                      {isMounted && (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={data?.networkMetrics?.packetLossGraph || []} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="latencyGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                                <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                              </linearGradient>
+                            </defs>
+                            <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                            <YAxis domain={[0, 5]} tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} unit="%" />
+                            <Tooltip />
+                            <Area type="monotone" dataKey="lossPct" stroke="#10b981" strokeWidth={2.5} fillOpacity={1} fill="url(#latencyGradient)" />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Latency Distribution Chart */}
+                  <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div>
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                          <Zap className="w-4 h-4 text-[#0058be]" />
+                          Latency Distribution (All 8 Terminals)
+                        </h3>
+                        <p className="text-[11px] text-slate-400">Green range: &lt;50ms response ensures seamless facial unlock</p>
+                      </div>
+                      <span className="px-2 py-0.5 rounded bg-blue-50 text-[#0058be] text-[10px] font-bold border border-blue-200">
+                        Avg 18ms
+                      </span>
+                    </div>
+
+                    <div className="h-36 w-full pt-3">
+                      {isMounted && (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={data?.networkMetrics?.latencyDistribution || []} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+                            <XAxis dataKey="bucket" tick={{ fontSize: 9, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                            <YAxis tick={{ fontSize: 10, fill: '#64748b' }} axisLine={false} tickLine={false} />
+                            <Tooltip />
+                            <Bar dataKey="count" fill="#0058be" radius={[4, 4, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 8 Terminal Health Cards Grid */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
+                      <Server className="w-4 h-4 text-[#0058be]" />
+                      Edge Terminal Inventory &amp; Telemetry (8 Units)
+                    </h3>
+                    <span className="text-[11px] text-slate-400">Firmware Auto-Sync Enabled</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {data?.terminals.map((term, idx) => {
+                      const isMaintenance = maintenanceStates[term.id];
+                      const latencyColor =
+                        term.latency < 50
+                          ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
+                          : term.latency < 100
+                          ? 'text-amber-600 bg-amber-50 border-amber-200'
+                          : 'text-red-600 bg-red-50 border-red-200';
+
+                      return (
+                        <div
+                          key={`${term.id || idx}-${idx}`}
+                          className={`p-4 rounded-xl border bg-white shadow-xs space-y-3 transition-all hover:shadow-md ${
+                            isMaintenance ? 'border-amber-300 bg-amber-50/20' : 'border-slate-200'
+                          }`}
+                        >
+                          {/* Card Header */}
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                <span className="text-xs font-bold text-[#0b1c30]">{term.code}</span>
+                              </div>
+                              <h4 className="text-xs font-bold text-slate-800 line-clamp-1 mt-0.5">{term.name}</h4>
+                              <span className="text-[10px] text-slate-400">{term.location}</span>
+                            </div>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${latencyColor}`}>
+                              {term.latency}ms
+                            </span>
+                          </div>
+
+                          {/* Device Specs & Vital stats */}
+                          <div className="grid grid-cols-2 gap-2 text-[10px] bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                            <div>
+                              <span className="text-slate-400 block">IP Address:</span>
+                              <span className="font-mono font-semibold text-slate-700">{term.ipAddress}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block">Heartbeat:</span>
+                              <span className="font-semibold text-slate-700">{term.heartbeat}</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block">Uptime Today:</span>
+                              <span className="font-semibold text-emerald-700">{term.uptime}%</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-400 block">Punches Logged:</span>
+                              <span className="font-semibold text-[#0058be]">{term.punchesRecordedToday}</span>
+                            </div>
+                          </div>
+
+                          {/* Firmware & Badges */}
+                          <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-100">
+                            <span className="text-slate-500 font-mono">{term.firmwareVersion}</span>
+                            {term.updateAvailable && (
+                              <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-bold border border-purple-200 flex items-center gap-1">
+                                <Sparkles className="w-2.5 h-2.5" />
+                                Update Available
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Quick Actions Buttons */}
+                          <div className="grid grid-cols-3 gap-1 pt-1">
+                            <button
+                              onClick={() => handleRestart(term)}
+                              title="Restart Terminal"
+                              className="flex items-center justify-center gap-1 py-1 px-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition-colors"
+                            >
+                              <RotateCcw className="w-3 h-3 text-[#0058be]" />
+                              <span>Restart</span>
+                            </button>
+                            <button
+                              onClick={() => setSelectedCameraTerminal(term)}
+                              title="View Live Camera Feed"
+                              className="flex items-center justify-center gap-1 py-1 px-1.5 rounded bg-blue-50 hover:bg-blue-100 text-[#0058be] text-[10px] font-bold transition-colors"
+                            >
+                              <Camera className="w-3 h-3" />
+                              <span>Cam</span>
+                            </button>
+                            <button
+                              onClick={() => handleToggleMaintenance(term)}
+                              title="Toggle Maintenance Mode"
+                              className={`flex items-center justify-center gap-1 py-1 px-1.5 rounded text-[10px] font-bold transition-colors ${
+                                isMaintenance
+                                  ? 'bg-amber-600 text-white'
+                                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                              }`}
+                            >
+                              <Wrench className="w-3 h-3" />
+                              <span>{isMaintenance ? 'Active' : 'Maint'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
           </>
         )}
       </div>
@@ -434,6 +1335,7 @@ export function TerminalsDetail({
               </div>
               <button
                 onClick={() => setSelectedCameraTerminal(null)}
+                aria-label="Close camera preview"
                 className="p-1 rounded-lg text-slate-400 hover:bg-slate-200"
               >
                 <X className="w-5 h-5" />

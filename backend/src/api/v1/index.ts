@@ -39,10 +39,12 @@ import myDeskRouter from '../../routes/myDesk.js';
 import localDatabaseRoutes from '../../routes/localDatabase.js';
 import analysisRoutes from '../../routes/analysis.js';
 import employeeImportRoutes, { employeeExportRouter } from '../../routes/employeeImport.js';
+import searchRoutes from '../../routes/search.js';
 
 export const apiV1Router = Router();
 
 // Domain Route Mounting under /api/v1 (or /api for backwards compatibility)
+apiV1Router.use('/search', searchRoutes);
 apiV1Router.use('/analysis', analysisRoutes);
 apiV1Router.use('/system', localDatabaseRoutes);
 apiV1Router.use('/my-desk', myDeskRouter);

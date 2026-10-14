@@ -369,15 +369,44 @@ export function AddEmployeeDialog({
 
       setIsSubmitting(false);
       const apiErrorMsg = err?.response?.data?.error || err?.response?.data?.message;
+      const apiDetails: string[] = Array.isArray(err?.response?.data?.details) ? err.response.data.details : [];
 
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Add Employee error:', err);
+      // Avoid polluting console with red error overlay on standard validation/conflict responses (400, 409, 422)
+      if (err?.response?.status && err.response.status >= 400 && err.response.status < 500) {
+        console.warn('[AddEmployeeDialog] Client validation/conflict response:', apiErrorMsg, apiDetails);
+      } else if (process.env.NODE_ENV === 'development') {
+        console.error('Add Employee server error:', err);
       }
 
+      // 1. Map Zod validation details to specific fields if present
+      if (apiDetails.length > 0) {
+        const fieldErrors: FormErrors = {};
+        for (const detail of apiDetails) {
+          const lower = detail.toLowerCase();
+          const cleanMsg = detail.includes(':') ? detail.split(':').slice(1).join(':').trim() : detail;
+          if (lower.includes('email')) {
+            fieldErrors.email = cleanMsg || 'Please enter a valid email address.';
+          } else if (lower.includes('phone') || lower.includes('mobile')) {
+            fieldErrors.phone = cleanMsg || 'Please enter a valid 10-digit mobile number.';
+          } else if (lower.includes('locationid')) {
+            fieldErrors.locationId = 'Please select a valid store location.';
+          } else if (lower.includes('firstname')) {
+            fieldErrors.firstName = cleanMsg || 'First name is required.';
+          } else if (lower.includes('lastname')) {
+            fieldErrors.lastName = cleanMsg || 'Last name is required.';
+          }
+        }
+        if (Object.keys(fieldErrors).length > 0) {
+          setErrors((prev) => ({ ...prev, ...fieldErrors }));
+          return;
+        }
+      }
+
+      // 2. Handle specific uniqueness conflicts
       if (apiErrorMsg && apiErrorMsg.toLowerCase().includes('email')) {
         setErrors((prev) => ({
           ...prev,
-          email: 'This email is already registered.',
+          email: 'This email is already registered. Please use another email address.',
         }));
       } else if (
         apiErrorMsg &&
@@ -385,9 +414,12 @@ export function AddEmployeeDialog({
       ) {
         setErrors((prev) => ({
           ...prev,
-          phone: apiErrorMsg.toLowerCase().includes('already')
-            ? 'This mobile number is already registered.'
-            : apiErrorMsg,
+          phone: 'This mobile number is already registered. Please enter a different number.',
+        }));
+      } else if (apiErrorMsg && apiErrorMsg.toLowerCase().includes('code')) {
+        setErrors((prev) => ({
+          ...prev,
+          general: 'Employee code collision detected. Please click Retry to auto-generate a new code.',
         }));
       } else if (apiErrorMsg) {
         setErrors((prev) => ({
@@ -397,7 +429,7 @@ export function AddEmployeeDialog({
       } else {
         setErrors((prev) => ({
           ...prev,
-          general: 'Could not add employee. Check the details and try again.',
+          general: 'Could not add employee. Please check the details and try again.',
         }));
       }
     }

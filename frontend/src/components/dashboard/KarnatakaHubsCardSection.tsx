@@ -57,15 +57,9 @@ interface KarnatakaHubsCardSectionProps {
   selectedHub: string;
   onSelectHub: (hubCode: string) => void;
   selectedShiftLabel?: string;
-  selectedDeptLabel?: string;
 }
 
-export function KarnatakaHubsCardSection({
-  selectedHub,
-  onSelectHub,
-  selectedShiftLabel,
-  selectedDeptLabel,
-}: KarnatakaHubsCardSectionProps) {
+export function KarnatakaHubsCardSection({ selectedHub, onSelectHub, selectedShiftLabel }: KarnatakaHubsCardSectionProps) {
   const [hubs, setHubs] = useState<HubCard[]>(INITIAL_HUBS);
   const [showModal, setShowModal] = useState(false);
   const [editingHub, setEditingHub] = useState<HubCard | null>(null);
@@ -174,11 +168,6 @@ export function KarnatakaHubsCardSection({
           {selectedShiftLabel && (
             <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 border border-blue-200 dark:border-blue-900 animate-in fade-in">
               Shift: {selectedShiftLabel}
-            </span>
-          )}
-          {selectedDeptLabel && (
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 border border-blue-200 dark:border-blue-900 animate-in fade-in">
-              Dept: {selectedDeptLabel}
             </span>
           )}
         </div>

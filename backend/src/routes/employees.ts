@@ -427,11 +427,15 @@ router.post('/', authorize('ADD'), validate(employeeSchema), async (req: AuthReq
         }
       }
       finalCode = `TEST-EMP-${String(maxNum + 1).padStart(3, '0')}`;
-    }
-
-    const existing = await prisma.employee.findUnique({ where: { employeeCode: finalCode } });
-    if (existing) {
-      return res.status(400).json({ error: 'Employee code already exists' });
+      while (await prisma.employee.findUnique({ where: { employeeCode: finalCode } })) {
+        maxNum++;
+        finalCode = `TEST-EMP-${String(maxNum + 1).padStart(3, '0')}`;
+      }
+    } else {
+      const existing = await prisma.employee.findUnique({ where: { employeeCode: finalCode } });
+      if (existing) {
+        return res.status(400).json({ error: 'Employee code already exists' });
+      }
     }
     
     const fullName = `${String(firstName).trim()} ${String(lastName).trim()}`;

@@ -464,8 +464,12 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
       }
     }
     if (status && status !== 'all') where.status = status;
-    if (departmentId && departmentId !== 'all') {
-      where.employee = { ...(where.employee || {}), departmentId: String(departmentId) };
+    if (departmentId && departmentId !== 'all' && departmentId !== 'ALL') {
+      if (String(departmentId).includes(',')) {
+        where.employee = { ...(where.employee || {}), departmentId: { in: String(departmentId).split(',').map((s: string) => s.trim()).filter(Boolean) } };
+      } else {
+        where.employee = { ...(where.employee || {}), departmentId: String(departmentId) };
+      }
     }
     // Date filters are normalised to strict yyyy-mm-dd strings so that
     // DATE column comparisons never drift with server/client timezone.

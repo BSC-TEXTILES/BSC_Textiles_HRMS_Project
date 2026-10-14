@@ -61,11 +61,19 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
       sellingPointWhere.locationId = locationId;
     }
 
-    if (departmentId) {
-      employeeWhere.departmentId = departmentId;
-      attendanceWhere.employee = { ...(attendanceWhere.employee || {}), departmentId };
-      incentiveWhere.employee = { ...(incentiveWhere.employee || {}), departmentId };
-      penaltyWhere.employee = { ...(penaltyWhere.employee || {}), departmentId };
+    if (departmentId && departmentId !== 'all' && departmentId !== 'ALL') {
+      if (departmentId.includes(',')) {
+        const idList = departmentId.split(',').map((s: string) => s.trim()).filter(Boolean);
+        employeeWhere.departmentId = { in: idList };
+        attendanceWhere.employee = { ...(attendanceWhere.employee || {}), departmentId: { in: idList } };
+        incentiveWhere.employee = { ...(incentiveWhere.employee || {}), departmentId: { in: idList } };
+        penaltyWhere.employee = { ...(penaltyWhere.employee || {}), departmentId: { in: idList } };
+      } else {
+        employeeWhere.departmentId = departmentId;
+        attendanceWhere.employee = { ...(attendanceWhere.employee || {}), departmentId };
+        incentiveWhere.employee = { ...(incentiveWhere.employee || {}), departmentId };
+        penaltyWhere.employee = { ...(penaltyWhere.employee || {}), departmentId };
+      }
     }
 
     if (shiftId) {
