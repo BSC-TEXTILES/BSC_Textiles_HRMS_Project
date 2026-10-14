@@ -43,7 +43,7 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
         take: Number(limit),
         orderBy: { breakDate: 'desc' },
         include: {
-          employee: { select: { id: true, employeeCode: true, fullName: true } },
+          employee: { select: { id: true, employeeCode: true, fullName: true, locationId: true } },
           qrScan: { select: { id: true, purpose: true, result: true, scannedAt: true } },
         },
       }),
