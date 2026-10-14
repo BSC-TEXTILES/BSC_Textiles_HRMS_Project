@@ -86,11 +86,9 @@ const HUB_LABELS: Record<string, string> = {
   loc_bel: 'Belagavi Flagship (BEL-01)',
   loc_dav: 'Davanagere Hub (DAV-02)',
   loc_shi: 'Shivamogga Hub (SHI-03)',
-  loc_bly: 'Bellary Silk Emporium (BLY-04)',
   BEL: 'Belagavi Flagship (BEL-01)',
   DAV: 'Davanagere Hub (DAV-02)',
   SHI: 'Shivamogga Hub (SHI-03)',
-  BLY: 'Bellary Silk Emporium (BLY-04)',
 };
 
 const DEFAULT_HUBS = [
@@ -98,7 +96,6 @@ const DEFAULT_HUBS = [
   { id: 'BEL', code: 'BEL', name: 'Belagavi Flagship (BEL-01)' },
   { id: 'DAV', code: 'DAV', name: 'Davanagere Hub (DAV-02)' },
   { id: 'SHI', code: 'SHI', name: 'Shivamogga Hub (SHI-03)' },
-  { id: 'BLY', code: 'BLY', name: 'Bellary Hub (BLY-04)' },
 ];
 
 const DEFAULT_DEPTS = [
