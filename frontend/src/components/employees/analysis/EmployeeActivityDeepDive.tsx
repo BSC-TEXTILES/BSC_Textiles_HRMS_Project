@@ -97,6 +97,7 @@ export function EmployeeActivityDeepDive({
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch selected employee's activity
