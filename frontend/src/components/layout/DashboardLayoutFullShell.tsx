@@ -61,14 +61,56 @@ interface NavItem {
   badge?: string;
 }
 
+interface NavSectionTheme {
+  color: string;
+  dotColor: string;
+  activeGradient: string;
+  hoverColor: string;
+  iconColor: string;
+}
+
 interface NavSectionConfig {
   title: string;
+  theme: NavSectionTheme;
   items: NavItem[];
+}
+
+function getBadgeClasses(badgeText: string, isActive: boolean) {
+  if (isActive) return 'bg-white/20 text-white font-bold';
+  switch (badgeText) {
+    case 'Live ID':
+      return 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 font-bold';
+    case 'Dossier':
+      return 'bg-teal-500/20 text-teal-300 border border-teal-400/40';
+    case 'Settlement':
+      return 'bg-amber-500/20 text-amber-300 border border-amber-400/40';
+    case 'DigiLocker':
+      return 'bg-sky-500/20 text-sky-300 border border-sky-400/40';
+    case 'UIDAI':
+      return 'bg-purple-500/20 text-purple-300 border border-purple-400/40';
+    case 'Scanner':
+      return 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40';
+    case 'Daily':
+      return 'bg-blue-500/20 text-blue-300 border border-blue-400/40';
+    case 'Policy':
+      return 'bg-rose-500/20 text-rose-300 border border-rose-400/40';
+    case 'Analytics':
+      return 'bg-sky-500/20 text-sky-300 border border-sky-400/40 font-bold';
+    default:
+      return 'bg-white/10 text-blue-100 border border-white/15';
+  }
 }
 
 const enterpriseNavigation: NavSectionConfig[] = [
   {
     title: 'Core Operations',
+    theme: {
+      color: 'text-sky-200',
+      dotColor: 'bg-sky-400',
+      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-sky-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-sky-300 group-hover:text-white',
+    },
     items: [
       { title: 'Executive Dashboard', href: '/dashboard', icon: LayoutDashboard },
       { title: 'My Desk Self-Service', href: '/my-desk', icon: UserCheck },
@@ -76,6 +118,13 @@ const enterpriseNavigation: NavSectionConfig[] = [
   },
   {
     title: 'Workforce Directory',
+    theme: {
+      color: 'text-emerald-200',
+      dotColor: 'bg-emerald-400',
+      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-emerald-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-emerald-300 group-hover:text-white',
+    },
     items: [
       { title: 'All Employees', href: '/employees', icon: Users },
       { title: 'Profile 360 & Dossier', href: '/employees/profile', icon: Contact },
@@ -87,6 +136,13 @@ const enterpriseNavigation: NavSectionConfig[] = [
   },
   {
     title: 'KYC & DigiLocker',
+    theme: {
+      color: 'text-purple-200',
+      dotColor: 'bg-purple-400',
+      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-purple-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-purple-300 group-hover:text-white',
+    },
     items: [
       { title: 'KYC Verification', href: '/operations/kyc', icon: ShieldCheck, badge: 'DigiLocker' },
       { title: 'Digital Document Verification', href: '/employees/profile?tab=documents', icon: FileText, badge: 'UIDAI' },
@@ -94,6 +150,13 @@ const enterpriseNavigation: NavSectionConfig[] = [
   },
   {
     title: 'QR Code Attendance',
+    theme: {
+      color: 'text-cyan-200',
+      dotColor: 'bg-cyan-400',
+      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-cyan-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-cyan-300 group-hover:text-white',
+    },
     items: [
       { title: 'Digital QR Passes', href: '/attendance/qr-codes', icon: QrCode, badge: 'Live ID' },
       { title: 'Contactless QR Scanner', href: '/operations/qr-scanner', icon: ScanFace, badge: 'Scanner' },
@@ -101,6 +164,13 @@ const enterpriseNavigation: NavSectionConfig[] = [
   },
   {
     title: 'Time & Attendance',
+    theme: {
+      color: 'text-amber-200',
+      dotColor: 'bg-amber-400',
+      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-amber-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-amber-300 group-hover:text-white',
+    },
     items: [
       { title: 'Biometric Punches', href: '/attendance/punches', icon: Fingerprint },
       { title: 'Floor Shifts & Rosters', href: '/attendance/shifts', icon: Calendar },
@@ -113,6 +183,13 @@ const enterpriseNavigation: NavSectionConfig[] = [
   },
   {
     title: 'Payroll Management',
+    theme: {
+      color: 'text-rose-200',
+      dotColor: 'bg-rose-400',
+      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-rose-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-rose-300 group-hover:text-white',
+    },
     items: [
       { title: 'Payroll Dashboard', href: '/payroll', icon: Banknote },
       { title: 'Employee Payslips', href: '/payroll/payslips', icon: Receipt },
@@ -122,6 +199,13 @@ const enterpriseNavigation: NavSectionConfig[] = [
   },
   {
     title: 'Leave & Incentives',
+    theme: {
+      color: 'text-fuchsia-200',
+      dotColor: 'bg-fuchsia-400',
+      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-fuchsia-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-fuchsia-300 group-hover:text-white',
+    },
     items: [
       { title: 'Leave Approvals', href: '/leaves', icon: CalendarClock },
       { title: 'Incentive Calculation', href: '/incentives/calculation', icon: Coins },
@@ -129,6 +213,13 @@ const enterpriseNavigation: NavSectionConfig[] = [
   },
   {
     title: 'Operations & Audits',
+    theme: {
+      color: 'text-indigo-200',
+      dotColor: 'bg-indigo-400',
+      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-indigo-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-indigo-300 group-hover:text-white',
+    },
     items: [
       { title: 'Face Verification', href: '/operations/face-verification', icon: ScanFace },
       { title: 'Selling Points & Audits', href: '/operations/selling-points', icon: Store },
@@ -194,7 +285,6 @@ export function isNavItemActive(pathname: string, itemHref: string): boolean {
     return pathname === '/organization';
   }
 
-  // Nested routes e.g. /employees/profile/123 matches /employees/profile
   return pathname.startsWith(itemPath + '/');
 }
 
@@ -231,7 +321,6 @@ export function DashboardLayoutFullShell({
   const setSelectedHub = shellContext ? shellContext.setSelectedHub : () => {};
   const activeShiftLabel = shellContext?.activeShiftLabel ?? localShiftLabel;
   const headerSearchSlot = shellContext?.headerSearchSlot ?? localSearchSlot;
-  const pendingPath = shellContext ? shellContext.pendingPath : null;
   const setPendingPath = shellContext ? shellContext.setPendingPath : () => {};
 
   const [currentTime, setCurrentTime] = useState<string>('');
@@ -299,33 +388,40 @@ export function DashboardLayoutFullShell({
   if (status === 'unauthenticated') {
     const hasToken = typeof window !== 'undefined' ? (localStorage.getItem('bsc_token') || localStorage.getItem('token')) : null;
     if (!hasToken) {
-      return (
-        <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#111317] flex items-center justify-center">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-10 h-10 border-3 border-[#0058be] border-t-transparent rounded-full animate-spin" />
-            <p className="text-slate-600 dark:text-slate-400 text-xs font-medium">Redirecting to login...</p>
-          </div>
-        </div>
-      );
+      return null;
     }
   }
 
-  const handleSignOut = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('bsc_token');
-      localStorage.removeItem('token');
-      localStorage.removeItem('bsc_user');
-      document.cookie = 'bsc_token=; path=/; max-age=0';
-      document.cookie = 'token=; path=/; max-age=0';
-    }
-    api.post('/auth/logout').catch(() => {});
-    signOut({ callbackUrl: '/login' });
+  const rawRole = (session?.user as any)?.role || 'EMPLOYEE';
+  const roleDisplayNames: Record<string, string> = {
+    SUPER_ADMIN: 'Super Admin',
+    ADMIN: 'Admin',
+    HR: 'HR Manager',
+    HR_MANAGER: 'HR Manager',
+    HR_EXECUTIVE: 'HR Executive',
+    PAYROLL_MANAGER: 'Payroll Specialist',
+    FLOOR_MANAGER: 'Floor Manager',
+    STORE_MANAGER: 'Store Manager',
+    DEPARTMENT_HEAD: 'Department Head',
+    EMPLOYEE: 'Employee',
   };
 
-  const userName = session?.user?.name || 'S. B. Angadi';
-  const userRole = session?.user?.role?.replace(/_/g, ' ') || 'Super Admin';
+  const userRole = roleDisplayNames[rawRole] || rawRole;
+  const userName = session?.user?.name || (session?.user as any)?.fullName || 'Super Admin';
   const userEmail = session?.user?.email || 'admin@bsctextiles.com';
-  const rawRole = session?.user?.role || 'SUPER_ADMIN';
+
+  const handleSignOut = async () => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('bsc_token');
+        localStorage.removeItem('token');
+        localStorage.removeItem('bsc_user');
+      }
+      await signOut({ callbackUrl: '/login', redirect: true });
+    } catch {
+      window.location.href = '/login';
+    }
+  };
 
   const visibleNavigation = enterpriseNavigation
     .map((section) => ({
@@ -391,91 +487,104 @@ export function DashboardLayoutFullShell({
 
   return (
     <div className="min-h-screen bg-[#f4f6fa] dark:bg-[#070c18] text-[#0b1c30] dark:text-slate-100 font-sans antialiased transition-colors duration-200">
-      {/* SIDEBAR (Desktop - Stays mounted across all routes) */}
+      {/* SIDEBAR (Desktop - Royal Cobalt Blue #1346a1) */}
       <aside 
         className={`fixed left-0 top-0 h-full ${
           isCollapsed ? 'w-20' : 'w-72'
-        } bg-white dark:bg-[#090f1d] border-r border-slate-200/80 dark:border-[#152038] text-slate-700 dark:text-slate-200 shadow-sm dark:shadow-[0_1px_4px_rgba(0,0,0,0.3)] z-50 flex flex-col justify-between overflow-y-auto no-scrollbar hidden lg:flex transition-all duration-200 ease-in-out`}
+        } bg-[#1346a1] border-r border-[#1a55c2] text-slate-100 shadow-xl z-50 flex flex-col justify-between overflow-y-auto no-scrollbar hidden lg:flex transition-all duration-200 ease-in-out`}
       >
         <div className="flex flex-col">
           {/* Top Logo Brand Header */}
           <div className={`h-14 flex items-center ${
             isCollapsed ? 'justify-center px-2' : 'px-4'
-          } bg-white dark:bg-[#090f1d] border-b border-slate-100 dark:border-slate-800/40 flex-shrink-0 transition-all`}>
+          } bg-[#0e3882] border-b border-[#1a55c2] flex-shrink-0 transition-all`}>
             <div className={`flex items-center overflow-hidden ${isCollapsed ? '' : 'gap-2.5'}`}>
-              <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 p-1 flex items-center justify-center shrink-0 shadow-xs border border-slate-200/60 dark:border-slate-700/60 overflow-hidden">
+              <div className="w-8 h-8 rounded-full bg-white/10 p-1 flex items-center justify-center shrink-0 border border-white/20 overflow-hidden shadow-xs">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/images/bsc_logo.png" alt="BSC Textiles" className="w-full h-full object-contain" />
               </div>
               {!isCollapsed && (
                 <div className="flex flex-col leading-tight truncate">
-                  <span className="text-[14px] font-bold tracking-tight text-[#0b1c30] dark:text-white truncate">BSC Textiles</span>
-                  <span className="text-[9px] font-bold tracking-wider uppercase text-[#0058be] dark:text-[#3b82f6]">Since 1938</span>
+                  <span className="text-[14px] font-bold tracking-tight text-white truncate">BSC Textiles</span>
+                  <span className="text-[9px] font-semibold tracking-wider uppercase text-blue-200/90">Since 1938</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Navigation Links */}
+          {/* Navigation Links with Category Theme Accents */}
           <nav className={`flex flex-col gap-1 ${isCollapsed ? 'px-2 py-3' : 'px-3 py-3'}`}>
-            {visibleNavigation.map((section) => (
-              <div key={section.title} className="mb-2">
-                {!isCollapsed ? (
-                  <div className="px-3 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 truncate">
-                    {section.title}
+            {visibleNavigation.map((section) => {
+              const theme = section.theme;
+              return (
+                <div key={section.title} className="mb-2.5">
+                  {!isCollapsed ? (
+                    <div className={`px-3 pt-2 pb-1 text-[10.5px] font-extrabold uppercase tracking-wider ${theme.color} flex items-center gap-1.5 truncate`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${theme.dotColor} shrink-0 shadow-2xs`} />
+                      <span className="truncate">{section.title}</span>
+                    </div>
+                  ) : (
+                    <div className="my-1.5 flex justify-center items-center" title={section.title}>
+                      <span className={`w-2 h-1 rounded-full ${theme.dotColor}`} />
+                    </div>
+                  )}
+                  <div className="space-y-0.5">
+                    {section.items.map((item) => {
+                      const isActive = isNavItemActive(pathname, item.href);
+                      const IconComponent = item.icon;
+                      return (
+                        <Link
+                          key={`${section.title}-${item.href}`}
+                          href={item.href}
+                          scroll={false}
+                          prefetch={true}
+                          onClick={(e) => handleLinkClick(item.href, e)}
+                          title={isCollapsed ? `${item.title} • ${section.title}` : undefined}
+                          className={`flex items-center ${
+                            isCollapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2'
+                          } rounded-lg text-xs transition-all relative ${
+                            isActive
+                              ? `${theme.activeGradient}`
+                              : `text-blue-100/90 hover:text-white ${theme.hoverColor} font-medium`
+                          }`}
+                        >
+                          <IconComponent className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : `${theme.iconColor}`}`} />
+                          {!isCollapsed && <span className="truncate flex-1">{item.title}</span>}
+                          {!isCollapsed && item.badge && (
+                            <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${getBadgeClasses(item.badge, isActive)}`}>
+                              {item.badge}
+                            </span>
+                          )}
+                        </Link>
+                      );
+                    })}
                   </div>
-                ) : (
-                  <div className="my-2 border-t border-slate-200 dark:border-[#152038] mx-1" title={section.title} />
-                )}
-                <div className="space-y-0.5">
-                  {section.items.map((item) => {
-                    const isActive = isNavItemActive(pathname, item.href);
-                    const isPending = pendingPath === item.href;
-                    const IconComponent = item.icon;
-                    return (
-                      <Link
-                        key={`${section.title}-${item.href}`}
-                        href={item.href}
-                        scroll={false}
-                        prefetch={true}
-                        onClick={(e) => handleLinkClick(item.href, e)}
-                        title={isCollapsed ? `${item.title} • ${section.title}` : undefined}
-                        className={`flex items-center ${
-                          isCollapsed ? 'justify-center p-2.5' : 'gap-2.5 px-3 py-2'
-                        } rounded-lg text-xs transition-all relative ${
-                          isActive
-                            ? 'bg-[#0058be] text-white font-semibold shadow-sm'
-                            : 'text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-white hover:bg-slate-100/80 dark:hover:bg-slate-800/60 font-medium'
-                        }`}
-                      >
-                        <IconComponent className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-400 dark:text-slate-400 group-hover:text-[#0058be] dark:group-hover:text-white'}`} />
-                        {!isCollapsed && <span className="truncate flex-1">{item.title}</span>}
-                        {isPending && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-300 animate-ping mr-1" />
-                        )}
-                        {!isCollapsed && item.badge && !isPending && (
-                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-50 dark:bg-[#14264d] text-[#0058be] dark:text-blue-300 border border-blue-200 dark:border-blue-700/50">
-                            {item.badge}
-                          </span>
-                        )}
-                      </Link>
-                    );
-                  })}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </nav>
         </div>
 
         {/* Bottom Application Meta & Sign Out */}
-        <div className="p-3 border-t border-slate-200 dark:border-[#152038] bg-white dark:bg-[#090f1d] space-y-2">
+        <div className="p-3 border-t border-[#1a55c2] bg-[#0e3882] space-y-2.5">
           {!isCollapsed ? (
-            <div className="px-3 py-2 bg-slate-50 dark:bg-[#0e172a] rounded-lg border border-slate-200 dark:border-[#1e2d4d]">
-              <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">BSC Textiles Pvt. Ltd.</div>
-              <div className="text-[10px] text-slate-400 font-mono">HRMS Enterprise v2.4</div>
+            <div className="p-3 rounded-xl bg-black/15 border border-white/15 shadow-xs relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-blue-400/10 rounded-full blur-xl pointer-events-none group-hover:bg-blue-400/20 transition-all" />
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11.5px] font-bold text-white tracking-tight">
+                  BSC Textiles Pvt. Ltd.
+                </span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400/50" title="System Operational" />
+              </div>
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-blue-200/90 font-medium">Davangere HQ</span>
+                <span className="font-mono font-bold text-amber-300 bg-amber-950/80 px-1.5 py-0.5 rounded border border-amber-500/40">
+                  HRMS Enterprise v2.4
+                </span>
+              </div>
             </div>
           ) : (
-            <div className="text-center py-1 text-[9px] font-bold text-slate-400 font-mono" title="BSC HRMS v2.4">
+            <div className="text-center py-1 text-[9px] font-bold text-blue-200 font-mono" title="BSC HRMS v2.4">
               v2.4
             </div>
           )}
@@ -483,11 +592,11 @@ export function DashboardLayoutFullShell({
           <button
             onClick={handleSignOut}
             className={`w-full flex items-center justify-center ${
-              isCollapsed ? 'p-2' : 'gap-2 px-3 py-1.5'
-            } rounded-lg text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors`}
+              isCollapsed ? 'p-2' : 'gap-2 px-3 py-2'
+            } rounded-xl text-xs font-bold text-rose-200 bg-rose-500/20 border border-rose-300/30 hover:bg-gradient-to-r hover:from-rose-600 hover:to-red-600 hover:text-white hover:border-transparent hover:shadow-md hover:shadow-rose-600/30 active:scale-[0.98] transition-all duration-200 group`}
             title={isCollapsed ? "Sign Out" : undefined}
           >
-            <LogOut className="w-4 h-4" />
+            <LogOut className="w-4 h-4 text-rose-300 group-hover:text-white transition-transform group-hover:-translate-x-0.5" />
             {!isCollapsed && <span>Sign Out</span>}
           </button>
         </div>
@@ -497,31 +606,31 @@ export function DashboardLayoutFullShell({
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 flex lg:hidden">
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
-          <div className="relative w-64 bg-white dark:bg-[#15181E] h-full shadow-2xl flex flex-col justify-between overflow-y-auto no-scrollbar z-10 border-r border-gray-200 dark:border-slate-800">
+          <div className="relative w-72 bg-[#1346a1] h-full shadow-2xl flex flex-col justify-between overflow-y-auto no-scrollbar z-10 border-r border-[#1a55c2] text-slate-100">
             <div>
-              <div className="h-14 flex items-center justify-between px-4 border-b border-gray-200 dark:border-slate-800">
+              <div className="h-14 flex items-center justify-between px-4 bg-[#0e3882] border-b border-[#1a55c2]">
                 <div className="flex items-center gap-2">
                   <Logo variant="icon" size="sm" />
                   <div className="flex flex-col leading-none">
-                    <span className="font-black text-sm text-[#18181B] dark:text-slate-100">BSC Textiles</span>
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-[#722F37] dark:text-[#E8DCC6]">Since 1938</span>
+                    <span className="font-bold text-sm text-white">BSC Textiles</span>
+                    <span className="text-[9px] font-semibold uppercase tracking-wider text-blue-200/90">Since 1938</span>
                   </div>
                 </div>
-                <button onClick={() => setMobileMenuOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                <button onClick={() => setMobileMenuOpen(false)} className="p-1 text-blue-200 hover:text-white">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Mobile Theme Toggle */}
-              <div className="p-2.5 mx-3 my-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200/60 dark:border-slate-700/60 flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">Theme</span>
+              <div className="p-2.5 mx-3 my-2 rounded-lg bg-white/10 border border-white/15 flex items-center justify-between">
+                <span className="text-xs font-semibold text-blue-100">Theme</span>
                 <ThemeToggle showLabel={true} size="sm" />
               </div>
 
               <nav className="p-3 space-y-2">
                 {visibleNavigation.map((sec) => (
                   <div key={sec.title}>
-                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    <div className="px-3 py-1 text-[10.5px] font-extrabold uppercase tracking-wider text-blue-200/90">
                       {sec.title}
                     </div>
                     {sec.items.map((i) => {
@@ -539,11 +648,11 @@ export function DashboardLayoutFullShell({
                           }}
                           className={`flex items-center gap-3 px-3 py-2 rounded-lg text-xs ${
                             isItemActive 
-                              ? 'bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 font-semibold' 
-                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                              ? 'bg-[#092b69] text-white font-semibold shadow-md' 
+                              : 'text-blue-100/90 hover:text-white hover:bg-white/10'
                           }`}
                         >
-                          <IconComp className="w-4 h-4" />
+                          <IconComp className="w-4 h-4 text-white" />
                           <span>{i.title}</span>
                         </Link>
                       );
@@ -553,12 +662,12 @@ export function DashboardLayoutFullShell({
               </nav>
             </div>
 
-            <div className="p-3 border-t border-gray-200 dark:border-slate-800">
+            <div className="p-3 border-t border-[#1a55c2] bg-[#0e3882]">
               <button
                 onClick={handleSignOut}
-                className="w-full flex items-center justify-center gap-2 p-2 rounded-lg text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors text-left"
+                className="w-full flex items-center justify-center gap-2 p-2 rounded-xl text-xs font-bold text-rose-200 bg-rose-500/20 border border-rose-300/30 hover:bg-rose-600 hover:text-white transition-colors text-left"
               >
-                <LogOut className="w-4 h-4 text-red-500 dark:text-red-400" />
+                <LogOut className="w-4 h-4 text-rose-300" />
                 <span>Sign Out</span>
               </button>
             </div>
@@ -566,15 +675,15 @@ export function DashboardLayoutFullShell({
         </div>
       )}
 
-      {/* TOP HEADER (Fixed - Stays mounted across all routes) */}
+      {/* TOP HEADER (Fixed - Executive Royal Navy Gradient) */}
       <header className={`fixed top-0 left-0 ${
         isCollapsed ? 'lg:left-20' : 'lg:left-72'
-      } right-0 h-14 bg-white dark:bg-[#090f1d] border-b border-slate-100 dark:border-slate-800/40 shadow-xs dark:shadow-[0_1px_4px_rgba(0,0,0,0.2)] z-40 flex items-center justify-between px-4 lg:px-6 transition-all duration-200 ease-in-out`}>
+      } right-0 h-14 bg-gradient-to-r from-[#003882] via-[#004ca3] to-[#0058be] dark:from-[#002860] dark:via-[#003b82] dark:to-[#004ca3] shadow-md z-40 flex items-center justify-between px-4 lg:px-6 transition-all duration-200 ease-in-out text-white`}>
         <div className="flex items-center gap-3 flex-1 max-w-2xl">
           {/* Mobile Drawer Trigger */}
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 lg:hidden"
+            className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 lg:hidden"
             aria-label="Open navigation menu"
           >
             <Menu className="w-5 h-5" />
@@ -583,25 +692,25 @@ export function DashboardLayoutFullShell({
           {/* Desktop Toggle Button in Top Header */}
           <button
             onClick={toggleSidebar}
-            className="p-1.5 rounded-lg text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 hidden lg:flex items-center justify-center transition-colors"
+            className="p-1.5 rounded-lg text-white/80 hover:text-white hover:bg-white/10 hidden lg:flex items-center justify-center transition-colors"
             title={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
             aria-label={isCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
           >
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Hub Location Dropdown (Global state persistent across all modules) */}
-          <div className="relative flex items-center bg-slate-100 dark:bg-[#10192e] rounded-lg px-2.5 py-1 text-xs border border-slate-200 dark:border-[#1f2d4e] hidden sm:flex text-slate-700 dark:text-slate-200">
-            <MapPin className="w-3.5 h-3.5 text-[#0058be] dark:text-[#3b82f6] mr-1.5" />
+          {/* Hub Location Dropdown */}
+          <div className="relative flex items-center bg-white/15 hover:bg-white/20 rounded-lg px-2.5 py-1 text-xs border border-white/25 hidden sm:flex text-white backdrop-blur-xs transition-colors">
+            <MapPin className="w-3.5 h-3.5 text-sky-200 mr-1.5" />
             <select
               value={selectedHub}
               onChange={(e) => setSelectedHub(e.target.value)}
-              className="bg-transparent font-semibold text-xs text-[#0b1c30] dark:text-white focus:outline-none cursor-pointer pr-1"
+              className="bg-transparent font-semibold text-xs text-white focus:outline-none cursor-pointer pr-1"
             >
-              <option value="all" className="bg-white dark:bg-[#090f1d] text-[#0b1c30] dark:text-white">All Hubs (Karnataka)</option>
-              <option value="bel" className="bg-white dark:bg-[#090f1d] text-[#0b1c30] dark:text-white">Belagavi Flagship (BEL-01)</option>
-              <option value="dav" className="bg-white dark:bg-[#090f1d] text-[#0b1c30] dark:text-white">Davanagere Hub (DAV-02)</option>
-              <option value="shi" className="bg-white dark:bg-[#090f1d] text-[#0b1c30] dark:text-white">Shivamogga Hub (SHI-03)</option>
+              <option value="all" className="bg-[#0e3882] text-white">All Hubs (Karnataka)</option>
+              <option value="bel" className="bg-[#0e3882] text-white">Belagavi Flagship (BEL-01)</option>
+              <option value="dav" className="bg-[#0e3882] text-white">Davanagere Hub (DAV-02)</option>
+              <option value="shi" className="bg-[#0e3882] text-white">Shivamogga Hub (SHI-03)</option>
             </select>
           </div>
 
@@ -618,10 +727,10 @@ export function DashboardLayoutFullShell({
           {/* Real-time Clock */}
           <div className="hidden md:flex flex-col text-right pr-2">
             <div className="flex items-center gap-1.5 justify-end">
-              <Clock className="w-3.5 h-3.5 text-[#0058be] dark:text-[#3b82f6]" />
-              <span className="text-xs font-semibold text-[#0b1c30] dark:text-white font-mono">{currentTime || '19:16:52 IST'}</span>
+              <Clock className="w-3.5 h-3.5 text-sky-200" />
+              <span className="text-xs font-semibold text-white font-mono">{currentTime || '19:16:52 IST'}</span>
             </div>
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+            <span className="text-[10px] text-sky-200 font-medium">
               Today • {activeShiftLabel || 'Shift A'}
             </span>
           </div>
@@ -639,13 +748,13 @@ export function DashboardLayoutFullShell({
                   fetchNotifications({ limit: 10 });
                 }
               }}
-              className="relative flex items-center justify-center p-2 rounded-lg text-slate-600 dark:text-slate-300 hover:text-[#0058be] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer border border-transparent"
+              className="relative flex items-center justify-center p-2 rounded-lg text-white/85 hover:text-white hover:bg-white/10 transition-colors cursor-pointer border border-transparent"
               title="Notifications & System Alerts"
               aria-label="Notifications"
             >
-              <Bell className="w-4 h-4 text-slate-600 dark:text-slate-300" />
+              <Bell className="w-4 h-4 text-white" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-bold shadow-xs">
+                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold shadow-xs">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
@@ -734,24 +843,24 @@ export function DashboardLayoutFullShell({
           </div>
 
           {/* User Profile Capsule with Interactive Dropdown */}
-          <div className="relative pl-1">
+          <div className="relative pl-1 border-l border-white/20">
             <button
               onClick={() => {
                 setProfileMenuOpen(!profileMenuOpen);
                 setNotificationsOpen(false);
               }}
-              className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors cursor-pointer text-left"
+              className="flex items-center gap-2 p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer text-left"
               title="User Account & Profile"
               aria-label="User Account"
             >
               <div className="hidden sm:flex flex-col text-right">
-                <span className="text-xs font-bold text-[#0b1c30] dark:text-white leading-none">{userName}</span>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400 mt-0.5">{userRole}</span>
+                <span className="text-xs font-bold text-white leading-none">{userName}</span>
+                <span className="text-[10px] uppercase font-bold tracking-wider text-sky-200 mt-0.5">{userRole}</span>
               </div>
-              <div className="w-8 h-8 rounded-full bg-[#0058be] text-white flex items-center justify-center font-bold text-xs shadow-xs">
+              <div className="w-8 h-8 rounded-full bg-white text-[#004ca3] flex items-center justify-center font-bold text-xs shadow-xs ring-1 ring-white/30">
                 {userName.split(' ').map((n: string) => n[0]).join('').slice(0, 2) || 'SA'}
               </div>
-              <ChevronDown className="w-3.5 h-3.5 text-slate-400 hidden sm:block" />
+              <ChevronDown className="w-3.5 h-3.5 text-white/70 hidden sm:block" />
             </button>
 
             {/* Profile Menu Dropdown */}
@@ -768,7 +877,6 @@ export function DashboardLayoutFullShell({
                 <div className="p-1.5 space-y-0.5 text-xs">
                   <Link
                     href="/employees/profile"
-                    scroll={false}
                     onClick={() => setProfileMenuOpen(false)}
                     className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-[#0058be] dark:hover:text-white font-medium transition-colors"
                   >
@@ -778,7 +886,6 @@ export function DashboardLayoutFullShell({
 
                   <Link
                     href="/my-desk"
-                    scroll={false}
                     onClick={() => setProfileMenuOpen(false)}
                     className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-[#0058be] dark:hover:text-white font-medium transition-colors"
                   >
@@ -789,7 +896,6 @@ export function DashboardLayoutFullShell({
                   {['SUPER_ADMIN', 'ADMIN'].includes(rawRole) && (
                     <Link
                       href="/admin"
-                      scroll={false}
                       onClick={() => setProfileMenuOpen(false)}
                       className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-[#0058be] dark:hover:text-white font-medium transition-colors"
                     >
