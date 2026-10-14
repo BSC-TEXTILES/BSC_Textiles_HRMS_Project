@@ -299,8 +299,8 @@ export function FloorPresenceDetail({
 
     try {
       if (!dataRef.current) setLoading(true);
-      const res = await fetch('/api/presence/live-floor', { credentials: 'include' });
-      if (res.ok) {
+      const res = await fetch('/api/presence/live-floor', { credentials: 'include' }).catch(() => null);
+      if (res && res.ok) {
         const text = await res.text().catch(() => '');
         let json: any = null;
         try {
@@ -317,11 +317,12 @@ export function FloorPresenceDetail({
           setLastRefreshedSec(0);
         }
       }
-    } catch (err) {
-      console.error('Failed to fetch live floor presence data:', err);
+    } catch {
+      // Gracefully maintain existing cache or state
     } finally {
       setLoading(false);
     }
+
   }, []);
 
   useEffect(() => {

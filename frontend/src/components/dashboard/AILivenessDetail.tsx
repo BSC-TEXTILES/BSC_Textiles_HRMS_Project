@@ -91,8 +91,8 @@ export function AILivenessDetail({
 
     try {
       if (!data) setLoading(true);
-      const res = await fetch('/api/biometric/liveness-logs', { credentials: 'include' });
-      if (res.ok) {
+      const res = await fetch('/api/biometric/liveness-logs', { credentials: 'include' }).catch(() => null);
+      if (res && res.ok) {
         const text = await res.text().catch(() => '');
         let json: any = null;
         try {
@@ -109,11 +109,12 @@ export function AILivenessDetail({
           setLastRefreshedSec(0);
         }
       }
-    } catch (err) {
-      console.error('Failed to load AI liveness logs:', err);
+    } catch {
+      // Gracefully maintain existing cache or state
     } finally {
       setLoading(false);
     }
+
   }, [data]);
 
   useEffect(() => {
