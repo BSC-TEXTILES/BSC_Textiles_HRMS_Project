@@ -24,6 +24,7 @@ function extractFilters(req: AuthRequest): AnalysisFilterOptions {
   const preset = req.query.preset ? String(req.query.preset) : undefined;
   const startDate = req.query.startDate ? String(req.query.startDate) : undefined;
   const endDate = req.query.endDate ? String(req.query.endDate) : undefined;
+  const date = req.query.date ? String(req.query.date) : undefined;
 
   return {
     locationId,
@@ -33,6 +34,7 @@ function extractFilters(req: AuthRequest): AnalysisFilterOptions {
     preset,
     startDate,
     endDate,
+    date,
   };
 }
 
@@ -185,6 +187,9 @@ router.get('/drilldown', authorize('VIEW'), async (req: AuthRequest, res: Respon
 
     const category = req.query.category ? String(req.query.category) : 'all';
     const date = req.query.date ? String(req.query.date) : undefined;
+    const startDate = req.query.startDate ? String(req.query.startDate) : undefined;
+    const endDate = req.query.endDate ? String(req.query.endDate) : undefined;
+    const preset = req.query.preset ? String(req.query.preset) : undefined;
     const status = req.query.status ? String(req.query.status) : undefined;
     const search = req.query.search ? String(req.query.search) : undefined;
     const page = req.query.page ? Number(req.query.page) : 1;
@@ -193,6 +198,9 @@ router.get('/drilldown', authorize('VIEW'), async (req: AuthRequest, res: Respon
     const data = await AnalysisService.getDrillDown({
       category,
       date,
+      startDate,
+      endDate,
+      preset,
       locationId,
       departmentId,
       status,
