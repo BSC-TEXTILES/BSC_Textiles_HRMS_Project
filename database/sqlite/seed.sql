@@ -19,19 +19,18 @@ INSERT OR REPLACE INTO floor (id, name, floorNumber, locationId, status) VALUES
 
 -- 3. DEPARTMENTS
 INSERT OR REPLACE INTO department (id, name, code, locationId, floorId) VALUES
-('dept_dav_sales', 'Retail Sales', 'SALES', 'loc_davanagere', 'flr_dav_2'),
 ('dept_dav_tailor', 'Atelier & Tailoring', 'ATELIER', 'loc_davanagere', 'flr_dav_1'),
 ('dept_dav_billing', 'Cashier & Billing', 'BILLING', 'loc_davanagere', 'flr_dav_g'),
-('dept_bel_sales', 'Retail Sales', 'SALES', 'loc_belagavi', 'flr_bel_g'),
-('dept_shi_sales', 'Retail Sales', 'SALES', 'loc_shivamogga', 'flr_shi_g');
+('dept_bel_sales', 'Retail Sales', 'SALES', 'loc_belagavi', 'flr_bel_g');
 
 -- 4. SECTIONS
 INSERT OR REPLACE INTO section (id, name, code, locationId, floorId, departmentId) VALUES
-('sec_dav_kids', 'Kids Wear', 'KIDS', 'loc_davanagere', 'flr_dav_2', 'dept_dav_sales'),
-('sec_dav_mens', 'Men''s Ethnic', 'MENS', 'loc_davanagere', 'flr_dav_1', 'dept_dav_sales'),
-('sec_dav_silks', 'Silk Sarees', 'SILK', 'loc_davanagere', 'flr_dav_g', 'dept_dav_sales'),
+('sec_dav_kids', 'Kids Wear', 'KIDS', 'loc_davanagere', 'flr_dav_2', 'dept_bel_sales'),
+('sec_dav_mens', 'Men''s Ethnic', 'MENS', 'loc_davanagere', 'flr_dav_1', 'dept_bel_sales'),
+('sec_dav_silks', 'Silk Sarees', 'SILK', 'loc_davanagere', 'flr_dav_g', 'dept_bel_sales'),
 ('sec_bel_silks', 'Wedding Silks', 'SILK', 'loc_belagavi', 'flr_bel_g', 'dept_bel_sales'),
-('sec_shi_silks', 'Daily Silks', 'SILK', 'loc_shivamogga', 'flr_shi_g', 'dept_shi_sales');
+('sec_shi_silks', 'Daily Silks', 'SILK', 'loc_shivamogga', 'flr_shi_g', 'dept_bel_sales');
+
 
 -- 5. SHIFTS
 INSERT OR REPLACE INTO shift (id, name, locationId, startTime, endTime, gracePeriod) VALUES
@@ -61,13 +60,13 @@ INSERT OR REPLACE INTO employee (
 ) VALUES
 (
   'emp_sadashiva_1372', '1372', 'SADASHIVA LINGARAJAPPA HADIMANI', 'sadashiva.1372@bsctextiles.com', '9845113720', 'MALE', '1992-05-14', '2021-08-01', 'ACTIVE',
-  'Sales Executive', 'loc_davanagere', 'flr_dav_2', 'dept_dav_sales', 'sec_dav_kids', 'shf_dav_shift2',
+  'Sales Executive', 'loc_davanagere', 'flr_dav_2', 'dept_bel_sales', 'sec_dav_kids', 'shf_dav_shift2',
   12000.00, 16000.00, 516.13, 31.00, 12000.00, 4000.00,
   '10653', '5858975468', '101278107174', 'HDFC Bank', '50100374312528', '1372', 'SHIFT II'
 ),
 (
   'emp_manjunath_1024', '1024', 'MANJUNATHA B K', 'manjunath.1024@bsctextiles.com', '9845110240', 'MALE', '1988-11-20', '2019-04-15', 'ACTIVE',
-  'Senior Sales Executive', 'loc_davanagere', 'flr_dav_1', 'dept_dav_sales', 'sec_dav_mens', 'shf_dav_shift2',
+  'Senior Sales Executive', 'loc_davanagere', 'flr_dav_1', 'dept_bel_sales', 'sec_dav_mens', 'shf_dav_shift2',
   14000.00, 18500.00, 596.77, 31.00, 14000.00, 4500.00,
   '10240', '5858971024', '101278101024', 'SBI Bank', '30248891234', '1024', 'SHIFT II'
 ),
@@ -79,10 +78,11 @@ INSERT OR REPLACE INTO employee (
 ),
 (
   'emp_anand_1088', '1088', 'ANAND KUMAR HEGDE', 'anand.1088@bsctextiles.com', '9845110880', 'MALE', '1990-09-09', '2020-06-01', 'ACTIVE',
-  'Section Lead', 'loc_shivamogga', 'flr_shi_g', 'dept_shi_sales', 'sec_shi_silks', 'shf_shi_shift1',
+  'Section Lead', 'loc_shivamogga', 'flr_shi_g', 'dept_bel_sales', 'sec_shi_silks', 'shf_shi_shift1',
   15000.00, 20000.00, 645.16, 31.00, 15000.00, 5000.00,
   '10880', '5858971088', '101278101088', 'ICICI Bank', '008812345678', '1088', 'SHIFT I'
 );
+
 
 -- 9. HISTORICAL & CERTIFIED PAYSLIP (Sadashiva 1372 for Aug-2026 Reference Document)
 INSERT OR REPLACE INTO payrollrun (id, locationId, periodStart, periodEnd, status, processedBy, processedAt) VALUES
