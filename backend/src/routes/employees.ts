@@ -349,14 +349,13 @@ router.post('/', authorize('ADD'), validate(employeeSchema), async (req: AuthReq
   try {
     const { employeeCode, firstName, lastName, email, phone, gender, locationId, floorId, departmentId, sectionId, shiftId, designation, role, joiningDate } = req.body;
     
-    // Resolve locationId (accepts cuid or code like BEL, DAV, SHI, HUB, or canonical aliases)
+    // Resolve locationId (accepts cuid or code like BEL, DAV, SHI, or canonical aliases)
     let resolvedLocationId = locationId;
     const foundLoc = await prisma.location.findFirst({
       where: {
         OR: [
           { id: locationId },
           { code: locationId },
-          ...(locationId === 'HUB-HQ' || locationId === 'loc_hub' ? [{ code: 'HUB' }] : []),
           ...(locationId === 'loc_bel' ? [{ code: 'BEL' }] : []),
           ...(locationId === 'loc_dav' ? [{ code: 'DAV' }] : []),
           ...(locationId === 'loc_shi' ? [{ code: 'SHI' }] : []),

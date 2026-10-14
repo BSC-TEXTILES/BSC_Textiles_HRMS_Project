@@ -113,7 +113,7 @@ export function TotalWorkforceDrawer({
     const counts: Record<string, { name: string; count: number; code: string }> = {};
     scopedEmployees.forEach((e) => {
       const locName = e.location?.name || 'Karnataka Store';
-      const locCode = e.location?.code || 'HUB';
+      const locCode = e.location?.code || 'BEL';
       if (!counts[locName]) {
         counts[locName] = { name: locName, count: 0, code: locCode };
       }

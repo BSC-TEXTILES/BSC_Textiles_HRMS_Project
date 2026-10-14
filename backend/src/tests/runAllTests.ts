@@ -14,6 +14,8 @@ import { runLateFinesTests } from './lateFines.test.js';
 import { runEmployeeDocumentsTests } from './employeeDocuments.test.js';
 import { runAttendanceBoardTests } from './attendanceBoard.test.js';
 import { runMyDeskTests } from './myDesk.test.js';
+import { runAnalysisTests } from './analysis.test.js';
+import { runEmployeeImportTests } from './employeeImport.test.js';
 
 const BASE_URL = (process.env.API_URL || 'http://localhost:4000').replace(/\/api\/?$/, '');
 
@@ -182,6 +184,16 @@ async function main() {
   console.log('▶ Executing Suite 15: My Desk Self-Service & Punch Corrections...');
   const deskResults = await runMyDeskTests(BASE_URL, adminToken, salesToken);
   allResults.push(...deskResults.map((r) => ({ ...r, suite: 'my-desk' })));
+
+  // 16. HR Analysis Module Suite
+  console.log('▶ Executing Suite 16: HR Analytics, Connected Dots & Drilldown...');
+  const analysisResults = await runAnalysisTests(BASE_URL, adminToken);
+  allResults.push(...analysisResults);
+
+  // 17. Bulk Employee Import & ID Management Suite
+  console.log('▶ Executing Suite 17: Bulk Employee Import, ID Management & Data Quality...');
+  const importResults = await runEmployeeImportTests(BASE_URL, adminToken);
+  allResults.push(...importResults);
 
   // Print Summary Table
   console.log('\n================================================================');

@@ -133,7 +133,7 @@ export default function DepartmentsPage() {
   }, [allEmployees]);
 
   const hubCodesString = useMemo(() => {
-    if (locations.length === 0) return 'BEL • DAV • SHI • HUB';
+    if (locations.length === 0) return 'BEL • DAV • SHI';
     return locations.map((l) => l.code).join(' • ');
   }, [locations]);
 

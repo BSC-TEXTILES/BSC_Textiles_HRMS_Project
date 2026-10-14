@@ -56,7 +56,6 @@ export function StoreLocationsDrawer({
         CANONICAL_HUB_STORES.find(
           (c) =>
             c.code.toUpperCase() === (loc.code || '').toUpperCase() ||
-            (loc.code === 'HUB' && c.code === 'HUB-HQ') ||
             c.id === loc.id
         ) || CANONICAL_HUB_STORES[0];
 
@@ -78,7 +77,7 @@ export function StoreLocationsDrawer({
 
       return {
         id: loc.id || matchedMeta.id,
-        code: loc.code === 'HUB' ? 'HUB-HQ' : loc.code || matchedMeta.code,
+        code: loc.code || matchedMeta.code,
         name: loc.name || matchedMeta.name,
         location: matchedMeta.location || `${loc.city || 'Karnataka'}, India`,
         city: loc.city || matchedMeta.city,
@@ -97,7 +96,7 @@ export function StoreLocationsDrawer({
   const activeLocationObj = storeList.find((l) => l.id === currentLocationId);
   const filterSummary = useMemo(() => {
     if (activeLocationObj) return `Filter: ${activeLocationObj.name} (${activeLocationObj.code})`;
-    return 'Karnataka Retail Hubs • 4 Store Networks';
+    return 'Karnataka Retail Hubs • 3 Store Networks';
   }, [activeLocationObj]);
 
   // Filtered store list by search
@@ -208,7 +207,7 @@ export function StoreLocationsDrawer({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search stores by code (BEL, DAV, SHI, HUB-HQ), city, or manager..."
+            placeholder="Search stores by code (BEL, DAV, SHI), city, or manager..."
             className="w-full bg-transparent text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none"
           />
           {search && (

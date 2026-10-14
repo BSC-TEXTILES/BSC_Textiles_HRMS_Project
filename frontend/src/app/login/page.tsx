@@ -12,8 +12,6 @@ import {
   EyeOff,
   AlertCircle,
   ArrowRight,
-  ArrowLeft,
-  Home,
   Loader2,
   ShieldCheck,
   Mail,
@@ -213,17 +211,7 @@ function LoginFormContent() {
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 sm:p-6 bg-[#F8F9FA] dark:bg-[#111317] text-[#18181B] dark:text-slate-100 transition-colors duration-200">
-      {/* Top Header Utilities */}
-      {/* Top Header Utilities: Back to Home & Theme Toggle */}
-      <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-20">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-[#0058be] dark:hover:text-blue-400 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-gray-200/90 dark:border-slate-800 shadow-xs hover:shadow-sm transition-all group"
-        >
-          <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 text-slate-500 group-hover:text-[#0058be] dark:group-hover:text-blue-400" />
-          <span>Back to Home</span>
-        </Link>
-      </div>
+      {/* Top Header Utilities: Theme Toggle */}
       <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-20">
         <ThemeToggle size="md" />
       </div>
@@ -232,8 +220,8 @@ function LoginFormContent() {
       <div className="w-full max-w-[420px] my-auto">
         <div className="bg-white dark:bg-[#161920] rounded-xl border border-gray-200/90 dark:border-slate-800 shadow-[0_2px_12px_rgba(0,0,0,0.04)] p-6 sm:p-8 transition-all">
 
-          {/* Brand Header — Clickable to return to Landing Page */}
-          <Link href="/" className="flex flex-col items-center text-center group cursor-pointer mb-1" title="Return to Landing Page">
+          {/* Brand Header */}
+          <div className="flex flex-col items-center text-center mb-1">
             <div className="w-16 h-16 rounded-xl bg-white dark:bg-slate-900 p-1.5 border border-gray-200 dark:border-slate-800 shadow-xs flex items-center justify-center overflow-hidden mb-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -249,7 +237,7 @@ function LoginFormContent() {
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
               Since 1938 • Enterprise Workforce Portal
             </p>
-          </Link>
+          </div>
 
           {/* Error Banner Notification */}
           {errorMessage && (
@@ -410,16 +398,6 @@ function LoginFormContent() {
                   </button>
                 );
               })}
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-slate-800/80 text-center">
-              <Link
-                href="/"
-                className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#0058be] dark:text-slate-400 dark:hover:text-blue-400 transition-colors"
-              >
-                <Home className="w-3.5 h-3.5 text-slate-400" />
-                <span>Return to BSC Textiles Home Page</span>
-              </Link>
             </div>
           </div>
         </div>

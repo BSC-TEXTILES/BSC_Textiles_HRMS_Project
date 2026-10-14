@@ -66,7 +66,7 @@ export default function AttendanceBreaksPage() {
               </span>
             </div>
             <p className="text-xs text-slate-500 max-w-3xl">
-              Live telemetry, duration countdowns, and strict policy adherence for meal and tea breaks across Karnataka stores (BEL, DAV, SHI, HUB).
+              Live telemetry, duration countdowns, and strict policy adherence for meal and tea breaks across Karnataka stores (BEL, DAV, SHI).
             </p>
           </div>
 

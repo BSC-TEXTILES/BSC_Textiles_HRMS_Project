@@ -23,6 +23,7 @@ import { setupKycSchema } from './scripts/setupKycSchema.js';
 import { setupEmployeeDocuments } from './scripts/setupEmployeeDocuments.js';
 import { setupFormerEmployees } from './scripts/setupFormerEmployees.js';
 import { setupOrganizationHubs } from './scripts/setupOrganizationHubs.js';
+import { ensureEmployeeImportSchema } from './scripts/setupEmployeeImportSchema.js';
 import { UserUploadService } from './services/userUploadService.js';
 
 const app = express();
@@ -173,6 +174,7 @@ httpServer.listen(PORT, () => {
   setupEmployeeDocuments().catch((err) => console.warn('[setupEmployeeDocuments warning]:', err.message));
   setupFormerEmployees().catch((err) => console.warn('[setupFormerEmployees warning]:', err.message));
   setupOrganizationHubs().catch((err) => console.warn('[setupOrganizationHubs warning]:', err.message));
+  ensureEmployeeImportSchema().catch((err) => console.warn('[setupEmployeeImportSchema warning]:', err.message));
   UserUploadService.syncAllUserFolders().catch((err) => console.warn('[UserUploadService warning]:', err.message));
 });
 

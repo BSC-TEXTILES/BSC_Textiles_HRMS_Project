@@ -24,7 +24,10 @@ import {
   FolderLock,
   AlertCircle,
   Eye,
+  BarChart3,
+  UploadCloud,
 } from 'lucide-react';
+import { HrAnalysisModule } from '@/components/employees/analysis/HrAnalysisModule';
 import { EmployeeQrModal } from '@/components/dashboard/EmployeeQrModal';
 import { EmployeeQuickDetailsDrawer } from '@/components/employees/drawers/EmployeeQuickDetailsDrawer';
 import { TotalWorkforceDrawer } from '@/components/employees/drawers/TotalWorkforceDrawer';
@@ -34,6 +37,7 @@ import { BiometricProfilesDrawer } from '@/components/employees/drawers/Biometri
 import { StoreLocationsDrawer } from '@/components/employees/drawers/StoreLocationsDrawer';
 import { CANONICAL_HUB_STORES } from '@/components/employees/drawers/storeLocationsHelper';
 import { AddEmployeeDialog } from '@/components/employees/AddEmployeeDialog';
+import { BulkImportModal } from '@/components/employees/BulkImportModal';
 
 import { useSession } from 'next-auth/react';
 
@@ -67,8 +71,10 @@ export default function EmployeesPage() {
   const drawerDataCacheRef = useRef<Record<string, any[]>>({});
   const drawerAbortControllerRef = useRef<AbortController | null>(null);
 
-  // Add Employee Dialog
+  // Add Employee & Bulk Import Dialogs
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isExportingCSV, setIsExportingCSV] = useState(false);
   const [selectedQrEmp, setSelectedQrEmp] = useState<any | null>(null);
   const [selectedDetailEmp, setSelectedDetailEmp] = useState<any | null>(null);
   const detailsTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -94,7 +100,6 @@ export default function EmployeesPage() {
         const found = fetchedLocs.find(
           (l: any) =>
             l.code?.toUpperCase() === canonical.code.toUpperCase() ||
-            (canonical.code === 'HUB-HQ' && l.code === 'HUB') ||
             l.id === canonical.id
         );
         return found ? { ...canonical, ...found, code: canonical.code } : canonical;
@@ -219,8 +224,8 @@ export default function EmployeesPage() {
   }, []);
 
   const drawerEmployees = (activeDrawer && drawerDataCacheRef.current[activeDrawer]) || employees;
-  const hqLocation = locations.find((l) => l.code === 'HUB-HQ' || l.code === 'HUB');
-  const nonHqLocations = locations.filter((l) => l.code !== 'HUB-HQ' && l.code !== 'HUB');
+  const hqLocation = locations.find((l) => l.code === 'BEL');
+  const nonHqLocations = locations.filter((l) => l.code !== 'BEL');
 
   const handleEmployeeCreated = (createdEmp: any) => {
     // Invalidate drawer cache so drawers will fetch latest records
@@ -256,22 +261,50 @@ export default function EmployeesPage() {
     setFilterNotice(null);
   };
 
-  const handleExportCSV = () => {
-    if (employees.length === 0) {
-      toast.error('No employees to export');
-      return;
+  const handleExportCSV = async () => {
+    try {
+      setIsExportingCSV(true);
+      const params = new URLSearchParams();
+      if (search) params.append('search', search);
+      if (selectedLocation) params.append('locationId', selectedLocation);
+      if (selectedDept) params.append('departmentId', selectedDept);
+      if (selectedStatus && selectedStatus !== 'ALL') params.append('status', selectedStatus);
+
+      // Call production endpoint which exports standard 49-column template compliant CSV
+      const res = await api.get(`/employees/export/csv?${params.toString()}`, {
+        responseType: 'blob'
+      });
+
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `BSC_Textiles_Workforce_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+      toast.success('Exported Workforce Master CSV (49-column standard)!');
+    } catch (err: any) {
+      console.warn('Backend export failed, falling back to local dataset export:', err);
+      if (employees.length === 0) {
+        toast.error('No employees to export');
+        return;
+      }
+      const headers = 'Employee Code,Name,Role,Location,Department,Status\n';
+      const rows = employees.map(e => 
+        `"${e.employeeCode}","${e.fullName || `${e.firstName} ${e.lastName}`}","${e.role}","${e.location?.name || ''}","${e.department?.name || ''}","${e.status}"`
+      ).join('\n');
+      const blob = new Blob([headers + rows], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `BSC_Textiles_Workforce_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      toast.success('Exported Workforce Master CSV!');
+    } finally {
+      setIsExportingCSV(false);
     }
-    const headers = 'Employee Code,Name,Role,Location,Department,Status\n';
-    const rows = employees.map(e => 
-      `"${e.employeeCode}","${e.fullName || `${e.firstName} ${e.lastName}`}","${e.role}","${e.location?.name || ''}","${e.department?.name || ''}","${e.status}"`
-    ).join('\n');
-    const blob = new Blob([headers + rows], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `BSC_Textiles_Workforce_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    toast.success('Exported Workforce Master CSV!');
   };
 
   return (
@@ -303,6 +336,13 @@ export default function EmployeesPage() {
           {/* PRIMARY ACTION CLUSTER */}
           <div className="flex flex-wrap items-center gap-2">
             <Link
+              href="/employees/analysis"
+              className="flex items-center gap-1.5 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-900/50 text-[#1346a1] dark:text-sky-300 border border-sky-300 dark:border-sky-700/60 px-3.5 py-2 rounded-lg text-xs font-semibold shadow-xs transition-all"
+            >
+              <BarChart3 className="w-4 h-4 text-[#1346a1] dark:text-sky-400" />
+              <span>Analysis & Trends</span>
+            </Link>
+            <Link
               href="/employees/documents"
               className="flex items-center gap-1.5 bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-900 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 px-3.5 py-2 rounded-lg text-xs font-semibold shadow-xs transition-all"
             >
@@ -310,11 +350,21 @@ export default function EmployeesPage() {
               <span>Employee Documents</span>
             </Link>
             <button
-              onClick={handleExportCSV}
-              className="flex items-center gap-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-100 px-3.5 py-2 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 shadow-xs transition-all cursor-pointer"
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex items-center gap-1.5 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700/60 px-3.5 py-2 rounded-lg text-xs font-semibold shadow-xs transition-all cursor-pointer"
+              title="Bulk import employees via CSV with validation preview and Employee ID assignment"
             >
-              <Download className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-              <span>Export CSV</span>
+              <UploadCloud className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>Bulk Import</span>
+            </button>
+            <button
+              onClick={handleExportCSV}
+              disabled={isExportingCSV}
+              className="flex items-center gap-1.5 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-100 px-3.5 py-2 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 shadow-xs transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Download className={`w-4 h-4 text-slate-500 dark:text-slate-400 ${isExportingCSV ? 'animate-bounce' : ''}`} />
+              <span>{isExportingCSV ? 'Exporting...' : 'Export CSV'}</span>
             </button>
             <button
               ref={addEmployeeBtnRef}
@@ -700,6 +750,14 @@ export default function EmployeesPage() {
           </div>
         </div>
 
+        {/* 3. NEW HR ANALYSIS & CONNECTED-DOT TELEMETRY SECTION */}
+        <div id="hr-analysis-section" className="pt-6 border-t border-slate-200 dark:border-slate-800">
+          <HrAnalysisModule
+            initialLocationId={selectedLocation}
+            initialDeptId={selectedDept}
+          />
+        </div>
+
         {/* CREATE EMPLOYEE MODAL */}
         <AddEmployeeDialog
           isOpen={isAddModalOpen}
@@ -711,6 +769,16 @@ export default function EmployeesPage() {
           departmentsError={departmentsError}
           onRetryDepartments={fetchMetadata}
           triggerRef={addEmployeeBtnRef}
+        />
+
+        {/* ENTERPRISE BULK EMPLOYEE IMPORT & ID MANAGEMENT MODAL */}
+        <BulkImportModal
+          isOpen={isImportModalOpen}
+          onClose={() => setIsImportModalOpen(false)}
+          onSuccess={() => {
+            fetchEmployees();
+            drawerDataCacheRef.current = {};
+          }}
         />
 
         {/* Employee One-Time QR Pass Modal */}

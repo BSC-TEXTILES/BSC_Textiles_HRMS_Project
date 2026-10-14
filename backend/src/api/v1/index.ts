@@ -37,10 +37,13 @@ import lateFineRoutes from '../../routes/lateFines.js';
 import employeeDocumentRoutes from '../../routes/employeeDocuments.js';
 import myDeskRouter from '../../routes/myDesk.js';
 import localDatabaseRoutes from '../../routes/localDatabase.js';
+import analysisRoutes from '../../routes/analysis.js';
+import employeeImportRoutes, { employeeExportRouter } from '../../routes/employeeImport.js';
 
 export const apiV1Router = Router();
 
 // Domain Route Mounting under /api/v1 (or /api for backwards compatibility)
+apiV1Router.use('/analysis', analysisRoutes);
 apiV1Router.use('/system', localDatabaseRoutes);
 apiV1Router.use('/my-desk', myDeskRouter);
 apiV1Router.use('/auth', authRoutes);
@@ -54,6 +57,10 @@ apiV1Router.use('/sections', sectionRoutes);
 apiV1Router.use('/selling-points', sellingPointRoutes);
 apiV1Router.use('/employees/documents', employeeDocumentRoutes);
 apiV1Router.use('/employee-documents', employeeDocumentRoutes);
+// Bulk import + workforce export MUST be mounted before the generic
+// /employees router, otherwise /employees/:id would swallow them.
+apiV1Router.use('/employees/import', employeeImportRoutes);
+apiV1Router.use('/employees/export', employeeExportRouter);
 apiV1Router.use('/employees', employeeRoutes);
 apiV1Router.use('/shifts', shiftRoutes);
 apiV1Router.use('/attendance', attendanceRoutes);

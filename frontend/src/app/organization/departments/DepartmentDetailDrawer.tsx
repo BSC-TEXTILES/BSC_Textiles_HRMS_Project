@@ -426,9 +426,9 @@ export function DepartmentDetailDrawer({
                   {/* Enterprise Overview Banner */}
                   <div className="p-4 rounded-xl bg-gradient-to-br from-[#1346a1] to-[#551E24] text-white space-y-1.5 shadow-sm">
                     <div className="text-[10px] font-bold uppercase tracking-wider text-[#E8DCC6]">Karnataka Topology</div>
-                    <div className="text-xl font-bold tracking-tight">4 Retail & Weaving Hubs Active</div>
+                    <div className="text-xl font-bold tracking-tight">3 Retail & Weaving Hubs Active</div>
                     <p className="text-xs text-white/80">
-                      Covers Belagavi Head Store (BEL), Davanagere Mega Store (DAV), Shivamogga Flagship (SHI), and Hubballi Test Hub (HUB).
+                      Covers Belagavi Head Store (BEL), Davanagere Mega Store (DAV), and Shivamogga Flagship (SHI).
                     </p>
                   </div>
 
@@ -777,8 +777,8 @@ export function DepartmentDetailDrawer({
                       },
                       {
                         title: 'Store Coverage Verification',
-                        desc: 'Active retail coverage at Belagavi, Davanagere, Shivamogga, and Hubballi.',
-                        status: '4/4 Hubs Operational',
+                        desc: 'Active retail coverage at Belagavi, Davanagere, and Shivamogga.',
+                        status: '3/3 Hubs Operational',
                         state: 'ok',
                       },
                     ].map((item, idx) => (

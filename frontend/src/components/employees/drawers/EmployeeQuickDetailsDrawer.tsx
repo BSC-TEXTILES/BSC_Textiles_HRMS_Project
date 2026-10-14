@@ -67,7 +67,7 @@ export function EmployeeQuickDetailsDrawer({
   const locationName =
     employee.location?.name || employee.locationName || 'Unassigned Hub';
   const locationCode =
-    employee.location?.code || employee.locationCode || 'HUB';
+    employee.location?.code || employee.locationCode || 'BEL';
   const departmentName =
     employee.department?.name || employee.departmentName || 'General Staff';
   const floorName =

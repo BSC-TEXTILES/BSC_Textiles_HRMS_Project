@@ -493,7 +493,7 @@ export default function FloorOverviewPage() {
                 }}
                 className="w-full text-xs font-semibold rounded-lg border border-slate-200 px-2.5 py-1.5 bg-slate-50/50 text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
               >
-                <option value="ALL">All Showrooms (BEL, DAV, SHI, HUB)</option>
+                <option value="ALL">All Showrooms (BEL, DAV, SHI)</option>
                 {availableFilters.locations.map(loc => (
                   <option key={loc.id} value={loc.code}>
                     [{loc.code}] {loc.name}

@@ -100,6 +100,8 @@ function getBadgeClasses(badgeText: string, isActive: boolean) {
       return 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40';
     case 'RBAC':
       return 'bg-indigo-500/20 text-indigo-300 border border-indigo-400/40';
+    case 'Analytics':
+      return 'bg-sky-500/20 text-sky-300 border border-sky-400/40 font-bold';
     default:
       return 'bg-white/10 text-blue-100 border border-white/15';
   }
@@ -131,6 +133,7 @@ const enterpriseNavigation: NavSectionConfig[] = [
     },
     items: [
       { title: 'All Employees', href: '/employees', icon: Users },
+      { title: 'Analysis', href: '/employees/analysis', icon: BarChart3, badge: 'Analytics' },
       { title: 'Profile 360 & Dossier', href: '/employees/profile', icon: Contact },
       { title: 'Employee Documents', href: '/employees/documents', icon: FolderLock, badge: 'Dossier' },
       { title: 'Departments & Units', href: '/organization/departments', icon: Building2 },
@@ -148,7 +151,6 @@ const enterpriseNavigation: NavSectionConfig[] = [
     },
     items: [
       { title: 'KYC Verification', href: '/operations/kyc', icon: ShieldCheck, badge: 'DigiLocker' },
-      { title: 'Digital Document Verification', href: '/employees/profile?tab=documents', icon: FileText, badge: 'UIDAI' },
     ],
   },
   {
@@ -176,7 +178,6 @@ const enterpriseNavigation: NavSectionConfig[] = [
     },
     items: [
       { title: 'Biometric Punches', href: '/attendance/punches', icon: Fingerprint },
-      { title: 'Digital QR Passes', href: '/attendance/qr-codes', icon: QrCode, badge: 'Daily' },
       { title: 'Floor Shifts & Rosters', href: '/attendance/shifts', icon: Calendar },
       { title: 'Late & Fine Management', href: '/attendance/late-fines', icon: AlertTriangle, badge: 'Policy' },
       { title: 'Lunch & Break Tracker', href: '/attendance/breaks', icon: Coffee },
@@ -260,6 +261,35 @@ function formatTimeAgo(dateString: string): string {
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
+}
+
+function checkIsActive(itemHref: string, currentPath: string): boolean {
+  if (currentPath === itemHref) return true;
+  if (itemHref.includes('?')) return currentPath === itemHref;
+
+  if (itemHref === '/dashboard') return currentPath === '/dashboard';
+
+  if (itemHref === '/employees') {
+    const isSpecialSubroute = [
+      '/employees/analysis',
+      '/employees/profile',
+      '/employees/documents',
+      '/employees/former',
+    ].some((sub) => currentPath.startsWith(sub));
+    return !isSpecialSubroute && (currentPath === '/employees' || currentPath.startsWith('/employees/'));
+  }
+
+  if (itemHref === '/payroll') {
+    const isSpecialPayrollSubroute = [
+      '/payroll/payslips',
+      '/payroll/salary-structure',
+      '/payroll/reports',
+    ].some((sub) => currentPath.startsWith(sub));
+    return !isSpecialPayrollSubroute && (currentPath === '/payroll' || currentPath.startsWith('/payroll/'));
+  }
+
+  const itemBase = itemHref.split('?')[0];
+  return currentPath.startsWith(itemBase + '/');
 }
 
 export function DashboardLayout({
@@ -502,8 +532,7 @@ export function DashboardLayout({
                   )}
                   <div className="space-y-0.5">
                     {section.items.map((item) => {
-                      const itemPath = item.href.split('?')[0];
-                      const isActive = pathname === item.href || (item.href !== '/dashboard' && !item.href.includes('?') && pathname.startsWith(itemPath));
+                      const isActive = checkIsActive(item.href, pathname);
                       const IconComponent = item.icon;
 
                       return (
@@ -615,8 +644,7 @@ export function DashboardLayout({
                       </div>
                       <div className="space-y-0.5 mt-1">
                         {sec.items.map((i) => {
-                          const itemPath = i.href.split('?')[0];
-                          const isItemActive = pathname === i.href || (i.href !== '/dashboard' && !i.href.includes('?') && pathname.startsWith(itemPath));
+                          const isItemActive = checkIsActive(i.href, pathname);
                           const IconComp = i.icon;
                           return (
                             <Link

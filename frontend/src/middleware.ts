@@ -1,5 +1,6 @@
 import { withAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
+import { getRoleHomePath } from '@/lib/roles';
 
 /**
  * Frontend RBAC rules. They mirror the sidebar filtering in
@@ -82,9 +83,13 @@ export default withAuth(
     const token = req.nextauth?.token;
     const pathname = req.nextUrl.pathname;
 
-    // Public landing page: always allow visitors to view / directly
+    // Root path: redirect to dashboard/home if authenticated, or login if not
     if (pathname === '/') {
-      return NextResponse.next();
+      if (token) {
+        const dest = getRoleHomePath(token.role as string);
+        return NextResponse.redirect(new URL(dest, req.url));
+      }
+      return NextResponse.redirect(new URL('/login', req.url));
     }
 
     if (!isAllowed(pathname, token?.role)) {
@@ -104,7 +109,7 @@ export default withAuth(
         const pathname = req.nextUrl.pathname;
 
         // Public routes.
-        if (pathname === '/' || pathname === '/login' || pathname === '/403') return true;
+        if (pathname === '/login' || pathname === '/403') return true;
         if (pathname.startsWith('/api/auth')) return true;
 
         return !!token;
@@ -115,6 +120,7 @@ export default withAuth(
 
 export const config = {
   matcher: [
+    '/',
     '/dashboard',
     '/dashboard/:path*',
     '/employees',
