@@ -15,14 +15,14 @@ const createHandler = (message: string) => (req: any, res: any) => {
 
 /**
  * Auth Critical Limiter: Login, Register, MFA Verify
- * 5 requests per 1 minute
+ * Maximum 10 attempts per 1 minute
  */
 export const authCriticalLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: process.env.NODE_ENV === 'production' ? 5 : 200,
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  handler: createHandler('Too many authentication attempts. Please wait a minute before trying again.'),
+  handler: createHandler('Too many authentication attempts. Maximum 10 attempts per minute allowed. Please wait before retrying.'),
   keyGenerator: (req) => {
     const ip = req.ip || req.socket.remoteAddress || '127.0.0.1';
     const email = (req.body?.email || '').toLowerCase().trim();
@@ -32,34 +32,34 @@ export const authCriticalLimiter = rateLimit({
 
 /**
  * Auth Sensitive Limiter: Forgot Password, Reset Password, Verify Email
- * 3 requests per 1 hour
+ * Maximum 10 requests per 1 hour
  */
 export const authSensitiveLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
-  max: 5, // slightly more forgiving in test environments, but strict in production
+  max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  handler: createHandler('Password reset or verification request limit reached. Please wait before retrying.'),
+  handler: createHandler('Password reset or verification request limit reached. Maximum 10 attempts per hour. Please wait before retrying.'),
 });
 
 /**
- * File Upload Limiter: 10 uploads per 1 minute
+ * File Upload Limiter: Maximum 10 uploads/validations per 1 minute
  */
 export const uploadLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  handler: createHandler('File upload frequency exceeded. Please wait a moment.'),
+  handler: createHandler('File upload frequency exceeded. Maximum 10 upload/validation attempts per minute allowed. Please wait a moment.'),
 });
 
 /**
- * Data Export Limiter: 5 exports per 1 minute
+ * Data Export Limiter: Maximum 10 exports/downloads per 1 minute
  */
 export const exportLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  handler: createHandler('Bulk export rate limit exceeded. Please allow the server to process current reports.'),
+  handler: createHandler('Bulk export rate limit exceeded. Maximum 10 download attempts per minute allowed. Please allow the server to process current reports.'),
 });

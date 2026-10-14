@@ -17,7 +17,7 @@ export class PasswordService {
   };
 
   private static readonly MAX_HISTORY_CHECK = 12;
-  private static readonly MAX_FAILED_ATTEMPTS = 5;
+  private static readonly MAX_FAILED_ATTEMPTS = 10;
   private static readonly LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
   /**
