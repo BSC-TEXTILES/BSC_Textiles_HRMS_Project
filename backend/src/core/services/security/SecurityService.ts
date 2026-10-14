@@ -5,7 +5,7 @@
 import { Pool } from 'mysql2/promise';
 import { v4 as uuid } from 'uuid';
 
-const MAX_FAILED_ATTEMPTS = 5;
+const MAX_FAILED_ATTEMPTS = 10;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000;   // 15 min lockout
 const BRUTE_FORCE_WINDOW_MS = 15 * 60 * 1000; // 15 min window
 const IP_RATE_LIMIT = 20;                      // max failed per IP in window

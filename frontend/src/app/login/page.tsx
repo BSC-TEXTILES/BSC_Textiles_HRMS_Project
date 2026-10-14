@@ -135,6 +135,14 @@ function LoginFormContent() {
         });
         const rawText = await loginRes.text().catch(() => '');
         const loginData = safeJsonParse<any>(rawText, {});
+        if (loginRes.status === 429) {
+          const rateMsg = loginData?.message || 'Rate limit reached: Maximum 10 attempts in 1 minute allowed. Please wait before retrying.';
+          clearStoredCredentials();
+          setErrorMessage(rateMsg);
+          toast.error(rateMsg);
+          setIsLoading(false);
+          return;
+        }
         if (loginRes.ok && loginData?.token) {
           directToken = loginData.token;
           directUser = loginData.user;
