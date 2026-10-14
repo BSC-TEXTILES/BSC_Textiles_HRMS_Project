@@ -17,6 +17,8 @@ import {
   ImportActor,
   ImportMode,
   buildTemplateCsv,
+  buildTemplateExcel,
+  excelToCsv,
   buildEmployeeExportCsv,
   canImport,
   canViewSensitive,
@@ -106,21 +108,39 @@ function importAccess(level: 'view' | 'edit') {
 }
 
 const csvBodySchema = z.object({
-  csv: z.string().min(1, 'CSV content is required').max(MAX_CSV_BYTES, 'CSV file is too large (max 5 MB)'),
+  csv: z.string().max(MAX_CSV_BYTES, 'CSV file is too large (max 5 MB)').optional().default(''),
+  fileBase64: z.string().optional(),
   fileName: z.string().max(255).optional().default('employees.csv'),
   mode: z.enum(['new', 'update', 'upsert']),
 });
 
 function rejectUnsafeFile(fileName: string, res: Response): boolean {
   const name = String(fileName || '').trim();
-  if (!/\.csv$/i.test(name)) {
+  if (!/\.(csv|xlsx|xls)$/i.test(name)) {
     res.status(400).json({
       error: 'Unsupported file type',
-      message: 'Only .csv files are accepted. Download the sample template and fill it in.',
+      message: 'Only .csv and .xlsx files are accepted. Download the official template and fill it in.',
     });
     return true;
   }
   return false;
+}
+
+/** Resolve CSV text from either raw text or uploaded Excel base64 */
+async function resolvePayloadCsv(data: { csv?: string; fileBase64?: string; fileName: string }): Promise<string> {
+  const isExcel = /\.(xlsx|xls)$/i.test(data.fileName);
+  if (isExcel && data.fileBase64) {
+    const buffer = Buffer.from(data.fileBase64, 'base64');
+    return excelToCsv(buffer);
+  }
+  if (data.fileBase64 && !data.csv) {
+    const buffer = Buffer.from(data.fileBase64, 'base64');
+    if (buffer.length > 4 && buffer[0] === 0x50 && buffer[1] === 0x4b) {
+      return excelToCsv(buffer);
+    }
+    return buffer.toString('utf-8');
+  }
+  return data.csv || '';
 }
 
 /** Shape-check the uploaded text before parsing (structure, size, row count). */
@@ -130,12 +150,12 @@ function checkCsvStructure(csv: string, res: Response): boolean {
     return true;
   }
   // Reject control characters (excluding tab/CR/LF) — a reliable signal that
-  // the file is binary (e.g. an .xlsx renamed to .csv) rather than UTF-8 text.
+  // the file is binary rather than UTF-8 text.
   const controlCount = (csv.match(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g) || []).length;
   if (controlCount > 0) {
     res.status(400).json({
       error: 'Binary or corrupt file',
-      message: 'The file does not look like a UTF-8 CSV document. Re-save it as CSV (UTF-8).',
+      message: 'The file does not look like a valid CSV document. Please use the official CSV or Excel template.',
     });
     return true;
   }
@@ -151,18 +171,55 @@ function checkCsvStructure(csv: string, res: Response): boolean {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /template — sample CSV generated from the live import schema
+// GET /template — sample template (CSV by default, formatted XLSX when requested)
 // ─────────────────────────────────────────────────────────────────────────────
-router.get('/template', exportLimiter, authorize('VIEW'), importAccess('view'), async (_req: AuthRequest, res: Response) => {
+router.get('/template', exportLimiter, authorize('VIEW'), importAccess('view'), async (req: AuthRequest, res: Response) => {
+  try {
+    const format = String(req.query.format || '').toLowerCase();
+    if (format === 'excel' || format === 'xlsx') {
+      const buffer = await buildTemplateExcel();
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', 'attachment; filename="bsc_textiles_employee_import_template.xlsx"');
+      res.setHeader('Cache-Control', 'no-store');
+      return res.send(buffer);
+    }
+
+    const csv = await buildTemplateCsv();
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="bsc_textiles_employee_import_template.csv"');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.send('\uFEFF' + csv); // BOM so Excel opens Unicode names correctly
+  } catch (err: any) {
+    console.error('Template download error:', err);
+    return res.status(500).json({ error: 'Failed to generate the sample template' });
+  }
+});
+
+// Dedicated /template/excel endpoint
+router.get('/template/excel', exportLimiter, authorize('VIEW'), importAccess('view'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const buffer = await buildTemplateExcel();
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="bsc_textiles_employee_import_template.xlsx"');
+    res.setHeader('Cache-Control', 'no-store');
+    return res.send(buffer);
+  } catch (err: any) {
+    console.error('Excel template download error:', err);
+    return res.status(500).json({ error: 'Failed to generate the Excel template' });
+  }
+});
+
+// Dedicated /template/csv endpoint
+router.get('/template/csv', exportLimiter, authorize('VIEW'), importAccess('view'), async (_req: AuthRequest, res: Response) => {
   try {
     const csv = await buildTemplateCsv();
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="bsc_textiles_employee_import_template.csv"');
     res.setHeader('Cache-Control', 'no-store');
-    res.send('\uFEFF' + csv); // BOM so Excel opens Unicode names correctly
+    return res.send('\uFEFF' + csv);
   } catch (err: any) {
-    console.error('Template download error:', err);
-    res.status(500).json({ error: 'Failed to generate the sample CSV template' });
+    console.error('CSV template download error:', err);
+    return res.status(500).json({ error: 'Failed to generate the CSV template' });
   }
 });
 
@@ -182,11 +239,13 @@ router.post(
         message: parsedBody.error.issues[0]?.message || 'Invalid upload payload',
       });
     }
-    const { csv, fileName, mode } = parsedBody.data;
+    const { fileName, mode } = parsedBody.data;
     if (rejectUnsafeFile(fileName, res)) return;
-    if (checkCsvStructure(csv, res)) return;
 
     try {
+      const csv = await resolvePayloadCsv(parsedBody.data);
+      if (checkCsvStructure(csv, res)) return;
+
       const actor = toActor(req);
       if (!canImport(actor)) {
         return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
@@ -195,7 +254,7 @@ router.post(
       return res.json(preview);
     } catch (err: any) {
       console.error('Import preview error:', err);
-      return res.status(500).json({ error: 'Failed to validate the CSV file', message: err?.message });
+      return res.status(500).json({ error: 'Failed to validate the file', message: err?.message });
     }
   }
 );
@@ -216,11 +275,13 @@ router.post(
         message: parsedBody.error.issues[0]?.message || 'Invalid import payload',
       });
     }
-    const { csv, fileName, mode } = parsedBody.data;
+    const { fileName, mode } = parsedBody.data;
     if (rejectUnsafeFile(fileName, res)) return;
-    if (checkCsvStructure(csv, res)) return;
 
     try {
+      const csv = await resolvePayloadCsv(parsedBody.data);
+      if (checkCsvStructure(csv, res)) return;
+
       const actor = toActor(req);
       if (!canImport(actor)) {
         return res.status(403).json({ error: 'Forbidden: insufficient permissions' });
