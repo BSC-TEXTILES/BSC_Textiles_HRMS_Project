@@ -195,21 +195,22 @@ export function resolveLocationCodeToId(val?: any): string | undefined {
   if (!val || val === 'all' || val === 'ALL') return undefined;
   const s = String(val).toLowerCase();
   const map: Record<string, string> = {
-    bel: 'cmuzam5fe00014n4pq25hkcww',
-    belagavi: 'cmuzam5fe00014n4pq25hkcww',
-    loc_bel: 'cmuzam5fe00014n4pq25hkcww',
-    cmuwszr8t00011vdtc7vgvags: 'cmuzam5fe00014n4pq25hkcww',
-    dav: 'cmuzam5fr00024n4p4izbomev',
-    davanagere: 'cmuzam5fr00024n4p4izbomev',
-    loc_dav: 'cmuzam5fr00024n4p4izbomev',
-    cmuwszr9500021vdtxscy3nsc: 'cmuzam5fr00024n4p4izbomev',
-    shi: 'cmuzam5g400034n4p89o33l8e',
-    shivamogga: 'cmuzam5g400034n4p89o33l8e',
-    loc_shi: 'cmuzam5g400034n4p89o33l8e',
-    cmuwszr9n00031vdtvdf7o734: 'cmuzam5g400034n4p89o33l8e',
-    hub: 'cmuzam5gf00044n4pb43g9y4v',
-    hubballi: 'cmuzam5gf00044n4pb43g9y4v',
-    loc_hub: 'cmuzam5gf00044n4pb43g9y4v',
+    bel: 'cmuwszr8t00011vdtc7vgvags',
+    belagavi: 'cmuwszr8t00011vdtc7vgvags',
+    loc_bel: 'cmuwszr8t00011vdtc7vgvags',
+    cmuzam5fe00014n4pq25hkcww: 'cmuwszr8t00011vdtc7vgvags',
+    cmuwszr8t00011vdtc7vgvags: 'cmuwszr8t00011vdtc7vgvags',
+    dav: 'cmuwszr9500021vdtxscy3nsc',
+    davanagere: 'cmuwszr9500021vdtxscy3nsc',
+    loc_dav: 'cmuwszr9500021vdtxscy3nsc',
+    cmuzam5fr00024n4p4izbomev: 'cmuwszr9500021vdtxscy3nsc',
+    cmuwszr9500021vdtxscy3nsc: 'cmuwszr9500021vdtxscy3nsc',
+    shi: 'cmuwszr9s00031vdtqlwzkrw8',
+    shivamogga: 'cmuwszr9s00031vdtqlwzkrw8',
+    loc_shi: 'cmuwszr9s00031vdtqlwzkrw8',
+    cmuzam5g400034n4p89o33l8e: 'cmuwszr9s00031vdtqlwzkrw8',
+    cmuwszr9s00031vdtqlwzkrw8: 'cmuwszr9s00031vdtqlwzkrw8',
+    cmuwszr9n00031vdtvdf7o734: 'cmuwszr9s00031vdtqlwzkrw8',
   };
   return map[s] || String(val);
 }

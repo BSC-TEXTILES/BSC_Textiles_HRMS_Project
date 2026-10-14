@@ -75,7 +75,6 @@ export async function setupOrganizationHubs() {
     { id: 'cmuzam5fe00014n4pq25hkcww', code: 'BEL' },
     { id: 'cmuzam5fr00024n4p4izbomev', code: 'DAV' },
     { id: 'cmuzam5g400034n4p89o33l8e', code: 'SHI' },
-    { id: hubLocId, code: 'HUB' },
   ]) {
     const [existingNight]: any = await pool.query('SELECT id FROM shift WHERE locationId = ? AND code = ?', [loc.id, 'NIGHT']);
     if (!existingNight || existingNight.length === 0) {

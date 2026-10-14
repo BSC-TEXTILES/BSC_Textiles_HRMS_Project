@@ -11,7 +11,12 @@ import { BscHolidaysCalendar } from '@/components/dashboard/BscHolidaysCalendar'
 import { KarnatakaHubsCardSection } from '@/components/dashboard/KarnatakaHubsCardSection';
 import { ExecutiveShiftFilter, type ShiftOptionItem } from '@/components/dashboard/ExecutiveShiftFilter';
 import { ExecutiveDeptFilter, type DeptOptionItem } from '@/components/dashboard/ExecutiveDeptFilter';
-import { CreateCustomShiftModal, type CreatedBatchResult } from '@/components/dashboard/CreateCustomShiftModal';
+import type { CreatedBatchResult } from '@/components/dashboard/CreateCustomShiftModal';
+import { ExecutiveHeaderSearch } from '@/components/dashboard/ExecutiveHeaderSearch';
+import {
+  ExecutiveSearchResultsDrawer,
+  type SearchResultsData,
+} from '@/components/dashboard/ExecutiveSearchResultsDrawer';
 import api from '@/lib/api';
 
 // Dynamically import heavy modals to eliminate ~5MB from the initial critical JS bundle
@@ -657,9 +662,9 @@ export default function DashboardPage() {
       activeShiftLabel={activeShiftHeaderLabel}
       headerSearchSlot={
         <ExecutiveHeaderSearch
-          onSelectDept={(deptId) => setSelectedDept(deptId)}
-          onSelectHub={(hubId) => setSelectedHub(hubId)}
-          onOpenSearchDrawer={(q, r) => {
+          onSelectDept={(deptId: string) => setSelectedDept(deptId)}
+          onSelectHub={(hubId: string) => setSelectedHub(hubId)}
+          onOpenSearchDrawer={(q: string, r: SearchResultsData) => {
             setSearchDrawerQuery(q);
             setSearchDrawerResults(r);
             setSearchDrawerOpen(true);
@@ -1272,8 +1277,8 @@ export default function DashboardPage() {
         onClose={() => setSearchDrawerOpen(false)}
         query={searchDrawerQuery}
         results={searchDrawerResults}
-        onSelectDept={(deptId) => setSelectedDept(deptId)}
-        onSelectHub={(hubId) => setSelectedHub(hubId)}
+        onSelectDept={(deptId: string) => setSelectedDept(deptId)}
+        onSelectHub={(hubId: string) => setSelectedHub(hubId)}
         selectedHubId={selectedHub}
       />
     </DashboardLayout>
