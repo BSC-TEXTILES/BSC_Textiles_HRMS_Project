@@ -1,13 +1,13 @@
-import mysql from 'mysql2/promise';
+import { pool } from '../nativeDb.js';
 import crypto from 'crypto';
 
 function genId(prefix = 'lar') {
   return prefix + Date.now().toString(36) + crypto.randomBytes(6).toString('hex');
 }
 
-async function run() {
-  const conn = await mysql.createConnection('mysql://root@localhost:3306/bsc_textiles_hrms');
-  console.log('Connected to MySQL database...');
+export async function setupLateFines() {
+  const conn = pool;
+  console.log('Connected to MySQL database via pool...');
 
   // 1. Create late_attendance_record table
   await conn.query(`
@@ -50,13 +50,14 @@ async function run() {
   `);
   console.log('late_attendance_record table ready.');
 
-  // 2. Fetch employees and shifts
+  // 2. Fetch active employees and shifts
   const [employees]: any = await conn.query(`
     SELECT id, employeeCode, fullName, designation, departmentId, locationId, shiftId 
     FROM employee 
+    WHERE status = 'ACTIVE'
     ORDER BY employeeCode ASC
   `);
-  console.log(`Found ${employees.length} employees.`);
+  console.log(`Found ${employees.length} active employees.`);
 
   const [shifts]: any = await conn.query(`SELECT id, name, locationId, gracePeriod FROM shift`);
   const [rules]: any = await conn.query(`SELECT * FROM attendancerules LIMIT 1`);
@@ -64,7 +65,14 @@ async function run() {
   const graceMinutes = activeRule.gracePeriodMinutes || 5;
   const fineRatePerSec = Number(activeRule.latePenaltyRatePerSecond || 1.0);
 
-  // 3. Clear existing late records to re-seed cleanly
+  // 3. Check if table is already seeded
+  const [existing]: any = await conn.query('SELECT id FROM late_attendance_record LIMIT 1');
+  if (existing.length > 0 && process.env.FORCE_RESEED_LATE_FINES !== 'true') {
+    console.log('late_attendance_record already populated, skipping re-seed.');
+    return;
+  }
+
+  // Clear existing late records to re-seed cleanly
   await conn.query('DELETE FROM late_attendance_record');
   console.log('Cleared old late_attendance_records.');
 
@@ -280,8 +288,14 @@ async function run() {
   }
 
   console.log(`Successfully seeded ${dates.length} days of attendance & late fine records (${totalLateGenerated} late fine entries).`);
-  await conn.end();
   console.log('Setup finished!');
 }
 
-run().catch(console.error);
+if (process.argv[1]?.includes('setupLateFines')) {
+  setupLateFines()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}

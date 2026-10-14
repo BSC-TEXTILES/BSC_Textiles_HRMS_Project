@@ -1,13 +1,13 @@
-import mysql from 'mysql2/promise';
+import { pool } from '../nativeDb.js';
 import crypto from 'crypto';
 
 function genId(prefix = 'c') {
   return prefix + Date.now().toString(36) + crypto.randomBytes(6).toString('hex');
 }
 
-async function run() {
-  const conn = await mysql.createConnection('mysql://root@localhost:3306/bsc_textiles_hrms');
-  console.log('Connected to MySQL...');
+export async function setupRetailOperations() {
+  const conn = pool;
+  console.log('Connected to MySQL via pool for retail operations...');
 
   // 1. Create tables
   await conn.query(`
@@ -260,8 +260,14 @@ async function run() {
     console.log(`Seeded authentic retail sales transactions successfully.`);
   }
 
-  await conn.end();
   console.log('Setup finished successfully!');
 }
 
-run().catch(console.error);
+if (process.argv[1]?.includes('setupRetailOperations')) {
+  setupRetailOperations()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}

@@ -798,8 +798,20 @@ router.get('/payslip/:itemId/pdf', async (req: AuthRequest, res) => {
       }
     }
 
-    const [settingsRows]: any = await pool.query(`SELECT * FROM payroll_settings LIMIT 1`);
-    const settings = settingsRows[0] || {};
+    let settings: any = {
+      companyName: 'BSC Textiles Private Limited',
+      companyAddress: '#104 Silk Mill Road, Industrial Area, Belagavi, Karnataka – 590014\nGSTIN: 29AAACB1234F1Z5 | TAN: BLRB12345C',
+      signatoryName: 'Sunita Deshmukh',
+      signatoryDesignation: 'Head of Human Resources & Statutory Compliance',
+    };
+    try {
+      const [settingsRows]: any = await pool.query(`SELECT * FROM payroll_settings LIMIT 1`);
+      if (settingsRows && settingsRows[0]) {
+        settings = { ...settings, ...settingsRows[0] };
+      }
+    } catch (e: any) {
+      console.warn('Could not query payroll_settings, using fallback:', e.message);
+    }
 
     const pdfData: PayslipPdfData = {
       id: p.id,
@@ -843,7 +855,7 @@ router.get('/payslip/:itemId/pdf', async (req: AuthRequest, res) => {
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.send(pdfBuffer);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Generate PDF error:', error);
     res.status(500).json({ error: 'Failed to generate payslip PDF' });
   }

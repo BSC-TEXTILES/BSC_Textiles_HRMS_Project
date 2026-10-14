@@ -743,14 +743,22 @@ export default function EmployeeDocumentsPage() {
                             </span>
                           )}
                         </td>
-                        <td className="py-2.5 px-3 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              onClick={() => handleOpenDossier(emp.id)}
-                              className="px-2.5 py-1 rounded bg-[#722F37] hover:bg-[#5B232A] text-white font-semibold text-[11px] transition-colors"
+                        <td className="py-2.5 px-3 text-right whitespace-nowrap min-w-[170px]">
+                          <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                            <Link
+                              href={`/employees/profile/${emp.id}`}
+                              aria-label={`View profile for ${emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || 'Employee'}`}
+                              title="Open the complete employee profile"
+                              onKeyDown={(e) => {
+                                if (e.key === ' ') {
+                                  e.preventDefault();
+                                  (e.currentTarget as HTMLElement).click();
+                                }
+                              }}
+                              className="px-2.5 py-1 rounded bg-[#722F37] hover:bg-[#5B232A] text-white font-semibold text-[11px] transition-colors whitespace-nowrap inline-flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-[#722F37] focus-visible:ring-offset-1"
                             >
-                              Open Dossier
-                            </button>
+                              View Profile
+                            </Link>
                             <button
                               onClick={() => {
                                 setUploadForm(prev => ({ ...prev, employeeId: emp.id }));

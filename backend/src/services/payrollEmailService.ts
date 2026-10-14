@@ -16,8 +16,20 @@ export async function sendPayslipEmail(
 ): Promise<EmailResult> {
   try {
     // 1. Fetch settings from DB or env
-    const [settingsRows]: any = await pool.query(`SELECT * FROM payroll_settings LIMIT 1`);
-    const settings = settingsRows[0] || {};
+    let settings: any = {
+      companyName: 'BSC Textiles Private Limited',
+      companyAddress: '#104 Silk Mill Road, Industrial Area, Belagavi, Karnataka – 590014\nGSTIN: 29AAACB1234F1Z5 | TAN: BLRB12345C',
+      signatoryName: 'Sunita Deshmukh',
+      signatoryDesignation: 'Head of Human Resources & Statutory Compliance',
+    };
+    try {
+      const [settingsRows]: any = await pool.query(`SELECT * FROM payroll_settings LIMIT 1`);
+      if (settingsRows && settingsRows[0]) {
+        settings = { ...settings, ...settingsRows[0] };
+      }
+    } catch (e: any) {
+      console.warn('Could not query payroll_settings in sendPayslipEmail, using fallback:', e.message);
+    }
 
     const smtpHost = process.env.SMTP_HOST || settings.smtpHost;
     const smtpPort = Number(process.env.SMTP_PORT || settings.smtpPort || 587);

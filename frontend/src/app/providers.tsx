@@ -6,6 +6,9 @@ import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { NotificationProvider } from '@/context/NotificationContext';
 
+import { DashboardShellProvider } from '@/context/DashboardShellContext';
+import { AppShell } from '@/components/layout/AppShell';
+
 export function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handleRejection = (event: PromiseRejectionEvent) => {
@@ -31,7 +34,11 @@ export function Providers({ children }: { children: ReactNode }) {
     <SessionProvider refetchOnWindowFocus={false} refetchWhenOffline={false}>
       <ThemeProvider>
         <NotificationProvider>
-          {children}
+          <DashboardShellProvider>
+            <AppShell>
+              {children}
+            </AppShell>
+          </DashboardShellProvider>
         </NotificationProvider>
         <Toaster position="top-right" />
       </ThemeProvider>

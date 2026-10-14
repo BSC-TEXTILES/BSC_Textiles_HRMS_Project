@@ -237,11 +237,12 @@ export default function LandingPage() {
               {/* Right Column: Modern Flagship Showroom Interior with modern framing */}
               <div className="lg:col-span-5">
                 <div className="group relative rounded-2xl overflow-hidden border border-slate-200/90 dark:border-slate-700 shadow-[0_12px_36px_rgba(0,0,0,0.08)] bg-slate-100 dark:bg-slate-800">
-                  <div className="relative aspect-4/3 sm:aspect-5/4 w-full overflow-hidden">
+                  <div className="relative aspect-[4/3] sm:aspect-[5/4] w-full min-h-[260px] overflow-hidden">
                     <Image
                       src="/images/showroom_modern.jpg"
                       alt="BSC Textiles Modern Flagship Showroom"
                       fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 45vw, 40vw"
                       className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                       priority
                     />
@@ -269,11 +270,12 @@ export default function LandingPage() {
               {/* Left Column: Modern Design Atelier Photography */}
               <div className="lg:col-span-5 order-2 lg:order-1">
                 <div className="group relative rounded-2xl overflow-hidden border border-slate-200/90 dark:border-slate-700 shadow-[0_12px_36px_rgba(0,0,0,0.06)] bg-white dark:bg-slate-800">
-                  <div className="relative aspect-4/3 w-full overflow-hidden">
+                  <div className="relative aspect-[4/3] w-full min-h-[260px] overflow-hidden">
                     <Image
                       src="/images/atelier_modern.jpg"
                       alt="Contemporary textile design atelier and weaving studio"
                       fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 45vw, 40vw"
                       className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                     />
                   </div>
@@ -358,11 +360,12 @@ export default function LandingPage() {
               
               <div className="lg:col-span-5">
                 <div className="group relative rounded-2xl overflow-hidden border border-slate-200/90 dark:border-slate-700 shadow-[0_12px_36px_rgba(0,0,0,0.06)] bg-white dark:bg-slate-800">
-                  <div className="relative aspect-4/3 w-full overflow-hidden">
+                  <div className="relative aspect-[4/3] w-full min-h-[260px] overflow-hidden">
                     <Image
                       src="/images/depot_modern.jpg"
                       alt="Modern textile design warehouse and fabric distribution depot"
                       fill
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 45vw, 40vw"
                       className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
                     />
                   </div>

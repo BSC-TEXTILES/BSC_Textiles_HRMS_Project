@@ -36,10 +36,12 @@ import { staffOpsRouter, observationLevelsRouter } from '../../routes/workerOps.
 import lateFineRoutes from '../../routes/lateFines.js';
 import employeeDocumentRoutes from '../../routes/employeeDocuments.js';
 import myDeskRouter from '../../routes/myDesk.js';
+import searchRoutes from '../../routes/search.js';
 
 export const apiV1Router = Router();
 
 // Domain Route Mounting under /api/v1 (or /api for backwards compatibility)
+apiV1Router.use('/search', searchRoutes);
 apiV1Router.use('/my-desk', myDeskRouter);
 apiV1Router.use('/auth', authRoutes);
 apiV1Router.use('/security', securityRoutes);

@@ -120,6 +120,24 @@ export async function setupOrganizationHubs() {
   // Ensure ALL employees have locationId and departmentId set
   await pool.query(`UPDATE employee SET status = 'ACTIVE' WHERE status IS NULL OR status = ''`);
 
+  // Ensure an active Night Shift exists for each hub for overnight roster scheduling
+  for (const loc of [
+    { id: 'cmuzam5fe00014n4pq25hkcww', code: 'BEL' },
+    { id: 'cmuzam5fr00024n4p4izbomev', code: 'DAV' },
+    { id: 'cmuzam5g400034n4p89o33l8e', code: 'SHI' },
+    { id: hubLocId, code: 'HUB' },
+  ]) {
+    const [existingNight]: any = await pool.query('SELECT id FROM shift WHERE locationId = ? AND code = ?', [loc.id, 'NIGHT']);
+    if (!existingNight || existingNight.length === 0) {
+      await pool.query(
+        `INSERT INTO shift (id, name, code, locationId, startTime, endTime, gracePeriod, lateThreshold, status, createdAt, updatedAt)
+         VALUES (?, 'Night Shift', 'NIGHT', ?, '2024-01-01 22:00:00.000', '2024-01-02 06:00:00.000', 5, 15, 'ACTIVE', NOW(), NOW())`,
+        [`shift-night-${loc.code.toLowerCase()}`, loc.id]
+      );
+      console.log(`[setupOrganizationHubs] Seeded Night Shift for ${loc.code}`);
+    }
+  }
+
   cacheService.invalidatePrefix('locations');
   cacheService.invalidatePrefix('departments');
   console.log('[setupOrganizationHubs] Organization topology synchronized successfully.');
