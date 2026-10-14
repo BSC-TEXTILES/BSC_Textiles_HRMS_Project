@@ -363,13 +363,13 @@ export function GlobalHeaderSearch({
 
       {/* Input Container */}
       <div
-        className={`relative flex items-center bg-slate-100 dark:bg-[#10192e] rounded-lg border transition-all duration-150 px-3 py-1 shadow-xs ${
+        className={`relative flex items-center bg-white/15 focus-within:bg-white/25 rounded-lg border transition-all duration-150 px-3 py-1 shadow-xs ${
           isOpen
-            ? 'border-[#0058be] dark:border-[#3b82f6] ring-1 ring-[#0058be]/20'
-            : 'border-slate-200 dark:border-[#1f2d4e] hover:border-slate-300 dark:hover:border-slate-700'
+            ? 'border-white/50 ring-1 ring-white/30'
+            : 'border-white/25 hover:border-white/35'
         }`}
       >
-        <Search className="w-3.5 h-3.5 text-slate-400 mr-2 shrink-0" aria-hidden="true" />
+        <Search className="w-3.5 h-3.5 text-sky-200 mr-2 shrink-0" aria-hidden="true" />
         <input
           ref={inputRef}
           type="text"
@@ -388,7 +388,7 @@ export function GlobalHeaderSearch({
           }}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="w-full bg-transparent text-xs text-[#0b1c30] dark:text-white placeholder:text-slate-400 focus:outline-none"
+          className="w-full bg-transparent text-xs text-white placeholder:text-white/70 focus:outline-none"
         />
 
         {/* Clear Button */}
@@ -396,7 +396,7 @@ export function GlobalHeaderSearch({
           <button
             type="button"
             onClick={handleClear}
-            className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 transition-colors mr-1"
+            className="p-1 rounded-md text-white/80 hover:text-white hover:bg-white/10 transition-colors mr-1"
             aria-label="Clear search"
           >
             <X className="w-3 h-3" />
@@ -405,7 +405,7 @@ export function GlobalHeaderSearch({
 
         {/* Loading Spinner */}
         {loading && (
-          <Loader2 className="w-3.5 h-3.5 text-[#0058be] dark:text-[#3b82f6] animate-spin shrink-0" aria-label="Loading" />
+          <Loader2 className="w-3.5 h-3.5 text-white animate-spin shrink-0" aria-label="Loading" />
         )}
       </div>
 
