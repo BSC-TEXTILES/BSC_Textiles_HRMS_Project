@@ -71,11 +71,7 @@ export async function setupOrganizationHubs() {
   await pool.query(`UPDATE employee SET status = 'ACTIVE' WHERE status IS NULL OR status = ''`);
 
   // Ensure an active Night Shift exists for each hub for overnight roster scheduling
-  for (const loc of [
-    { id: 'cmuzam5fe00014n4pq25hkcww', code: 'BEL' },
-    { id: 'cmuzam5fr00024n4p4izbomev', code: 'DAV' },
-    { id: 'cmuzam5g400034n4p89o33l8e', code: 'SHI' },
-  ]) {
+  for (const loc of locations) {
     const [existingNight]: any = await pool.query('SELECT id FROM shift WHERE locationId = ? AND code = ?', [loc.id, 'NIGHT']);
     if (!existingNight || existingNight.length === 0) {
       await pool.query(

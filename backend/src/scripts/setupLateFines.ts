@@ -80,7 +80,7 @@ export async function setupLateFines() {
     `);
     await conn.query(`
       UPDATE late_attendance_record
-      SET earlyIncentive = MAX(1, ROUND((earlySeconds / 60.0) * 1.0))
+      SET earlyIncentive = GREATEST(1.00, ROUND((earlySeconds / 60.0) * 1.0))
       WHERE earlySeconds > 0
     `);
     console.log('late_attendance_record already populated, verified and migrated to PER_MINUTE.');
