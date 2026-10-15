@@ -12,6 +12,7 @@ import { GlobalHeaderSearch } from '@/components/layout/GlobalHeaderSearch';
 import { useDashboardShellContext } from '@/context/DashboardShellContext';
 import { 
   LayoutDashboard,
+  Cpu,
   UserCheck,
   Users,
   Contact,
@@ -485,7 +486,7 @@ export function DashboardLayoutFullShell({
         if (item.href.startsWith('/reports')) {
           return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole);
         }
-        if (item.href === '/attendance/calculation' || item.href === '/attendance/corrections' || item.href === '/attendance/missed-punching') {
+        if (item.href === '/attendance/calculation' || item.href === '/attendance/corrections' || item.href === '/attendance/missed-punching' || item.href === '/attendance/devices') {
           return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole);
         }
         if (item.href === '/employees' && !['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole)) {
