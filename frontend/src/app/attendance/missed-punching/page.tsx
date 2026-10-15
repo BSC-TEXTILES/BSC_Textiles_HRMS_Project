@@ -234,7 +234,26 @@ export default function MissedPunchingPage() {
         },
       });
       if (res.data?.folders) {
-        setFolders(res.data.folders);
+        // Guarantee unique combination of folderName + storeCode
+        const folderMap = new Map<string, FolderSummary>();
+        for (const f of res.data.folders) {
+          const key = `${f.folderName}__${f.storeCode}`;
+          if (folderMap.has(key)) {
+            const existing = folderMap.get(key)!;
+            existing.totalAssigned += Number(f.totalAssigned || 0);
+            existing.missedIn += Number(f.missedIn || 0);
+            existing.missedOut += Number(f.missedOut || 0);
+            existing.incomplete += Number(f.incomplete || 0);
+            existing.missingPunchTotal += Number(f.missingPunchTotal || 0);
+            existing.under9Hours += Number(f.under9Hours || 0);
+            existing.pendingCorrections += Number(f.pendingCorrections || 0);
+            existing.resolvedIssues += Number(f.resolvedIssues || 0);
+            existing.totalAttentionNeeded += Number(f.totalAttentionNeeded || 0);
+          } else {
+            folderMap.set(key, { ...f });
+          }
+        }
+        setFolders(Array.from(folderMap.values()));
       }
     } catch (err) {
       console.error('Fetch folders error:', err);
@@ -784,7 +803,7 @@ export default function MissedPunchingPage() {
                   ) : (
                     folders.map((f, i) => (
                       <tr
-                        key={i}
+                        key={`${f.folderName}-${f.storeCode}-${i}`}
                         className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
                         onClick={() => handleDrillFolder(f.folderName, f.storeCode)}
                       >
@@ -796,7 +815,7 @@ export default function MissedPunchingPage() {
                         </td>
                         <td className="py-3 px-3">
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
-                            {f.storeCode} · {f.storeName}
+                            {f.storeCode} &middot; {f.storeName}
                           </span>
                         </td>
                         <td className="py-3 px-3 text-center font-bold text-slate-700 dark:text-slate-300">

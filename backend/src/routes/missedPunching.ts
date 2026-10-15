@@ -76,8 +76,8 @@ router.get('/stats', authorize('VIEW'), async (req: AuthRequest, res) => {
     }
 
     if (filterDept && filterDept !== 'all') {
-      whereClause += ' AND e.departmentId = ?';
-      params.push(filterDept);
+      whereClause += ' AND (e.departmentId = ? OR d.name = ?)';
+      params.push(filterDept, filterDept);
     }
 
     if (date && date !== 'all') {
@@ -100,6 +100,7 @@ router.get('/stats', authorize('VIEW'), async (req: AuthRequest, res) => {
        FROM attendance a
        JOIN employee e ON a.employeeId = e.id
        LEFT JOIN location l ON a.locationId = l.id
+       LEFT JOIN department d ON e.departmentId = d.id
        ${whereClause}
        AND (
          (a.actualLogin IS NULL AND a.actualLogout IS NOT NULL) OR
@@ -115,6 +116,7 @@ router.get('/stats', authorize('VIEW'), async (req: AuthRequest, res) => {
        FROM attendance a
        JOIN employee e ON a.employeeId = e.id
        LEFT JOIN location l ON a.locationId = l.id
+       LEFT JOIN department d ON e.departmentId = d.id
        ${whereClause}
        AND a.actualLogin IS NOT NULL 
        AND a.actualLogout IS NOT NULL
@@ -132,6 +134,14 @@ router.get('/stats', authorize('VIEW'), async (req: AuthRequest, res) => {
       corrWhere += ' AND (c.locationId = ? OR l.code = ?)';
       corrParams.push(filterLoc, String(filterLoc).toUpperCase());
     }
+    if (filterFloor && filterFloor !== 'all') {
+      corrWhere += ' AND e.floorId = ?';
+      corrParams.push(filterFloor);
+    }
+    if (filterDept && filterDept !== 'all') {
+      corrWhere += ' AND (e.departmentId = ? OR d.name = ?)';
+      corrParams.push(filterDept, filterDept);
+    }
     if (date && date !== 'all') {
       corrWhere += ' AND DATE(c.attendanceDate) = ?';
       corrParams.push(date);
@@ -141,6 +151,8 @@ router.get('/stats', authorize('VIEW'), async (req: AuthRequest, res) => {
       `SELECT COUNT(DISTINCT c.id) as cnt
        FROM attendancecorrection c
        LEFT JOIN location l ON c.locationId = l.id
+       LEFT JOIN employee e ON c.employeeId = e.id
+       LEFT JOIN department d ON e.departmentId = d.id
        ${corrWhere}`,
       corrParams
     );
@@ -222,10 +234,10 @@ router.get('/folders', authorize('VIEW'), async (req: AuthRequest, res) => {
 
     const [rows]: any = await pool.query(
       `SELECT 
-        d.id as folderId,
+        MIN(d.id) as folderId,
         d.name as folderName,
-        l.code as storeCode,
-        l.name as storeName,
+        COALESCE(l.code, 'BEL') as storeCode,
+        COALESCE(l.name, 'Belagavi Head Store') as storeName,
         COUNT(DISTINCT e.id) as totalAssigned,
         COUNT(DISTINCT CASE WHEN (a.actualLogin IS NULL AND a.actualLogout IS NOT NULL) THEN a.id END) as missedIn,
         COUNT(DISTINCT CASE WHEN (a.actualLogin IS NOT NULL AND a.actualLogout IS NULL) THEN a.id END) as missedOut,
@@ -242,7 +254,7 @@ router.get('/folders', authorize('VIEW'), async (req: AuthRequest, res) => {
       LEFT JOIN attendance a ON a.employeeId = e.id ${attDateFilter}
       LEFT JOIN attendancecorrection c ON c.employeeId = e.id AND DATE(c.attendanceDate) = DATE(a.attendanceDate)
       WHERE 1=1 ${locFilter}
-      GROUP BY d.id, d.name, l.code, l.name
+      GROUP BY d.name, COALESCE(l.code, 'BEL'), COALESCE(l.name, 'Belagavi Head Store')
       ORDER BY (missedIn + missedOut + under9Hours + pendingCorrections) DESC, d.name ASC`,
       params
     );
