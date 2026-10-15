@@ -35,9 +35,9 @@ async function probeDeviceSocket(ip: string, port = 4370, timeoutMs = 800): Prom
 
 // Live hardware biometric terminals & peripheral devices (Configured on 192.168.100.135, .136, .137 : 4370)
 const REGISTERED_DEVICES = [
-  { id: 'DEV-BIO-001', name: 'ZKTeco Biometric Terminal 1 (Flagship Belagavi)', type: 'BIOMETRIC_PUNCH', locationCode: 'BEL', port: 4370, ip: '192.168.100.135' },
-  { id: 'DEV-BIO-002', name: 'ZKTeco Biometric Terminal 2 (Mega Store Davanagere)', type: 'BIOMETRIC_PUNCH', locationCode: 'DAV', port: 4370, ip: '192.168.100.136' },
-  { id: 'DEV-BIO-003', name: 'ZKTeco Biometric Terminal 3 (Flagship Shivamogga)', type: 'BIOMETRIC_PUNCH', locationCode: 'SHI', port: 4370, ip: '192.168.100.137' },
+  { id: 'DEV-BIO-001', serialNumber: 'JNP2252300795', name: 'ZKTeco Biometric Terminal 1 (Flagship Belagavi)', type: 'BIOMETRIC_PUNCH', locationCode: 'BEL', port: 4370, ip: '192.168.100.135' },
+  { id: 'DEV-BIO-002', serialNumber: 'JNPJNP2252300802', name: 'ZKTeco Biometric Terminal 2 (Mega Store Davanagere)', type: 'BIOMETRIC_PUNCH', locationCode: 'DAV', port: 4370, ip: '192.168.100.136' },
+  { id: 'DEV-BIO-003', serialNumber: 'JNP2252300797', name: 'ZKTeco Biometric Terminal 3 (Flagship Shivamogga)', type: 'BIOMETRIC_PUNCH', locationCode: 'SHI', port: 4370, ip: '192.168.100.137' },
   { id: 'DEV-QR-001', name: 'Canteen QR Stand 1 (Belagavi)', type: 'QR_SCANNER', locationCode: 'BEL', port: 4370, ip: '192.168.100.135' },
   { id: 'DEV-QR-002', name: 'Tea Break QR Scanner Handheld (Shivamogga)', type: 'QR_SCANNER', locationCode: 'SHI', port: 4370, ip: '192.168.100.137' },
   { id: 'DEV-CAM-001', name: 'HikVision Face Recognition Gateway (Davanagere)', type: 'FACE_CAM', locationCode: 'DAV', port: 4370, ip: '192.168.100.136' },
