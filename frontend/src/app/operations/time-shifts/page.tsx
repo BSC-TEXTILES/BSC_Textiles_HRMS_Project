@@ -19,8 +19,10 @@ export default function TimeShiftsPage() {
     gracePeriodMinutes: 5,
     lateThresholdMinutes: 5,
     earlyLoginIncentiveEnabled: true,
+    earlyLoginRatePerMinute: 1,
     earlyLoginRatePerSecond: 1,
     latePenaltyEnabled: true,
+    latePenaltyRatePerMinute: 1,
     latePenaltyRatePerSecond: 1,
     overtimeIncentiveEnabled: true,
     overtimeRatePerSecond: 1.5,
@@ -64,9 +66,11 @@ export default function TimeShiftsPage() {
           gracePeriodMinutes: s.gracePeriodMinutes ?? 5,
           lateThresholdMinutes: s.lateThresholdMinutes ?? 5,
           earlyLoginIncentiveEnabled: s.earlyLoginIncentiveEnabled ?? true,
-          earlyLoginRatePerSecond: Number(s.earlyLoginRatePerSecond ?? 1),
+          earlyLoginRatePerMinute: Number(s.earlyLoginRatePerMinute ?? s.earlyLoginRatePerSecond ?? 1),
+          earlyLoginRatePerSecond: Number(s.earlyLoginRatePerMinute ?? s.earlyLoginRatePerSecond ?? 1),
           latePenaltyEnabled: s.latePenaltyEnabled ?? true,
-          latePenaltyRatePerSecond: Number(s.latePenaltyRatePerSecond ?? 1),
+          latePenaltyRatePerMinute: Number(s.latePenaltyRatePerMinute ?? s.latePenaltyRatePerSecond ?? 1),
+          latePenaltyRatePerSecond: Number(s.latePenaltyRatePerMinute ?? s.latePenaltyRatePerSecond ?? 1),
           overtimeIncentiveEnabled: s.overtimeIncentiveEnabled ?? true,
           overtimeRatePerSecond: Number(s.overtimeRatePerSecond ?? 1.5),
           lunchDurationMinutes: s.lunchDurationMinutes ?? 100,
@@ -200,7 +204,7 @@ export default function TimeShiftsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Early Incentive Rate (₹ per second)
+                  Early Incentive Rate (₹ per minute)
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-xs text-gray-400 font-bold">₹</span>
@@ -208,14 +212,14 @@ export default function TimeShiftsPage() {
                     type="number"
                     step="0.01"
                     min="0"
-                    value={form.earlyLoginRatePerSecond}
-                    onChange={(e) => setForm({ ...form, earlyLoginRatePerSecond: Number(e.target.value) })}
+                    value={form.earlyLoginRatePerMinute}
+                    onChange={(e) => setForm({ ...form, earlyLoginRatePerMinute: Number(e.target.value), earlyLoginRatePerSecond: Number(e.target.value) })}
                     className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 font-mono"
                   />
-                  <span className="absolute right-3 top-2.5 text-xs text-gray-400">/ sec</span>
+                  <span className="absolute right-3 top-2.5 text-xs text-gray-400">/ min</span>
                 </div>
                 <div className="mt-2 p-2.5 bg-emerald-50 rounded-lg text-xs text-emerald-800">
-                  Example: 10 mins early (600 seconds) × ₹{form.earlyLoginRatePerSecond} = <strong>₹{600 * form.earlyLoginRatePerSecond} early incentive</strong>.
+                  Example: 10 mins early × ₹{form.earlyLoginRatePerMinute} = <strong>₹{10 * form.earlyLoginRatePerMinute} early incentive</strong>.
                 </div>
               </div>
             </div>
@@ -245,7 +249,7 @@ export default function TimeShiftsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
               <div>
                 <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Late Deduction Rate (₹ per second)
+                  Late Deduction Rate (₹ per minute)
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-2.5 text-xs text-gray-400 font-bold">₹</span>
@@ -253,11 +257,11 @@ export default function TimeShiftsPage() {
                     type="number"
                     step="0.01"
                     min="0"
-                    value={form.latePenaltyRatePerSecond}
-                    onChange={(e) => setForm({ ...form, latePenaltyRatePerSecond: Number(e.target.value) })}
+                    value={form.latePenaltyRatePerMinute}
+                    onChange={(e) => setForm({ ...form, latePenaltyRatePerMinute: Number(e.target.value), latePenaltyRatePerSecond: Number(e.target.value) })}
                     className="w-full pl-7 pr-3 py-2 text-sm border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 font-mono"
                   />
-                  <span className="absolute right-3 top-2.5 text-xs text-gray-400">/ sec</span>
+                  <span className="absolute right-3 top-2.5 text-xs text-gray-400">/ min</span>
                 </div>
               </div>
 

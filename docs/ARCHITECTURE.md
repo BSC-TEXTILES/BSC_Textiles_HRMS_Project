@@ -25,7 +25,7 @@ BSC Textiles HRMS is an installable, standalone Windows desktop application desi
 │  │                    Embedded Node.js Backend                      │  │
 │  │  - Bound strictly to 127.0.0.1 (No external network exposure)    │  │
 │  │  - Express.js micro-service with enterprise JWT auth             │  │
-│  │  - Statutory payroll calculation engine (₹1.0/sec late fine)      │  │
+│  │  - Statutory payroll calculation engine (₹1.0/min late fine)      │  │
 │  │  - Biometric eSSL USB log importer                               │  │
 │  └──────────────────────────────────┬───────────────────────────────┘  │
 │                                     │ SQLite WAL Engine                │

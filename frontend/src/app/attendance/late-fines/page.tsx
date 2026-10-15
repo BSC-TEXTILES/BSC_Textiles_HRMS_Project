@@ -91,11 +91,13 @@ export default function LateFinesPage() {
   // Policy Settings
   const [policy, setPolicy] = useState<any>({
     gracePeriodMinutes: 5,
+    latePenaltyRatePerMinute: 1.0,
     latePenaltyRatePerSecond: 1.0,
+    earlyLoginRatePerMinute: 1.0,
     earlyLoginRatePerSecond: 1.0,
     maxFinePerDay: 500,
     maxFinePerMonth: 3000,
-    calculationMethod: 'PER_SECOND',
+    calculationMethod: 'PER_MINUTE',
     roundingRule: 'NEAREST_RUPEE'
   });
 
@@ -364,8 +366,49 @@ export default function LateFinesPage() {
     }
   };
 
+  // CSV Export for Early Logins
+  const handleExportEarlyCSV = () => {
+    if (earlyRecords.length === 0) {
+      toast.error('No early login records available to export');
+      return;
+    }
+    const headers = [
+      'Employee Code', 'Employee Name', 'Department', 'Location', 'Shift',
+      'Scheduled Login', 'Actual Punch In', 'Early Duration (Mins)', 'Early (Sec)',
+      'Incentive Rate (₹/min)', 'Calculated Incentive (₹)', 'Status'
+    ];
+    const rows = earlyRecords.map(e => [
+      `"${e.employeeCode || ''}"`,
+      `"${e.employeeName || ''}"`,
+      `"${e.departmentName || ''}"`,
+      `"${e.locationName || ''}"`,
+      `"${e.shiftName || ''}"`,
+      `"${e.scheduledLogin ? new Date(e.scheduledLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''}"`,
+      `"${e.actualPunchIn ? new Date(e.actualPunchIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-'}"`,
+      Math.round(e.earlySeconds / 60),
+      e.earlySeconds,
+      '₹1.0/min',
+      e.earlyIncentive,
+      'ELIGIBLE'
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `BSC_Early_Login_Incentives_${selectedDate}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('Early Login Incentives exported successfully');
+  };
+
   // CSV Export
   const handleExportCSV = () => {
+    if (activeTab === 'early') {
+      handleExportEarlyCSV();
+      return;
+    }
     if (records.length === 0) {
       toast.error('No records available to export');
       return;
@@ -373,7 +416,7 @@ export default function LateFinesPage() {
     const headers = [
       'Employee Code', 'Employee Name', 'Department', 'Location', 'Shift',
       'Scheduled Login', 'Actual Punch In', 'Grace Period (Mins)', 'Late (Sec)',
-      'Chargeable Late (Sec)', 'Rate (₹/sec)', 'Calculated Fine (₹)',
+      'Chargeable Late (Sec)', 'Rate (₹/min)', 'Calculated Fine (₹)',
       'Approved Fine (₹)', 'Waived Fine (₹)', 'Final Fine (₹)',
       'Fine Status', 'Approval Status', 'Payroll Status', 'Date', 'Remarks'
     ];
@@ -479,7 +522,7 @@ export default function LateFinesPage() {
       id: 'fineCalculated',
       title: 'Fine Calculated',
       value: `₹${metrics.totalFineCalculated.toLocaleString('en-IN')}`,
-      subtitle: 'At ₹1/sec baseline rule',
+      subtitle: 'At ₹1/min baseline rule',
       icon: DollarSign,
       iconBg: 'bg-purple-50 dark:bg-purple-950/40',
       iconColor: 'text-purple-600 dark:text-purple-400',
@@ -556,11 +599,11 @@ export default function LateFinesPage() {
               </h1>
               <span className="px-3 py-1 rounded-full bg-[#1346a1]/10 dark:bg-[#1346a1]/30 text-[#1346a1] dark:text-[#E8DCC6] text-xs font-bold border border-[#1346a1]/20 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                Policy Active: ₹1/sec • 5m Grace
+                Policy Active: ₹1/min • 5m Grace
               </span>
             </div>
             <p className="text-xs lg:text-sm text-slate-600 dark:text-slate-400 max-w-3xl">
-              Configurable biometric late arrival audit, ₹1/sec policy deductions, manager approvals, penalty waivers, and synchronized payroll handoff.
+              Configurable biometric late arrival audit, ₹1/min policy deductions, manager approvals, penalty waivers, and synchronized payroll handoff.
             </p>
           </div>
 
@@ -948,7 +991,7 @@ export default function LateFinesPage() {
                             )}
                           </td>
                           <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">
-                            ₹{r.fineRate || 1.0}/sec
+                            ₹{r.fineRate || 1.0}/min
                           </td>
                           <td className="py-2.5 px-3 font-mono font-semibold text-slate-700 dark:text-slate-300">
                             ₹{r.calculatedFine}
@@ -1123,19 +1166,28 @@ export default function LateFinesPage() {
         {/* TAB 3: EARLY LOGIN & INCENTIVES */}
         {activeTab === 'early' && (
           <div className="bg-white dark:bg-[#1A1D24] rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between bg-amber-50/20 dark:bg-amber-950/10">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-50/20 dark:bg-amber-950/10">
               <div>
                 <h3 className="text-sm font-bold text-[#0b1c30] dark:text-white flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-amber-500" />
-                  <span>Early Login Incentive Register (₹1/sec Incentive)</span>
+                  <span>Early Login Incentive Register (₹1/min Incentive)</span>
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Biometric arrivals ahead of scheduled shift start. Kept strictly independent from late fine records.
+                  Biometric arrivals ahead of scheduled shift start calculated at authorized ₹1.0/min incentive rate. Kept strictly independent from late fine records.
                 </p>
               </div>
-              <span className="px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-bold text-xs">
-                Total Incentives: ₹{metrics.totalEarlyIncentives.toLocaleString('en-IN')}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-bold text-xs">
+                  Total Incentives: ₹{metrics.totalEarlyIncentives.toLocaleString('en-IN')} (₹1.0/min)
+                </span>
+                <button
+                  onClick={handleExportEarlyCSV}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs font-semibold shadow-xs transition-all"
+                >
+                  <Download className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  <span>Export Early CSV</span>
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -1149,7 +1201,7 @@ export default function LateFinesPage() {
                     <th className="py-3 px-3">Scheduled</th>
                     <th className="py-3 px-3">Actual Punch</th>
                     <th className="py-3 px-3">Early Duration</th>
-                    <th className="py-3 px-3">Incentive Rate</th>
+                    <th className="py-3 px-3">Incentive Rate (₹/min)</th>
                     <th className="py-3 px-3 font-extrabold text-emerald-600">Calculated Incentive</th>
                     <th className="py-3 px-3">Status</th>
                   </tr>
@@ -1185,8 +1237,8 @@ export default function LateFinesPage() {
                         <td className="py-2.5 px-3 font-bold text-emerald-600">
                           {Math.round(e.earlySeconds / 60)} min early ({e.earlySeconds}s)
                         </td>
-                        <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">
-                          ₹1.0/sec
+                        <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400 font-semibold">
+                          ₹1.0/min
                         </td>
                         <td className="py-2.5 px-3 font-mono font-extrabold text-emerald-600 dark:text-emerald-400">
                           +₹{e.earlyIncentive}
@@ -1239,7 +1291,7 @@ export default function LateFinesPage() {
                   Late Duration = Actual Punch - Shift Start - Grace Window (5m)
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-400">
-                  At ₹1 per second, arriving 8 minutes late (3 mins beyond grace) produces exactly <strong>180 seconds = ₹180</strong> fine.
+                  At ₹1 per minute, arriving 8 minutes late (3 mins beyond grace) produces exactly <strong>3 minutes = ₹3</strong> fine.
                 </p>
               </div>
 
@@ -1325,8 +1377,8 @@ export default function LateFinesPage() {
                   <div className="space-y-1.5 text-slate-700 dark:text-slate-300 font-mono text-[11px] pt-1">
                     <p>• Total delay from shift start: <strong>{selectedRecord.lateSeconds} seconds</strong> ({Math.round(selectedRecord.lateSeconds / 60)} mins)</p>
                     <p>• Grace tolerance applied: <strong>- {selectedRecord.gracePeriodMinutes * 60} seconds</strong> (5 mins)</p>
-                    <p>• Net Chargeable late duration: <strong>{selectedRecord.chargeableLateSeconds} seconds</strong></p>
-                    <p>• Fine Rate: <strong>₹{selectedRecord.fineRate || 1.0} per second</strong></p>
+                    <p>• Net Chargeable late duration: <strong>{Math.round(selectedRecord.chargeableLateSeconds / 60)} minutes</strong> ({selectedRecord.chargeableLateSeconds} seconds)</p>
+                    <p>• Fine Rate: <strong>₹{selectedRecord.fineRate || 1.0} per minute</strong></p>
                     <p className="text-sm font-bold text-slate-900 dark:text-white pt-1">
                       = Total Calculated Fine: ₹{selectedRecord.calculatedFine}
                     </p>
@@ -1560,12 +1612,30 @@ export default function LateFinesPage() {
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="font-bold text-slate-700 dark:text-slate-300">Late Fine Rate (₹/sec)</label>
+                  <label className="font-bold text-slate-700 dark:text-slate-300">Late Fine Rate (₹/min)</label>
                   <input
                     type="number"
                     step="0.1"
-                    value={policy.latePenaltyRatePerSecond}
-                    onChange={(e) => setPolicy({ ...policy, latePenaltyRatePerSecond: Number(e.target.value) })}
+                    value={policy.latePenaltyRatePerMinute ?? policy.latePenaltyRatePerSecond ?? 1.0}
+                    onChange={(e) => setPolicy({
+                      ...policy,
+                      latePenaltyRatePerMinute: Number(e.target.value),
+                      latePenaltyRatePerSecond: Number(e.target.value)
+                    })}
+                    className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="font-bold text-slate-700 dark:text-slate-300">Early Incentive Rate (₹/min)</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={policy.earlyLoginRatePerMinute ?? policy.earlyLoginRatePerSecond ?? 1.0}
+                    onChange={(e) => setPolicy({
+                      ...policy,
+                      earlyLoginRatePerMinute: Number(e.target.value),
+                      earlyLoginRatePerSecond: Number(e.target.value)
+                    })}
                     className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                   />
                 </div>

@@ -362,9 +362,9 @@ router.get('/policy', authorize('VIEW'), async (req: AuthRequest, res) => {
       success: true,
       data: {
         gracePeriodMinutes: rule.gracePeriodMinutes ?? 5,
-        latePenaltyRatePerSecond: Number(rule.latePenaltyRatePerSecond ?? 1.0),
-        earlyLoginRatePerSecond: Number(rule.earlyLoginRatePerSecond ?? 1.0),
-        calculationMethod: penalty.calculationType || 'PER_SECOND',
+        latePenaltyRatePerMinute: Number(rule.latePenaltyRatePerMinute ?? 1.0),
+        earlyLoginRatePerMinute: Number(rule.earlyLoginRatePerMinute ?? 1.0),
+        calculationMethod: penalty.calculationType || 'PER_MINUTE',
         maxFinePerDay: Number(rule.maxFinePerDay ?? 500),
         maxFinePerMonth: Number(rule.maxFinePerMonth ?? 3000),
         effectiveStartDate: '2026-01-01',
@@ -388,20 +388,37 @@ router.put('/policy', authorize('EDIT'), async (req: AuthRequest, res) => {
   try {
     const {
       gracePeriodMinutes = 5,
-      latePenaltyRatePerSecond = 1.0,
-      earlyLoginRatePerSecond = 1.0,
+      latePenaltyRatePerMinute,
+      latePenaltyRatePerSecond,
+      earlyLoginRatePerMinute,
+      earlyLoginRatePerSecond,
       maxFinePerDay = 500,
       maxFinePerMonth = 3000,
-      calculationMethod = 'PER_SECOND'
+      calculationMethod = 'PER_MINUTE'
     } = req.body;
 
-    await pool.query(`
-      UPDATE attendancerules 
-      SET gracePeriodMinutes = ?,
-          latePenaltyRatePerSecond = ?,
-          earlyLoginRatePerSecond = ?,
-          updatedAt = NOW(3)
-    `, [gracePeriodMinutes, latePenaltyRatePerSecond, earlyLoginRatePerSecond]);
+    const rate = Number(latePenaltyRatePerMinute ?? latePenaltyRatePerSecond ?? 1.0);
+    const earlyRate = Number(earlyLoginRatePerMinute ?? earlyLoginRatePerSecond ?? 1.0);
+
+    try {
+      await pool.query(`
+        UPDATE attendancerules 
+        SET gracePeriodMinutes = ?,
+            latePenaltyRatePerMinute = ?,
+            latePenaltyRatePerSecond = ?,
+            earlyLoginRatePerMinute = ?,
+            earlyLoginRatePerSecond = ?,
+            updatedAt = NOW(3)
+      `, [gracePeriodMinutes, rate, rate, earlyRate, earlyRate]);
+    } catch {
+      await pool.query(`
+        UPDATE attendancerules 
+        SET gracePeriodMinutes = ?,
+            latePenaltyRatePerSecond = ?,
+            earlyLoginRatePerSecond = ?,
+            updatedAt = NOW(3)
+      `, [gracePeriodMinutes, rate, earlyRate]);
+    }
 
     await pool.query(`
       UPDATE shift SET gracePeriod = ?
@@ -412,8 +429,10 @@ router.put('/policy', authorize('EDIT'), async (req: AuthRequest, res) => {
       message: 'Late fine policy successfully updated and active.',
       data: {
         gracePeriodMinutes,
-        latePenaltyRatePerSecond,
-        earlyLoginRatePerSecond,
+        latePenaltyRatePerMinute: rate,
+        latePenaltyRatePerSecond: rate,
+        earlyLoginRatePerMinute: earlyRate,
+        earlyLoginRatePerSecond: earlyRate,
         maxFinePerDay,
         maxFinePerMonth,
         calculationMethod

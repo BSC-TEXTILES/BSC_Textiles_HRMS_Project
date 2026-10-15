@@ -159,7 +159,7 @@ CREATE TABLE IF NOT EXISTS user (
 CREATE INDEX IF NOT EXISTS idx_user_email ON user(email);
 CREATE INDEX IF NOT EXISTS idx_user_role ON user(role);
 
--- 8. ATTENDANCE RULES (Statutory Rule: Permanent ₹1.0/sec late fine)
+-- 8. ATTENDANCE RULES (Statutory Rule: Permanent ₹1.0/min late fine)
 CREATE TABLE IF NOT EXISTS attendancerules (
   id TEXT PRIMARY KEY,
   locationId TEXT UNIQUE,
@@ -168,9 +168,11 @@ CREATE TABLE IF NOT EXISTS attendancerules (
   gracePeriodMinutes INTEGER DEFAULT 5,
   lateThresholdMinutes INTEGER DEFAULT 5,
   earlyLoginIncentiveEnabled INTEGER DEFAULT 1,
-  earlyLoginRatePerSecond REAL DEFAULT 1.0000,
+  earlyLoginRatePerMinute REAL DEFAULT 1.0000,
+  earlyLoginRatePerSecond REAL DEFAULT 0.0167,
   latePenaltyEnabled INTEGER DEFAULT 1,
-  latePenaltyRatePerSecond REAL DEFAULT 1.0000,
+  latePenaltyRatePerMinute REAL DEFAULT 1.0000,
+  latePenaltyRatePerSecond REAL DEFAULT 0.0167,
   overtimeIncentiveEnabled INTEGER DEFAULT 1,
   overtimeRatePerSecond REAL DEFAULT 1.5000,
   earlyLogoutPenaltyEnabled INTEGER DEFAULT 1,
@@ -192,6 +194,7 @@ CREATE TABLE IF NOT EXISTS attendance (
   lateLoginSeconds INTEGER DEFAULT 0,
   earlyLogoutSeconds INTEGER DEFAULT 0,
   lateLoginPenalty REAL DEFAULT 0.00,
+  -- Fine rate: ₹1.0 per minute (₹1.0/min) of chargeable late time
   earlyLoginSeconds INTEGER DEFAULT 0,
   earlyLoginIncentive REAL DEFAULT 0.00,
   status TEXT DEFAULT 'PRESENT',
@@ -206,7 +209,7 @@ CREATE TABLE IF NOT EXISTS attendance (
 CREATE INDEX IF NOT EXISTS idx_att_emp_date ON attendance(employeeId, attendanceDate);
 CREATE INDEX IF NOT EXISTS idx_att_date ON attendance(attendanceDate);
 
--- 10. LATE ATTENDANCE RECORD (Dedicated Fine Ledger at ₹1.0/sec)
+-- 10. LATE ATTENDANCE RECORD (Dedicated Fine Ledger at ₹1.0/min)
 CREATE TABLE IF NOT EXISTS late_attendance_record (
   id TEXT PRIMARY KEY,
   employeeId TEXT NOT NULL,
@@ -219,7 +222,7 @@ CREATE TABLE IF NOT EXISTS late_attendance_record (
   gracePeriodMinutes INTEGER DEFAULT 5,
   lateSeconds INTEGER DEFAULT 0,
   chargeableLateSeconds INTEGER DEFAULT 0,
-  fineCalculationType TEXT DEFAULT 'PER_SECOND',
+  fineCalculationType TEXT DEFAULT 'PER_MINUTE',
   fineRate REAL DEFAULT 1.0000,
   calculatedFine REAL DEFAULT 0.00,
   approvedFine REAL DEFAULT 0.00,
@@ -228,7 +231,13 @@ CREATE TABLE IF NOT EXISTS late_attendance_record (
   fineStatus TEXT DEFAULT 'NO_FINE',
   approvalStatus TEXT DEFAULT 'PENDING',
   payrollStatus TEXT DEFAULT 'NOT_APPLIED',
+  earlySeconds INTEGER DEFAULT 0,
+  earlyIncentive REAL DEFAULT 0.00,
   managerRemarks TEXT,
+  reviewedById TEXT,
+  reviewedAt TEXT,
+  payrollRunId TEXT,
+  historyJson TEXT,
   createdAt TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
   updatedAt TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
   FOREIGN KEY (employeeId) REFERENCES employee(id) ON DELETE CASCADE

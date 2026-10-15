@@ -13,7 +13,7 @@ CREATE TABLE `attendancerules` (
   `gracePeriodMinutes` int NOT NULL DEFAULT '5',
   `lateThresholdMinutes` int NOT NULL DEFAULT '5',
   `earlyLoginIncentiveEnabled` tinyint(1) NOT NULL DEFAULT '1',
-  `earlyLoginRatePerSecond` decimal(10,4) NOT NULL DEFAULT '1.0000',
+  `earlyLoginRatePerMinute` decimal(10,4) NOT NULL DEFAULT '1.0000',
   `earlyLoginMaxDaily` decimal(15,2) DEFAULT NULL,
   `earlyLoginMaxMonthly` decimal(15,2) DEFAULT NULL,
   `latePenaltyEnabled` tinyint(1) NOT NULL DEFAULT '0',

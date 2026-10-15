@@ -16,7 +16,7 @@ CREATE TABLE `shift` (
   `gracePeriod` int NOT NULL DEFAULT '5',
   `lateThreshold` int NOT NULL DEFAULT '5',
   `earlyLoginIncentive` tinyint(1) NOT NULL DEFAULT '1',
-  `earlyLoginRatePerSecond` decimal(10,4) NOT NULL DEFAULT '1.0000',
+  `earlyLoginRatePerMinute` decimal(10,4) NOT NULL DEFAULT '1.0000',
   `maxDailyEarlyIncentive` decimal(15,2) DEFAULT NULL,
   `maxMonthlyEarlyIncentive` decimal(15,2) DEFAULT NULL,
   `latePenaltyEnabled` tinyint(1) NOT NULL DEFAULT '0',

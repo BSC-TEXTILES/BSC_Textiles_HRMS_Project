@@ -21,7 +21,7 @@ The database schema includes 20 comprehensive business tables:
 | `shift` | Work shift definitions | `id`, `name`, `startTime`, `endTime`, `gracePeriod` |
 | `employee` | Employee master records | `id`, `employeeCode`, `fullName`, `basicSalary`, `fixedGrossSalary`, `pfNo`, `esiNo`, `uanNo`, `bankAccount` |
 | `user` | Local system users & auth | `id`, `email`, `passwordHash`, `role`, `isActive` |
-| `attendancerules` | Statutory policy (₹1.0/sec late fine) | `id`, `locationId`, `latePenaltyRatePerSecond`, `gracePeriodMinutes` |
+| `attendancerules` | Statutory policy (₹1.0/min late fine) | `id`, `locationId`, `latePenaltyRatePerMinute`, `gracePeriodMinutes` |
 | `attendance` | Daily attendance & biometric punches | `id`, `employeeId`, `attendanceDate`, `punchIn`, `punchOut`, `lateLoginPenalty` |
 | `late_attendance_record` | Late fine calculation ledger | `id`, `employeeId`, `recordDate`, `chargeableLateSeconds`, `calculatedFine`, `approvalStatus` |
 | `payrollrun` | Monthly payroll execution batches | `id`, `periodStart`, `periodEnd`, `status` |
@@ -41,7 +41,7 @@ The database schema includes 20 comprehensive business tables:
 On first launch on any Windows machine:
 1. The app creates the persistent folder `%APPDATA%\BSCTextiles\data` if missing.
 2. If `bsc_textiles.db` does not exist, it runs `database/sqlite/schema.sql` and `database/sqlite/seed.sql`.
-3. Seeds all 3 showroom locations, departments, floors, shifts, and the statutory ₹1.0/sec late rule.
+3. Seeds all 3 showroom locations, departments, floors, shifts, and the statutory ₹1.0/min late rule.
 4. Pre-seeds Super Admin (`admin@bsctextiles.com`) and HR Manager (`kavita.bhat@bsctextiles.com`).
 5. All future launches read and write directly to this file without resetting existing data.
 

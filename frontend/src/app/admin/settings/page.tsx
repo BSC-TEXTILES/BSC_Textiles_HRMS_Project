@@ -71,8 +71,10 @@ export default function AdminSettingsPage() {
     gracePeriodMinutes: 5,
     lateThresholdMinutes: 5,
     earlyLoginIncentiveEnabled: true,
+    earlyLoginRatePerMinute: 1,
     earlyLoginRatePerSecond: 1,
     latePenaltyEnabled: true,
+    latePenaltyRatePerMinute: 1,
     latePenaltyRatePerSecond: 1,
     maleLunchMinutes: 100,
     femaleLunchMinutes: 40,
@@ -131,9 +133,11 @@ export default function AdminSettingsPage() {
           gracePeriodMinutes: s.gracePeriodMinutes ?? 5,
           lateThresholdMinutes: s.lateThresholdMinutes ?? 5,
           earlyLoginIncentiveEnabled: s.earlyLoginIncentiveEnabled ?? true,
-          earlyLoginRatePerSecond: Number(s.earlyLoginRatePerSecond ?? 1),
+          earlyLoginRatePerMinute: Number(s.earlyLoginRatePerMinute ?? s.earlyLoginRatePerSecond ?? 1),
+          earlyLoginRatePerSecond: Number(s.earlyLoginRatePerMinute ?? s.earlyLoginRatePerSecond ?? 1),
           latePenaltyEnabled: s.latePenaltyEnabled ?? true,
-          latePenaltyRatePerSecond: Number(s.latePenaltyRatePerSecond ?? 1),
+          latePenaltyRatePerMinute: Number(s.latePenaltyRatePerMinute ?? s.latePenaltyRatePerSecond ?? 1),
+          latePenaltyRatePerSecond: Number(s.latePenaltyRatePerMinute ?? s.latePenaltyRatePerSecond ?? 1),
           maleLunchMinutes: s.maleLunchMinutes ?? 100,
           femaleLunchMinutes: s.femaleLunchMinutes ?? 40,
           maleTeaMinutes: s.maleTeaMinutes ?? 20,
@@ -304,8 +308,10 @@ export default function AdminSettingsPage() {
           payload.gracePeriodMinutes = settings.gracePeriodMinutes;
           payload.lateThresholdMinutes = settings.lateThresholdMinutes;
           payload.earlyLoginIncentiveEnabled = settings.earlyLoginIncentiveEnabled;
-          payload.earlyLoginRatePerSecond = settings.earlyLoginRatePerSecond;
+          payload.earlyLoginRatePerMinute = settings.earlyLoginRatePerMinute;
+          payload.earlyLoginRatePerSecond = settings.earlyLoginRatePerMinute;
           payload.latePenaltyEnabled = settings.latePenaltyEnabled;
+          payload.latePenaltyRatePerMinute = settings.latePenaltyRatePerSecond;
           payload.latePenaltyRatePerSecond = settings.latePenaltyRatePerSecond;
         }
       }

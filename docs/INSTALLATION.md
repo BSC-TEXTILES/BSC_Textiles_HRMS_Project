@@ -36,7 +36,7 @@ On first launch on any Windows machine:
    ```
 3. If this is a fresh computer, the application automatically runs:
    * `schema.sql` (creates all 20 business tables, indexes, and foreign keys).
-   * `seed.sql` (initializes Belagavi, Davanagere, Shivamogga showrooms, floors, departments, shifts, and statutory ₹1.0/sec late fine rules).
+   * `seed.sql` (initializes Belagavi, Davanagere, Shivamogga showrooms, floors, departments, shifts, and statutory ₹1.0/min late fine rules).
 4. Pre-configured Administrator credentials are immediately active:
    * **Super Admin:** `admin@bsctextiles.com` / `admin123`
    * **HR Manager:** `kavita.bhat@bsctextiles.com` / `hr123`

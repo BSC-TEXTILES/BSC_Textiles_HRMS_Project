@@ -27,7 +27,7 @@ export const RBAC_MODULES: RbacModule[] = [
   { key: 'BILLING_TERMINALS', label: 'Billing & POS Terminal Hub', description: 'Express checkout terminals, cashier shifts, float tracking and tax invoices' },
   { key: 'STATUTORY_MUSTER', label: 'Statutory Form T Muster Roll', description: 'Karnataka Factories Act Form T muster ledger, weekly-offs, and compliance lock' },
   { key: 'ATTENDANCE_CORRECTIONS', label: 'Punch Corrections & Regularization', description: 'Biometric optical anomaly triage, missed out-punches and manual corrections' },
-  { key: 'LATE_FINES', label: 'Late Attendance & SLA Enforcement', description: 'Grace period breaches, ₹1/sec penalty calculation, fine waivers and approvals' },
+  { key: 'LATE_FINES', label: 'Late Attendance & SLA Enforcement', description: 'Grace period breaches, ₹1/min penalty calculation, fine waivers and approvals' },
   { key: 'DOCUMENT_MANAGEMENT', label: 'Employee Documents & KYC', description: 'Aadhaar, PAN, Bank verification, academic records, and DigiLocker dossiers' },
   { key: 'SALARY_CADRES', label: 'Salary Cadres & Compensation', description: 'Statutory salary grades, HRA, fixed allowances, PF deductions and take-home' },
   { key: 'BIOMETRIC_POLICY', label: 'Biometric Face Verification Threshold', description: 'Face verification minimum match confidence threshold (85%) and fraud detection' },

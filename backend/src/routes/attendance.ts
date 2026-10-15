@@ -1599,14 +1599,14 @@ router.post('/', authorize('RECORD'), validate(attendanceSchema), async (req: Au
     let earlyLogoutPenalty = 0;
     
     if (earlyLoginSeconds > 0 && rules?.earlyLoginIncentiveEnabled) {
-      earlyLoginIncentive = earlyLoginSeconds * Number(rules.earlyLoginRatePerSecond || 1);
+      earlyLoginIncentive = Math.round((earlyLoginSeconds / 60.0) * Number(rules.earlyLoginRatePerMinute || rules.earlyLoginRatePerSecond || 1));
       if (rules.earlyLoginMaxDaily && earlyLoginIncentive > Number(rules.earlyLoginMaxDaily)) {
         earlyLoginIncentive = Number(rules.earlyLoginMaxDaily);
       }
     }
     
     if (lateLoginSeconds > 0 && rules?.latePenaltyEnabled) {
-      lateLoginPenalty = lateLoginSeconds * Number(rules.latePenaltyRatePerSecond || 1);
+      lateLoginPenalty = Math.round((lateLoginSeconds / 60.0) * Number(rules.latePenaltyRatePerMinute || rules.latePenaltyRatePerSecond || 1));
       if (rules.latePenaltyMaxDaily && lateLoginPenalty > Number(rules.latePenaltyMaxDaily)) {
         lateLoginPenalty = Number(rules.latePenaltyMaxDaily);
       }
@@ -1707,10 +1707,10 @@ router.put('/:id', authorize('EDIT'), async (req: AuthRequest, res) => {
       
       // Recalculate incentives
       if (updateData.earlyLoginSeconds > 0 && rules?.earlyLoginIncentiveEnabled) {
-        updateData.earlyLoginIncentive = updateData.earlyLoginSeconds * Number(rules.earlyLoginRatePerSecond || 1);
+        updateData.earlyLoginIncentive = Math.round((updateData.earlyLoginSeconds / 60.0) * Number(rules.earlyLoginRatePerMinute || rules.earlyLoginRatePerSecond || 1));
       }
       if (updateData.lateLoginSeconds > 0 && rules?.latePenaltyEnabled) {
-        updateData.lateLoginPenalty = updateData.lateLoginSeconds * Number(rules.latePenaltyRatePerSecond || 1);
+        updateData.lateLoginPenalty = Math.round((updateData.lateLoginSeconds / 60.0) * Number(rules.latePenaltyRatePerMinute || rules.latePenaltyRatePerSecond || 1));
       }
       if (updateData.overtimeSeconds > 0 && rules?.overtimeIncentiveEnabled) {
         updateData.overtimeIncentive = updateData.overtimeSeconds * Number(rules.overtimeRatePerSecond || 1.5);

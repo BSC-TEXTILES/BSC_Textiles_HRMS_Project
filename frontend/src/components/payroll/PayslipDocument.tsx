@@ -168,7 +168,7 @@ export function PayslipDocument({
         { label: 'EMPLOYEE PF', amount: Number((p as any)?.employeePf || (p as any)?.pfDeduction || 3840.00) },
         { label: 'EMPLOYEE ESI', amount: Number((p as any)?.employeeEsi || 153.00) },
         { label: 'PROF TAX', amount: Number((p as any)?.profTax || 0.00) },
-        ...(Number((p as any)?.lateFineDeduction || (p as any)?.penalties || 0) > 0 ? [{ label: 'LATE FINE DEDUCTION (₹1.0/SEC)', amount: Number((p as any)?.lateFineDeduction || (p as any)?.penalties) }] : []),
+        ...(Number((p as any)?.lateFineDeduction || (p as any)?.penalties || 0) > 0 ? [{ label: 'LATE FINE DEDUCTION (₹1.0/MIN)', amount: Number((p as any)?.lateFineDeduction || (p as any)?.penalties) }] : []),
       ];
 
   // Totals

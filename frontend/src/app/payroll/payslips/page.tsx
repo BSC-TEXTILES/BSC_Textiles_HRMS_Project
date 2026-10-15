@@ -1071,7 +1071,7 @@ export default function PayslipsPage() {
                         Deductions Components
                       </h4>
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-100/80 text-rose-800 font-semibold border border-rose-200">
-                        Late Fine: ₹1.0/sec
+                        Late Fine: ₹1.0/min
                       </span>
                     </div>
                     <button
