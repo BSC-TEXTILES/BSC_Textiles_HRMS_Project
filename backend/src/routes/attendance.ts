@@ -22,6 +22,7 @@ import {
   type ShiftWindow,
 } from '../core/services/AttendanceCalculationService.js';
 import lateFineRoutes from './lateFines.js';
+import missedPunchingRoutes from './missedPunching.js';
 
 const router = Router();
 
@@ -1511,6 +1512,8 @@ router.get('/shift-board/export', authorize('VIEW'), async (req: AuthRequest, re
     res.status(500).json({ error: 'Failed to export shift board' });
   }
 });
+
+router.use('/missed-punching', missedPunchingRoutes);
 
 router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
