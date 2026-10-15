@@ -41,6 +41,7 @@ export async function GET(request: Request) {
     {
       id: 'TERM-01',
       code: 'BEL-BIO-01',
+      serialNumber: 'JNP2252300795',
       name: 'BEL-BIO-01 Main Face & Fingerprint Terminal A',
       location: 'Belagavi Flagship (Karnataka HQ · Ground Floor)',
       ipAddress: '192.168.100.135',
@@ -59,6 +60,7 @@ export async function GET(request: Request) {
     {
       id: 'TERM-02',
       code: 'DAV-BIO-02',
+      serialNumber: 'JNPJNP2252300802',
       name: 'DAV-BIO-02 Staff Lounge Biometric Terminal B',
       location: 'Davanagere Mega Store (KB Extension · Floor 1)',
       ipAddress: '192.168.100.136',
@@ -77,6 +79,7 @@ export async function GET(request: Request) {
     {
       id: 'TERM-03',
       code: 'SHI-BIO-03',
+      serialNumber: 'JNP2252300797',
       name: 'SHI-BIO-03 Concierge Floor Biometric Terminal C',
       location: 'Shivamogga Flagship (B.H. Road Apex · Floor 1)',
       ipAddress: '192.168.100.137',
@@ -178,9 +181,9 @@ export async function GET(request: Request) {
       { bucket: '> 50ms (Degraded)', count: offlineCount, color: '#ef4444' },
     ],
     hubsSummary: [
-      { hub: 'Belagavi Flagship (BEL · 192.168.100.135)', terminals: 2, status: probe135.online ? 'Online (Port 4370)' : 'Offline' },
-      { hub: 'Davanagere Mega Store (DAV · 192.168.100.136)', terminals: 2, status: probe136.online ? 'Online (Port 4370)' : 'Offline' },
-      { hub: 'Shivamogga Flagship (SHI · 192.168.100.137)', terminals: 2, status: probe137.online ? 'Online (Port 4370)' : 'Offline' },
+      { hub: 'Belagavi Flagship (BEL · 192.168.100.135 · SN: JNP2252300795)', terminals: 2, status: probe135.online ? 'Online (Port 4370)' : 'Offline' },
+      { hub: 'Davanagere Mega Store (DAV · 192.168.100.136 · SN: JNPJNP2252300802)', terminals: 2, status: probe136.online ? 'Online (Port 4370)' : 'Offline' },
+      { hub: 'Shivamogga Flagship (SHI · 192.168.100.137 · SN: JNP2252300797)', terminals: 2, status: probe137.online ? 'Online (Port 4370)' : 'Offline' },
     ],
   };
 
