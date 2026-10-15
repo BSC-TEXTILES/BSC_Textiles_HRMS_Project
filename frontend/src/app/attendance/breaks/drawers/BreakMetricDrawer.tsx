@@ -182,12 +182,20 @@ export function BreakMetricDrawer({
   // Overrun metrics
   const totalOverrunMinutes = overrunBreaks.reduce((acc, b) => acc + (b.excessDuration || 0), 0);
   const longestOverrun = overrunBreaks.reduce((max, b) => Math.max(max, b.excessDuration || 0), 0);
-  const employeeOverrunCounts: Record<string, number> = {};
-  overrunBreaks.forEach((b) => {
-    const empId = b.employee?.id || b.employeeId || 'unknown';
-    employeeOverrunCounts[empId] = (employeeOverrunCounts[empId] || 0) + 1;
-  });
-  const repeatOffendersCount = Object.values(employeeOverrunCounts).filter((c) => c > 1).length;
+
+  const employeeOverrunCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    overrunBreaks.forEach((b) => {
+      const empId = b.employee?.id || b.employeeId || 'unknown';
+      counts[empId] = (counts[empId] || 0) + 1;
+    });
+    return counts;
+  }, [overrunBreaks]);
+
+  const repeatOffendersCount = useMemo(
+    () => Object.values(employeeOverrunCounts).filter((c) => c > 1).length,
+    [employeeOverrunCounts]
+  );
   const withinGraceCount = overrunBreaks.filter((b) => (b.excessDuration || 0) <= 3).length;
 
   // Avg break metrics

@@ -101,6 +101,16 @@ function getBadgeClasses(badgeText: string, isActive: boolean) {
   }
 }
 
+const ClockAlertIndicator = ({ className, ...props }: { className?: string; [key: string]: any }) => (
+  <span className="relative inline-flex items-center justify-center">
+    <Clock className={className || 'w-4 h-4'} {...props} />
+    <span className="absolute -top-1 -right-1 flex h-2 w-2">
+      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+    </span>
+  </span>
+);
+
 const enterpriseNavigation: NavSectionConfig[] = [
   {
     title: 'Core Operations',
@@ -173,6 +183,7 @@ const enterpriseNavigation: NavSectionConfig[] = [
     },
     items: [
       { title: 'Biometric Punches', href: '/attendance/punches', icon: Fingerprint },
+      { title: 'Missed Punching & Working Hours', href: '/attendance/missed-punching', icon: ClockAlertIndicator, badge: 'Attention' },
       { title: 'Floor Shifts & Rosters', href: '/attendance/shifts', icon: Calendar },
       { title: 'Late & Fine Management', href: '/attendance/late-fines', icon: AlertTriangle, badge: 'Policy' },
       { title: 'Lunch & Break Tracker', href: '/attendance/breaks', icon: Coffee },
@@ -311,6 +322,28 @@ export function DashboardLayoutFullShell({
     markAsRead, 
     markAllAsRead,
   } = useNotifications();
+
+  const [missedAttentionCount, setMissedAttentionCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const fetchMissedCount = async () => {
+      try {
+        const res = await api.get('/attendance/missed-punching/stats');
+        if (active && res.data && typeof res.data.totalAttentionNeeded === 'number') {
+          setMissedAttentionCount(res.data.totalAttentionNeeded);
+        }
+      } catch (e) {
+        // Silently fallback if endpoint is not loaded yet
+      }
+    };
+    fetchMissedCount();
+    const interval = setInterval(fetchMissedCount, 30000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   // Use shell context states if mounted, fallback to local
   const isCollapsed = shellContext ? shellContext.isCollapsed : false;
@@ -452,7 +485,7 @@ export function DashboardLayoutFullShell({
         if (item.href.startsWith('/reports')) {
           return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole);
         }
-        if (item.href === '/attendance/calculation' || item.href === '/attendance/corrections') {
+        if (item.href === '/attendance/calculation' || item.href === '/attendance/corrections' || item.href === '/attendance/missed-punching') {
           return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole);
         }
         if (item.href === '/employees' && !['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole)) {

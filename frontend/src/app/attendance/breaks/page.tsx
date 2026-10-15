@@ -8,12 +8,13 @@ import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
 export default function AttendanceBreaksPage() {
-  const [breaks, setBreaks] = useState<any[]>([]);
+  const [allBreaks, setAllBreaks] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [activeDrawer, setActiveDrawer] = useState<BreakDrawerType>(null);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
 
   // References for keyboard focus restoration
   const cardActiveRef = useRef<HTMLButtonElement>(null);
@@ -22,7 +23,15 @@ export default function AttendanceBreaksPage() {
   const cardOverrunRef = useRef<HTMLButtonElement>(null);
   const cardAvgRef = useRef<HTMLButtonElement>(null);
 
-  // Deep-link support: /attendance/breaks?breakType=LUNCH&status=ACTIVE
+  // Update real-time clock every 5 seconds for live duration calculations
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 5000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Deep-link support for ledger filters: /attendance/breaks?breakType=LUNCH&status=ACTIVE
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const q = new URLSearchParams(window.location.search);
@@ -49,47 +58,42 @@ export default function AttendanceBreaksPage() {
     };
   }, []);
 
+  // Fetch all breaks from backend
   const fetchBreaks = useCallback(async () => {
     try {
       setLoading(true);
-      const params = new URLSearchParams();
-      if (filterType) params.append('breakType', filterType);
-      if (filterStatus) params.append('status', filterStatus);
-
-      // Fetch comprehensive records without artificial 50 limit truncation
-      const res = await api.get(`/breaks?${params.toString()}&limit=200`);
-      setBreaks(res.data?.breaks || []);
+      const res = await api.get('/breaks?limit=200');
+      setAllBreaks(res.data?.breaks || []);
     } catch (e) {
       console.error('Failed to load breaks:', e);
+      toast.error('Failed to load break telemetry');
     } finally {
       setLoading(false);
     }
-  }, [filterType, filterStatus]);
+  }, []);
 
   useEffect(() => {
     fetchBreaks();
   }, [fetchBreaks]);
 
-  // Derived metrics from current break dataset
-  const activeBreaks = useMemo(() => breaks.filter((b) => b.status === 'ACTIVE' || !b.endTime), [breaks]);
-  const lunchBreaks = useMemo(() => breaks.filter((b) => b.breakType === 'LUNCH'), [breaks]);
-  const teaBreaks = useMemo(() => breaks.filter((b) => b.breakType === 'TEA'), [breaks]);
+  // Derived metrics from master dataset for top KPI cards
+  const activeBreaks = useMemo(() => allBreaks.filter((b) => b.status === 'ACTIVE' || !b.endTime), [allBreaks]);
+  const lunchBreaks = useMemo(() => allBreaks.filter((b) => b.breakType === 'LUNCH'), [allBreaks]);
+  const teaBreaks = useMemo(() => allBreaks.filter((b) => b.breakType === 'TEA'), [allBreaks]);
   const exceededBreaks = useMemo(
-    () => breaks.filter((b) => b.status === 'EXCEEDED' || (b.excessDuration && b.excessDuration > 0)),
-    [breaks]
+    () => allBreaks.filter((b) => b.status === 'EXCEEDED' || (b.excessDuration && b.excessDuration > 0)),
+    [allBreaks]
   );
-  const completedBreaks = useMemo(() => breaks.filter((b) => b.status === 'COMPLETED'), [breaks]);
 
   // Active breaks overage check
   const activePastLimitCount = useMemo(() => {
-    const now = Date.now();
     return activeBreaks.filter((b) => {
       if (!b.startTime) return false;
-      const elapsedMinutes = Math.floor((now - new Date(b.startTime).getTime()) / 60000);
+      const elapsedMinutes = Math.floor((currentTime - new Date(b.startTime).getTime()) / 60000);
       const cap = b.allowedDuration || (b.breakType === 'LUNCH' ? 45 : 20);
       return elapsedMinutes > cap;
     }).length;
-  }, [activeBreaks]);
+  }, [activeBreaks, currentTime]);
 
   // Lunch adherence calculation
   const lunchAdherence = useMemo(() => {
@@ -115,14 +119,48 @@ export default function AttendanceBreaksPage() {
   const { avgTea, avgLunch, overallAvg } = useMemo(() => {
     const teaDurations = teaBreaks.map((b) => b.actualDuration || 0).filter((d) => d > 0);
     const lunchDurations = lunchBreaks.map((b) => b.actualDuration || 0).filter((d) => d > 0);
-    const allDurations = breaks.map((b) => b.actualDuration || 0).filter((d) => d > 0);
+    const allDurations = allBreaks.map((b) => b.actualDuration || 0).filter((d) => d > 0);
 
     const teaAvgVal = teaDurations.length > 0 ? (teaDurations.reduce((a, b) => a + b, 0) / teaDurations.length).toFixed(1) : '18.4';
     const lunchAvgVal = lunchDurations.length > 0 ? (lunchDurations.reduce((a, b) => a + b, 0) / lunchDurations.length).toFixed(1) : '41.2';
     const overallAvgVal = allDurations.length > 0 ? (allDurations.reduce((a, b) => a + b, 0) / allDurations.length).toFixed(1) : '24.5';
 
     return { avgTea: teaAvgVal, avgLunch: lunchAvgVal, overallAvg: overallAvgVal };
-  }, [teaBreaks, lunchBreaks, breaks]);
+  }, [teaBreaks, lunchBreaks, allBreaks]);
+
+  // Independent ledger dataset: controlled ONLY by its own dropdown filters (NOT affected by card clicks)
+  const displayedBreaks = useMemo(() => {
+    return allBreaks.filter((b) => {
+      // 1. Break Type Filter from dropdown
+      if (filterType && b.breakType !== filterType) return false;
+
+      // 2. Status Filter from dropdown
+      if (filterStatus) {
+        if (filterStatus === 'ACTIVE') {
+          if (b.status !== 'ACTIVE' && b.endTime) return false;
+        } else if (filterStatus === 'EXCEEDED') {
+          const isExceeded = b.status === 'EXCEEDED' || (b.excessDuration && b.excessDuration > 0);
+          if (!isExceeded) return false;
+        } else if (filterStatus === 'COMPLETED') {
+          if (b.status !== 'COMPLETED') return false;
+        } else if (b.status !== filterStatus) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [allBreaks, filterType, filterStatus]);
+
+  // Clicking any of the 5 cards ONLY opens the relevant detail drawer; it does NOT touch the ledger below
+  const handleCardClick = (metric: BreakDrawerType) => {
+    setActiveDrawer(metric);
+  };
+
+  const handleResetFilters = () => {
+    setFilterType('');
+    setFilterStatus('');
+  };
 
   const activeTriggerRef = useMemo(() => {
     if (activeDrawer === 'ACTIVE') return cardActiveRef;
@@ -166,14 +204,14 @@ export default function AttendanceBreaksPage() {
                 toast.success('Break policies synchronized across all store terminals!');
                 fetchBreaks();
               }}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-all text-xs font-semibold"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-all text-xs font-semibold cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px] text-slate-400">sync</span>
               <span>Sync Rules</span>
             </button>
             <button
               onClick={() => toast.success('Break audit report generated!')}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0b1c30] text-white shadow-sm hover:bg-slate-800 transition-all text-xs font-bold"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#0b1c30] text-white shadow-sm hover:bg-slate-800 transition-all text-xs font-bold cursor-pointer"
             >
               <span className="material-symbols-outlined text-[18px]">summarize</span>
               <span>Audit Report</span>
@@ -189,11 +227,11 @@ export default function AttendanceBreaksPage() {
             type="button"
             role="button"
             tabIndex={0}
-            onClick={() => setActiveDrawer('ACTIVE')}
+            onClick={() => handleCardClick('ACTIVE')}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                setActiveDrawer('ACTIVE');
+                handleCardClick('ACTIVE');
               }
             }}
             aria-label="View details for Active on Break"
@@ -228,11 +266,11 @@ export default function AttendanceBreaksPage() {
             type="button"
             role="button"
             tabIndex={0}
-            onClick={() => setActiveDrawer('LUNCH')}
+            onClick={() => handleCardClick('LUNCH')}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                setActiveDrawer('LUNCH');
+                handleCardClick('LUNCH');
               }
             }}
             aria-label="View details for Lunch Sessions"
@@ -269,11 +307,11 @@ export default function AttendanceBreaksPage() {
             type="button"
             role="button"
             tabIndex={0}
-            onClick={() => setActiveDrawer('TEA')}
+            onClick={() => handleCardClick('TEA')}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                setActiveDrawer('TEA');
+                handleCardClick('TEA');
               }
             }}
             aria-label="View details for Tea Sessions"
@@ -310,11 +348,11 @@ export default function AttendanceBreaksPage() {
             type="button"
             role="button"
             tabIndex={0}
-            onClick={() => setActiveDrawer('OVERRUN')}
+            onClick={() => handleCardClick('OVERRUN')}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                setActiveDrawer('OVERRUN');
+                handleCardClick('OVERRUN');
               }
             }}
             aria-label="View details for Overrun Violations"
@@ -373,11 +411,11 @@ export default function AttendanceBreaksPage() {
             type="button"
             role="button"
             tabIndex={0}
-            onClick={() => setActiveDrawer('AVG')}
+            onClick={() => handleCardClick('AVG')}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                setActiveDrawer('AVG');
+                handleCardClick('AVG');
               }
             }}
             aria-label="View details for Avg Break Time"
@@ -438,10 +476,7 @@ export default function AttendanceBreaksPage() {
 
             <button
               type="button"
-              onClick={() => {
-                setFilterType('');
-                setFilterStatus('');
-              }}
+              onClick={handleResetFilters}
               title="Reset filters"
               aria-label="Reset break filters"
               className="h-[36px] px-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center justify-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#1346a1]/40"
@@ -456,13 +491,13 @@ export default function AttendanceBreaksPage() {
           </div>
         </div>
 
-        {/* Break Sessions Table */}
+        {/* Break Sessions Table (Independent of Card Selection) */}
         <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
           <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-[#1346a1] dark:text-[#E8DCC6] text-[20px]">coffee</span>
               <h2 className="text-sm font-bold text-[#0b1c30] dark:text-white">Break Telemetry & Compliance Ledger</h2>
-              <span className="text-xs text-slate-400 dark:text-slate-500">({breaks.length} Records)</span>
+              <span className="text-xs text-slate-400 dark:text-slate-500">({displayedBreaks.length} Records)</span>
             </div>
             <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Synced with Floor Biometrics</span>
           </div>
@@ -470,8 +505,18 @@ export default function AttendanceBreaksPage() {
           <div className="overflow-x-auto">
             {loading ? (
               <div className="p-12 text-center text-slate-400">Loading break telemetry...</div>
-            ) : breaks.length === 0 ? (
-              <div className="p-12 text-center text-slate-400">No break records found.</div>
+            ) : displayedBreaks.length === 0 ? (
+              <div className="p-12 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
+                <span className="material-symbols-outlined text-[32px] text-slate-300">filter_alt_off</span>
+                <p>No break records found matching current criteria.</p>
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  className="mt-1 text-xs text-[#1346a1] dark:text-blue-400 font-bold hover:underline cursor-pointer"
+                >
+                  Clear Filters & Show All
+                </button>
+              </div>
             ) : (
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#F8F4F1]/60 dark:bg-slate-800/60 text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 tracking-wider">
@@ -487,9 +532,16 @@ export default function AttendanceBreaksPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-200">
-                  {breaks.map((b) => {
+                  {displayedBreaks.map((b) => {
                     const emp = b.employee || {};
                     const isExceeded = b.status === 'EXCEEDED' || (b.excessDuration && b.excessDuration > 0);
+                    const isActive = b.status === 'ACTIVE' || !b.endTime;
+                    const elapsed = b.startTime
+                      ? Math.max(0, Math.floor((currentTime - new Date(b.startTime).getTime()) / 60000))
+                      : 0;
+                    const cap = b.allowedDuration || (b.breakType === 'LUNCH' ? 45 : 20);
+                    const isActiveOverrun = isActive && elapsed > cap;
+
                     return (
                       <tr key={b.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                         <td className="py-3 px-4">
@@ -531,18 +583,31 @@ export default function AttendanceBreaksPage() {
                           {b.endTime ? (
                             new Date(b.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                           ) : (
-                            <span className="text-[#1346a1] dark:text-blue-400 font-bold">Active Now</span>
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-[#1346a1] dark:bg-blue-950/50 dark:text-blue-300">
+                              <span className="h-1.5 w-1.5 rounded-full bg-[#1346a1] animate-ping"></span>
+                              Active Now
+                            </span>
                           )}
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400">
-                          {b.allowedDuration || (b.breakType === 'LUNCH' ? 45 : 20)} Mins
+                          {cap} Mins
                         </td>
                         <td className="py-3 px-4 font-mono font-bold text-[#0b1c30] dark:text-white">
-                          {b.actualDuration ? `${b.actualDuration} Mins` : 'In Progress'}
+                          {b.actualDuration ? (
+                            `${b.actualDuration} Mins`
+                          ) : isActive ? (
+                            <span className={isActiveOverrun ? 'text-red-600 font-bold' : 'text-[#1346a1] font-bold'}>
+                              {elapsed}m (In Progress)
+                            </span>
+                          ) : (
+                            'In Progress'
+                          )}
                         </td>
                         <td className="py-3 px-4 font-mono">
                           {isExceeded ? (
                             <span className="text-red-600 font-bold">+{b.excessDuration || 5} Mins</span>
+                          ) : isActiveOverrun ? (
+                            <span className="text-red-600 font-bold">+{elapsed - cap}m Overdue</span>
                           ) : (
                             <span className="text-emerald-600 font-semibold">0 Mins</span>
                           )}
@@ -550,14 +615,14 @@ export default function AttendanceBreaksPage() {
                         <td className="py-3 px-4">
                           <span
                             className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
-                              b.status === 'ACTIVE'
+                              isActive
                                 ? 'bg-blue-50 text-blue-700 border-blue-200 animate-pulse dark:bg-blue-950/60 dark:text-blue-300'
                                 : b.status === 'COMPLETED'
                                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-400'
                                 : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/60 dark:text-red-400'
                             }`}
                           >
-                            {b.status}
+                            {isActive ? 'ACTIVE' : b.status}
                           </span>
                         </td>
                       </tr>
@@ -569,19 +634,16 @@ export default function AttendanceBreaksPage() {
           </div>
         </div>
 
-        {/* RIGHT-SIDE DETAIL DRAWER */}
+        {/* RIGHT-SIDE DETAIL DRAWER (Opens independently on card clicks) */}
         <BreakMetricDrawer
           isOpen={activeDrawer !== null}
           type={activeDrawer}
           onClose={() => setActiveDrawer(null)}
-          breaks={breaks}
+          breaks={allBreaks}
           locations={locations}
           filterType={filterType}
           filterStatus={filterStatus}
-          onApplyPageFilter={(newType, newStatus) => {
-            setFilterType(newType);
-            setFilterStatus(newStatus);
-          }}
+          onApplyPageFilter={() => {}}
           onRefresh={fetchBreaks}
           triggerRef={activeTriggerRef}
         />
