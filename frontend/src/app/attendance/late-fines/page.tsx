@@ -84,6 +84,10 @@ export default function LateFinesPage() {
 
   const [records, setRecords] = useState<any[]>([]);
   const [earlyRecords, setEarlyRecords] = useState<any[]>([]);
+  const [repeatedRecords, setRepeatedRecords] = useState<any[]>([]);
+  const [repeatedLoading, setRepeatedLoading] = useState<boolean>(false);
+  const [earlyLoading, setEarlyLoading] = useState<boolean>(false);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
   const [sortField, setSortField] = useState('lar.scheduledLogin');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
@@ -126,28 +130,37 @@ export default function LateFinesPage() {
     data: null
   });
 
+  // Fetch policy rules
+  const fetchPolicy = useCallback(async () => {
+    try {
+      const polRes = await api.get('/late-fines/policy');
+      if (polRes.data?.data) {
+        setPolicy(polRes.data.data);
+      }
+    } catch (err) {
+      console.error('Failed to load late fine policy:', err);
+    }
+  }, []);
+
   // Fetch filter options
   useEffect(() => {
     const loadFilterData = async () => {
       try {
-        const [locRes, deptRes, shiftRes, polRes] = await Promise.all([
+        const [locRes, deptRes, shiftRes] = await Promise.all([
           api.get('/locations/all').catch(() => ({ data: [] })),
           api.get('/departments').catch(() => ({ data: { departments: [] } })),
-          api.get('/shifts').catch(() => ({ data: { shifts: [] } })),
-          api.get('/late-fines/policy').catch(() => ({ data: { data: {} } }))
+          api.get('/shifts').catch(() => ({ data: { shifts: [] } }))
         ]);
         setLocations(locRes.data || []);
         setDepartments(deptRes.data?.departments || []);
         setShifts(shiftRes.data?.shifts || []);
-        if (polRes.data?.data) {
-          setPolicy(polRes.data.data);
-        }
+        await fetchPolicy();
       } catch (err) {
         console.error('Error loading filter data:', err);
       }
     };
     loadFilterData();
-  }, []);
+  }, [fetchPolicy]);
 
   // Fetch dashboard summary cards
   const fetchDashboardMetrics = useCallback(async () => {
@@ -156,6 +169,9 @@ export default function LateFinesPage() {
       if (selectedLocation && selectedLocation !== 'all') params.append('locationId', selectedLocation);
       if (selectedDept && selectedDept !== 'all') params.append('departmentId', selectedDept);
       if (selectedShift && selectedShift !== 'all') params.append('shiftId', selectedShift);
+      if (selectedStatus && selectedStatus !== 'all') params.append('fineStatus', selectedStatus);
+      if (selectedApproval && selectedApproval !== 'all') params.append('approvalStatus', selectedApproval);
+      if (selectedPayroll && selectedPayroll !== 'all') params.append('payrollStatus', selectedPayroll);
       if (selectedDate) params.append('date', selectedDate);
 
       const res = await api.get(`/late-fines/dashboard?${params.toString()}`);
@@ -165,7 +181,7 @@ export default function LateFinesPage() {
     } catch (err) {
       console.error('Failed to load dashboard metrics:', err);
     }
-  }, [selectedLocation, selectedDept, selectedShift, selectedDate]);
+  }, [selectedLocation, selectedDept, selectedShift, selectedStatus, selectedApproval, selectedPayroll, selectedDate]);
 
   // Fetch records
   const fetchRecords = useCallback(async (drillMetric?: string) => {
@@ -209,8 +225,11 @@ export default function LateFinesPage() {
   // Fetch early logins
   const fetchEarlyLogins = useCallback(async () => {
     try {
+      setEarlyLoading(true);
       const params = new URLSearchParams();
       if (selectedLocation && selectedLocation !== 'all') params.append('locationId', selectedLocation);
+      if (selectedDept && selectedDept !== 'all') params.append('departmentId', selectedDept);
+      if (selectedShift && selectedShift !== 'all') params.append('shiftId', selectedShift);
       if (selectedDate) params.append('date', selectedDate);
       const res = await api.get(`/late-fines/early-logins?${params.toString()}`);
       if (res.data?.success) {
@@ -218,8 +237,55 @@ export default function LateFinesPage() {
       }
     } catch (err) {
       console.error('Failed to fetch early logins:', err);
+    } finally {
+      setEarlyLoading(false);
     }
-  }, [selectedLocation, selectedDate]);
+  }, [selectedLocation, selectedDept, selectedShift, selectedDate]);
+
+  // Fetch repeated late offenders
+  const fetchRepeatedOffenders = useCallback(async () => {
+    try {
+      setRepeatedLoading(true);
+      const params = new URLSearchParams();
+      if (selectedLocation && selectedLocation !== 'all') params.append('locationId', selectedLocation);
+      if (selectedDept && selectedDept !== 'all') params.append('departmentId', selectedDept);
+      if (selectedShift && selectedShift !== 'all') params.append('shiftId', selectedShift);
+      if (selectedApproval && selectedApproval !== 'all') params.append('approvalStatus', selectedApproval);
+      if (selectedPayroll && selectedPayroll !== 'all') params.append('payrollStatus', selectedPayroll);
+      if (selectedDate) params.append('date', selectedDate);
+      params.append('drillDownMetric', 'REPEATED_LATE');
+      params.append('limit', '50');
+
+      const res = await api.get(`/late-fines/records?${params.toString()}`);
+      if (res.data?.success) {
+        setRepeatedRecords(res.data.data || []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch repeated late offenders:', err);
+    } finally {
+      setRepeatedLoading(false);
+    }
+  }, [selectedLocation, selectedDept, selectedShift, selectedApproval, selectedPayroll, selectedDate]);
+
+  // Master refresh action triggered by the "Refresh Records" button
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      await Promise.all([
+        fetchDashboardMetrics(),
+        fetchRecords(),
+        fetchEarlyLogins(),
+        fetchRepeatedOffenders(),
+        fetchPolicy()
+      ]);
+      toast.success('Dashboard records and metrics refreshed successfully');
+    } catch (err) {
+      console.error('Failed to refresh records:', err);
+      toast.error('Failed to refresh records');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   useEffect(() => {
     fetchDashboardMetrics();
@@ -227,7 +293,10 @@ export default function LateFinesPage() {
     if (activeTab === 'early') {
       fetchEarlyLogins();
     }
-  }, [fetchDashboardMetrics, fetchRecords, fetchEarlyLogins, activeTab]);
+    if (activeTab === 'repeated') {
+      fetchRepeatedOffenders();
+    }
+  }, [fetchDashboardMetrics, fetchRecords, fetchEarlyLogins, fetchRepeatedOffenders, activeTab]);
 
   // Card click: Drill-down handler
   const handleCardClick = async (metricKey: string, cardTitle: string) => {
@@ -598,12 +667,12 @@ export default function LateFinesPage() {
                 Late Attendance & Fine Management
               </h1>
               <span className="px-3 py-1 rounded-full bg-[#1346a1]/10 dark:bg-[#1346a1]/30 text-[#1346a1] dark:text-[#E8DCC6] text-xs font-bold border border-[#1346a1]/20 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                Policy Active: ₹1/min • 5m Grace
+                <span className={`w-2 h-2 rounded-full ${policy?.isActive !== false ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+                Policy {policy?.isActive !== false ? 'Active' : 'Inactive'}: ₹{policy?.latePenaltyRatePerMinute ?? 1}/min • {policy?.gracePeriodMinutes ?? 5}m Grace
               </span>
             </div>
             <p className="text-xs lg:text-sm text-slate-600 dark:text-slate-400 max-w-3xl">
-              Configurable biometric late arrival audit, ₹1/min policy deductions, manager approvals, penalty waivers, and synchronized payroll handoff.
+              Configurable biometric late arrival audit, ₹{policy?.latePenaltyRatePerMinute ?? 1}/min policy deductions, manager approvals, penalty waivers, and synchronized payroll handoff.
             </p>
           </div>
 
@@ -623,11 +692,16 @@ export default function LateFinesPage() {
               <span>Export CSV</span>
             </button>
             <button
-              onClick={() => { fetchDashboardMetrics(); fetchRecords(); }}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#1346a1] hover:bg-[#0e3882] text-white text-xs font-bold shadow-md shadow-[#1346a1]/20 transition-all"
+              id="refresh-records-btn"
+              onClick={handleRefresh}
+              disabled={isRefreshing || loading}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-lg bg-[#1346a1] hover:bg-[#0e3882] text-white text-xs font-bold shadow-md shadow-[#1346a1]/20 transition-all ${
+                isRefreshing ? 'opacity-80 cursor-wait' : ''
+              }`}
+              title="Reload and update all dashboard metrics, registers, and policy rules"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
-              <span>Refresh Records</span>
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              <span>{isRefreshing ? 'Refreshing Records...' : 'Refresh Records'}</span>
             </button>
           </div>
         </div>
@@ -1108,7 +1182,7 @@ export default function LateFinesPage() {
         {/* TAB 2: REPEATED LATE OFFENDERS */}
         {activeTab === 'repeated' && (
           <div className="bg-white dark:bg-[#1A1D24] p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs flex flex-col gap-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-bold text-[#0b1c30] dark:text-white flex items-center gap-2">
                   <ShieldAlert className="w-4 h-4 text-red-500" />
@@ -1118,48 +1192,74 @@ export default function LateFinesPage() {
                   Employees with persistent punctuality exceptions requiring supervisor counseling or HR intervention.
                 </p>
               </div>
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 rounded-full bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300 font-bold text-xs">
+                  Offenders Identified: {repeatedRecords.length || metrics.employeesWithRepeatedLateArrivals}
+                </span>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
-              {records.filter(r => r.chargeableLateSeconds > 0).slice(0, 6).map((r) => (
-                <div
-                  key={r.id}
-                  className="p-4 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/20 dark:bg-red-950/10 flex flex-col justify-between gap-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-mono font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded">
-                        {r.employeeCode}
-                      </span>
-                      <h4 className="font-bold text-slate-900 dark:text-white mt-1">{r.employeeName}</h4>
-                      <p className="text-[11px] text-slate-500">{r.designation} • {r.departmentName}</p>
-                    </div>
-                    <span className="px-2 py-1 rounded bg-red-600 text-white font-extrabold text-[10px]">
-                      HIGH RISK
-                    </span>
-                  </div>
+            {repeatedLoading ? (
+              <div className="flex flex-col items-center justify-center p-12 text-slate-400">
+                <RefreshCw className="w-6 h-6 animate-spin text-[#1346a1] mb-2" />
+                <span className="text-xs">Loading repeated late offenders...</span>
+              </div>
+            ) : (() => {
+              const displayRepeated = repeatedRecords.length > 0 
+                ? repeatedRecords 
+                : records.filter(r => r.chargeableLateSeconds > 0);
 
-                  <div className="grid grid-cols-2 gap-2 text-[11px] bg-white dark:bg-slate-800/80 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
-                    <div>
-                      <span className="text-slate-400">Delay:</span>
-                      <span className="font-bold text-rose-600 block">+{Math.round(r.chargeableLateSeconds / 60)} min</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Calculated:</span>
-                      <span className="font-bold text-slate-800 dark:text-slate-200 block">₹{r.calculatedFine}</span>
-                    </div>
+              if (displayRepeated.length === 0) {
+                return (
+                  <div className="py-12 text-center text-slate-400 dark:text-slate-500 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-xs">
+                    No repeated late offenders detected for the selected filters.
                   </div>
+                );
+              }
 
-                  <button
-                    onClick={() => handleOpenEmployeeHistory(r.employeeId)}
-                    className="w-full py-2 rounded-lg bg-[#1346a1] hover:bg-[#0e3882] text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5"
-                  >
-                    <span>View Complete Punctuality Log</span>
-                    <ArrowRight className="w-3.5 h-3.5" />
-                  </button>
+              return (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-2">
+                  {displayRepeated.map((r) => (
+                    <div
+                      key={r.id}
+                      className="p-4 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50/20 dark:bg-red-950/10 flex flex-col justify-between gap-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="text-[10px] font-mono font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/40 px-2 py-0.5 rounded">
+                            {r.employeeCode}
+                          </span>
+                          <h4 className="font-bold text-slate-900 dark:text-white mt-1">{r.employeeName}</h4>
+                          <p className="text-[11px] text-slate-500">{r.designation} • {r.departmentName}</p>
+                        </div>
+                        <span className="px-2 py-1 rounded bg-red-600 text-white font-extrabold text-[10px]">
+                          HIGH RISK
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2 text-[11px] bg-white dark:bg-slate-800/80 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700">
+                        <div>
+                          <span className="text-slate-400">Delay:</span>
+                          <span className="font-bold text-rose-600 block">+{Math.round(r.chargeableLateSeconds / 60)} min</span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Calculated:</span>
+                          <span className="font-bold text-slate-800 dark:text-slate-200 block">₹{r.calculatedFine}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleOpenEmployeeHistory(r.employeeId)}
+                        className="w-full py-2 rounded-lg bg-[#1346a1] hover:bg-[#0e3882] text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <span>View Complete Punctuality Log</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              );
+            })()}
           </div>
         )}
 
@@ -1170,15 +1270,15 @@ export default function LateFinesPage() {
               <div>
                 <h3 className="text-sm font-bold text-[#0b1c30] dark:text-white flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-amber-500" />
-                  <span>Early Login Incentive Register (₹1/min Incentive)</span>
+                  <span>Early Login Incentive Register (₹{policy?.earlyLoginRatePerMinute ?? 1.0}/min Incentive)</span>
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Biometric arrivals ahead of scheduled shift start calculated at authorized ₹1.0/min incentive rate. Kept strictly independent from late fine records.
+                  Biometric arrivals ahead of scheduled shift start calculated at authorized ₹{policy?.earlyLoginRatePerMinute ?? 1.0}/min incentive rate. Kept strictly independent from late fine records.
                 </p>
               </div>
               <div className="flex items-center gap-2">
                 <span className="px-3 py-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 font-bold text-xs">
-                  Total Incentives: ₹{metrics.totalEarlyIncentives.toLocaleString('en-IN')} (₹1.0/min)
+                  Total Incentives: ₹{metrics.totalEarlyIncentives.toLocaleString('en-IN')} (₹{policy?.earlyLoginRatePerMinute ?? 1.0}/min)
                 </span>
                 <button
                   onClick={handleExportEarlyCSV}
@@ -1207,7 +1307,14 @@ export default function LateFinesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {earlyRecords.length === 0 ? (
+                  {earlyLoading ? (
+                    <tr>
+                      <td colSpan={10} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                        <RefreshCw className="w-5 h-5 animate-spin inline-block mr-2 text-[#1346a1]" />
+                        Loading early punch incentive records...
+                      </td>
+                    </tr>
+                  ) : earlyRecords.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="py-12 text-center text-slate-400 dark:text-slate-500">
                         No early punch incentive records found for the selected date.
@@ -1238,7 +1345,7 @@ export default function LateFinesPage() {
                           {Math.round(e.earlySeconds / 60)} min early ({e.earlySeconds}s)
                         </td>
                         <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400 font-semibold">
-                          ₹1.0/min
+                          ₹{policy?.earlyLoginRatePerMinute ?? 1.0}/min
                         </td>
                         <td className="py-2.5 px-3 font-mono font-extrabold text-emerald-600 dark:text-emerald-400">
                           +₹{e.earlyIncentive}
@@ -1275,9 +1382,9 @@ export default function LateFinesPage() {
                 <span className="text-xs font-bold text-[#1346a1] dark:text-[#E8DCC6] uppercase tracking-wider">
                   Rule 1: Grace Period Window
                 </span>
-                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">5-Minute Buffer Window</h4>
+                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">{policy?.gracePeriodMinutes ?? 5}-Minute Buffer Window</h4>
                 <p className="text-xs text-slate-600 dark:text-slate-400">
-                  Any employee punching within 5 minutes (300 seconds) after their scheduled shift start time is granted tolerance.
+                  Any employee punching within {policy?.gracePeriodMinutes ?? 5} minutes ({(policy?.gracePeriodMinutes ?? 5) * 60} seconds) after their scheduled shift start time is granted tolerance.
                   Chargeable late seconds remain exactly <strong>0</strong> and no late fine is triggered.
                 </p>
               </div>
@@ -1286,12 +1393,12 @@ export default function LateFinesPage() {
                 <span className="text-xs font-bold text-[#1346a1] dark:text-[#E8DCC6] uppercase tracking-wider">
                   Rule 2: Calculation Formula
                 </span>
-                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Late Duration Formula</h4>
+                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Late Duration Formula ({policy?.calculationMethod || 'PER_MINUTE'})</h4>
                 <div className="p-2.5 rounded bg-white dark:bg-slate-900 font-mono text-xs text-rose-600 dark:text-rose-400 border border-slate-200 dark:border-slate-800">
-                  Late Duration = Actual Punch - Shift Start - Grace Window (5m)
+                  Late Duration = Actual Punch - Shift Start - Grace Window ({policy?.gracePeriodMinutes ?? 5}m)
                 </div>
                 <p className="text-xs text-slate-600 dark:text-slate-400">
-                  At ₹1 per minute, arriving 8 minutes late (3 mins beyond grace) produces exactly <strong>3 minutes = ₹3</strong> fine.
+                  At ₹{policy?.latePenaltyRatePerMinute ?? 1.0} per minute, arriving {(policy?.gracePeriodMinutes ?? 5) + 3} minutes late (3 mins beyond grace) produces exactly <strong>3 minutes = ₹{Math.round(3 * Number(policy?.latePenaltyRatePerMinute ?? 1.0))}</strong> fine.
                 </p>
               </div>
 
@@ -1299,20 +1406,20 @@ export default function LateFinesPage() {
                 <span className="text-xs font-bold text-[#1346a1] dark:text-[#E8DCC6] uppercase tracking-wider">
                   Rule 3: Financial Safety & Approval Workflow
                 </span>
-                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Multi-stage Lifecycle</h4>
+                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Multi-stage Lifecycle & Caps</h4>
                 <p className="text-xs text-slate-600 dark:text-slate-400">
                   Status transitions from <code>CALCULATED</code> → <code>PENDING_APPROVAL</code> → <code>APPROVED</code> / <code>WAIVED</code>.
-                  Fines cannot be applied to payroll until explicitly approved by an authorized manager.
+                  Fines are strictly capped at max ₹{policy?.maxFinePerDay ?? 500}/day and ₹{policy?.maxFinePerMonth ?? 3000}/month, requiring authorized manager sign-off prior to payroll sync.
                 </p>
               </div>
 
               <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex flex-col gap-2">
                 <span className="text-xs font-bold text-[#1346a1] dark:text-[#E8DCC6] uppercase tracking-wider">
-                  Rule 4: Auditable Waivers & Reversals
+                  Rule 4: Auditable Waivers & Early Incentives
                 </span>
-                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Mandatory Justification Reasons</h4>
+                <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">Mandatory Justifications & ₹{policy?.earlyLoginRatePerMinute ?? 1.0}/min Incentive</h4>
                 <p className="text-xs text-slate-600 dark:text-slate-400">
-                  Every waiver, rejection, amount adjustment, or payroll reversal requires a non-empty reason that is permanently recorded in the immutable audit JSON history.
+                  Every waiver, rejection, amount adjustment, or payroll reversal requires a non-empty reason recorded in the immutable audit history. Early punch-ins receive an independent ₹{policy?.earlyLoginRatePerMinute ?? 1.0}/min incentive.
                 </p>
               </div>
             </div>
@@ -1672,6 +1779,7 @@ export default function LateFinesPage() {
                       await api.put('/late-fines/policy', policy);
                       toast.success('Fine policy updated successfully');
                       setIsPolicyModalOpen(false);
+                      await fetchPolicy();
                       fetchDashboardMetrics();
                       fetchRecords();
                     } catch (err: any) {

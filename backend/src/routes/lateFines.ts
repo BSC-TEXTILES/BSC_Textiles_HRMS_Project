@@ -23,7 +23,7 @@ function formatToYMD(d: Date | string): string {
  */
 router.get('/dashboard', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
-    const { locationId, departmentId, shiftId, date, startDate, endDate, attendanceStatus } = req.query;
+    const { locationId, departmentId, shiftId, date, startDate, endDate, fineStatus, attendanceStatus, approvalStatus, payrollStatus } = req.query;
 
     let scopedLocId = getScopedLocationId(req.user, locationId as string);
     if (scopedLocId === 'all') scopedLocId = undefined;
@@ -42,6 +42,19 @@ router.get('/dashboard', authorize('VIEW'), async (req: AuthRequest, res) => {
     if (shiftId && shiftId !== 'all') {
       conditions.push('lar.shiftId = ?');
       params.push(shiftId);
+    }
+    const effFineStatus = fineStatus || attendanceStatus;
+    if (effFineStatus && effFineStatus !== 'all') {
+      conditions.push('lar.fineStatus = ?');
+      params.push(effFineStatus);
+    }
+    if (approvalStatus && approvalStatus !== 'all') {
+      conditions.push('lar.approvalStatus = ?');
+      params.push(approvalStatus);
+    }
+    if (payrollStatus && payrollStatus !== 'all') {
+      conditions.push('lar.payrollStatus = ?');
+      params.push(payrollStatus);
     }
 
     if (date) {
@@ -85,15 +98,31 @@ router.get('/dashboard', authorize('VIEW'), async (req: AuthRequest, res) => {
       WHERE ${whereClause}
     `, params);
 
-    // Repeated late arrivals (employees with > 2 late arrivals within the filtered period or month)
+    // Repeated late arrivals (employees with >= 2 late arrivals within the month or period)
+    const monthPrefix = date ? String(date).split('T')[0].substring(0, 7) : '2026-10';
+    const repConditions: string[] = ['lar.chargeableLateSeconds > 0', 'lar.recordDate LIKE ?'];
+    const repParams: any[] = [`${monthPrefix}%`];
+    if (scopedLocId) {
+      repConditions.push('(lar.locationId = ? OR l.code = ?)');
+      repParams.push(scopedLocId, scopedLocId.replace(/^loc_/, '').toUpperCase());
+    }
+    if (departmentId && departmentId !== 'all') {
+      repConditions.push('lar.departmentId = ?');
+      repParams.push(departmentId);
+    }
+    if (shiftId && shiftId !== 'all') {
+      repConditions.push('lar.shiftId = ?');
+      repParams.push(shiftId);
+    }
+
     const [repeatedRows]: any = await pool.query(`
-      SELECT COUNT(DISTINCT lar.employeeId) as repeatedLateCount
+      SELECT lar.employeeId
       FROM late_attendance_record lar
       LEFT JOIN location l ON lar.locationId = l.id
-      WHERE ${whereClause} AND lar.chargeableLateSeconds > 0
+      WHERE ${repConditions.join(' AND ')}
       GROUP BY lar.employeeId
       HAVING COUNT(lar.id) >= 2
-    `, params);
+    `, repParams);
 
     const repeatedLateArrivals = repeatedRows.length;
 
@@ -929,7 +958,7 @@ router.get('/employee-history/:employeeId', authorize('VIEW'), async (req: AuthR
  */
 router.get('/early-logins', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
-    const { locationId, date, startDate, endDate } = req.query;
+    const { locationId, departmentId, shiftId, date, startDate, endDate } = req.query;
 
     const conditions: string[] = ['lar.earlySeconds > 0'];
     const params: any[] = [];
@@ -937,6 +966,14 @@ router.get('/early-logins', authorize('VIEW'), async (req: AuthRequest, res) => 
     if (locationId && locationId !== 'all') {
       conditions.push('lar.locationId = ?');
       params.push(locationId);
+    }
+    if (departmentId && departmentId !== 'all') {
+      conditions.push('lar.departmentId = ?');
+      params.push(departmentId);
+    }
+    if (shiftId && shiftId !== 'all') {
+      conditions.push('lar.shiftId = ?');
+      params.push(shiftId);
     }
     if (date) {
       conditions.push('lar.recordDate = ?');
