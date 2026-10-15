@@ -236,8 +236,9 @@ router.get('/folders', authorize('VIEW'), async (req: AuthRequest, res) => {
       `SELECT 
         MIN(d.id) as folderId,
         d.name as folderName,
-        COALESCE(l.code, 'BEL') as storeCode,
-        COALESCE(l.name, 'Belagavi Head Store') as storeName,
+        GROUP_CONCAT(DISTINCT COALESCE(l.code, 'BEL') ORDER BY l.code SEPARATOR ', ') as storeCodes,
+        MAX(COALESCE(l.code, 'BEL')) as storeCode,
+        MAX(COALESCE(l.name, 'Belagavi Head Store')) as storeName,
         COUNT(DISTINCT e.id) as totalAssigned,
         COUNT(DISTINCT CASE WHEN (a.actualLogin IS NULL AND a.actualLogout IS NOT NULL) THEN a.id END) as missedIn,
         COUNT(DISTINCT CASE WHEN (a.actualLogin IS NOT NULL AND a.actualLogout IS NULL) THEN a.id END) as missedOut,
@@ -254,7 +255,7 @@ router.get('/folders', authorize('VIEW'), async (req: AuthRequest, res) => {
       LEFT JOIN attendance a ON a.employeeId = e.id ${attDateFilter}
       LEFT JOIN attendancecorrection c ON c.employeeId = e.id AND DATE(c.attendanceDate) = DATE(a.attendanceDate)
       WHERE 1=1 ${locFilter}
-      GROUP BY d.name, COALESCE(l.code, 'BEL'), COALESCE(l.name, 'Belagavi Head Store')
+      GROUP BY d.name
       ORDER BY (missedIn + missedOut + under9Hours + pendingCorrections) DESC, d.name ASC`,
       params
     );
@@ -262,6 +263,7 @@ router.get('/folders', authorize('VIEW'), async (req: AuthRequest, res) => {
     const folders = rows.map((r: any) => ({
       folderId: r.folderId,
       folderName: r.folderName,
+      storeCodes: r.storeCodes || 'BEL',
       storeCode: r.storeCode || 'BEL',
       storeName: r.storeName || 'Store Hub',
       totalAssigned: Number(r.totalAssigned || 0),
