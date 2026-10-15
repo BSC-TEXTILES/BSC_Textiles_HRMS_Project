@@ -27,6 +27,7 @@ import { ensureEmployeeImportSchema } from './scripts/setupEmployeeImportSchema.
 import { setupPayrollSchema } from './scripts/setupPayrollSchema.js';
 import { setupLateFines } from './scripts/setupLateFines.js';
 import { setupRetailOperations } from './scripts/setupRetailOperations.js';
+import { setupBreaks } from './scripts/setupBreaks.js';
 import { UserUploadService } from './services/userUploadService.js';
 
 const app = express();
@@ -181,6 +182,7 @@ httpServer.listen(PORT, () => {
   setupPayrollSchema().catch((err) => console.warn('[setupPayrollSchema warning]:', err.message));
   setupLateFines().catch((err) => console.warn('[setupLateFines warning]:', err.message));
   setupRetailOperations().catch((err) => console.warn('[setupRetailOperations warning]:', err.message));
+  setupBreaks().catch((err) => console.warn('[setupBreaks warning]:', err.message));
   UserUploadService.syncAllUserFolders().catch((err) => console.warn('[UserUploadService warning]:', err.message));
 });
 
