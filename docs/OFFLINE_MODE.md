@@ -18,12 +18,12 @@ Every business module works without interruption when the computer is completely
 1. **HRMS Dashboard:** Live employee counts, on-time vs. late attendance ratios, floor distribution across Belagavi, Davanagere, and Shivamogga.
 2. **Employee Management:** Add, edit, deactivate employees, manage designations, departments, Aadhaar, PAN, PF, UAN, and ESI numbers.
 3. **Attendance & Late Penalty Engine:**
-   * Calculates ₹1.0/second late penalty based on showroom shift start time.
+   * Calculates ₹1.0/minute late penalty based on showroom shift start time.
    * Tracks exact seconds late, chargeable seconds, and approved penalty waivers.
 4. **Payroll & Payslip Management:**
    * Generates complete monthly payroll runs.
    * Renders the authentic Davanagere Payslip design with Belagavi / Shivamogga showroom selector.
-   * Full statutory breakdowns: Basic, HRA, Medical Allowance, Washing Allowance, Conveyance, PF, ESI, TDS, Professional Tax, Advance, and ₹1.0/sec late fine.
+   * Full statutory breakdowns: Basic, HRA, Medical Allowance, Washing Allowance, Conveyance, PF, ESI, TDS, Professional Tax, Advance, and ₹1.0/min late fine.
    * Native offline A4 printing and PDF export via Electron `webContents.print()`.
 5. **Floor-Wise Salary Overview:**
    * Summarizes gross, deductions, employer PF/ESI contributions, and net payable salaries by showroom floor and department.

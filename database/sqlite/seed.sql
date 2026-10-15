@@ -38,11 +38,11 @@ INSERT OR REPLACE INTO shift (id, name, locationId, startTime, endTime, gracePer
 ('shf_bel_shift1', 'Shift I (General)', 'loc_belagavi', '10:30:00', '20:30:00', 5),
 ('shf_shi_shift1', 'Shift I (General)', 'loc_shivamogga', '10:30:00', '20:30:00', 5);
 
--- 6. ATTENDANCE RULES (₹1.0/sec permanent statutory rate)
-INSERT OR REPLACE INTO attendancerules (id, locationId, loginTime, logoutTime, gracePeriodMinutes, lateThresholdMinutes, earlyLoginIncentiveEnabled, earlyLoginRatePerSecond, latePenaltyEnabled, latePenaltyRatePerSecond, overtimeIncentiveEnabled, overtimeRatePerSecond, earlyLogoutPenaltyEnabled, earlyLogoutRatePerSecond) VALUES
-('rule_dav', 'loc_davanagere', '10:30:00', '20:30:00', 5, 5, 1, 1.0000, 1, 1.0000, 1, 1.5000, 1, 1.0000),
-('rule_bel', 'loc_belagavi', '10:30:00', '20:30:00', 5, 5, 1, 1.0000, 1, 1.0000, 1, 1.5000, 1, 1.0000),
-('rule_shi', 'loc_shivamogga', '10:30:00', '20:30:00', 5, 5, 1, 1.0000, 1, 1.0000, 1, 1.5000, 1, 1.0000);
+-- 6. ATTENDANCE RULES (₹1.0/min permanent statutory rate)
+INSERT OR REPLACE INTO attendancerules (id, locationId, loginTime, logoutTime, gracePeriodMinutes, lateThresholdMinutes, earlyLoginIncentiveEnabled, earlyLoginRatePerMinute, earlyLoginRatePerSecond, latePenaltyEnabled, latePenaltyRatePerMinute, latePenaltyRatePerSecond, overtimeIncentiveEnabled, overtimeRatePerSecond, earlyLogoutPenaltyEnabled, earlyLogoutRatePerSecond) VALUES
+('rule_dav', 'loc_davanagere', '10:30:00', '20:30:00', 5, 5, 1, 1.0000, 0.0167, 1, 1.0000, 0.0167, 1, 1.5000, 1, 1.0000),
+('rule_bel', 'loc_belagavi', '10:30:00', '20:30:00', 5, 5, 1, 1.0000, 0.0167, 1, 1.0000, 0.0167, 1, 1.5000, 1, 1.0000),
+('rule_shi', 'loc_shivamogga', '10:30:00', '20:30:00', 5, 5, 1, 1.0000, 0.0167, 1, 1.0000, 0.0167, 1, 1.5000, 1, 1.0000);
 
 -- 7. USERS (Bcrypt hash for password123: $2a$10$o6v9t7t29L/wz6M4g4z7v.Y9h0y7J8t7p9v3j7k5m1n8q4r7s8t9u)
 -- Using universal hash compatible with bcryptjs: $2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy -> 'password123'

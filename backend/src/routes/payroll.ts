@@ -527,7 +527,7 @@ router.get('/load-or-calculate', async (req: AuthRequest, res) => {
 
     const attIncentive = Number(attRows[0]?.earlyTotal || 0);
 
-    // Query Late Attendance Records (Permanent ₹1.0/sec policy: 1s chargeable late beyond grace = ₹1.00 deduction)
+    // Query Late Attendance Records (Permanent ₹1.0/min policy: 1m chargeable late beyond grace = ₹1.00 deduction)
     let lateFineAmount = 0;
     let lateChargeableSeconds = 0;
     try {
@@ -541,18 +541,20 @@ router.get('/load-or-calculate', async (req: AuthRequest, res) => {
           AND approvalStatus != 'WAIVED'
       `, [emp.id, startDateStr, endDateStr]);
 
-      if (lateRows && lateRows.length > 0 && Number(lateRows[0].totalChargeableSeconds) > 0) {
+      if (lateRows && lateRows.length > 0 && (Number(lateRows[0].totalFine) > 0 || Number(lateRows[0].totalChargeableSeconds) > 0)) {
         lateChargeableSeconds = Number(lateRows[0].totalChargeableSeconds || 0);
-        // Permanent ₹1.0/sec statutory rate
-        lateFineAmount = Math.round(lateChargeableSeconds * 1.0);
+        // Permanent ₹1.0/min statutory rate
+        lateFineAmount = Number(lateRows[0].totalFine) > 0
+          ? Math.round(Number(lateRows[0].totalFine))
+          : Math.round((lateChargeableSeconds / 60.0) * 1.0);
       } else if (Number(attRows[0]?.lateSecondsTotal || 0) > 0) {
         lateChargeableSeconds = Number(attRows[0].lateSecondsTotal);
-        lateFineAmount = Math.round(lateChargeableSeconds * 1.0);
+        lateFineAmount = Math.round((lateChargeableSeconds / 60.0) * 1.0);
       }
     } catch (e) {
       if (Number(attRows[0]?.lateSecondsTotal || 0) > 0) {
         lateChargeableSeconds = Number(attRows[0].lateSecondsTotal);
-        lateFineAmount = Math.round(lateChargeableSeconds * 1.0);
+        lateFineAmount = Math.round((lateChargeableSeconds / 60.0) * 1.0);
       }
     }
 
@@ -580,7 +582,7 @@ router.get('/load-or-calculate', async (req: AuthRequest, res) => {
       { id: 'loan_adv', label: 'LOAN ADVANCE', amount: 0, enabled: true },
       { 
         id: 'late_fine', 
-        label: 'LATE FINE DEDUCTION (₹1.0/SEC)', 
+        label: 'LATE FINE DEDUCTION (₹1.0/MIN)', 
         amount: lateFineAmount, 
         enabled: lateFineAmount > 0 
       },

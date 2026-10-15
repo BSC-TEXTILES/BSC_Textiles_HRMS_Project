@@ -272,7 +272,7 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
 
           <div className="mt-3 space-y-1 text-xs">
             <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 font-medium">
-              <span>Early Login ₹1/sec:</span>
+              <span>Early Login ₹1/min:</span>
               <span className="font-bold text-[#0b1c30] dark:text-slate-100">₹2,300</span>
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">

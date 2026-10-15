@@ -21,7 +21,7 @@
 * External web URLs are intercepted and opened in the default OS browser.
 
 ### 2.3 Statutory Payroll & Payslip Rules
-* Fixed statutory late fine: **₹1.0 per second** late (`₹1.0/sec`).
+* Fixed statutory late fine: **₹1.0 per minute** late (`₹1.0/min`).
 * Authentic Davanagere Payslip design recreated and preserved with multi-showroom switcher (`BEL`, `DAV`, `SHI`).
 * Dynamic employee search and selection with validation for matching employee name and ID.
 * Floor-wise salary overview displaying gross salary, deductions, net payable, and employer contributions per floor.

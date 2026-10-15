@@ -103,8 +103,8 @@ export function PunctualityDetail({
 
     try {
       if (!data) setLoading(true);
-      const res = await fetch('/api/analytics/punctuality', { credentials: 'include' });
-      if (res.ok) {
+      const res = await fetch('/api/analytics/punctuality', { credentials: 'include' }).catch(() => null);
+      if (res && res.ok) {
         const text = await res.text().catch(() => '');
         let json: any = null;
         try {
@@ -127,11 +127,12 @@ export function PunctualityDetail({
           setGraceCountdowns(initCountdowns);
         }
       }
-    } catch (err) {
-      console.error('Failed to load punctuality analytics:', err);
+    } catch {
+      // Gracefully maintain existing cache or state
     } finally {
       setLoading(false);
     }
+
   }, [data]);
 
   useEffect(() => {

@@ -16,7 +16,7 @@
 - **Schema & Master Seed Data (`database/sqlite/`):**
   - 20 complete business tables: locations, floors, departments, sections, shifts, employees, users, attendance rules, attendance, late records, payroll runs, payroll items, customer CRM, wedding registrations, telecaller interactions, customer feedback, showroom footfall, visual merchandising, and audit logs.
   - Master seeds for Belagavi (`BEL`), Davanagere (`DAV`), and Shivamogga (`SHI`).
-  - Pre-seeded statutory late fine rule: ₹1.0/second late penalty.
+  - Pre-seeded statutory late fine rule: ₹1.0/minute late penalty.
 - **Automated MySQL-to-SQLite Migration Tool (`scripts/migrateToSqlite.ts`):**
   - Schema-reflective data migrator supporting live migration of employees, punches, late records, payroll runs, and audit logs.
 - **Admin Database & Backup UI (`frontend/src/app/admin/local-database/`):**

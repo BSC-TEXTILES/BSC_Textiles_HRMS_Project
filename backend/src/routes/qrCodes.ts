@@ -407,7 +407,7 @@ router.post('/scan', authorize('SCAN'), validate(qrScanSchema), async (req: Auth
         
         let earlyLoginIncentive = 0;
         if (earlyLoginSeconds > 0 && attRules?.earlyLoginIncentiveEnabled) {
-          earlyLoginIncentive = earlyLoginSeconds * Number(attRules.earlyLoginRatePerSecond || 1);
+          earlyLoginIncentive = Math.round((earlyLoginSeconds / 60.0) * Number(attRules.earlyLoginRatePerMinute || attRules.earlyLoginRatePerSecond || 1));
         }
         
         await prisma.attendance.create({

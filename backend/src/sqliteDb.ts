@@ -162,6 +162,12 @@ class SqliteEngine {
     // IFNULL(a, b) -> COALESCE(a, b)
     s = s.replace(/\bIFNULL\(/gi, 'COALESCE(');
 
+    // ENUM(...) -> TEXT
+    s = s.replace(/\bENUM\([^)]*\)/gi, 'TEXT');
+
+    // Remove ENGINE=...
+    s = s.replace(/\)\s*ENGINE=[^;]*/gi, ')');
+
     return s;
   }
 

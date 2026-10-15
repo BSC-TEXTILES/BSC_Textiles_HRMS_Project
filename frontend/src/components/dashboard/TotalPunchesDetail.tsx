@@ -103,8 +103,8 @@ export function TotalPunchesDetail({
 
     try {
       if (!data) setLoading(true);
-      const res = await fetch('/api/attendance/punches/detail?limit=50', { credentials: 'include' });
-      if (res.ok) {
+      const res = await fetch('/api/attendance/punches/detail?limit=50', { credentials: 'include' }).catch(() => null);
+      if (res && res.ok) {
         const text = await res.text().catch(() => '');
         let json: any = null;
         try {
@@ -120,11 +120,12 @@ export function TotalPunchesDetail({
           setLastRefreshedSec(0);
         }
       }
-    } catch (err) {
-      console.error('Failed to fetch punches detail:', err);
+    } catch {
+      // Gracefully maintain existing cache or state
     } finally {
       setLoading(false);
     }
+
   }, [data]);
 
   useEffect(() => {

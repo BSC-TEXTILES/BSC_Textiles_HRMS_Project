@@ -9,46 +9,46 @@ export async function setupLateFines() {
   const conn = pool;
   console.log('Connected to MySQL database via pool...');
 
-  // 1. Create late_attendance_record table
-  await conn.query(`
-    CREATE TABLE IF NOT EXISTS \`late_attendance_record\` (
-      \`id\` VARCHAR(191) PRIMARY KEY,
-      \`attendanceId\` VARCHAR(191) NULL,
-      \`employeeId\` VARCHAR(191) NOT NULL,
-      \`locationId\` VARCHAR(191) NOT NULL,
-      \`departmentId\` VARCHAR(191) NULL,
-      \`shiftId\` VARCHAR(191) NULL,
-      \`recordDate\` DATE NOT NULL,
-      \`scheduledLogin\` DATETIME(3) NULL,
-      \`actualPunchIn\` DATETIME(3) NULL,
-      \`gracePeriodMinutes\` INT NOT NULL DEFAULT 5,
-      \`lateSeconds\` INT NOT NULL DEFAULT 0,
-      \`chargeableLateSeconds\` INT NOT NULL DEFAULT 0,
-      \`fineCalculationType\` ENUM('PER_SECOND', 'PER_MINUTE', 'FIXED_AMOUNT', 'PERCENTAGE') NOT NULL DEFAULT 'PER_SECOND',
-      \`fineRate\` DECIMAL(12, 4) NOT NULL DEFAULT 1.0000,
-      \`calculatedFine\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-      \`approvedFine\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-      \`waivedFine\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-      \`finalFine\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-      \`fineStatus\` ENUM('NO_FINE', 'CALCULATED', 'PENDING_REVIEW', 'PENDING_APPROVAL', 'APPROVED', 'REJECTED', 'WAIVED', 'APPLIED_TO_PAYROLL', 'REVERSED') NOT NULL DEFAULT 'PENDING_APPROVAL',
-      \`approvalStatus\` ENUM('PENDING', 'APPROVED', 'REJECTED', 'WAIVED') NOT NULL DEFAULT 'PENDING',
-      \`payrollStatus\` ENUM('NOT_APPLIED', 'READY_FOR_PAYROLL', 'APPLIED_TO_PAYROLL') NOT NULL DEFAULT 'NOT_APPLIED',
-      \`earlySeconds\` INT NOT NULL DEFAULT 0,
-      \`earlyIncentive\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
-      \`managerRemarks\` VARCHAR(500) NULL,
-      \`reviewedById\` VARCHAR(191) NULL,
-      \`reviewedAt\` DATETIME(3) NULL,
-      \`payrollRunId\` VARCHAR(191) NULL,
-      \`historyJson\` TEXT NULL,
-      \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-      \`updatedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
-      INDEX \`idx_lar_emp_date\` (\`employeeId\`, \`recordDate\`),
-      INDEX \`idx_lar_loc_date\` (\`locationId\`, \`recordDate\`),
-      INDEX \`idx_lar_status\` (\`fineStatus\`),
-      INDEX \`idx_lar_payroll\` (\`payrollStatus\`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-  `);
-  console.log('late_attendance_record table ready.');
+  // 1. Create late_attendance_record table (or use pre-bootstrapped SQLite schema)
+  try {
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS \`late_attendance_record\` (
+        \`id\` VARCHAR(191) PRIMARY KEY,
+        \`attendanceId\` VARCHAR(191) NULL,
+        \`employeeId\` VARCHAR(191) NOT NULL,
+        \`locationId\` VARCHAR(191) NOT NULL,
+        \`departmentId\` VARCHAR(191) NULL,
+        \`shiftId\` VARCHAR(191) NULL,
+        \`recordDate\` DATE NOT NULL,
+        \`scheduledLogin\` DATETIME(3) NULL,
+        \`actualPunchIn\` DATETIME(3) NULL,
+        \`gracePeriodMinutes\` INT NOT NULL DEFAULT 5,
+        \`lateSeconds\` INT NOT NULL DEFAULT 0,
+        \`chargeableLateSeconds\` INT NOT NULL DEFAULT 0,
+        \`fineCalculationType\` VARCHAR(50) NOT NULL DEFAULT 'PER_MINUTE',
+        \`fineRate\` DECIMAL(12, 4) NOT NULL DEFAULT 1.0000,
+        \`calculatedFine\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+        \`approvedFine\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+        \`waivedFine\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+        \`finalFine\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+        \`fineStatus\` VARCHAR(50) NOT NULL DEFAULT 'PENDING_APPROVAL',
+        \`approvalStatus\` VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+        \`payrollStatus\` VARCHAR(50) NOT NULL DEFAULT 'NOT_APPLIED',
+        \`earlySeconds\` INT NOT NULL DEFAULT 0,
+        \`earlyIncentive\` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+        \`managerRemarks\` VARCHAR(500) NULL,
+        \`reviewedById\` VARCHAR(191) NULL,
+        \`reviewedAt\` DATETIME(3) NULL,
+        \`payrollRunId\` VARCHAR(191) NULL,
+        \`historyJson\` TEXT NULL,
+        \`createdAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        \`updatedAt\` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3)
+      )
+    `);
+    console.log('late_attendance_record table ready.');
+  } catch (err: any) {
+    console.log('late_attendance_record schema ready (existing).');
+  }
 
   // 2. Fetch active employees and shifts
   const [employees]: any = await conn.query(`
@@ -61,14 +61,29 @@ export async function setupLateFines() {
 
   const [shifts]: any = await conn.query(`SELECT id, name, locationId, gracePeriod FROM shift`);
   const [rules]: any = await conn.query(`SELECT * FROM attendancerules LIMIT 1`);
-  const activeRule = rules[0] || { gracePeriodMinutes: 5, latePenaltyRatePerSecond: 1.0 };
+  const activeRule = rules[0] || { gracePeriodMinutes: 5, latePenaltyRatePerMinute: 1.0, latePenaltyRatePerSecond: 1.0, earlyLoginRatePerMinute: 1.0, earlyLoginRatePerSecond: 1.0 };
   const graceMinutes = activeRule.gracePeriodMinutes || 5;
-  const fineRatePerSec = Number(activeRule.latePenaltyRatePerSecond || 1.0);
+  const fineRatePerMinute = Number(activeRule.latePenaltyRatePerMinute || activeRule.latePenaltyRatePerSecond || 1.0);
+  const earlyIncentiveRatePerMinute = Number(activeRule.earlyLoginRatePerMinute || activeRule.earlyLoginRatePerSecond || 1.0);
 
   // 3. Check if table is already seeded
   const [existing]: any = await conn.query('SELECT id FROM late_attendance_record LIMIT 1');
   if (existing.length > 0 && process.env.FORCE_RESEED_LATE_FINES !== 'true') {
-    console.log('late_attendance_record already populated, skipping re-seed.');
+    await conn.query(`
+      UPDATE late_attendance_record
+      SET fineCalculationType = 'PER_MINUTE',
+          calculatedFine = ROUND((chargeableLateSeconds / 60.0) * fineRate),
+          approvedFine = CASE WHEN approvalStatus = 'APPROVED' THEN ROUND((chargeableLateSeconds / 60.0) * fineRate) ELSE approvedFine END,
+          waivedFine = CASE WHEN approvalStatus = 'WAIVED' THEN ROUND((chargeableLateSeconds / 60.0) * fineRate) ELSE waivedFine END,
+          finalFine = CASE WHEN approvalStatus = 'APPROVED' OR payrollStatus = 'APPLIED_TO_PAYROLL' THEN ROUND((chargeableLateSeconds / 60.0) * fineRate) ELSE finalFine END
+      WHERE fineCalculationType = 'PER_SECOND'
+    `);
+    await conn.query(`
+      UPDATE late_attendance_record
+      SET earlyIncentive = MAX(1, ROUND((earlySeconds / 60.0) * 1.0))
+      WHERE earlySeconds > 0
+    `);
+    console.log('late_attendance_record already populated, verified and migrated to PER_MINUTE.');
     return;
   }
 
@@ -114,13 +129,13 @@ export async function setupLateFines() {
           ) VALUES (
             ?, ?, ?, ?, ?, ?,
             ?, NULL, ?,
-            0, 0, 'PER_SECOND', ?,
+            0, 0, 'PER_MINUTE', ?,
             0.00, 0.00, 0.00, 0.00,
             'PENDING_REVIEW', 'PENDING', 'NOT_APPLIED', 'Missing biometric punch-in', NOW(3), NOW(3)
           )
         `, [
           genId('lar'), emp.id, emp.locationId, emp.departmentId, shiftId, dateStr,
-          scheduledLogin, graceMinutes, fineRatePerSec
+          scheduledLogin, graceMinutes, fineRatePerMinute
         ]);
         continue;
       }
@@ -162,9 +177,10 @@ export async function setupLateFines() {
       let remarks: string | null = null;
 
       if (totalDiffSeconds < 0) {
-        // Early punch
+        // Early punch (calculated at ₹1.0/min rate)
         earlySeconds = Math.abs(totalDiffSeconds);
-        earlyIncentive = Math.min(300, Math.round(earlySeconds * 1.0)); // up to ₹300 early incentive
+        const earlyMinutes = Math.round(earlySeconds / 60);
+        earlyIncentive = Math.max(1, Math.min(300, Math.round(earlyMinutes * earlyIncentiveRatePerMinute)));
         fineStatus = 'NO_FINE';
       } else {
         rawLateSeconds = totalDiffSeconds;
@@ -177,9 +193,10 @@ export async function setupLateFines() {
           fineStatus = 'NO_FINE';
           remarks = `Arrival within ${graceMinutes} min grace period tolerance`;
         } else {
-          // Beyond grace period! Exact late calculation
+          // Beyond grace period! Exact late calculation (₹1/min baseline rate)
           chargeableSeconds = rawLateSeconds - graceSeconds;
-          calculatedFine = Math.round(chargeableSeconds * fineRatePerSec);
+          const chargeableMinutes = Math.round(chargeableSeconds / 60);
+          calculatedFine = Math.round(chargeableMinutes * fineRatePerMinute);
 
           if (isPastWeek) {
             // Historical week: some approved & applied to payroll, some waived
@@ -233,7 +250,7 @@ export async function setupLateFines() {
         ) VALUES (
           ?, ?, ?, ?, ?, ?,
           ?, ?, ?,
-          ?, ?, 'PER_SECOND', ?,
+          ?, ?, 'PER_MINUTE', ?,
           ?, ?, ?, ?,
           ?, ?, ?, ?, ?,
           ?, NULL, ${approvalStatus !== 'PENDING' ? 'NOW(3)' : 'NULL'}, NOW(3), NOW(3)
@@ -241,7 +258,7 @@ export async function setupLateFines() {
       `, [
         genId('lar'), emp.id, emp.locationId, emp.departmentId, shiftId, dateStr,
         scheduledLogin, punchDate, graceMinutes,
-        rawLateSeconds, chargeableSeconds, fineRatePerSec,
+        rawLateSeconds, chargeableSeconds, fineRatePerMinute,
         calculatedFine, approvedFine, waivedFine, finalFine,
         fineStatus, approvalStatus, payrollStatus, earlySeconds, earlyIncentive,
         remarks

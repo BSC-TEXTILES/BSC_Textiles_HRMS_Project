@@ -75,8 +75,8 @@ export async function runLateFinesTests(adminToken: string, hrToken: string): Pr
     }
   });
 
-  // 3. Beyond grace period calculation test (10:38 AM arrival has 3 min chargeable = 180s = ₹180)
-  await runTest('3. Chargeable late calculation formula: Actual - ShiftStart - Grace = ₹1/sec', async () => {
+  // 3. Beyond grace period calculation test (10:38 AM arrival has 3 min chargeable = ₹3 at ₹1/min)
+  await runTest('3. Chargeable late calculation formula: Actual - ShiftStart - Grace = ₹1/min', async () => {
     const res = await fetch(`${BASE_URL}/api/late-fines/records?date=2026-10-11&drillDownMetric=LATE`, {
       headers: { Authorization: `Bearer ${adminToken}` }
     });
@@ -84,7 +84,8 @@ export async function runLateFinesTests(adminToken: string, hrToken: string): Pr
     const json: any = await res.json();
     if (!json.data || json.data.length === 0) throw new Error('No late records found');
     const lateRec = json.data[0];
-    const expectedFine = Math.round(lateRec.chargeableLateSeconds * lateRec.fineRate);
+    const chargeableMinutes = Math.round(lateRec.chargeableLateSeconds / 60);
+    const expectedFine = Math.round(chargeableMinutes * lateRec.fineRate);
     if (Math.abs(lateRec.calculatedFine - expectedFine) > 2) {
       throw new Error(`Fine mismatch: calculated ${lateRec.calculatedFine} vs expected ${expectedFine}`);
     }
@@ -132,8 +133,9 @@ export async function runLateFinesTests(adminToken: string, hrToken: string): Pr
     if (json.data.gracePeriodMinutes !== 5) {
       throw new Error(`Expected gracePeriodMinutes 5, got ${json.data.gracePeriodMinutes}`);
     }
-    if (json.data.latePenaltyRatePerSecond !== 1) {
-      throw new Error(`Expected latePenaltyRatePerSecond 1.0, got ${json.data.latePenaltyRatePerSecond}`);
+    const rate = Number(json.data.latePenaltyRatePerMinute ?? json.data.latePenaltyRatePerSecond);
+    if (rate !== 1) {
+      throw new Error(`Expected latePenaltyRatePerMinute 1.0, got ${rate}`);
     }
   });
 

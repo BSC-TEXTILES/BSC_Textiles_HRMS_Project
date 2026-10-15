@@ -120,7 +120,7 @@ Retail textile operations face unique workforce dynamics: high floor-staff count
 BSC Textiles HRMS solves these operational bottlenecks by providing:
 - **Centralized Administrative Governance with Rigid Multi-Branch Isolation:** Super Administrators control all corporate policies, whereas branch managers (e.g., Belagavi, Davanagere, Shivamogga) only access their local personnel and roster records.
 - **Biometric & Cryptographic Fraud Prevention:** Combines daily dynamic QR token badges with server-validated face verification (thresholding at $\ge 85.0\%$).
-- **Sub-Second Precision Incentive Engine:** Calculates on-time and early-arrival incentives at an authoritative ₹1.00/second rate with mathematical explainability.
+- **Sub-Second Precision Incentive Engine:** Calculates on-time and early-arrival incentives at an authoritative ₹1.00/minute rate with mathematical explainability.
 - **Real-Time Break & Occupancy Oversight:** Sub-second WebSocket break countdowns with strict gendered duration allowances and automated overrun penalties.
 - **Supervisory Live Streaming & Floor Observations:** Live in-store stream broadcasts with timecoded performance feedback notes and incident tags.
 - **Transparent Multi-Branch Payroll Processing:** Consolidated gross-to-net salary derivation accounting for basic pay, allowances, incentives, break deductions, and attendance penalties.
@@ -145,7 +145,7 @@ The long-term vision of BSC Textiles HRMS is to serve as the unified operating s
 | **Multi-Location Hierarchy** | 6-Tier Hierarchy: Location $\rightarrow$ Floor $\rightarrow$ Department $\rightarrow$ Section $\rightarrow$ Selling Point $\rightarrow$ Staff | Eliminates branch data leakage while allowing cross-store analytics |
 | **Biometric Face Verification** | Canvas capture matched against enrolled profile baseline ($\ge 85.0\%$ threshold) | Eliminates buddy punching and proxy card swapping |
 | **Dynamic Daily QR Badges** | Ephemeral $\ge 24$-char cryptographically random tokens valid only for current date | Prevents static barcode photocopying or badge reuse |
-| **Early Login Incentives** | Configurable per-second calculation (e.g., ₹1/sec before scheduled shift start) | Drives prompt showroom readiness and opening compliance |
+| **Early Login Incentives** | Configurable per-minute calculation (e.g., ₹1/min before scheduled shift start) | Drives prompt showroom readiness and opening compliance |
 | **Grace & Late Penalties** | Configurable grace windows (e.g., 5 min) with second-level penalty accruals | Standardizes punctuality enforcement transparently |
 | **Gendered Break Countdown** | Dynamic DB rules (Male Lunch: 100m, Female Lunch: 40m, Male Tea: 20m, Female Tea: 15m) | Accommodates operational retail realities while halting floor abandonment |
 | **Floor Live Streaming** | WebRTC/HLS/RTMP camera feeds with live chat and timecoded observations | Enables executive floor audits without physical travel |
@@ -867,7 +867,7 @@ flowchart TD
     FACE_GATE -- "NO (< 85%)" --> LOG_FAIL["Log FAILED Biometric Event & Block Punch"]:::cRed
     FACE_GATE -- "YES (>= 85%)" --> CHECK_TIME{"Check Server Clock vs Shift Start (e.g. 10:30 AM)"}:::cOrange
 
-    CHECK_TIME -- "Arrived Earlier than Shift Start" --> CALC_EARLY["Calculate Early Seconds * ₹1.00/s<br/>(e.g., 600s = ₹600.00 Incentive)"]:::cGreen
+    CHECK_TIME -- "Arrived Earlier than Shift Start" --> CALC_EARLY["Calculate Early Minutes * ₹1.00/min<br/>(e.g., 10 mins = ₹10.00 Incentive)"]:::cGreen
     CHECK_TIME -- "Within Grace Window (<= 5 min)" --> GRACE["Mark Status: PRESENT<br/>₹0 Penalty (Grace Protected)"]:::cGreen
     CHECK_TIME -- "Arrived Past Grace (> 5 min)" --> CALC_LATE["Calculate Late Seconds * Penalty Policy<br/>Status: LATE"]:::cOrange
 
@@ -887,9 +887,9 @@ flowchart TD
 ```
 
 ### Attendance Calculation Transparency Rules
-1. **Early Login Incentive Rate:** Authoritative server calculation at `₹1.00 / second`.
-   $$\text{Early Seconds} = \max(0, \text{Scheduled Start} - \text{Punch In})$$
-   $$\text{Early Incentive (₹)} = \text{Early Seconds} \times ₹1.00$$
+1. **Early Login Incentive Rate:** Authoritative server calculation at `₹1.00 / minute`.
+   $$\text{Early Minutes} = \max(0, (\text{Scheduled Start} - \text{Punch In}) / 60)$$
+   $$\text{Early Incentive (₹)} = \text{Early Minutes} \times ₹1.00$$
 2. **Grace Period Protection:** Arrival within 5 minutes (`300 seconds`) past scheduled shift start incurs `₹0.00` penalty.
 3. **Late Arrival Penalties:** Arrival exceeding the 5-minute grace window calculates penalty based on total elapsed lateness from shift start.
 
@@ -1056,7 +1056,7 @@ sequenceDiagram
 
     HR->>UI: Select Month & Location (e.g., Oct 2024, Belagavi Flagship)
     UI->>API: POST /api/payroll/runs (Generate Cycle Run)
-    API->>DB: Compute base wages, incentives (₹1/sec), OT, and statutory deductions
+    API->>DB: Compute base wages, incentives (₹1/min), OT, and statutory deductions
     API->>DB: INSERT INTO payrollitem (Status: PENDING, EmailStatus: NOT_SENT)
     API-->>UI: Interactive Ledger Table Rendered
 
@@ -1430,7 +1430,7 @@ npm run test --workspace=backend
 ```
 
 ### Verified Test Categories (43 / 43 Passed — 100% Pass Rate):
-1. **Attendance Suite:** On-time calculation, ₹1/sec early incentive formula, 5-minute grace protection, late penalties, overtime accumulation.
+1. **Attendance Suite:** On-time calculation, ₹1/min early incentive formula, 5-minute grace protection, late penalties, overtime accumulation.
 2. **Breaks Suite:** Gendered break durations (100m, 40m, 20m, 15m), countdown timer calculations, break overrun penalties.
 3. **QR System Suite:** Cryptographic token entropy ($\ge 24$ chars), single-use badge retrieval, invalidation of expired tokens, duplicate scan rejection, cross-location scan rejection.
 4. **Face Verification Suite:** Match score thresholding ($\ge 85.0\% \rightarrow \text{VERIFIED}$, $< 85.0\% \rightarrow \text{FAILED}$), boundary compliance, non-fabricated score validation.
@@ -1699,7 +1699,7 @@ Built using **React Native with Expo**, integrating directly with the shared bac
 📁 [QR SYSTEM]                     5/5 Passed  (Cryptographic replay protected)
 📁 [FACE VERIFICATION]             5/5 Passed  (Threshold boundary validated)
 📁 [PERMISSIONS & LOCATION]        6/6 Passed  (Multi-tenant hub isolated)
-📁 [INCENTIVES & PENALTIES]        8/8 Passed  (₹1/sec transparent math)
+📁 [INCENTIVES & PENALTIES]        8/8 Passed  (₹1/min transparent math)
 📁 [SECURITY & AUTH]               6/6 Passed  (bcrypt, JWT, XSS protected)
 📁 [KYC & DIGILOCKER]              8/8 Passed  (PKCE OAuth S256, UID masked)
 📁 [FULL & FINAL & LEAVES]         6/6 Passed  (Sub-25ms indexed DB queries)
