@@ -505,22 +505,44 @@ router.post('/', authorize('ADD'), validate(employeeSchema), async (req: AuthReq
       data: { qrCodeId: empQR.id, dailyQRCodeId: dailyQR.id },
     });
     
-    // Create user account if email provided
+    // Create the HRMS account in PENDING_APPROVAL state: a new account must be
+    // approved by HR (POST /auth/approve/:userId) before it can log in, and the
+    // temporary password is random — never a shared default like 'password123'.
     if (trimmedEmail) {
-      const passwordHash = await PasswordService.hashPassword('password123');
-      
+      const tempPassword = crypto.randomBytes(18).toString('base64url');
+      const passwordHash = await PasswordService.hashPassword(tempPassword);
+
       await prisma.user.create({
         data: {
           email: trimmedEmail,
           passwordHash,
           fullName,
-          role: role || 'EMPLOYEE',
+          role: role || 'SALES_EMPLOYEE',
           permissions: ['VIEW'],
           employeeId: employee.id,
           locationId: resolvedLocationId,
+          isActive: false,
+          status: 'PENDING_APPROVAL',
         },
       });
     }
+
+    await AuditService.log({
+      userId: req.user!.userId,
+      locationId: resolvedLocationId,
+      action: 'CREATE',
+      entityType: 'employee',
+      entityId: employee.id,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      newValue: {
+        employeeCode: finalCode,
+        fullName,
+        locationId: resolvedLocationId,
+        departmentId: resolvedDepartmentId,
+        status: 'ACTIVE',
+      },
+    });
 
     // Publish notification for new employee creation
     await container.notificationService.publishEvent({

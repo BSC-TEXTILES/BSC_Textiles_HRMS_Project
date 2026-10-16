@@ -48,8 +48,9 @@ import {
   ClipboardList,
   UserCog,
   KeyRound,
-  UserCheck as HistoryIcon,
+  History,
   ListChecks,
+  AlarmClock,
   PartyPopper,
 } from 'lucide-react';
 import type { MyAccess } from '@/lib/rbac';
@@ -137,7 +138,7 @@ export const enterpriseNavigation: NavSectionConfig[] = [
         roles: WORKFORCE,
         badge: 'Exit / Block',
       },
-      { title: 'Employee History', href: '/employees/history', icon: HistoryIcon, roles: WORKFORCE },
+      { title: 'Employee History', href: '/employees/history', icon: History, roles: WORKFORCE },
       { title: 'Profile 360 & Dossier', href: '/employees/profile', icon: Contact },
       {
         title: 'Analysis & Reports',
@@ -199,7 +200,7 @@ export const enterpriseNavigation: NavSectionConfig[] = [
       {
         title: 'Late & Fine Management',
         href: '/attendance/late-fines',
-        icon: ScanFace,
+        icon: AlarmClock,
         badge: 'Policy',
         moduleKey: 'LATE_FINES',
         roles: WORKFORCE,
