@@ -8,24 +8,33 @@ import dotenv from 'dotenv';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { sqlitePool } from './sqliteDb.js';
+import { postgresPool } from './postgresDb.js';
 
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 dotenv.config();
 
-const connectionUri = process.env.DATABASE_URL || 'mysql://root@localhost:3306/bsc_textiles_hrms';
+const rawUri = process.env.DATABASE_URL || '';
 const dbType = (process.env.DB_TYPE || '').trim().toLowerCase();
 
-// MySQL is the primary datastore. SQLite is opt-in for the offline/desktop build
-// (DB_TYPE=sqlite or a file-based DATABASE_URL) — never an accidental fallback.
-const isMysql =
-  dbType === 'mysql'
-    ? true
-    : dbType === 'sqlite'
-      ? false
-      : !(/^file:/i.test(connectionUri) || /\.db$/i.test(connectionUri));
+// Determine target engine: PostgreSQL/Supabase, SQLite, or MySQL
+const isPostgres =
+  dbType === 'postgres' ||
+  dbType === 'supabase' ||
+  /^postgres(ql)?:\/\//i.test(rawUri) ||
+  Boolean(process.env.VERCEL && !process.env.SQLITE_PATH && dbType !== 'sqlite');
+
+const isSqlite =
+  !isPostgres &&
+  (dbType === 'sqlite' || /^file:/i.test(rawUri) || /\.db$/i.test(rawUri));
+
+const isMysql = !isPostgres && !isSqlite;
+
+const connectionUri = isPostgres
+  ? process.env.SUPABASE_POOLER_URL || process.env.SUPABASE_DB_URL || rawUri || 'postgresql://postgres.opoeigmbiwctvqtzxkde:HRMS_Project%402026@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres'
+  : rawUri || 'mysql://root@localhost:3306/bsc_textiles_hrms';
 
 console.log(
-  `[Database] Engine: ${isMysql ? 'MySQL' : 'SQLite'} (DB_TYPE=${dbType || '<unset>'}, DATABASE_URL=${isMysql ? connectionUri.replace(/\/\/[^@]*@/, '//***@') : 'file-based'})`
+  `[Database] Engine: ${isPostgres ? 'PostgreSQL (Supabase Cloud)' : isMysql ? 'MySQL' : 'SQLite'} (DB_TYPE=${dbType || '<unset>'}, VERCEL=${Boolean(process.env.VERCEL)})`
 );
 
 export const mysqlPool: Pool = isMysql
@@ -45,7 +54,11 @@ export const mysqlPool: Pool = isMysql
     })
   : (null as unknown as Pool);
 
-export const pool: Pool = isMysql ? mysqlPool : (sqlitePool as unknown as Pool);
+export const pool: Pool = isPostgres
+  ? (postgresPool as unknown as Pool)
+  : isMysql
+    ? mysqlPool
+    : (sqlitePool as unknown as Pool);
 
 export class Decimal {
   private value: number;

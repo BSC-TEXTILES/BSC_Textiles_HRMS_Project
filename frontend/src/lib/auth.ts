@@ -29,8 +29,17 @@ export const authOptions: NextAuthOptions = {
         const boundBackendApi = process.env.BACKEND_URL
           ? `${process.env.BACKEND_URL.replace(/\/+$/, '')}/api`
           : null;
+        const vercelHostApi = process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}/api`
+          : null;
+        const nextAuthUrlApi = process.env.NEXTAUTH_URL
+          ? `${process.env.NEXTAUTH_URL.replace(/\/+$/, '')}/api`
+          : null;
         const candidateUrls = [
           boundBackendApi,
+          vercelHostApi,
+          nextAuthUrlApi,
+          'https://bsctextileshrmsproject.vercel.app/api',
           API_URL,
           API_URL.includes('127.0.0.1') ? API_URL.replace('127.0.0.1', 'localhost') : API_URL.replace('localhost', '127.0.0.1'),
           'http://127.0.0.1:4000/api',
