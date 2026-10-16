@@ -79,6 +79,103 @@ export interface ZkConnectionResult {
 }
 
 /**
+ * Standardized mapping of eSSL / ZKTeco verification method codes
+ * Never defaults unrecognized or missing codes to Card, Face, or Fingerprint
+ */
+export function decodeVerificationMode(mode: number | string | undefined | null): { code: number; label: string } {
+  if (mode === undefined || mode === null || mode === '') {
+    return { code: -1, label: 'NOT PROVIDED BY DEVICE' };
+  }
+  const code = Number(mode);
+  if (isNaN(code) || code < 0) {
+    return { code: -1, label: 'UNKNOWN' };
+  }
+  switch (code) {
+    case 1:
+      return { code: 1, label: 'Fingerprint' };
+    case 2:
+      return { code: 2, label: 'PIN / Password' };
+    case 3:
+    case 4:
+      return { code, label: 'RFID Card' };
+    case 15:
+      return { code: 15, label: 'Face Recognition' };
+    case 8:
+      return { code: 8, label: 'Card + Face' };
+    case 9:
+      return { code: 9, label: 'Face + Fingerprint' };
+    case 0:
+      return { code: 0, label: 'Password' };
+    default:
+      return { code, label: `Mode ${code} (Unknown)` };
+  }
+}
+
+/**
+ * Parses raw 40-byte attendance records streamed by eSSL MB160 TFT terminal
+ */
+export function parseZkAttLogBuffer(buf: Buffer): ZkAttendanceRecord[] {
+  const records: ZkAttendanceRecord[] = [];
+  const RECORD_SIZE = 40;
+  
+  let pos = 0;
+  while (pos + RECORD_SIZE <= buf.length) {
+    // Check if this chunk is a TCP frame header (0x5050827d)
+    if (pos + 8 <= buf.length && buf.readUInt16BE(pos) === 0x5050 && buf.readUInt16BE(pos + 2) === 0x827d) {
+      pos += 8;
+      // Skip ACK header if present
+      if (pos + 8 <= buf.length) {
+        const cmd = buf.readUInt16LE(pos);
+        if (cmd === ZK_COMMANDS.CMD_PREPARE_DATA || cmd === ZK_COMMANDS.CMD_ACK_OK || cmd === ZK_COMMANDS.CMD_DATA) {
+          pos += 8;
+        }
+      }
+      continue;
+    }
+
+    const chunk = buf.subarray(pos, pos + RECORD_SIZE);
+    
+    // Read PIN (bytes 2..25, null terminated)
+    let pinEnd = 2;
+    while (pinEnd < 26 && chunk[pinEnd] !== 0) pinEnd++;
+    const pin = chunk.subarray(2, pinEnd).toString('utf-8').trim();
+
+    // Check validity of PIN
+    if (!pin || pin.length > 24 || /[\x00-\x1F\x7F]/.test(pin)) {
+      pos++;
+      continue;
+    }
+
+    const verifyMode = chunk.readUInt8(26);
+    const rawTime = chunk.readUInt32LE(27);
+    const status = chunk.readUInt8(31);
+
+    const timestamp = decodeZkTimestamp(rawTime);
+    const year = timestamp.getUTCFullYear();
+    if (isNaN(timestamp.getTime()) || year < 2020 || year > 2035) {
+      pos++;
+      continue;
+    }
+
+    let punchType: 'CHECK_IN' | 'CHECK_OUT' | 'BREAK_OUT' | 'BREAK_IN' | 'AUTO_PAIR' = 'CHECK_IN';
+    if (status === 1) punchType = 'CHECK_OUT';
+    else if (status === 2) punchType = 'BREAK_OUT';
+    else if (status === 3) punchType = 'BREAK_IN';
+
+    records.push({
+      enrollmentNumber: pin,
+      punchTime: timestamp,
+      verifyMode,
+      punchType,
+      workCode: chunk.readUInt32LE(32),
+    });
+
+    pos += RECORD_SIZE;
+  }
+  return records;
+}
+
+/**
  * Calculates standard ZKTeco 16-bit 1's complement checksum
  */
 export function calculateZkChecksum(buffer: Buffer): number {
@@ -259,6 +356,9 @@ export class ZkProtocolClient {
               if (replyCode === ZK_COMMANDS.CMD_ACK_OK) {
                 this.isConnected = true;
                 resolved = true;
+                sock.removeAllListeners('data');
+                sock.removeAllListeners('timeout');
+                sock.setTimeout(0);
                 const latency = Math.max(1, Date.now() - start);
                 resolve({
                   connected: true,
@@ -284,6 +384,9 @@ export class ZkProtocolClient {
                 this.replyId = receivedReply;
                 this.isConnected = true;
                 resolved = true;
+                sock.removeAllListeners('data');
+                sock.removeAllListeners('timeout');
+                sock.setTimeout(0);
                 const latency = Math.max(1, Date.now() - start);
                 resolve({
                   connected: true,
@@ -375,23 +478,51 @@ export class ZkProtocolClient {
   }
 
   /**
-   * Reads attendance logs from the terminal
+   * Reads attendance logs from the terminal using ZK 40-byte streaming protocol
    */
-  public async getAttendanceRecords(): Promise<ZkAttendanceRecord[]> {
+  public async getAttendanceRecords(timeoutMs = 4000): Promise<ZkAttendanceRecord[]> {
     if (!this.isConnected || !this.socket) {
       throw new Error('Terminal is not connected. Call connect() first.');
     }
 
-    try {
-      const resp = await this.sendCommand(ZK_COMMANDS.CMD_ATTLOG_RRQ);
-      const replyCode = resp.readUInt16LE(0);
-      if (replyCode !== ZK_COMMANDS.CMD_ACK_OK && replyCode !== ZK_COMMANDS.CMD_PREPARE_DATA) {
-        return [];
-      }
-      return [];
-    } catch {
-      return [];
-    }
+    const sock = this.socket;
+    return new Promise((resolve) => {
+      const chunks: Buffer[] = [];
+      let idleTimer: NodeJS.Timeout | null = null;
+      let hardTimer: NodeJS.Timeout | null = null;
+      let finished = false;
+
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        if (idleTimer) clearTimeout(idleTimer);
+        if (hardTimer) clearTimeout(hardTimer);
+        sock.removeListener('data', onData);
+
+        const fullBuffer = Buffer.concat(chunks);
+        const records = parseZkAttLogBuffer(fullBuffer);
+        resolve(records);
+      };
+
+      const resetIdleTimer = () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(finish, 600);
+      };
+
+      const onData = (data: Buffer) => {
+        chunks.push(data);
+        resetIdleTimer();
+      };
+
+      sock.on('data', onData);
+      hardTimer = setTimeout(finish, timeoutMs);
+
+      // Send CMD_ATTLOG_RRQ (13)
+      this.replyId = (this.replyId + 1) & 0xffff;
+      const pkt = createZkPacket(ZK_COMMANDS.CMD_ATTLOG_RRQ, this.sessionId, this.replyId);
+      sock.write(wrapTcpZkPacket(pkt));
+      resetIdleTimer();
+    });
   }
 
   /**

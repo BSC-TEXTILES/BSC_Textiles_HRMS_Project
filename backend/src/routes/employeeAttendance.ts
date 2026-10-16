@@ -10,6 +10,7 @@ import { Router, Response } from 'express';
 import { pool } from '../nativeDb.js';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth.js';
 import { ingestRawPunches, probeDeviceSocket } from '../services/biometricService.js';
+import { decodeVerificationMode } from '../services/zkProtocolAdapter.js';
 import { socketIO } from '../socket.js';
 import crypto from 'node:crypto';
 
@@ -346,7 +347,8 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res: Response) =>
           punchTime: p.punchTime,
           timeFormatted: new Date(p.punchTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
           punchType: p.punchType,
-          verifyMode: p.verifyMode === 15 ? 'Face Recognition' : p.verifyMode === 1 ? 'Fingerprint' : 'Card / Pass',
+          verifyMode: decodeVerificationMode(p.verifyMode).label,
+          rawVerifyMode: p.verifyMode,
           deviceSerialNumber: p.serialNumber,
           deviceName: p.deviceName || 'eSSL MB160 Terminal',
           syncStatus: p.syncStatus,
