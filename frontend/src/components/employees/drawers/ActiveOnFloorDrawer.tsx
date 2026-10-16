@@ -13,7 +13,16 @@ interface ActiveOnFloorDrawerProps {
   locations: any[];
   departments: any[];
   /** Today's attendance rows keyed by employee id (GET /attendance/today). */
-  liveAttendance?: Record<string, { actualLogin?: string | null; actualLogout?: string | null; status?: string }>;
+  liveAttendance?: Record<
+    string,
+    {
+      actualLogin?: string | null;
+      actualLogout?: string | null;
+      status?: string;
+      /** Seconds the IN punch was after shift start; absent when the feed omits it. */
+      lateLoginSeconds?: number | null;
+    }
+  >;
   currentLocationId: string;
   currentDeptId: string;
   onApplyDirectoryFilter?: (filters: { locationId?: string; departmentId?: string; status?: string }) => void;
@@ -107,7 +116,7 @@ export function ActiveOnFloorDrawer({
 
   const onFloorCount = rosterData.filter((e) => e.isOnFloor).length;
   const lateLoginCount = rosterData.filter(
-    (e) => Number((liveAttendance?.[String(e.id)] as any)?.lateLoginSeconds || 0) > 0
+    (e) => Number(liveAttendance?.[String(e.id)]?.lateLoginSeconds || 0) > 0
   ).length;
   const offDutyCount = rosterData.filter((e) => !e.isOnFloor).length;
   const totalCount = rosterData.length;
