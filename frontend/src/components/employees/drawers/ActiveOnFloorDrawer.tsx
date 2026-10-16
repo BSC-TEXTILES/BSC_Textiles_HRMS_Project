@@ -116,7 +116,7 @@ export function ActiveOnFloorDrawer({
 
   const onFloorCount = rosterData.filter((e) => e.isOnFloor).length;
   const lateLoginCount = rosterData.filter(
-    (e) => Number((liveAttendance?.[String(e.id)] as any)?.lateLoginSeconds || 0) > 0
+    (e) => Number(liveAttendance?.[String(e.id)]?.lateLoginSeconds || 0) > 0
   ).length;
   const offDutyCount = rosterData.filter((e) => !e.isOnFloor).length;
   const totalCount = rosterData.length;
