@@ -67,7 +67,8 @@ const io = new Server(httpServer, {
 });
 setSocketIO(io);
 
-export { prisma, socketIO };
+export { prisma, socketIO, app, httpServer };
+export default app;
 
 // 1. High-resolution timing, latency metrics, and request correlation IDs
 app.use(timingMiddleware);

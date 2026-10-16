@@ -8,7 +8,9 @@ const CredentialsProvider: typeof _CredentialsProvider =
     ? (_CredentialsProvider as any).default
     : (_CredentialsProvider as any)?.default?.default || _CredentialsProvider;
 
-const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000/api';
+const API_URL = process.env.BACKEND_URL
+  ? `${process.env.BACKEND_URL.replace(/\/+$/, '')}/api`
+  : process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000/api';
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -24,12 +26,16 @@ export const authOptions: NextAuthOptions = {
         }
 
         let response: Response | null = null;
+        const boundBackendApi = process.env.BACKEND_URL
+          ? `${process.env.BACKEND_URL.replace(/\/+$/, '')}/api`
+          : null;
         const candidateUrls = [
+          boundBackendApi,
           API_URL,
           API_URL.includes('127.0.0.1') ? API_URL.replace('127.0.0.1', 'localhost') : API_URL.replace('localhost', '127.0.0.1'),
           'http://127.0.0.1:4000/api',
           'http://localhost:4000/api',
-        ];
+        ].filter(Boolean) as string[];
         const uniqueUrls = Array.from(new Set(candidateUrls));
 
         let lastErrorMsg = '';

@@ -487,7 +487,7 @@ export default function MissedPunchingPage() {
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
 
-    const exportUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/attendance/missed-punching/export?${params.toString()}`;
+    const exportUrl = `${process.env.NEXT_PUBLIC_API_URL || '/api'}/attendance/missed-punching/export?${params.toString()}`;
     window.open(exportUrl, '_blank');
   };
 
