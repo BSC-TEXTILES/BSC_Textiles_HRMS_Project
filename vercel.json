@@ -63,6 +63,12 @@
       }
     },
     {
+      "source": "/api/auth/login",
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
       "source": "/api/analytics/(.*)",
       "destination": {
         "service": "frontend"
