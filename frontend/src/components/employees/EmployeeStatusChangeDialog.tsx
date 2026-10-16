@@ -153,7 +153,6 @@ export function EmployeeStatusChangeDialog({ open, onClose, employee, intent, re
 
         <Textarea
           label={reasonRequired ? 'Reason for change *' : 'Reason for change'}
-          required={undefined as any}
           value={reason}
           onChange={(e) => {
             setReason(e.target.value);

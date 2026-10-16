@@ -28,7 +28,16 @@
 --    VIRTUAL GENERATED columns that reject explicit values.)
 --    Rollback for phases 2-6 is: TRUNCATE the live table + INSERT ... SELECT
 --    (naming the real columns) from its `_bak_022_*` counterpart.
+--
+--    `leaverequest` holds four rows whose `updatedAt` is the literal zero date
+--    '0000-00-00 00:00:00.000' (a pre-existing defect, reported in 025). A
+--    byte-faithful snapshot of those rows is impossible under NO_ZERO_DATE, so
+--    the mode is relaxed for the snapshot statements only and restored
+--    immediately afterwards. No live table is written by this section.
 -- ---------------------------------------------------------------------------
+SET @pre_022_sql_mode = @@SESSION.sql_mode;
+SET SESSION sql_mode = 'IGNORE_SPACE,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
+
 DROP TABLE IF EXISTS `_bak_022_employee`;
 CREATE TABLE `_bak_022_employee` AS SELECT * FROM `employee`;
 
@@ -76,6 +85,10 @@ CREATE TABLE `_bak_022_employee_documents` AS SELECT * FROM `employee_documents`
 
 DROP TABLE IF EXISTS `_bak_022_employee_id_sequence`;
 CREATE TABLE `_bak_022_employee_id_sequence` AS SELECT * FROM `employee_id_sequence`;
+
+-- Snapshot mode over: restore the server default strictness for every DDL/DML
+-- statement below (and for the rest of the migration run).
+SET SESSION sql_mode = @@GLOBAL.sql_mode;
 
 -- ---------------------------------------------------------------------------
 -- 2. Column parity. These are preservation/audit columns and carry NO foreign
