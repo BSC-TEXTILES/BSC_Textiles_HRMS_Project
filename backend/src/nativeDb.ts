@@ -66,7 +66,14 @@ export class Decimal {
   }
 }
 
-export type ReactionType = 'UPVOTE' | 'FLAG' | 'HEART' | 'CHECK' | string;
+export const ReactionType = {
+  UPVOTE: 'UPVOTE',
+  FLAG: 'FLAG',
+  HEART: 'HEART',
+  CHECK: 'CHECK',
+} as const;
+
+export type ReactionType = (typeof ReactionType)[keyof typeof ReactionType] | string;
 
 export const MODEL_TO_TABLE: Record<string, string> = {
   user: 'user',
