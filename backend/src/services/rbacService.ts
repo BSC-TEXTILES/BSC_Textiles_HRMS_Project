@@ -207,8 +207,25 @@ const SQLITE_DDL = [
   'CREATE INDEX IF NOT EXISTS "UserRole_roleId_idx" ON "userrole"("roleId")',
 ];
 
+const POSTGRES_DDL = [
+  'CREATE TABLE IF NOT EXISTS "role" ("id" VARCHAR(191) PRIMARY KEY, "name" VARCHAR(100) NOT NULL UNIQUE, "description" VARCHAR(500), "isSystem" BOOLEAN NOT NULL DEFAULT FALSE, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())',
+  'CREATE TABLE IF NOT EXISTS "rolepermission" ("id" VARCHAR(191) PRIMARY KEY, "roleId" VARCHAR(191) NOT NULL REFERENCES "role"("id") ON DELETE CASCADE ON UPDATE CASCADE, "module" VARCHAR(100) NOT NULL, "accessLevel" VARCHAR(20) NOT NULL DEFAULT \'none\', CONSTRAINT "RolePermission_roleId_module_key" UNIQUE ("roleId", "module"))',
+  'CREATE TABLE IF NOT EXISTS "userrole" ("id" VARCHAR(191) PRIMARY KEY, "userId" VARCHAR(191) NOT NULL REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE CASCADE, "roleId" VARCHAR(191) NOT NULL REFERENCES "role"("id") ON DELETE CASCADE ON UPDATE CASCADE, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), CONSTRAINT "UserRole_userId_roleId_key" UNIQUE ("userId", "roleId"))',
+  'CREATE INDEX IF NOT EXISTS "UserRole_roleId_idx" ON "userrole"("roleId")',
+];
+
 function isSqlite(): boolean {
   return String(process.env.DB_TYPE || 'mysql').toLowerCase() === 'sqlite';
+}
+
+function isPostgres(): boolean {
+  const dbType = String(process.env.DB_TYPE || '').toLowerCase();
+  return (
+    dbType === 'postgres' ||
+    dbType === 'supabase' ||
+    Boolean(process.env.VERCEL) ||
+    /^postgres(ql)?:\/\//i.test(process.env.DATABASE_URL || '')
+  );
 }
 
 function generateId(prefix: string): string {
@@ -231,7 +248,7 @@ export function ensureRbacReady(): Promise<void> {
 }
 
 async function initialize(): Promise<void> {
-  const ddl = isSqlite() ? SQLITE_DDL : MYSQL_DDL;
+  const ddl = isSqlite() ? SQLITE_DDL : isPostgres() ? POSTGRES_DDL : MYSQL_DDL;
   for (const stmt of ddl) {
     await prisma.$executeRaw(stmt);
   }
