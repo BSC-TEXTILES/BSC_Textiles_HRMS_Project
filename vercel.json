@@ -20,6 +20,78 @@
   },
   "rewrites": [
     {
+      "source": "/api/auth/session",
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
+      "source": "/api/auth/csrf",
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
+      "source": "/api/auth/providers",
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
+      "source": "/api/auth/signin/(.*)",
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
+      "source": "/api/auth/callback/(.*)",
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
+      "source": "/api/auth/signout/(.*)",
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
+      "source": "/api/auth/error",
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
+      "source": "/api/analytics/(.*)",
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
+      "source": "/api/attendance/punches/detail",
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
+      "source": "/api/biometric/liveness-logs",
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
+      "source": "/api/presence/(.*)",
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
+      "source": "/api/terminals/network-status",
+      "destination": {
+        "service": "frontend"
+      }
+    },
+    {
       "source": "/api/(.*)",
       "destination": {
         "service": "backend"

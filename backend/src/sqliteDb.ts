@@ -4,10 +4,18 @@
  * Provides drop-in compatibility with mysql2/promise `pool.query(sql, params)`.
  */
 
-import Database, { Database as DatabaseType } from 'better-sqlite3';
+import type { Database as DatabaseType } from 'better-sqlite3';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+
+let BetterSqlite3: any = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  BetterSqlite3 = require('better-sqlite3');
+} catch {
+  // better-sqlite3 native addon unavailable in serverless / Lambda environment
+}
 
 export interface SqliteQueryResult<T = any> {
   rows: T[];
@@ -21,7 +29,7 @@ class SqliteEngine {
   private dataDir: string = '';
 
   constructor() {
-    this.initDatabase();
+    // Lazy: do not initialize in constructor to avoid cold-start serverless crashes
   }
 
   public getDataDirectory(): string {
@@ -38,37 +46,58 @@ class SqliteEngine {
   }
 
   private initDatabase() {
-    // 1. Determine persistent application directory (Windows: %APPDATA%\BSCTextiles\data)
-    if (process.env.SQLITE_PATH) {
-      this.dbPath = path.resolve(process.env.SQLITE_PATH);
-      this.dataDir = path.dirname(this.dbPath);
-    } else {
-      const baseAppData =
-        process.env.APPDATA ||
-        (process.platform === 'win32'
-          ? path.join(os.homedir(), 'AppData', 'Roaming')
-          : path.join(os.homedir(), '.bsc_textiles'));
-
-      this.dataDir = path.join(baseAppData, 'BSCTextiles', 'data');
-      this.dbPath = path.join(this.dataDir, 'bsc_textiles.db');
+    if (this.db) return;
+    if (!BetterSqlite3) {
+      console.warn('[SQLite Engine] better-sqlite3 native driver not available in this environment.');
+      return;
     }
 
-    if (!fs.existsSync(this.dataDir)) {
-      fs.mkdirSync(this.dataDir, { recursive: true });
+    try {
+      if (process.env.SQLITE_PATH) {
+        this.dbPath = path.resolve(process.env.SQLITE_PATH);
+        this.dataDir = path.dirname(this.dbPath);
+      } else if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+        this.dataDir = '/tmp/BSCTextiles/data';
+        this.dbPath = path.join(this.dataDir, 'bsc_textiles.db');
+      } else {
+        const baseAppData =
+          process.env.APPDATA ||
+          (process.platform === 'win32'
+            ? path.join(os.homedir(), 'AppData', 'Roaming')
+            : path.join(os.homedir(), '.bsc_textiles'));
+
+        this.dataDir = path.join(baseAppData, 'BSCTextiles', 'data');
+        this.dbPath = path.join(this.dataDir, 'bsc_textiles.db');
+      }
+
+      if (!fs.existsSync(this.dataDir)) {
+        fs.mkdirSync(this.dataDir, { recursive: true });
+      }
+    } catch (fsErr: any) {
+      console.warn('[SQLite Engine] Could not create local directory, falling back to /tmp:', fsErr.message);
+      this.dataDir = '/tmp';
+      this.dbPath = '/tmp/bsc_textiles.db';
     }
 
     const isNewDb = !fs.existsSync(this.dbPath) || fs.statSync(this.dbPath).size === 0;
 
     console.log(`[SQLite Engine] Connecting to local database: ${this.dbPath}`);
-    this.db = new Database(this.dbPath, {
-      verbose: process.env.DEBUG_SQL ? console.log : undefined,
-    });
+    try {
+      this.db = new BetterSqlite3(this.dbPath, {
+        verbose: process.env.DEBUG_SQL ? console.log : undefined,
+      });
+    } catch (dbErr: any) {
+      console.error('[SQLite Engine] Initialization error:', dbErr.message);
+      return;
+    }
 
     // 2. Set performance and integrity pragmas
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('foreign_keys = ON');
-    this.db.pragma('synchronous = NORMAL');
-    this.db.pragma('temp_store = MEMORY');
+    if (this.db) {
+      this.db.pragma('journal_mode = WAL');
+      this.db.pragma('foreign_keys = ON');
+      this.db.pragma('synchronous = NORMAL');
+      this.db.pragma('temp_store = MEMORY');
+    }
 
     // 3. Auto-initialize schema & master seed if newly created
     if (isNewDb) {
@@ -264,8 +293,11 @@ class SqliteEngine {
       throw new Error(`Backup file not found at: ${backupFilePath}`);
     }
 
+    if (!BetterSqlite3) {
+      throw new Error('better-sqlite3 driver is unavailable in this environment');
+    }
     // Verify backup file integrity before applying
-    const verifyDb = new Database(backupFilePath, { readonly: true });
+    const verifyDb = new BetterSqlite3(backupFilePath, { readonly: true });
     try {
       const integrity = verifyDb.pragma('integrity_check');
       if (!Array.isArray(integrity) || integrity[0]?.integrity_check !== 'ok') {
