@@ -11,7 +11,8 @@ import { BscHolidaysCalendar } from '@/components/dashboard/BscHolidaysCalendar'
 import { KarnatakaHubsCardSection } from '@/components/dashboard/KarnatakaHubsCardSection';
 import { ExecutiveShiftFilter, type ShiftOptionItem } from '@/components/dashboard/ExecutiveShiftFilter';
 import { ExecutiveDeptFilter, type DeptOptionItem } from '@/components/dashboard/ExecutiveDeptFilter';
-import type { CreatedBatchResult } from '@/components/dashboard/CreateCustomShiftModal';
+import { SHIFT_I_LABEL } from '@/config/shiftPolicyConfig';
+import type { CreatedCustomShift } from '@/components/dashboard/ExecutiveCustomShiftDialog';
 import { ExecutiveHeaderSearch } from '@/components/dashboard/ExecutiveHeaderSearch';
 import {
   ExecutiveSearchResultsDrawer,
@@ -30,8 +31,8 @@ const KpiDetailContainer = dynamic(
   { ssr: false }
 );
 
-const CreateCustomShiftModal = dynamic(
-  () => import('@/components/dashboard/CreateCustomShiftModal').then((mod) => mod.CreateCustomShiftModal),
+const ExecutiveCustomShiftDialog = dynamic(
+  () => import('@/components/dashboard/ExecutiveCustomShiftDialog').then((mod) => mod.ExecutiveCustomShiftDialog),
   { ssr: false }
 );
 
@@ -108,9 +109,30 @@ const DEFAULT_DEPTS = [
 ];
 
 const DEFAULT_SHIFTS: ShiftOptionItem[] = [
-  { id: 'MORNING', name: 'Morning Shift', timeRange: '09:00 – 18:00', staffCount: 24 },
-  { id: 'GENERAL', name: 'General Shift', timeRange: '09:30 – 18:30', staffCount: 8 },
-  { id: 'EVENING', name: 'Evening Shift', timeRange: '12:00 – 21:00', staffCount: 3 },
+  {
+    id: 'shift-i-bel',
+    name: SHIFT_I_LABEL,
+    timeRange: '10:00 – 21:30',
+    startTime: '10:00',
+    endTime: '21:30',
+    lunchDurationMinutes: 100,
+    teaDurationMinutes: 20,
+    teaBreakSlot: 'Evening',
+    staffCount: 0,
+    isCustom: false,
+  },
+  {
+    id: 'shift-2-bel',
+    name: 'Shift 2',
+    timeRange: '11:00 – 21:00',
+    startTime: '11:00',
+    endTime: '21:00',
+    lunchDurationMinutes: 45,
+    teaDurationMinutes: 10,
+    teaBreakSlot: 'None',
+    staffCount: 0,
+    isCustom: false,
+  },
 ];
 
 function parseShiftTime(timeVal: any): string {
@@ -128,121 +150,140 @@ function parseShiftTime(timeVal: any): string {
 }
 
 function normalizeTimeRange(shift: any): string {
-  const nameLower = (shift.name || '').toLowerCase();
-  if (nameLower.includes('morning')) return '09:00 – 18:00';
-  if (nameLower.includes('general')) return '09:30 – 18:30';
-  if (nameLower.includes('evening')) return '12:00 – 21:00';
-  const start = parseShiftTime(shift.startTime) || '09:30';
-  const end = parseShiftTime(shift.endTime) || '18:30';
+  const start = parseShiftTime(shift.startTime) || '10:00';
+  const end = parseShiftTime(shift.endTime) || '21:00';
   return `${start} – ${end}`;
 }
 
 function processShifts(rawShifts: any[], isAllHubs: boolean): ShiftOptionItem[] {
-  if (!Array.isArray(rawShifts) || rawShifts.length === 0) return [];
+  if (!Array.isArray(rawShifts) || rawShifts.length === 0) return DEFAULT_SHIFTS;
 
-  if (!isAllHubs) {
-    const items: ShiftOptionItem[] = rawShifts.map((s: any) => {
-      const isBatch = Boolean(s.scannerRoles?.isCustomBatch || s.code?.startsWith('BATCH_'));
-      return {
-        id: s.id,
-        name: s.name,
-        timeRange: normalizeTimeRange(s),
-        staffCount: s._count?.employees ?? undefined,
-        capacity: s.scannerRoles?.capacity ?? undefined,
-        isCustomBatch: isBatch,
-      };
-    });
+  // 1. Match Shift I
+  const shift1Matches = rawShifts.filter((s: any) => {
+    const nameLower = (s.name || '').trim().toLowerCase();
+    const codeUpper = (s.code || '').trim().toUpperCase();
+    return (
+      nameLower === 'shift i' ||
+      nameLower === 'shift 1' ||
+      codeUpper.startsWith('SHIFT_I')
+    );
+  });
 
-    return items.sort((a, b) => {
-      const getPriority = (name: string) => {
-        const n = name.toLowerCase();
-        if (n.includes('morning')) return 1;
-        if (n.includes('general')) return 2;
-        if (n.includes('evening')) return 3;
-        return 4;
-      };
-      const pA = getPriority(a.name);
-      const pB = getPriority(b.name);
-      if (pA !== pB) return pA - pB;
-      return a.name.localeCompare(b.name);
-    });
-  }
+  // 2. Match Shift 2
+  const shift2Matches = rawShifts.filter((s: any) => {
+    const nameLower = (s.name || '').trim().toLowerCase();
+    const codeUpper = (s.code || '').trim().toUpperCase();
+    return (
+      nameLower === 'shift 2' ||
+      nameLower === 'shift ii' ||
+      codeUpper.startsWith('SHIFT_2')
+    );
+  });
 
-  const standardMorning: any[] = [];
-  const standardGeneral: any[] = [];
-  const standardEvening: any[] = [];
-  const customBatches: any[] = [];
+  // 3. User custom shifts (exclude legacy: Morning, General, Evening, Night Batch, and Shift I / Shift 2)
+  const legacyNames = ['morning', 'general', 'evening', 'night'];
+  const legacyCodes = ['MORNING', 'GENERAL', 'EVENING', 'NIGHT', 'SHIFT-240'];
 
-  rawShifts.forEach((s: any) => {
-    const isBatch = Boolean(s.scannerRoles?.isCustomBatch || s.code?.startsWith('BATCH_'));
-    if (isBatch) {
-      customBatches.push(s);
-      return;
+  const customShiftsRaw = rawShifts.filter((s: any) => {
+    const nameLower = (s.name || '').trim().toLowerCase();
+    const codeUpper = (s.code || '').trim().toUpperCase();
+
+    if (
+      nameLower === 'shift i' ||
+      nameLower === 'shift 1' ||
+      codeUpper.startsWith('SHIFT_I') ||
+      nameLower === 'shift 2' ||
+      nameLower === 'shift ii' ||
+      codeUpper.startsWith('SHIFT_2')
+    ) {
+      return false;
     }
-    const nameLower = (s.name || '').toLowerCase();
-    if (nameLower.includes('morning') || s.code === 'MORNING') {
-      standardMorning.push(s);
-    } else if (nameLower.includes('general') || s.code === 'GENERAL') {
-      standardGeneral.push(s);
-    } else if (nameLower.includes('evening') || s.code === 'EVENING') {
-      standardEvening.push(s);
-    } else {
-      customBatches.push(s);
-    }
+
+    if (legacyNames.some((leg) => nameLower.includes(leg))) return false;
+    if (legacyCodes.some((leg) => codeUpper.includes(leg))) return false;
+
+    return true;
   });
 
   const result: ShiftOptionItem[] = [];
 
-  if (standardMorning.length > 0) {
-    const totalStaff = standardMorning.reduce((sum, s) => sum + (s._count?.employees || 0), 0);
-    result.push({
-      id: standardMorning.map((s) => s.id).join(','),
-      name: 'Morning Shift',
-      timeRange: '09:00 – 18:00',
-      staffCount: totalStaff > 0 ? totalStaff : 24,
-      isCustomBatch: false,
-    });
-  }
+  // Exact option 2: Shift I (Roman numeral I)
+  const shift1Staff = shift1Matches.reduce(
+    (sum: number, s: any) => sum + (s._count?.employees || 0),
+    0
+  );
+  const shift1Id =
+    shift1Matches.length > 0
+      ? isAllHubs
+        ? shift1Matches.map((s: any) => s.id).join(',')
+        : shift1Matches[0].id
+      : 'shift-i-bel';
 
-  if (standardGeneral.length > 0) {
-    const totalStaff = standardGeneral.reduce((sum, s) => sum + (s._count?.employees || 0), 0);
-    result.push({
-      id: standardGeneral.map((s) => s.id).join(','),
-      name: 'General Shift',
-      timeRange: '09:30 – 18:30',
-      staffCount: totalStaff > 0 ? totalStaff : 8,
-      isCustomBatch: false,
-    });
-  }
-
-  if (standardEvening.length > 0) {
-    const totalStaff = standardEvening.reduce((sum, s) => sum + (s._count?.employees || 0), 0);
-    result.push({
-      id: standardEvening.map((s) => s.id).join(','),
-      name: 'Evening Shift',
-      timeRange: '12:00 – 21:00',
-      staffCount: totalStaff > 0 ? totalStaff : 3,
-      isCustomBatch: false,
-    });
-  }
-
-  const batchByName = new Map<string, ShiftOptionItem>();
-  customBatches.forEach((b: any) => {
-    if (!batchByName.has(b.name)) {
-      batchByName.set(b.name, {
-        id: b.id,
-        name: b.name,
-        timeRange: normalizeTimeRange(b),
-        staffCount: b._count?.employees,
-        capacity: b.scannerRoles?.capacity,
-        isCustomBatch: true,
-      });
-    }
+  result.push({
+    id: shift1Id,
+    name: SHIFT_I_LABEL,
+    timeRange: '10:00 – 21:30',
+    startTime: '10:00',
+    endTime: '21:30',
+    lunchDurationMinutes: 100,
+    teaDurationMinutes: 20,
+    teaBreakSlot: 'Evening',
+    staffCount: shift1Staff,
+    isCustom: false,
   });
 
-  Array.from(batchByName.values())
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .forEach((batch) => result.push(batch));
+  // Exact option 3: Shift 2
+  const shift2Staff = shift2Matches.reduce(
+    (sum: number, s: any) => sum + (s._count?.employees || 0),
+    0
+  );
+  const shift2Id =
+    shift2Matches.length > 0
+      ? isAllHubs
+        ? shift2Matches.map((s: any) => s.id).join(',')
+        : shift2Matches[0].id
+      : 'shift-2-bel';
+
+  result.push({
+    id: shift2Id,
+    name: 'Shift 2',
+    timeRange: '11:00 – 21:00',
+    startTime: '11:00',
+    endTime: '21:00',
+    lunchDurationMinutes: 45,
+    teaDurationMinutes: 10,
+    teaBreakSlot: 'None',
+    staffCount: shift2Staff,
+    isCustom: false,
+  });
+
+  // Exact option 4: Custom shifts in creation order, de-duplicated by shiftId
+  const seenIds = new Set<string>();
+  const sortedCustom = [...customShiftsRaw].sort((a: any, b: any) => {
+    const timeA = new Date(a.createdAt || 0).getTime();
+    const timeB = new Date(b.createdAt || 0).getTime();
+    return timeA - timeB;
+  });
+
+  for (const s of sortedCustom) {
+    if (!seenIds.has(s.id)) {
+      seenIds.add(s.id);
+      const scanner = s.scannerRoles || {};
+      result.push({
+        id: s.id,
+        name: s.name,
+        code: s.code,
+        timeRange: normalizeTimeRange(s),
+        startTime: s.startTime,
+        endTime: s.endTime,
+        lunchDurationMinutes: s.lunchDurationMinutes ?? 45,
+        teaDurationMinutes: s.teaDurationMinutes ?? 0,
+        teaBreakSlot: scanner.teaBreakSlot || 'None',
+        staffCount: s._count?.employees || 0,
+        isCustom: true,
+      });
+    }
+  }
 
   return result;
 }
@@ -284,7 +325,7 @@ export default function DashboardPage() {
   const [shiftsLoading, setShiftsLoading] = useState(false);
   const [shiftsError, setShiftsError] = useState<string | null>(null);
   const [shiftNotice, setShiftNotice] = useState<string | null>(null);
-  const [createBatchModalOpen, setCreateBatchModalOpen] = useState(false);
+  const [customShiftDialogOpen, setCustomShiftDialogOpen] = useState(false);
   const shiftCacheRef = useRef<Record<string, ShiftOptionItem[]>>({});
   const [deptOptions, setDeptOptions] = useState<Array<{ id: string; name: string }>>(DEFAULT_DEPTS);
   const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null);
@@ -449,9 +490,11 @@ export default function DashboardPage() {
           if (selectedShift !== 'all') {
             const activeOpt = shiftOptions.find((o) => o.id === selectedShift);
             const s = (activeOpt?.name || selectedShift).toLowerCase();
-            if (s.includes('morning') && !item.scheduledTime.includes('09:00')) return false;
-            if (s.includes('general') && !item.scheduledTime.includes('09:30') && !item.scheduledTime.includes('10:30')) return false;
-            if (s.includes('evening') && !item.scheduledTime.includes('12:00')) return false;
+            if (s.includes('shift i') || s.includes('shift 1')) {
+              if (!item.scheduledTime.includes('10:00') && !item.scheduledTime.includes('09:30')) return false;
+            } else if (s.includes('shift 2')) {
+              if (!item.scheduledTime.includes('11:00') && !item.scheduledTime.includes('10:30')) return false;
+            }
           }
           return true;
         });
@@ -572,23 +615,29 @@ export default function DashboardPage() {
     };
   }, [selectedHub]);
 
-  const handleBatchCreated = (newBatch: CreatedBatchResult) => {
-    // Invalidate shift caches
-    delete shiftCacheRef.current[newBatch.locationId];
-    delete shiftCacheRef.current['all'];
+  const handleCustomShiftCreated = (newShift: CreatedCustomShift) => {
+    shiftCacheRef.current = {};
 
     const newOption: ShiftOptionItem = {
-      id: newBatch.id,
-      name: newBatch.name,
-      timeRange: `${newBatch.startTime} – ${newBatch.endTime}`,
-      staffCount: newBatch.assignedCount,
-      capacity: newBatch.capacity,
-      isCustomBatch: true,
+      id: newShift.id,
+      name: newShift.name,
+      code: newShift.code,
+      timeRange: `${newShift.startTime} – ${newShift.endTime}`,
+      startTime: newShift.startTime,
+      endTime: newShift.endTime,
+      lunchDurationMinutes: newShift.lunchDurationMinutes,
+      teaDurationMinutes: newShift.teaDurationMinutes,
+      teaBreakSlot: newShift.teaBreakSlot,
+      staffCount: newShift.staffCount,
+      isCustom: true,
     };
 
-    setShiftOptions((prev) => [newOption, ...prev.filter((p) => p.id !== newBatch.id)]);
-    setSelectedShift(newBatch.id);
-    setShiftNotice(`Custom shift batch "${newBatch.name}" created and set as active filter.`);
+    setShiftOptions((prev) => {
+      if (prev.some((p) => p.id === newShift.id)) return prev;
+      return [...prev, newOption];
+    });
+
+    setShiftNotice(`Shift ${newShift.name} added.`);
   };
 
   const handleManualSync = async () => {
@@ -833,7 +882,7 @@ export default function DashboardPage() {
                   loading={shiftsLoading}
                   error={shiftsError}
                   onRetry={() => loadShiftOptions(selectedHub, true)}
-                  onOpenCreateModal={() => setCreateBatchModalOpen(true)}
+                  onOpenCreateModal={() => setCustomShiftDialogOpen(true)}
                 />
               </div>
 
@@ -1258,14 +1307,13 @@ export default function DashboardPage() {
         locationId={selectedHub}
       />
 
-      {/* Create Custom Shift Batch Modal */}
-      <CreateCustomShiftModal
-        open={createBatchModalOpen}
-        onClose={() => setCreateBatchModalOpen(false)}
-        hubs={hubOptions}
-        initialHubId={selectedHub}
+      {/* Create Custom Shift Dialog */}
+      <ExecutiveCustomShiftDialog
+        open={customShiftDialogOpen}
+        onClose={() => setCustomShiftDialogOpen(false)}
         existingShiftNames={shiftOptions.map((s) => s.name)}
-        onSuccess={handleBatchCreated}
+        locationId={selectedHub}
+        onSuccess={handleCustomShiftCreated}
       />
 
       {/* Executive Header Search Results Slide-over Drawer */}
