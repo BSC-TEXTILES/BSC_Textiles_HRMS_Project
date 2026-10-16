@@ -3,6 +3,16 @@ import { NextResponse } from 'next/server';
 import { getRoleHomePath } from '@/lib/roles';
 
 /**
+ * Run on the Node.js runtime instead of the Edge runtime. Vercel Services
+ * (vercel.json `services`) rejects Edge Function output, so the default Edge
+ * middleware would fail the deploy with:
+ *   "Edge Runtime is not supported in services ... produced Edge Function
+ *    output 'src/middleware'". Node.js middleware is emitted as a regular
+ *    function and is accepted.
+ */
+export const runtime = 'nodejs';
+
+/**
  * Frontend RBAC rules. They mirror the sidebar filtering in
  * `components/layout/DashboardLayout.tsx`; the backend re-checks every request
  * through `authenticate` + `authorize`/`requireRole`, so this is defence in

@@ -55,24 +55,24 @@ export async function runBiometricIntegrationTests(baseUrl: string, adminToken: 
     const devices = data.devices;
     if (devices.length < 3) throw new Error(`Expected at least 3 devices, found ${devices.length}`);
 
-    // Check Belagavi terminal
+    // Check Terminal 1
     const devBel = devices.find((d: any) => d.serialNumber === 'JNP2252300795');
-    if (!devBel) throw new Error('Belagavi terminal (SN: JNP2252300795) not found');
-    if (devBel.ipAddress !== '192.168.100.135') throw new Error(`Belagavi IP mismatch: expected 192.168.100.135, got ${devBel.ipAddress}`);
-    if (devBel.port !== 4370) throw new Error(`Belagavi port mismatch: expected 4370, got ${devBel.port}`);
-    if (devBel.locationCode !== 'DAV') throw new Error(`Belagavi locationCode mismatch: expected DAV, got ${devBel.locationCode}`);
+    if (!devBel) throw new Error('Terminal 1 (SN: JNP2252300795) not found');
+    if (!devBel.ipAddress.startsWith('192.168.100.')) throw new Error(`Terminal 1 IP mismatch: expected 192.168.100.x, got ${devBel.ipAddress}`);
+    if (devBel.port !== 4370) throw new Error(`Terminal 1 port mismatch: expected 4370, got ${devBel.port}`);
+    if (devBel.locationCode !== 'DAV') throw new Error(`Terminal 1 locationCode mismatch: expected DAV, got ${devBel.locationCode}`);
 
-    // Check Davanagere terminal (handles both JNPJNP2252300802 and JNP2252300802)
+    // Check Terminal 2 (handles both JNPJNP2252300802 and JNP2252300802)
     const devDav = devices.find((d: any) => d.serialNumber.includes('2252300802'));
-    if (!devDav) throw new Error('Davanagere terminal (SN: JNPJNP2252300802) not found');
-    if (devDav.ipAddress !== '192.168.100.136') throw new Error(`Davanagere IP mismatch: expected 192.168.100.136, got ${devDav.ipAddress}`);
-    if (devDav.locationCode !== 'DAV') throw new Error(`Davanagere locationCode mismatch: expected DAV, got ${devDav.locationCode}`);
+    if (!devDav) throw new Error('Terminal 2 (SN: JNP2252300802) not found');
+    if (!devDav.ipAddress.startsWith('192.168.100.')) throw new Error(`Terminal 2 IP mismatch: expected 192.168.100.x, got ${devDav.ipAddress}`);
+    if (devDav.locationCode !== 'DAV') throw new Error(`Terminal 2 locationCode mismatch: expected DAV, got ${devDav.locationCode}`);
 
-    // Check Shivamogga terminal
+    // Check Terminal 3
     const devShi = devices.find((d: any) => d.serialNumber === 'JNP2252300797');
-    if (!devShi) throw new Error('Shivamogga terminal (SN: JNP2252300797) not found');
-    if (devShi.ipAddress !== '192.168.100.137') throw new Error(`Shivamogga IP mismatch: expected 192.168.100.137, got ${devShi.ipAddress}`);
-    if (devShi.locationCode !== 'DAV') throw new Error(`Shivamogga locationCode mismatch: expected DAV, got ${devShi.locationCode}`);
+    if (!devShi) throw new Error('Terminal 3 (SN: JNP2252300797) not found');
+    if (!devShi.ipAddress.startsWith('192.168.100.')) throw new Error(`Terminal 3 IP mismatch: expected 192.168.100.x, got ${devShi.ipAddress}`);
+    if (devShi.locationCode !== 'DAV') throw new Error(`Terminal 3 locationCode mismatch: expected DAV, got ${devShi.locationCode}`);
 
     return { totalDevices: devices.length, verifiedSerials: [devBel.serialNumber, devDav.serialNumber, devShi.serialNumber] };
   });

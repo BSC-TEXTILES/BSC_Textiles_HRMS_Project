@@ -53,7 +53,7 @@ interface BiometricDevice {
   locationId: string | null;
   locationCode: string;
   locationName?: string;
-  status: 'CONNECTED' | 'DISCONNECTED' | 'SYNC_PENDING' | 'SYNC_FAILED' | 'CONFIG_INCOMPLETE' | 'SDK_UNAVAILABLE';
+  status: 'CONNECTED' | 'DISCONNECTED' | 'SYNC_PENDING' | 'SYNC_FAILED' | 'DATA_SYNC_FAILED' | 'CONFIG_INCOMPLETE' | 'SDK_UNAVAILABLE';
   protocol: string;
   lastConnectionAt: string | null;
   lastSyncAt: string | null;
@@ -108,6 +108,31 @@ interface SyncLog {
   latencyMs: number;
   durationMs: number;
   syncedAt: string;
+}
+
+function formatVerificationMode(mode: number | string | undefined | null): string {
+  if (mode === undefined || mode === null || mode === '') return 'Not Provided by Device';
+  const code = Number(mode);
+  if (isNaN(code) || code < 0) return 'Unknown';
+  switch (code) {
+    case 15:
+      return 'Face Recognition';
+    case 1:
+      return 'Fingerprint';
+    case 2:
+      return 'PIN / Password';
+    case 3:
+    case 4:
+      return 'RFID Card';
+    case 8:
+      return 'Card + Face';
+    case 9:
+      return 'Face + Fingerprint';
+    case 0:
+      return 'Password';
+    default:
+      return `Mode ${code} (Unknown)`;
+  }
 }
 
 export default function BiometricDevicesPage() {
@@ -423,11 +448,12 @@ export default function BiometricDevicesPage() {
 
   // Metrics computation
   const connectedCount = devices.filter((d) => d.status === 'CONNECTED').length;
-  const disconnectedCount = devices.length - connectedCount;
-  const avgLatency = Math.round(
-    devices.reduce((acc, d) => acc + (d.latency && d.status === 'CONNECTED' ? d.latency : 0), 0) /
-      (connectedCount || 1)
-  );
+  const syncFailedCount = devices.filter((d) => d.status === 'DATA_SYNC_FAILED' || (d.lastError && d.status !== 'DISCONNECTED')).length;
+  const disconnectedCount = devices.length - connectedCount - syncFailedCount;
+  const onlineDevicesWithLatency = devices.filter((d) => (d.status === 'CONNECTED' || d.status === 'DATA_SYNC_FAILED') && typeof d.latency === 'number' && d.latency > 0 && d.latency < 900);
+  const avgLatency = onlineDevicesWithLatency.length > 0
+    ? Math.round(onlineDevicesWithLatency.reduce((acc, d) => acc + d.latency!, 0) / onlineDevicesWithLatency.length)
+    : null;
 
   return (
     <DashboardLayout>
@@ -444,7 +470,7 @@ export default function BiometricDevicesPage() {
               Biometric Devices & Attendance Sync
             </h1>
             <p className="text-sm text-slate-300 max-w-2xl">
-              Real-time hardware integration with eSSL & ZKTeco standalone terminals across Belagavi, Davanagere, and Shivamogga showrooms.
+              Real-time hardware integration with eSSL MB160 standalone terminals at Davanagere Mega Store.
             </p>
           </div>
 
@@ -520,7 +546,7 @@ export default function BiometricDevicesPage() {
               <span className="text-2xl font-black text-slate-900">{devices.length}</span>
               <span className="text-xs text-slate-500">Hardware Units</span>
             </div>
-            <div className="mt-1 text-[11px] text-slate-400">Belagavi, Davanagere, Shivamogga</div>
+            <div className="mt-1 text-[11px] text-slate-400">Davanagere Mega Store (DAV)</div>
           </Card>
 
           <Card className="p-4 border-slate-200/80 shadow-sm hover:shadow transition-shadow">
@@ -532,11 +558,14 @@ export default function BiometricDevicesPage() {
             </div>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-black text-emerald-600">{connectedCount} Online</span>
+              {syncFailedCount > 0 && (
+                <span className="text-xs font-bold text-amber-600">({syncFailedCount} Sync Failed)</span>
+              )}
               {disconnectedCount > 0 && (
                 <span className="text-xs font-bold text-rose-500">({disconnectedCount} Disconnected)</span>
               )}
             </div>
-            <div className="mt-1 text-[11px] text-slate-400">Real TCP Socket Probed</div>
+            <div className="mt-1 text-[11px] text-slate-400">Real TCP Port 4370 Probe</div>
           </Card>
 
           <Card className="p-4 border-slate-200/80 shadow-sm hover:shadow transition-shadow">
@@ -547,8 +576,14 @@ export default function BiometricDevicesPage() {
               </span>
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black text-slate-900">{avgLatency || 4} ms</span>
-              <span className="text-xs font-bold text-emerald-600">Ultra-Fast</span>
+              <span className="text-2xl font-black text-slate-900">
+                {avgLatency !== null ? `${avgLatency} ms` : 'Unavailable'}
+              </span>
+              {avgLatency !== null && (
+                <span className={`text-xs font-bold ${avgLatency < 20 ? 'text-emerald-600' : 'text-blue-600'}`}>
+                  {avgLatency < 20 ? 'Ultra-Fast' : 'Stable'}
+                </span>
+              )}
             </div>
             <div className="mt-1 text-[11px] text-slate-400">Local LAN subnet mesh</div>
           </Card>
@@ -561,7 +596,7 @@ export default function BiometricDevicesPage() {
               </span>
             </div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black text-purple-700">40 Enrolled</span>
+              <span className="text-2xl font-black text-purple-700">{mappings.length} Enrolled</span>
               <span className="text-xs text-slate-500">in Database</span>
             </div>
             <div className="mt-1 text-[11px] text-slate-400">Auto-matched with Attendance</div>
@@ -663,16 +698,22 @@ export default function BiometricDevicesPage() {
                       </p>
                     </div>
 
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-black flex items-center gap-1.5 border shadow-xs ${
-                        isOnline
-                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          : 'bg-rose-50 text-rose-700 border-rose-200'
-                      }`}
-                    >
-                      <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-                      {isOnline ? 'CONNECTED' : 'DISCONNECTED'}
-                    </span>
+                    {isOnline && dev.lastError ? (
+                      <span className="px-2.5 py-1 rounded-full text-[10px] font-black flex items-center gap-1.5 border shadow-xs bg-amber-50 text-amber-800 border-amber-300">
+                        <span className="w-2 h-2 rounded-full bg-amber-500" />
+                        SYNC FAILED
+                      </span>
+                    ) : isOnline ? (
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-black flex items-center gap-1.5 border shadow-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        CONNECTED
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-black flex items-center gap-1.5 border shadow-xs bg-rose-50 text-rose-700 border-rose-200">
+                        <span className="w-2 h-2 rounded-full bg-rose-500" />
+                        DISCONNECTED
+                      </span>
+                    )}
                   </div>
 
                   <div className="mt-4 grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
@@ -685,7 +726,7 @@ export default function BiometricDevicesPage() {
                     <div>
                       <span className="text-[10px] uppercase font-bold text-slate-400 block">Round-trip Ping</span>
                       <span className="font-mono font-bold text-emerald-600">
-                        {isOnline ? `${dev.latency || 4} ms` : 'Unreachable'}
+                        {isOnline && typeof dev.latency === 'number' && dev.latency < 900 ? `${dev.latency} ms` : isOnline ? 'Active' : 'Unreachable'}
                       </span>
                     </div>
                     <div>
@@ -855,8 +896,10 @@ export default function BiometricDevicesPage() {
                       <td className="px-4 py-3 font-mono text-slate-800 font-bold">
                         {new Date(p.punchTime).toLocaleString()}
                       </td>
-                      <td className="px-4 py-3 text-slate-600">
-                        {p.verifyMode === 1 ? 'Fingerprint' : p.verifyMode === 2 ? 'Face Recognition' : 'Card'}
+                      <td className="px-4 py-3">
+                        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 inline-block">
+                          {formatVerificationMode(p.verifyMode)}
+                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <span

@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { pool } from '../nativeDb.js';
 import { socketIO } from '../socket.js';
 import { shardRouter } from '../core/sharding/ShardRouter.js';
+import { ZkProtocolClient } from './zkProtocolAdapter.js';
 
 export interface DeviceProbeResult {
   online: boolean;
@@ -120,21 +121,30 @@ export async function listBiometricDevices(locationFilter?: string): Promise<Bio
   // Probe devices while respecting ADMS push heartbeat telemetry
   const devices = await Promise.all(
     rows.map(async (dev: any) => {
-      const recentHeartbeat = dev.lastHeartbeatAt && (Math.abs(Date.now() - new Date(dev.lastHeartbeatAt).getTime()) < 1800000);
-      const probe = dev.ipAddress ? await probeDeviceSocket(dev.ipAddress, dev.port, 600) : { online: false, latency: 999 };
-      const isOnline = recentHeartbeat || probe.online || dev.status === 'CONNECTED';
-      const newStatus = isOnline ? 'CONNECTED' : 'DISCONNECTED';
-      const latency = probe.online ? probe.latency : (recentHeartbeat ? 12 : 999);
+      const recentHeartbeat = dev.lastHeartbeatAt && (Math.abs(Date.now() - new Date(dev.lastHeartbeatAt).getTime()) < 300000);
+      const probe = dev.ipAddress ? await probeDeviceSocket(dev.ipAddress, dev.port, 800) : { online: false, latency: 999, error: 'No IP configured' };
+      const isOnline = Boolean(probe.online || recentHeartbeat);
+      
+      let newStatus: string;
+      if (!isOnline) {
+        newStatus = 'DISCONNECTED';
+      } else if (dev.lastError) {
+        newStatus = 'DATA_SYNC_FAILED';
+      } else {
+        newStatus = 'CONNECTED';
+      }
 
-      if (isOnline && dev.status !== 'CONNECTED') {
+      const latency = probe.online ? probe.latency : null;
+
+      if (isOnline && dev.status === 'DISCONNECTED') {
         pool.query(
-          `UPDATE biometric_devices SET status = 'CONNECTED', lastConnectionAt = NOW(), lastError = NULL WHERE id = ?`,
-          [dev.id]
+          `UPDATE biometric_devices SET status = ?, lastConnectionAt = NOW() WHERE id = ?`,
+          [newStatus, dev.id]
         ).catch(() => {});
-      } else if (!isOnline && dev.status === 'CONNECTED') {
+      } else if (!isOnline && dev.status !== 'DISCONNECTED') {
         pool.query(
           `UPDATE biometric_devices SET status = 'DISCONNECTED', lastError = ? WHERE id = ?`,
-          ['Device heartbeat timeout / TCP unreachable', dev.id]
+          [probe.error || 'Device port 4370 unreachable', dev.id]
         ).catch(() => {});
       }
 
@@ -778,36 +788,148 @@ export async function syncSingleDevice(deviceId: string, triggerType = 'MANUAL_U
     };
   }
 
-  // 2. Ingest current device punches
-  const syncLogId = `sync-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  // 2. Connect to terminal session via ZkProtocolClient
+  const client = new ZkProtocolClient(device.ipAddress, device.port, 3500);
+  let records: any[] = [];
+  try {
+    const conn = await client.connect();
+    if (!conn.connected) {
+      const durationMs = Date.now() - startTime;
+      const errMsg = conn.error || 'ZKTeco Protocol Handshake failed';
+      await pool.query(`
+        INSERT INTO biometric_sync_logs (id, deviceId, serialNumber, triggerType, status, errorMessage, latencyMs, durationMs, syncedAt)
+        VALUES (?, ?, ?, ?, 'FAILED', ?, ?, ?, NOW())
+      `, [
+        `log-${Date.now().toString(36)}`,
+        device.id,
+        device.serialNumber,
+        triggerType,
+        errMsg,
+        conn.latencyMs,
+        durationMs,
+      ]);
+      await pool.query(`UPDATE biometric_devices SET status = 'DISCONNECTED', lastError = ? WHERE id = ?`, [errMsg, device.id]);
+      return {
+        deviceId: device.id,
+        serialNumber: device.serialNumber,
+        deviceName: device.name,
+        locationCode: device.locationCode,
+        recordsPulled: 0,
+        recordsInserted: 0,
+        recordsSkipped: 0,
+        status: 'FAILED',
+        errorMessage: errMsg,
+        latencyMs: conn.latencyMs,
+        durationMs,
+      };
+    }
+
+    // Update firmware if exposed
+    try {
+      const devInfo = await client.getDeviceInfo();
+      if (devInfo.firmwareVersion) {
+        await pool.query(`UPDATE biometric_devices SET firmwareVersion = ? WHERE id = ?`, [devInfo.firmwareVersion, device.id]).catch(() => {});
+      }
+    } catch (_) {}
+
+    // Pull attendance records
+    records = await client.getAttendanceRecords(4000);
+    await client.disconnect();
+  } catch (err: any) {
+    try { await client.disconnect(); } catch (_) {}
+    const durationMs = Date.now() - startTime;
+    await pool.query(`
+      INSERT INTO biometric_sync_logs (id, deviceId, serialNumber, triggerType, status, errorMessage, latencyMs, durationMs, syncedAt)
+      VALUES (?, ?, ?, ?, 'FAILED', ?, ?, ?, NOW())
+    `, [
+      `log-${Date.now().toString(36)}`,
+      device.id,
+      device.serialNumber,
+      triggerType,
+      err.message,
+      latencyMs,
+      durationMs,
+    ]);
+    await pool.query(`UPDATE biometric_devices SET lastError = ? WHERE id = ?`, [err.message, device.id]);
+    return {
+      deviceId: device.id,
+      serialNumber: device.serialNumber,
+      deviceName: device.name,
+      locationCode: device.locationCode,
+      recordsPulled: 0,
+      recordsInserted: 0,
+      recordsSkipped: 0,
+      status: 'FAILED',
+      errorMessage: err.message,
+      latencyMs,
+      durationMs,
+    };
+  }
+
+  // 3. Ingest records if any were returned
+  let inserted = 0;
+  let duplicates = 0;
+  let unmapped = 0;
+
+  if (records.length > 0) {
+    const recentRecords = records.length > 100 ? records.slice(-100) : records;
+    const ingestResult = await ingestRawPunches(
+      recentRecords.map((r: any) => ({
+        serialNumber: device.serialNumber,
+        enrollmentNumber: r.enrollmentNumber,
+        punchTime: r.punchTime,
+        punchType: r.punchType,
+        verifyMode: r.verifyMode,
+      }))
+    );
+    inserted = ingestResult.inserted;
+    duplicates = ingestResult.duplicates;
+    unmapped = ingestResult.unmapped;
+  }
+
   const durationMs = Date.now() - startTime;
+  const syncLogId = `sync-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 
   await pool.query(`
     UPDATE biometric_devices
-    SET status = 'CONNECTED', lastConnectionAt = NOW(), lastSyncAt = NOW(), lastError = NULL, failedRecords = 0
+    SET status = 'CONNECTED', lastConnectionAt = NOW(), lastSyncAt = NOW(), lastError = NULL, failedRecords = ?
     WHERE id = ?
-  `, [device.id]);
+  `, [unmapped, device.id]);
 
   await pool.query(`
     INSERT INTO biometric_sync_logs (id, deviceId, serialNumber, triggerType, recordsPulled, recordsInserted, recordsSkipped, status, latencyMs, durationMs, syncedAt)
-    VALUES (?, ?, ?, ?, 0, 0, 0, 'SUCCESS', ?, ?, NOW())
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'SUCCESS', ?, ?, NOW())
   `, [
     syncLogId,
     device.id,
     device.serialNumber,
     triggerType,
+    records.length,
+    inserted,
+    duplicates,
     latencyMs,
     durationMs,
   ]);
+
+  // Emit WebSocket notification
+  socketIO.emit('device:sync', {
+    deviceId: device.id,
+    serialNumber: device.serialNumber,
+    recordsPulled: records.length,
+    recordsInserted: inserted,
+    recordsSkipped: duplicates,
+    status: 'SUCCESS',
+    syncedAt: new Date().toISOString(),
+  });
 
   return {
     deviceId: device.id,
     serialNumber: device.serialNumber,
     deviceName: device.name,
     locationCode: device.locationCode,
-    recordsPulled: 0,
-    recordsInserted: 0,
-    recordsSkipped: 0,
+    recordsPulled: records.length,
+    recordsInserted: inserted,
+    recordsSkipped: duplicates,
     status: 'SUCCESS',
     latencyMs,
     durationMs,
