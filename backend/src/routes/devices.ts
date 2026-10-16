@@ -16,12 +16,52 @@ import {
 import { pool } from '../nativeDb.js';
 
 const router = Router();
-router.use(authenticate);
+const CONNECTOR_KEY = process.env.BIOMETRIC_CONNECTOR_KEY || 'bsc-biometric-connector-secret-key-2024';
+
+// Dual authentication: Accept either User JWT session or Edge Connector Secret Key
+router.use((req: any, res, next) => {
+  const headerKey = req.headers['x-connector-key'];
+  const bearerKey = req.headers.authorization?.replace('Bearer ', '');
+  if ((headerKey && headerKey === CONNECTOR_KEY) || (bearerKey && bearerKey === CONNECTOR_KEY)) {
+    req.user = {
+      id: 'connector-svc',
+      email: 'connector@bsctextiles.internal',
+      fullName: 'BSC Biometric Hardware Connector',
+      role: 'SUPER_ADMIN',
+      permissions: ['ALL'],
+    };
+    return next();
+  }
+  return authenticate(req, res, next);
+});
 
 /**
- * GET /api/devices
- * List all registered biometric hardware terminals with live TCP socket status
+ * GET /api/devices/sdk-status
+ * Report hardware model, firmware, protocol, and network compatibility
  */
+router.get('/sdk-status', authorize('VIEW'), async (req: AuthRequest, res) => {
+  try {
+    const [devices]: any = await pool.query('SELECT serialNumber, name, model, firmwareVersion, ipAddress, port, locationCode, status FROM biometric_devices');
+    res.json({
+      success: true,
+      protocol: 'ZKTeco / eSSL Standalone Protocol (Port 4370 TCP/UDP + ADMS Push)',
+      sdkCompatibility: 'SUPPORTED',
+      supportedFirmware: ['ZKFinger VX10.0', 'ZKFinger VX9.0', 'SilkBio-101TC v4.2.1-prod'],
+      devices,
+      networkEnvironment: {
+        hostSubnet: '192.168.100.120/24',
+        isolatedShowroomSubnets: ['192.168.0.0/24 (Belagavi / Davanagere)', '192.168.30.0/24 (Shivamogga)'],
+        integrationMethods: [
+          'Option A (Recommended): eSSL ADMS Cloud Server Push direct to /iclock/cdata',
+          'Option B: Supervised Local Edge Connector on showroom LAN forwarding to /api/devices/ingest-raw',
+          'Option C: Site-to-site IPsec/WireGuard VPN for direct TCP port 4370 polling'
+        ],
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to retrieve SDK status: ' + error.message });
+  }
+});
 router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
     const locationCode = req.user!.role === 'SUPER_ADMIN' || req.user!.role === 'ADMIN'
@@ -259,6 +299,69 @@ router.post('/ingest-raw', async (req: AuthRequest, res) => {
     });
   } catch (error: any) {
     res.status(500).json({ error: 'Ingestion failed: ' + error.message });
+  }
+});
+
+/**
+ * GET /api/devices/unmapped
+ * Retrieve raw punches that could not be matched to an employee
+ */
+router.get('/unmapped', authorize('VIEW'), async (req: AuthRequest, res) => {
+  try {
+    const limit = Number(req.query.limit) || 100;
+    const [rows]: any = await pool.query(`
+      SELECT r.*, d.name as deviceName, d.locationCode
+      FROM biometric_raw_punches r
+      LEFT JOIN biometric_devices d ON r.deviceId = d.id
+      WHERE r.syncStatus = 'UNMAPPED'
+      ORDER BY r.punchTime DESC
+      LIMIT ?
+    `, [limit]);
+
+    res.json({ success: true, unmapped: rows, total: rows.length });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to retrieve unmapped punches: ' + error.message });
+  }
+});
+
+/**
+ * POST /api/devices/retry-failed
+ * Retry processing of UNMAPPED punches after new employee mappings are saved
+ */
+router.post('/retry-failed', authorize('EDIT'), async (req: AuthRequest, res) => {
+  try {
+    const [unmappedRows]: any = await pool.query(`
+      SELECT serialNumber, enrollmentNumber, punchTime, punchType, verifyMode
+      FROM biometric_raw_punches
+      WHERE syncStatus = 'UNMAPPED'
+      ORDER BY punchTime ASC
+      LIMIT 200
+    `);
+
+    if (unmappedRows.length === 0) {
+      return res.json({ success: true, message: 'No unmapped punches pending reconciliation', reprocessed: 0 });
+    }
+
+    // Re-run through ingestion
+    const punchesToRetry = unmappedRows.map((r: any) => ({
+      serialNumber: r.serialNumber,
+      enrollmentNumber: r.enrollmentNumber,
+      punchTime: r.punchTime,
+      punchType: r.punchType,
+      verifyMode: r.verifyMode,
+    }));
+
+    // Reset status to QUEUED temporarily for reprocessing
+    await pool.query(`UPDATE biometric_raw_punches SET syncStatus = 'QUEUED' WHERE syncStatus = 'UNMAPPED' LIMIT 200`);
+    const result = await ingestRawPunches(punchesToRetry);
+
+    res.json({
+      success: true,
+      message: `Reconciliation complete: ${result.processed} matched to employee attendance, ${result.unmapped} remain unmapped.`,
+      result,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: 'Reprocessing failed: ' + error.message });
   }
 });
 

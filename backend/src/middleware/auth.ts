@@ -15,9 +15,12 @@ export interface AuthRequest extends Request {
     permissions: string[];
     locationId?: string;
     employeeId?: string;
+    databaseId?: string;
+    database_id?: string;
     sessionId?: string;
     mfaVerified?: boolean;
   };
+  shardDatabaseId?: string;
 }
 
 export async function authenticate(req: AuthRequest, res: Response, next: NextFunction) {
@@ -64,6 +67,7 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
           permissions: true,
           locationId: true,
           employeeId: true,
+          database_id: true,
           isActive: true,
           status: true,
           lockedUntil: true,
@@ -101,6 +105,18 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
       });
     }
 
+    const resolvedDatabaseId =
+      user.database_id ||
+      (user.locationId
+        ? user.locationId.includes('cmuwszr8t')
+          ? 'BSC-SHARD-BEL-001'
+          : user.locationId.includes('cmuwszr95')
+          ? 'BSC-SHARD-DAV-001'
+          : user.locationId.includes('cmuwszr9s')
+          ? 'BSC-SHARD-SHI-001'
+          : 'BSC-SHARD-HQ-001'
+        : 'BSC-SHARD-HQ-001');
+
     req.user = {
       id: user.id,
       email: user.email,
@@ -109,9 +125,12 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
       permissions: Array.isArray(user.permissions) ? (user.permissions as string[]) : [],
       locationId: user.locationId ?? undefined,
       employeeId: user.employeeId ?? undefined,
+      databaseId: resolvedDatabaseId,
+      database_id: resolvedDatabaseId,
       sessionId: decoded.sessionId ?? undefined,
       mfaVerified: decoded.mfaVerified ?? false,
     };
+    req.shardDatabaseId = resolvedDatabaseId;
     next();
   } catch (error) {
     return res.status(401).json({ error: 'Invalid or expired token' });
@@ -195,22 +214,22 @@ export function resolveLocationCodeToId(val?: any): string | undefined {
   if (!val || val === 'all' || val === 'ALL') return undefined;
   const s = String(val).toLowerCase();
   const map: Record<string, string> = {
-    bel: 'cmuzam5fe00014n4pq25hkcww',
-    belagavi: 'cmuzam5fe00014n4pq25hkcww',
-    loc_bel: 'cmuzam5fe00014n4pq25hkcww',
-    cmuzam5fe00014n4pq25hkcww: 'cmuzam5fe00014n4pq25hkcww',
-    cmuwszr8t00011vdtc7vgvags: 'cmuzam5fe00014n4pq25hkcww',
-    dav: 'cmuzam5fr00024n4p4izbomev',
-    davanagere: 'cmuzam5fr00024n4p4izbomev',
-    loc_dav: 'cmuzam5fr00024n4p4izbomev',
-    cmuzam5fr00024n4p4izbomev: 'cmuzam5fr00024n4p4izbomev',
-    cmuwszr9500021vdtxscy3nsc: 'cmuzam5fr00024n4p4izbomev',
-    shi: 'cmuzam5g400034n4p89o33l8e',
-    shivamogga: 'cmuzam5g400034n4p89o33l8e',
-    loc_shi: 'cmuzam5g400034n4p89o33l8e',
-    cmuzam5g400034n4p89o33l8e: 'cmuzam5g400034n4p89o33l8e',
-    cmuwszr9s00031vdtqlwzkrw8: 'cmuzam5g400034n4p89o33l8e',
-    cmuwszr9n00031vdtvdf7o734: 'cmuzam5g400034n4p89o33l8e',
+    bel: 'cmuwszr8t00011vdtc7vgvags',
+    belagavi: 'cmuwszr8t00011vdtc7vgvags',
+    loc_bel: 'cmuwszr8t00011vdtc7vgvags',
+    cmuzam5fe00014n4pq25hkcww: 'cmuwszr8t00011vdtc7vgvags',
+    cmuwszr8t00011vdtc7vgvags: 'cmuwszr8t00011vdtc7vgvags',
+    dav: 'cmuwszr9500021vdtxscy3nsc',
+    davanagere: 'cmuwszr9500021vdtxscy3nsc',
+    loc_dav: 'cmuwszr9500021vdtxscy3nsc',
+    cmuzam5fr00024n4p4izbomev: 'cmuwszr9500021vdtxscy3nsc',
+    cmuwszr9500021vdtxscy3nsc: 'cmuwszr9500021vdtxscy3nsc',
+    shi: 'cmuwszr9s00031vdtqlwzkrw8',
+    shivamogga: 'cmuwszr9s00031vdtqlwzkrw8',
+    loc_shi: 'cmuwszr9s00031vdtqlwzkrw8',
+    cmuzam5g400034n4p89o33l8e: 'cmuwszr9s00031vdtqlwzkrw8',
+    cmuwszr9s00031vdtqlwzkrw8: 'cmuwszr9s00031vdtqlwzkrw8',
+    cmuwszr9n00031vdtvdf7o734: 'cmuwszr9s00031vdtqlwzkrw8',
   };
   return map[s] || String(val);
 }
@@ -298,3 +317,76 @@ export function generateToken(
 export function verifyToken(token: string) {
   return jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
 }
+
+export function enforceShardAccess(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.user) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
+  const requestedLocationId =
+    (req.params?.locationId as string) ||
+    (req.query?.locationId as string) ||
+    (req.body?.locationId as string) ||
+    undefined;
+
+  const requestedDatabaseId =
+    (req.params?.databaseId as string) ||
+    (req.query?.databaseId as string) ||
+    (req.body?.databaseId as string) ||
+    (req.headers['x-shard-id'] as string) ||
+    undefined;
+
+  const isSuperAdmin = req.user.role === 'SUPER_ADMIN';
+  const userDbId = req.user.database_id || req.user.databaseId || 'BSC-SHARD-HQ-001';
+
+  if (!isSuperAdmin) {
+    if (requestedDatabaseId && requestedDatabaseId !== userDbId) {
+      AuditService.log({
+        userId: req.user.id,
+        locationId: req.user.locationId,
+        action: 'CROSS_SHARD_ACCESS_VIOLATION',
+        entityType: 'SHARD_ROUTER',
+        entityId: requestedDatabaseId,
+        ipAddress: req.ip || req.socket.remoteAddress || '127.0.0.1',
+        userAgent: (req.headers['user-agent'] as string) || 'Client',
+        riskScore: 75,
+        tags: ['sharding-security', 'cross-shard-violation', 'tamper-detected'],
+        after: {
+          requestedDatabaseId,
+          userDatabaseId: userDbId,
+        },
+      }).catch(() => {});
+
+      return res.status(403).json({
+        error: 'Forbidden: Cross-shard access violation',
+        message: `User with role '${req.user.role}' is restricted to assigned shard '${userDbId}'. Cannot route to '${requestedDatabaseId}'.`,
+      });
+    }
+
+    if (requestedLocationId && req.user.locationId && requestedLocationId !== req.user.locationId) {
+      AuditService.log({
+        userId: req.user.id,
+        locationId: req.user.locationId,
+        action: 'CROSS_LOCATION_ACCESS_VIOLATION',
+        entityType: 'SHARD_ROUTER',
+        entityId: requestedLocationId,
+        ipAddress: req.ip || req.socket.remoteAddress || '127.0.0.1',
+        userAgent: (req.headers['user-agent'] as string) || 'Client',
+        riskScore: 75,
+        tags: ['sharding-security', 'cross-location-violation'],
+        after: {
+          requestedLocationId,
+          userLocationId: req.user.locationId,
+        },
+      }).catch(() => {});
+
+      return res.status(403).json({
+        error: 'Forbidden: Location access violation',
+        message: `User is restricted to assigned location '${req.user.locationId}'. Cannot access '${requestedLocationId}'.`,
+      });
+    }
+  }
+
+  req.shardDatabaseId = requestedDatabaseId || userDbId;
+  next();
+}

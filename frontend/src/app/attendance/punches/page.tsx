@@ -8,6 +8,7 @@ import { MetricDrillDownModal, MetricKey } from '@/components/dashboard/MetricDr
 import { KpiDetailContainer, MetricDetailType } from '@/components/dashboard/KpiDetailContainer';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import { useNotifications } from '@/context/NotificationContext';
 import {
   Fingerprint,
   Download,
@@ -102,9 +103,72 @@ export default function BiometricPunchesPage() {
     }
   }, []);
 
+  const { socket } = useNotifications();
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Real-time automatic updates from eSSL MB160 pushes
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleRealtimePunch = (data: any) => {
+      setPunches((prev) => {
+        const existingIdx = prev.findIndex(
+          (p) => p.employeeId === data.employeeId || p.employee?.id === data.employeeId
+        );
+        if (existingIdx >= 0) {
+          const updated = [...prev];
+          updated[existingIdx] = {
+            ...updated[existingIdx],
+            actualLogout: data.punchType === 'CHECK_OUT' ? data.punchTime : updated[existingIdx].actualLogout,
+            actualLogin: data.punchType === 'CHECK_IN' ? data.punchTime : updated[existingIdx].actualLogin,
+            faceVerified: data.isFaceVerified ? 1 : updated[existingIdx].faceVerified,
+            status: 'PRESENT',
+          };
+          return updated;
+        } else {
+          const newRecord = {
+            id: data.attendanceId || `att-${data.employeeId}`,
+            employeeId: data.employeeId,
+            locationId: data.locationId,
+            actualLogin: data.punchTime,
+            scheduledLogin: data.punchTime,
+            status: 'PRESENT',
+            faceVerified: data.isFaceVerified ? 1 : 0,
+            faceMatchPercentage: data.isFaceVerified ? 98.5 : 0,
+            employee: {
+              id: data.employeeId,
+              fullName: data.employeeName,
+              employeeCode: data.employeeCode,
+              designation: data.designation,
+            },
+            location: {
+              name: data.locationCode === 'BEL' ? 'Belagavi Flagship (BEL-01)' :
+                    data.locationCode === 'DAV' ? 'Davanagere Showroom (DAV-02)' :
+                    'Shivamogga Megastore (SHI-03)',
+              code: data.locationCode,
+            },
+          };
+          return [newRecord, ...prev];
+        }
+      });
+
+      toast.success(
+        `⚡ Live ${data.verifyMethod || 'Face'} Punch: ${data.employeeName} (${data.locationCode})`,
+        { duration: 4000, icon: '🟢' }
+      );
+    };
+
+    socket.on('attendance:punch', handleRealtimePunch);
+    socket.on('biometric:punch', handleRealtimePunch);
+
+    return () => {
+      socket.off('attendance:punch', handleRealtimePunch);
+      socket.off('biometric:punch', handleRealtimePunch);
+    };
+  }, [socket]);
 
   const handleManualPunch = async (e: React.FormEvent) => {
     e.preventDefault();

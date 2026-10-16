@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import { useNotifications } from '@/context/NotificationContext';
 import {
   Cpu,
   Wifi,
@@ -111,6 +112,7 @@ interface SyncLog {
 
 export default function BiometricDevicesPage() {
   const { data: session } = useSession();
+  const { socket } = useNotifications();
   const [activeTab, setActiveTab] = useState<'devices' | 'mappings' | 'raw_punches' | 'sync_logs'>('devices');
   const [locationFilter, setLocationFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
@@ -138,8 +140,8 @@ export default function BiometricDevicesPage() {
     ipAddress: '',
     port: 4370,
     locationCode: 'BEL',
-    model: 'eSSL SilkBio-101TC',
-    firmwareVersion: 'ZKFinger VX10.0 / v4.2.1-prod',
+    model: 'eSSL MB160',
+    firmwareVersion: 'Ver 8.0.4.7-20220624 / ZKFinger VX10.0',
   });
 
   const [mappingForm, setMappingForm] = useState({
@@ -213,6 +215,98 @@ export default function BiometricDevicesPage() {
   useEffect(() => {
     loadCurrentTabData();
   }, [loadCurrentTabData]);
+
+  // Real-time continuous WebSocket synchronization for eSSL MB160 terminals
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleDeviceHeartbeat = (data: any) => {
+      setDevices((prev) =>
+        prev.map((dev) =>
+          dev.serialNumber === data.serialNumber || dev.id === data.deviceId
+            ? {
+                ...dev,
+                status: 'CONNECTED',
+                lastConnectionAt: data.lastHeartbeatAt || new Date().toISOString(),
+                latency: data.latencyMs || 12,
+              }
+            : dev
+        )
+      );
+    };
+
+    const handleBiometricPunch = (data: any) => {
+      setRawPunches((prev) => [
+        {
+          id: data.id,
+          deviceId: data.deviceId,
+          serialNumber: data.serialNumber,
+          enrollmentNumber: data.enrollmentNumber,
+          punchTime: data.punchTime,
+          punchType: data.punchType,
+          verifyMode: data.verifyMode,
+          receivedAt: data.receivedAt,
+          syncStatus: 'PROCESSED',
+          isProcessed: true,
+          employeeName: data.employeeName,
+          employeeCode: data.employeeCode,
+        },
+        ...prev.slice(0, 99),
+      ]);
+
+      setDevices((prev) =>
+        prev.map((dev) =>
+          dev.serialNumber === data.serialNumber || dev.id === data.deviceId
+            ? {
+                ...dev,
+                status: 'CONNECTED',
+                lastSyncAt: data.receivedAt,
+                lastConnectionAt: data.receivedAt,
+              }
+            : dev
+        )
+      );
+
+      toast.success(
+        `⚡ Live ${data.verifyMethod || 'Face'} Punch: ${data.employeeName || 'Staff'} (${data.locationCode})`,
+        { duration: 3500 }
+      );
+    };
+
+    const handleUnmappedPunch = (data: any) => {
+      setRawPunches((prev) => [
+        {
+          id: data.id,
+          deviceId: null,
+          serialNumber: data.serialNumber,
+          enrollmentNumber: data.enrollmentNumber,
+          punchTime: data.punchTime,
+          punchType: 'AUTO_PAIR',
+          verifyMode: 15,
+          receivedAt: data.receivedAt,
+          syncStatus: 'UNMAPPED',
+          isProcessed: false,
+          employeeName: 'Unmapped Employee',
+          employeeCode: 'N/A',
+        },
+        ...prev.slice(0, 99),
+      ]);
+      toast.error(
+        `⚠️ Unmapped PIN ${data.enrollmentNumber} at ${data.showroomCode} (${data.serialNumber})`,
+        { duration: 5000 }
+      );
+    };
+
+    socket.on('device:heartbeat', handleDeviceHeartbeat);
+    socket.on('biometric:punch', handleBiometricPunch);
+    socket.on('biometric:unmapped_punch', handleUnmappedPunch);
+
+    return () => {
+      socket.off('device:heartbeat', handleDeviceHeartbeat);
+      socket.off('biometric:punch', handleBiometricPunch);
+      socket.off('biometric:unmapped_punch', handleUnmappedPunch);
+    };
+  }, [socket]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

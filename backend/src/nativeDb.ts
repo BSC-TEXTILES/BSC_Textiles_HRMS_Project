@@ -1133,7 +1133,7 @@ export class ModelDelegate {
   }
 }
 
-class NativeMySQLClient {
+export class NativeMySQLClient {
   private delegates = new Map<string, ModelDelegate>();
 
   constructor(private connectionGetter: () => Promise<any> = async () => pool) {}
@@ -1197,7 +1197,7 @@ class NativeMySQLClient {
   }
 }
 
-function createProxyClient(nativeClient: NativeMySQLClient): any {
+export function createProxyClient(nativeClient: NativeMySQLClient): any {
   return new Proxy(nativeClient, {
     get(target, prop: string) {
       if (prop in target) {

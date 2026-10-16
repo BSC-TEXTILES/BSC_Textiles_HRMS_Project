@@ -1039,41 +1039,11 @@ async function buildShiftBoard(req: AuthRequest) {
   let targetDeptIds: Set<string> | null = null;
   if (departmentId) {
     targetDeptIds = new Set([departmentId]);
-    if (!scopeLocId) {
-      const deptRecord = await prisma.department.findUnique({ where: { id: departmentId } }).catch(() => null);
-      if (deptRecord) {
-        const matchingDepts = await prisma.department.findMany({
-          where: {
-            OR: [
-              { code: deptRecord.code },
-              { name: deptRecord.name },
-            ],
-          },
-          select: { id: true },
-        }).catch(() => []);
-        for (const md of matchingDepts) targetDeptIds.add(md.id);
-      }
-    }
   }
 
   let targetShiftIds: Set<string> | null = null;
   if (shiftId) {
     targetShiftIds = new Set([shiftId]);
-    if (!scopeLocId) {
-      const shiftRecord = await prisma.shift.findUnique({ where: { id: shiftId } }).catch(() => null);
-      if (shiftRecord) {
-        const matchingShifts = await prisma.shift.findMany({
-          where: {
-            OR: [
-              { code: shiftRecord.code },
-              { name: shiftRecord.name },
-            ],
-          },
-          select: { id: true },
-        }).catch(() => []);
-        for (const ms of matchingShifts) targetShiftIds.add(ms.id);
-      }
-    }
   }
 
   const [locations, shifts, employees, attendance, weeklyOffRules, holidays, breakRows, leaveRows, correctionRows] =

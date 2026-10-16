@@ -52,7 +52,9 @@ import {
   AlertTriangle,
   Info,
   XCircle,
-  QrCode
+  QrCode,
+  Database,
+  HardDrive
 } from 'lucide-react';
 
 interface NavItem {
@@ -174,6 +176,21 @@ const enterpriseNavigation: NavSectionConfig[] = [
     ],
   },
   {
+    title: 'Biometric Integration & IoT',
+    theme: {
+      color: 'text-violet-200',
+      dotColor: 'bg-violet-400',
+      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-violet-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-violet-300 group-hover:text-white',
+    },
+    items: [
+      { title: 'Biometric Device Manager', href: '/attendance/devices', icon: Cpu, badge: 'eSSL IoT' },
+      { title: 'Biometric Punches Ledger', href: '/attendance/punches', icon: Fingerprint },
+      { title: 'Biometric Mappings', href: '/attendance/devices?tab=mappings', icon: UserCheck },
+    ],
+  },
+  {
     title: 'Time & Attendance',
     theme: {
       color: 'text-amber-200',
@@ -183,13 +200,12 @@ const enterpriseNavigation: NavSectionConfig[] = [
       iconColor: 'text-amber-300 group-hover:text-white',
     },
     items: [
-      { title: 'Biometric Punches', href: '/attendance/punches', icon: Fingerprint },
-      { title: 'Missed Punching & Working Hours', href: '/attendance/missed-punching', icon: ClockAlertIndicator, badge: 'Attention' },
+      { title: 'Attendance Register', href: '/attendance/register', icon: ClipboardCheck },
+      { title: 'Missed Punching & Hours', href: '/attendance/missed-punching', icon: ClockAlertIndicator, badge: 'Attention' },
       { title: 'Floor Shifts & Rosters', href: '/attendance/shifts', icon: Calendar },
       { title: 'Late & Fine Management', href: '/attendance/late-fines', icon: AlertTriangle, badge: 'Policy' },
       { title: 'Lunch & Break Tracker', href: '/attendance/breaks', icon: Coffee },
       { title: 'Punch Corrections', href: '/attendance/corrections', icon: FileEdit },
-      { title: 'Attendance Register', href: '/attendance/register', icon: ClipboardCheck },
       { title: 'Attendance Calculation', href: '/attendance/calculation', icon: Calculator },
     ],
   },
@@ -237,6 +253,8 @@ const enterpriseNavigation: NavSectionConfig[] = [
       { title: 'Selling Points & Audits', href: '/operations/selling-points', icon: Store },
       { title: 'Observation Module', href: '/operations/observations', icon: Eye },
       { title: 'Governance Reports', href: '/reports', icon: FileText },
+      { title: 'Database & Shards', href: '/admin/shards', icon: Database, badge: 'MySQL' },
+      { title: 'Local DB & Backups', href: '/admin/local-database', icon: HardDrive },
       { title: 'Audit Logs & Security', href: '/admin/audit-logs', icon: ShieldAlert },
       { title: 'System Settings', href: '/admin/settings', icon: Settings },
     ],

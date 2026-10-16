@@ -366,8 +366,8 @@ export async function runAttendanceBoardTests(
   /* API integration: GET /attendance/shift-board                        */
   /* ------------------------------------------------------------------ */
 
-  let belLocId = 'cmuzam5fe00014n4pq25hkcww';
-  let davLocId = 'cmuzam5fr00024n4p4izbomev';
+  let belLocId = 'cmuwszr8t00011vdtc7vgvags';
+  let davLocId = 'cmuwszr9500021vdtxscy3nsc';
   try {
     const locRes = await api('/locations', adminToken);
     const locData: any = await locRes.json();
