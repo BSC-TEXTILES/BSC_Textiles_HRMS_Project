@@ -44,9 +44,30 @@ const ENTERPRISE_USERS: Record<string, any> = {
     locationId: 'loc_davangere_01',
     employeeId: 'emp_hr',
   },
+  'vikram.singh@bsctextiles.com': {
+    id: 'cmuwszr8b00002vdt6ldrzqdo',
+    email: 'vikram.singh@bsctextiles.com',
+    fullName: 'HR Manager',
+    role: 'HR_MANAGER',
+    permissions: [
+      'VIEW', 'ADD', 'EDIT', 'APPROVE', 'REJECT', 'ASSIGN',
+      'EXPORT', 'IMPORT', 'MANAGE', 'RECORD'
+    ],
+    locationId: 'loc_davangere_01',
+    employeeId: 'emp_hr',
+  },
   'staff@bsctextiles.com': {
     id: 'cmuwszr8b00003vdt6ldrzqdp',
     email: 'staff@bsctextiles.com',
+    fullName: 'Staff Member',
+    role: 'STAFF',
+    permissions: ['VIEW', 'RECORD'],
+    locationId: 'loc_davangere_01',
+    employeeId: 'emp_staff',
+  },
+  'rajesh.kumar@bsctextiles.com': {
+    id: 'cmuwszr8b00003vdt6ldrzqdp',
+    email: 'rajesh.kumar@bsctextiles.com',
     fullName: 'Staff Member',
     role: 'STAFF',
     permissions: ['VIEW', 'RECORD'],
