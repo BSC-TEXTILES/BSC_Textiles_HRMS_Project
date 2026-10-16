@@ -1,3 +1,28 @@
+/**
+ * Identity-only description of the hubs the employee directory expects to exist.
+ *
+ * This is a fallback used when `GET /locations/all` has not answered yet, so the
+ * filter dropdown and the drawer shell can still render. It deliberately carries
+ * NO headcount, attendance or manager fields: those come from the API only. If a
+ * metric is missing the UI shows "—" rather than a fabricated zero.
+ *
+ * `id` mirrors `code` because the backend issues cuids; matching is done on
+ * `code`, which is stable across both the legacy and current location tables.
+ */
+export interface CanonicalHubStore {
+  id: string;
+  code: string;
+  name: string;
+  city: string;
+  status: 'ACTIVE';
+}
+
+export const CANONICAL_HUB_STORES: CanonicalHubStore[] = [
+  { id: 'BEL', code: 'BEL', name: 'Belagavi', city: 'Belagavi', status: 'ACTIVE' },
+  { id: 'DAV', code: 'DAV', name: 'Davanagere', city: 'Davanagere', status: 'ACTIVE' },
+  { id: 'SHI', code: 'SHI', name: 'Shivamogga', city: 'Shivamogga', status: 'ACTIVE' },
+];
+
 export interface StoreHubItem {
   id: string;
   code: string;
@@ -5,55 +30,18 @@ export interface StoreHubItem {
   location: string;
   city: string;
   address: string;
+  /** All roster rows attached to this location. */
   totalEmployees: number;
-  activeOnFloor: number;
+  activeEmployees: number;
+  inactiveEmployees: number;
+  /**
+   * Staff with an attendance row today (null when live attendance was not
+   * supplied — the drawer then shows "—" instead of guessing).
+   */
+  presentOnFloor: number | null;
   departmentsAvailable: string;
   terminalCount: number;
   managerName: string;
-  status: 'ACTIVE' | 'INACTIVE';
+  hrContactName: string;
+  status: 'ACTIVE' | 'INACTIVE' | string;
 }
-
-export const CANONICAL_HUB_STORES: StoreHubItem[] = [
-  {
-    id: 'loc_bel',
-    code: 'BEL',
-    name: 'Belagavi Head Store',
-    location: 'Khade Bazar, Belagavi',
-    city: 'Belagavi',
-    address: 'Khade Bazar, Belagavi, Karnataka 590001',
-    totalEmployees: 23,
-    activeOnFloor: 7,
-    departmentsAvailable: '6 Units (Silk, Men, Women, Ops, HR, Fin)',
-    terminalCount: 4,
-    managerName: 'Kavita Bhat (HR & Store In-Charge)',
-    status: 'ACTIVE',
-  },
-  {
-    id: 'loc_dav',
-    code: 'DAV',
-    name: 'Davanagere Mega Store',
-    location: 'P.B. Road, Davanagere',
-    city: 'Davanagere',
-    address: 'P.B. Road, Davanagere, Karnataka 577002',
-    totalEmployees: 8,
-    activeOnFloor: 3,
-    departmentsAvailable: '6 Units (Retail Sales, Ops, Accounts)',
-    terminalCount: 3,
-    managerName: 'Suresh Patil (Store Manager)',
-    status: 'ACTIVE',
-  },
-  {
-    id: 'loc_shi',
-    code: 'SHI',
-    name: 'Shivamogga Flagship',
-    location: 'Nehru Road, Shivamogga',
-    city: 'Shivamogga',
-    address: 'Nehru Road, Shivamogga, Karnataka 577201',
-    totalEmployees: 7,
-    activeOnFloor: 2,
-    departmentsAvailable: '6 Units (Showroom, Logistics, HR)',
-    terminalCount: 3,
-    managerName: 'Vikram Singh (Regional HR Manager)',
-    status: 'ACTIVE',
-  },
-];

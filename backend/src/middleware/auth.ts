@@ -5,6 +5,7 @@ import { JWT_SECRET, JWT_ISSUER, TOKEN_TTL } from '../config/env.js';
 import { SessionService } from '../services/sessionService.js';
 import { AuditService } from '../services/auditService.js';
 import { cacheService } from '../services/cacheService.js';
+import { resolveLocationAlias } from '../services/locationRegistry.js';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -211,27 +212,11 @@ export function isElevatedRole(role?: string): boolean {
 }
 
 export function resolveLocationCodeToId(val?: any): string | undefined {
-  if (!val || val === 'all' || val === 'ALL') return undefined;
-  const s = String(val).toLowerCase();
-  const map: Record<string, string> = {
-    bel: 'cmuwszr8t00011vdtc7vgvags',
-    belagavi: 'cmuwszr8t00011vdtc7vgvags',
-    loc_bel: 'cmuwszr8t00011vdtc7vgvags',
-    cmuzam5fe00014n4pq25hkcww: 'cmuwszr8t00011vdtc7vgvags',
-    cmuwszr8t00011vdtc7vgvags: 'cmuwszr8t00011vdtc7vgvags',
-    dav: 'cmuwszr9500021vdtxscy3nsc',
-    davanagere: 'cmuwszr9500021vdtxscy3nsc',
-    loc_dav: 'cmuwszr9500021vdtxscy3nsc',
-    cmuzam5fr00024n4p4izbomev: 'cmuwszr9500021vdtxscy3nsc',
-    cmuwszr9500021vdtxscy3nsc: 'cmuwszr9500021vdtxscy3nsc',
-    shi: 'cmuwszr9s00031vdtqlwzkrw8',
-    shivamogga: 'cmuwszr9s00031vdtqlwzkrw8',
-    loc_shi: 'cmuwszr9s00031vdtqlwzkrw8',
-    cmuzam5g400034n4p89o33l8e: 'cmuwszr9s00031vdtqlwzkrw8',
-    cmuwszr9s00031vdtqlwzkrw8: 'cmuwszr9s00031vdtqlwzkrw8',
-    cmuwszr9n00031vdtvdf7o734: 'cmuwszr9s00031vdtqlwzkrw8',
-  };
-  return map[s] || String(val);
+  // Backed by `locationRegistry`, which reads the `location` table. This
+  // replaces the previous hard-coded BEL/DAV/SHI literal map: a location
+  // created through /api/locations is now resolvable by every module —
+  // attendance, payroll, analysis, organisation — without a code change.
+  return resolveLocationAlias(val);
 }
 
 export function getScopedLocationId(user?: AuthRequest['user'], requestedLocationId?: any): string | undefined {

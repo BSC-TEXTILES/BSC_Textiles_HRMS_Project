@@ -53,7 +53,9 @@ CREATE TABLE IF NOT EXISTS `user_employee_link_report` (
 -- ---------------------------------------------------------------------------
 DROP TABLE IF EXISTS `_work_026_link`;
 
-CREATE TABLE `_work_026_link` AS
+CREATE TABLE `_work_026_link`
+       DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci
+AS
 SELECT u.`id`         AS `userId`,
        u.`email`      AS `email`,
        u.`fullName`   AS `userFullName`,
@@ -74,7 +76,7 @@ SELECT u.`id`         AS `userId`,
   FROM `user` u;
 
 ALTER TABLE `_work_026_link` ADD PRIMARY KEY (`userId`);
-ALTER TABLE `_work_026_link` ADD COLUMN `resolvedEmployeeId` varchar(191) NULL;
+ALTER TABLE `_work_026_link` ADD COLUMN `resolvedEmployeeId` varchar(191) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL;
 ALTER TABLE `_work_026_link` ADD COLUMN `matchStrategy`
        enum('EMAIL','EXISTING_LINK_REVALIDATED','EXISTING_LINK_CORRECTED','NAME_AND_LOCATION','NO_MATCH')
        NOT NULL DEFAULT 'NO_MATCH';

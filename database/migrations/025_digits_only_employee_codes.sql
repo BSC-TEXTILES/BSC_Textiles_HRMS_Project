@@ -29,14 +29,41 @@
 -- ===========================================================================
 
 -- ---------------------------------------------------------------------------
--- 1. Columns supporting the rule.
+-- 1. Columns supporting the rule. Guarded so a re-tried run cannot fail on an
+--    already-present column.
 -- ---------------------------------------------------------------------------
-ALTER TABLE `employee`
-  ADD COLUMN `employeeCodeProposal`     varchar(191) NULL DEFAULT NULL,
-  ADD COLUMN `employeeCodeOrigin`       varchar(40)  NOT NULL DEFAULT 'hr-assigned',
-  ADD COLUMN `requiresHrCodeReview`     tinyint(1)   NOT NULL DEFAULT 0,
-  ADD COLUMN `employeeCodeReviewedAt`   datetime(3)  NULL DEFAULT NULL,
-  ADD COLUMN `employeeCodeReviewedById` varchar(191) NULL DEFAULT NULL;
+DROP PROCEDURE IF EXISTS `_ensure_025_columns`;
+CREATE PROCEDURE `_ensure_025_columns`()
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employee'
+                    AND COLUMN_NAME = 'employeeCodeProposal') THEN
+    ALTER TABLE `employee` ADD COLUMN `employeeCodeProposal` varchar(191) NULL DEFAULT NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employee'
+                    AND COLUMN_NAME = 'employeeCodeOrigin') THEN
+    ALTER TABLE `employee` ADD COLUMN `employeeCodeOrigin` varchar(40) NOT NULL DEFAULT 'hr-assigned';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employee'
+                    AND COLUMN_NAME = 'requiresHrCodeReview') THEN
+    ALTER TABLE `employee` ADD COLUMN `requiresHrCodeReview` tinyint(1) NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employee'
+                    AND COLUMN_NAME = 'employeeCodeReviewedAt') THEN
+    ALTER TABLE `employee` ADD COLUMN `employeeCodeReviewedAt` datetime(3) NULL DEFAULT NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employee'
+                    AND COLUMN_NAME = 'employeeCodeReviewedById') THEN
+    ALTER TABLE `employee` ADD COLUMN `employeeCodeReviewedById` varchar(191) NULL DEFAULT NULL;
+  END IF;
+END;
+
+CALL `_ensure_025_columns`();
+DROP PROCEDURE IF EXISTS `_ensure_025_columns`;
 
 CREATE TABLE IF NOT EXISTS `employee_code_compliance_report` (
   `id`                 int AUTO_INCREMENT PRIMARY KEY,
@@ -83,10 +110,11 @@ UPDATE `employee_id_sequence`
 
 UPDATE `employee_id_sequence` seq
   JOIN (SELECT GREATEST(
-               COALESCE(MAX(CAST(NULLIF(`employeeCode`, '') AS UNSIGNED)), 0),
-               COALESCE(MAX(seq2.`next_value`), 0)) + 1 AS floor_value
+               COALESCE(MAX(CASE WHEN e.`employeeCode` REGEXP '^[0-9]+$'
+                                 THEN CAST(e.`employeeCode` AS UNSIGNED) END), 0),
+               COALESCE(MAX(s2.`next_value`), 0)) + 1 AS floor_value
           FROM `employee` e
-         CROSS JOIN `employee_id_sequence` seq2
+         CROSS JOIN `employee_id_sequence` s2
         ) m
    SET seq.`next_value` = m.floor_value;
 
@@ -95,118 +123,121 @@ UPDATE `employee_id_sequence`
 
 -- ---------------------------------------------------------------------------
 -- 3. Snapshot the roster codes, extract proposals, detect conflicts.
+--    `numericOriginal` / `numericProposal` are materialised here behind an
+--    explicit REGEXP guard instead of CAST-ing inline later: under
+--    STRICT_TRANS_TABLES a bare `CAST('BSC-BEL-0102' AS UNSIGNED)` is an ERROR,
+--    not a warning, so every numeric comparison below reads these columns.
 -- ---------------------------------------------------------------------------
 DROP TABLE IF EXISTS `_work_025_codes`;
-CREATE TABLE `_work_025_codes` AS
+CREATE TABLE `_work_025_codes`
+       DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci
+AS
 SELECT e.`id`                                               AS `employeeId`,
        e.`fullName`                                         AS `fullName`,
        e.`employeeCode`                                     AS `originalCode`,
        e.`createdAt`                                        AS `createdAt`,
-       REGEXP_REPLACE(e.`employeeCode`, '[^0-9]', '')       AS `proposal`,
+       REGEXP_REPLACE(e.`employeeCode`, '[^0-9]', '') COLLATE utf8mb4_unicode_ci AS `proposal`,
        CASE WHEN e.`employeeCode` REGEXP '^[0-9]+$' THEN 1 ELSE 0 END        AS `alreadyValid`,
        CASE WHEN REGEXP_REPLACE(e.`employeeCode`, '[^0-9]', '') = '' THEN 1 ELSE 0 END AS `noDigits`,
-       0                                                    AS `proposalClashes`,
-       NULL                                                 AS `appliedCode`
+       CASE WHEN e.`employeeCode` REGEXP '^[0-9]+$'
+            THEN CAST(e.`employeeCode` AS UNSIGNED) ELSE 0 END               AS `numericOriginal`,
+       CASE WHEN REGEXP_REPLACE(e.`employeeCode`, '[^0-9]', '') <> ''
+            THEN CAST(REGEXP_REPLACE(e.`employeeCode`, '[^0-9]', '') AS UNSIGNED)
+            ELSE 0 END                                                       AS `numericProposal`,
+       0                                                    AS `proposalClashes`
   FROM `employee` e;
 
 ALTER TABLE `_work_025_codes` ADD PRIMARY KEY (`employeeId`);
+-- Declared explicitly rather than as `NULL AS appliedCode` in the select list:
+-- CREATE TABLE AS SELECT infers a zero-width type for a bare NULL, which then
+-- rejects every real value.
+ALTER TABLE `_work_025_codes` ADD COLUMN `appliedCode` varchar(191)
+    CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL;
 
--- 3a. Numeric duplicates that ALREADY exist among valid codes.
+-- 3a. Numeric duplicates that ALREADY exist among valid codes (`102` vs `0102`).
 TRUNCATE TABLE `employee_code_number_conflict`;
 
 INSERT INTO `employee_code_number_conflict` (`numericValue`, `employeeId`, `employeeCode`)
-SELECT CAST(v.`originalCode` AS UNSIGNED), v.`employeeId`, v.`originalCode`
+SELECT v.`numericOriginal`, v.`employeeId`, v.`originalCode`
   FROM `_work_025_codes` v
  WHERE v.`alreadyValid` = 1
+   AND v.`numericOriginal` > 0
    AND (SELECT COUNT(*)
           FROM `_work_025_codes` o
          WHERE o.`alreadyValid` = 1
-           AND CAST(o.`originalCode` AS UNSIGNED) = CAST(v.`originalCode` AS UNSIGNED)) > 1;
+           AND o.`numericOriginal` = v.`numericOriginal`) > 1;
 
 -- 3b. Proposals that clash with another proposal, or with a code already in the
 --     roster, judged by NUMERIC value so `01` and `001` are one identifier.
+--     Materialised into a side table first: MySQL rejects a correlated
+--     subquery over the same table an UPDATE is writing (ER 1093).
+DROP TABLE IF EXISTS `_work_025_clash`;
+
+CREATE TABLE `_work_025_clash`
+       DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci
+AS
+SELECT a.`employeeId`
+  FROM `_work_025_codes` a
+  LEFT JOIN `_work_025_codes` b
+         ON b.`noDigits` = 0
+        AND b.`employeeId` <> a.`employeeId`
+        AND b.`numericProposal` = a.`numericProposal`
+  LEFT JOIN `_work_025_codes` v
+         ON v.`alreadyValid` = 1
+        AND v.`numericOriginal` = a.`numericProposal`
+  LEFT JOIN `employee_code_number_conflict` c
+         ON c.`numericValue` = a.`numericProposal`
+ WHERE a.`noDigits` = 0
+   AND a.`alreadyValid` = 0
+   AND (b.`employeeId` IS NOT NULL OR v.`employeeId` IS NOT NULL OR c.`id` IS NOT NULL)
+ GROUP BY a.`employeeId`;
+
 UPDATE `_work_025_codes` w
-   SET w.`proposalClashes` = 1
- WHERE w.`noDigits` = 0
-   AND w.`alreadyValid` = 0
-   AND (
-         EXISTS (SELECT 1 FROM `_work_025_codes` o
-                  WHERE o.`employeeId` <> w.`employeeId`
-                    AND o.`noDigits` = 0
-                    AND CAST(o.`proposal` AS UNSIGNED) = CAST(w.`proposal` AS UNSIGNED))
-         OR EXISTS (SELECT 1 FROM `_work_025_codes` v
-                     WHERE v.`alreadyValid` = 1
-                       AND CAST(v.`originalCode` AS UNSIGNED) = CAST(w.`proposal` AS UNSIGNED))
-         OR EXISTS (SELECT 1 FROM `employee_code_number_conflict` c
-                     WHERE c.`numericValue` = CAST(w.`proposal` AS UNSIGNED))
-   );
+  JOIN `_work_025_clash` x ON x.`employeeId` = w.`employeeId`
+   SET w.`proposalClashes` = 1;
+
+DROP TABLE `_work_025_clash`;
 
 -- 3c. Decide the applied code. Conflicts and no-digit rows are left NULL here
 --     and filled from the sequence in 3d.
-UPDATE `_work_025_codes` SET `appliedCode` = `proposal`
+UPDATE `_work_025_codes` SET `appliedCode` = CONVERT(`proposal` USING utf8mb4) COLLATE utf8mb4_unicode_ci
  WHERE `alreadyValid` = 0 AND `noDigits` = 0 AND `proposalClashes` = 0;
 
 UPDATE `_work_025_codes` SET `appliedCode` = `originalCode`
  WHERE `alreadyValid` = 1;
 
 -- 3d. Allocate the unresolved ones from the project's DB-backed sequence, in a
---     deterministic roster order, skipping any value already taken.
-DROP PROCEDURE IF EXISTS `_allocate_025_sequence_codes`;
-CREATE PROCEDURE `_allocate_025_sequence_codes`()
-BEGIN
-  DECLARE done      INT DEFAULT 0;
-  DECLARE v_emp     varchar(191);
-  DECLARE v_next    BIGINT;
-  DECLARE v_padding INT;
-  DECLARE v_candidate varchar(191);
+--     deterministic roster order. Set-based rather than a cursor: the sequence
+--     was already pushed above MAX(numeric code in the roster) in step 2, so
+--     consecutive values from it cannot collide with an existing code, and no
+--     retry loop is needed.
+SET @alloc_base = (SELECT `next_value` FROM `employee_id_sequence`
+                    WHERE `format_key` = 'BSC-EMP-DIGITS' LIMIT 1);
+SET @alloc_padding = (SELECT `padding` FROM `employee_id_sequence`
+                       WHERE `format_key` = 'BSC-EMP-DIGITS' LIMIT 1);
 
-  DECLARE cur CURSOR FOR
-        SELECT `employeeId` FROM `_work_025_codes`
-         WHERE `appliedCode` IS NULL
-         ORDER BY `createdAt`, `employeeId`;
-  DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
+UPDATE `_work_025_codes` w
+  JOIN (SELECT `employeeId`,
+               ROW_NUMBER() OVER (ORDER BY `createdAt`, `employeeId`) AS `seq`
+          FROM `_work_025_codes`
+         WHERE `appliedCode` IS NULL) r ON r.`employeeId` = w.`employeeId`
+   SET w.`appliedCode` = LPAD(@alloc_base + r.`seq` - 1, @alloc_padding, '0');
 
-  SELECT `next_value`, `padding` INTO v_next, v_padding
-    FROM `employee_id_sequence`
-   WHERE `format_key` = 'BSC-EMP-DIGITS' LIMIT 1;
-
-  IF v_next IS NULL THEN
-    SET v_next = 1;
-    SET v_padding = 4;
-  END IF;
-
-  OPEN cur;
-  allocate_loop: LOOP
-    FETCH cur INTO v_emp;
-    IF done = 1 THEN
-      LEAVE allocate_loop;
-    END IF;
-
-    allocation_retry: LOOP
-      SET v_candidate = LPAD(v_next, v_padding, '0');
-      IF NOT EXISTS (SELECT 1 FROM `_work_025_codes` x WHERE x.`appliedCode` = v_candidate)
-         AND NOT EXISTS (SELECT 1 FROM `employee` e WHERE e.`employeeCode` = v_candidate) THEN
-        LEAVE allocation_retry;
-      END IF;
-      SET v_next = v_next + 1;
-    END LOOP allocation_retry;
-
-    UPDATE `_work_025_codes` SET `appliedCode` = v_candidate WHERE `employeeId` = v_emp;
-    SET v_next = v_next + 1;
-  END LOOP allocate_loop;
-
-  CLOSE cur;
-
-  UPDATE `employee_id_sequence` SET `next_value` = v_next WHERE `format_key` = 'BSC-EMP-DIGITS';
-  UPDATE `employee_id_sequence` SET `sample_format` = LPAD(`next_value`, `padding`, '0');
-END;
-
-CALL `_allocate_025_sequence_codes`();
-DROP PROCEDURE IF EXISTS `_allocate_025_sequence_codes`;
+UPDATE `employee_id_sequence`
+   SET `next_value` = @alloc_base + (SELECT COUNT(*) FROM `_work_025_codes`
+                                      WHERE `alreadyValid` = 0
+                                        AND (`proposalClashes` = 1 OR `noDigits` = 1)),
+       `sample_format` = LPAD(`next_value`, `padding`, '0')
+ WHERE `format_key` = 'BSC-EMP-DIGITS';
 
 -- ---------------------------------------------------------------------------
 -- 4. Write the HR correction report BEFORE rewriting anything.
+--    Rows this migration owns carry `createdById IS NULL`; rows written later
+--    by the application always name an actor, so a re-run refreshes its own
+--    report rows without erasing HR's.
 -- ---------------------------------------------------------------------------
+DELETE FROM `employee_code_compliance_report` WHERE `createdById` IS NULL;
+
 INSERT INTO `employee_code_compliance_report`
       (`employeeId`, `fullName`, `originalCode`, `digitsOnlyProposal`, `appliedCode`,
        `issue`, `resolution`, `requiresHrReview`, `conflictGroupKey`, `note`, `createdById`)
@@ -256,8 +287,7 @@ UPDATE `employee` e
   JOIN `_work_025_codes` w ON w.`employeeId` = e.`id`
    SET e.`employeeCode` = w.`appliedCode`
  WHERE w.`alreadyValid` = 0
-   AND w.`appliedCode` IS NOT NULL
-   AND e.`employeeCode` <> w.`appliedCode`;
+   AND w.`appliedCode` IS NOT NULL;
 
 -- Gender casing differed between the two rosters (legacy 'male', seed 'MALE').
 -- The authoritative legacy convention wins; the change is case-only.
@@ -317,4 +347,4 @@ DROP PROCEDURE IF EXISTS `_add_025_digits_check`;
 SELECT e.`id`, e.`employeeCode`, e.`legacyEmployeeCode`, e.`employeeCodeProposal`,
        e.`employeeCodeOrigin`, e.`requiresHrCodeReview`
   FROM `employee` e
- ORDER BY CAST(e.`employeeCode` AS UNSIGNED);
+ ORDER BY LPAD(e.`employeeCode`, 30, '0');

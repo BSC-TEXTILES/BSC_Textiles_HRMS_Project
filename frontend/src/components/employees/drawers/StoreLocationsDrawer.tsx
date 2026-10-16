@@ -3,13 +3,15 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Building2, Store, Users, ShieldCheck, X, RefreshCw, AlertCircle } from 'lucide-react';
 import { EmployeeDrawerWrapper } from './EmployeeDrawerWrapper';
-import { StoreHubItem, CANONICAL_HUB_STORES } from './storeLocationsHelper';
+import type { StoreHubItem } from './storeLocationsHelper';
 
 interface StoreLocationsDrawerProps {
   open: boolean;
   onClose: () => void;
   locations: any[];
   employees: any[];
+  /** Today's attendance rows keyed by employee id, from GET /attendance/today. */
+  liveAttendance?: Record<string, any> | null;
   currentLocationId: string;
   currentDeptId: string;
   onSelectLocation?: (locationId: string) => void;
@@ -26,6 +28,7 @@ export function StoreLocationsDrawer({
   onClose,
   locations,
   employees,
+  liveAttendance,
   currentLocationId,
   currentDeptId,
   onSelectLocation,
@@ -45,59 +48,56 @@ export function StoreLocationsDrawer({
     }
   }, [open]);
 
-  // Merge canonical store metadata with live locations and employee data
+  // Every value below is derived from the records the API returned for this
+  // drawer: the live location list plus the roster passed in by the directory.
+  // Nothing is merged from a canned store list and no ratio is invented.
   const storeList: StoreHubItem[] = useMemo(() => {
-    // If locations array has elements from backend, match and enrich them
-    const activeLocations = locations.length > 0 ? locations : CANONICAL_HUB_STORES;
-
-    return activeLocations.map((loc: any) => {
-      // Find matching canonical meta by code or id
-      const matchedMeta =
-        CANONICAL_HUB_STORES.find(
-          (c) =>
-            c.code.toUpperCase() === (loc.code || '').toUpperCase() ||
-            c.id === loc.id
-        ) || CANONICAL_HUB_STORES[0];
-
-      // Calculate total employees matching this location from live roster
+    return locations.map((loc: any) => {
       const matchingEmps = employees.filter(
         (e) =>
           e.locationId === loc.id ||
           e.location?.id === loc.id ||
-          (e.location?.code && e.location.code.toUpperCase() === (loc.code || '').toUpperCase())
+          (e.location?.code && loc.code && e.location.code.toUpperCase() === String(loc.code).toUpperCase())
       );
-      const totalEmps = matchingEmps.length > 0 ? matchingEmps.length : matchedMeta.totalEmployees;
-
-      // Calculate active on floor for this store
-      // In canonical data, ~34% of active staff are on floor in Shift A
-      const onFloorCount = Math.min(
-        Math.max(Math.round(totalEmps * 0.34), 2),
-        totalEmps
+      const totalEmps = matchingEmps.length;
+      const activeEmps = matchingEmps.filter((e) => String(e.status).toUpperCase() === 'ACTIVE').length;
+      const presentEmps = liveAttendance
+        ? matchingEmps.filter((e) => liveAttendance[String(e.id)]).length
+        : null;
+      const deptNames = Array.from(
+        new Set(
+          matchingEmps
+            .map((e) => e.department?.name)
+            .filter((n): n is string => Boolean(n))
+        )
       );
 
       return {
-        id: loc.id || matchedMeta.id,
-        code: loc.code || matchedMeta.code,
-        name: loc.name || matchedMeta.name,
-        location: matchedMeta.location || `${loc.city || 'Karnataka'}, India`,
-        city: loc.city || matchedMeta.city,
-        address: matchedMeta.address || `${loc.name}, Karnataka`,
+        id: loc.id,
+        code: loc.code || '—',
+        name: loc.name || '—',
+        location: [loc.city, loc.state].filter(Boolean).join(', ') || '—',
+        city: loc.city || '—',
+        address: loc.address || loc.addressLine1 || '—',
         totalEmployees: totalEmps,
-        activeOnFloor: onFloorCount,
-        departmentsAvailable: matchedMeta.departmentsAvailable,
-        terminalCount: matchedMeta.terminalCount,
-        managerName: loc.manager?.fullName || matchedMeta.managerName,
+        activeEmployees: activeEmps,
+        inactiveEmployees: totalEmps - activeEmps,
+        presentOnFloor: presentEmps,
+        departmentsAvailable: deptNames.length ? deptNames.join(', ') : 'No departments assigned',
+        terminalCount: Number(loc._count?.sellingPoints ?? loc.deviceCount ?? 0),
+        managerName: loc.manager?.fullName || loc.managerName || 'Not assigned',
+        hrContactName: loc.hrManager?.fullName || loc.hrContactName || 'Not assigned',
         status: (loc.status as any) || 'ACTIVE',
       };
     });
-  }, [locations, employees]);
+  }, [locations, employees, liveAttendance]);
 
   // Active filter summary string
   const activeLocationObj = storeList.find((l) => l.id === currentLocationId);
   const filterSummary = useMemo(() => {
     if (activeLocationObj) return `Filter: ${activeLocationObj.name} (${activeLocationObj.code})`;
-    return 'Karnataka Retail Hubs • 3 Store Networks';
-  }, [activeLocationObj]);
+    return `${storeList.length} location${storeList.length === 1 ? '' : 's'} registered in the HRMS`;
+  }, [activeLocationObj, storeList.length]);
 
   // Filtered store list by search
   const filteredStores = useMemo(() => {
@@ -117,8 +117,9 @@ export function StoreLocationsDrawer({
     return storeList.reduce((acc, s) => acc + s.totalEmployees, 0);
   }, [storeList]);
 
-  const totalActiveFloor = useMemo(() => {
-    return storeList.reduce((acc, s) => acc + s.activeOnFloor, 0);
+  const totalPresentFloor = useMemo(() => {
+    const values = storeList.map((s) => s.presentOnFloor).filter((v): v is number => typeof v === 'number');
+    return values.length ? values.reduce((acc, v) => acc + v, 0) : null;
   }, [storeList]);
 
   const handleShowStoreInDirectory = (storeId: string) => {
@@ -183,7 +184,7 @@ export function StoreLocationsDrawer({
             Active On-Floor
           </span>
           <div className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300 mt-1">
-            {totalActiveFloor}
+            {totalPresentFloor !== null ? totalPresentFloor : '—'}
           </div>
           <span className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">Shift A Manning</span>
         </div>
@@ -312,7 +313,7 @@ export function StoreLocationsDrawer({
                       <td className="py-2.5 px-3 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          {store.activeOnFloor} active
+                          {store.presentOnFloor !== null ? `${store.presentOnFloor} active` : '—'}
                         </span>
                       </td>
                       <td className="py-2.5 px-3 whitespace-nowrap text-[11px] text-slate-600 dark:text-slate-300">
