@@ -28,6 +28,15 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     return next();
   }
 
+  // Exempt IoT hardware connectors & ADMS push endpoints
+  if (
+    req.headers['x-connector-key'] ||
+    req.path.startsWith('/iclock') ||
+    req.path.includes('/devices/ingest-raw')
+  ) {
+    return next();
+  }
+
   // Exempt auth bootstrap endpoints (login/register/refresh/forgot-password)
   const exemptPaths = [
     '/api/auth/login',

@@ -1,8 +1,9 @@
 import { pool } from '../../nativeDb.js';
+import { shardRouter } from '../sharding/ShardRouter.js';
 
 /**
  * BaseRepository: Abstract OOP base class encapsulating MySQL operations
- * Encapsulation, prepared statement abstraction, and connection pooling.
+ * Encapsulation, prepared statement abstraction, connection pooling, and multi-tenant shard routing.
  */
 export abstract class BaseRepository<T> {
   protected abstract readonly tableName: string;
@@ -33,4 +34,23 @@ export abstract class BaseRepository<T> {
     );
     return Number(res?.count || 0);
   }
+
+  // Shard-aware executions
+  public async queryOnShard<R = T>(databaseId: string, sql: string, params: any[] = []): Promise<R[]> {
+    return shardRouter.executeShardRead<R>(databaseId, sql, params);
+  }
+
+  public async queryOneOnShard<R = T>(databaseId: string, sql: string, params: any[] = []): Promise<R | null> {
+    const rows = await this.queryOnShard<R>(databaseId, sql, params);
+    return rows.length > 0 ? rows[0] : null;
+  }
+
+  public async executeOnShard(databaseId: string, sql: string, params: any[] = []): Promise<any> {
+    return shardRouter.executeShardWrite(databaseId, sql, params);
+  }
+
+  public async findByIdOnShard(databaseId: string, id: string): Promise<T | null> {
+    return this.queryOneOnShard<T>(databaseId, `SELECT * FROM ${this.tableName} WHERE id = ? LIMIT 1`, [id]);
+  }
 }
+

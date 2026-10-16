@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
@@ -36,6 +36,9 @@ import {
   User,
   Coffee,
   CheckSquare,
+  Zap,
+  Calculator,
+  Sparkles,
   FolderTree,
   Folder,
   Download,
@@ -342,23 +345,63 @@ export default function MissedPunchingPage() {
     toast.success(`Filtered report by Floor: ${floorName}`);
   };
 
+  // Live calculation of working hours in the Edit Modal
+  const calculatedPreview = useMemo(() => {
+    if (!punchInTime || !punchOutTime) return null;
+    const [inH, inM] = punchInTime.split(':').map(Number);
+    const [outH, outM] = punchOutTime.split(':').map(Number);
+    if (isNaN(inH) || isNaN(inM) || isNaN(outH) || isNaN(outM)) return null;
+
+    let grossMins = (outH * 60 + outM) - (inH * 60 + inM);
+    if (grossMins < 0) grossMins += 24 * 60; // handles overnight shift
+
+    const breakMins = Number(breakDuration) || 0;
+    const netMins = Math.max(0, grossMins - breakMins);
+    const netH = Math.floor(netMins / 60);
+    const netM = netMins % 60;
+    const targetMins = 9 * 60; // 540 minutes (9 hours)
+    const diffMins = netMins - targetMins;
+    const isTargetMet = netMins >= targetMins;
+
+    return {
+      grossMinutes: grossMins,
+      netMinutes: netMins,
+      formattedNet: `${String(netH).padStart(2, '0')}h ${String(netM).padStart(2, '0')}m`,
+      isTargetMet,
+      diffMinutes: diffMins,
+      formattedDiff: diffMins >= 0 
+        ? `+${String(Math.floor(diffMins / 60)).padStart(2, '0')}h ${String(diffMins % 60).padStart(2, '0')}m`
+        : `-${String(Math.floor(Math.abs(diffMins) / 60)).padStart(2, '0')}h ${String(Math.abs(diffMins) % 60).padStart(2, '0')}m`,
+      percentage: Math.min(100, Math.round((netMins / targetMins) * 100))
+    };
+  }, [punchInTime, punchOutTime, breakDuration]);
+
   // Open Edit Modal
-  const handleOpenEdit = (rec: MissedPunchRecord) => {
+  const handleOpenEdit = (rec: MissedPunchRecord, autoCalculate9h: boolean = false) => {
     setSelectedRecord(rec);
     const defaultIn = rec.firstPunchIn ? rec.firstPunchIn.substring(11, 16) : '10:00';
-    const defaultOut = rec.lastPunchOut ? rec.lastPunchOut.substring(11, 16) : '19:00';
+    let defaultOut = rec.lastPunchOut ? rec.lastPunchOut.substring(11, 16) : '19:00';
+    const initialBreak = rec.breakDurationMinutes || 0;
+
+    if (autoCalculate9h && defaultIn) {
+      const [inH, inM] = defaultIn.split(':').map(Number);
+      const targetMins = inH * 60 + inM + 9 * 60 + initialBreak;
+      const outH = Math.floor(targetMins / 60) % 24;
+      const outM = targetMins % 60;
+      defaultOut = `${String(outH).padStart(2, '0')}:${String(outM).padStart(2, '0')}`;
+    }
+
     setPunchInTime(defaultIn);
     setPunchOutTime(defaultOut);
-    setBreakDuration(rec.breakDurationMinutes || 0);
-    setCorrectionReason('');
+    setBreakDuration(initialBreak);
+    const reason = rec.missingPunchType === 'MISSED_IN'
+      ? 'Forgot morning punch-in'
+      : rec.missingPunchType === 'MISSED_OUT'
+      ? 'Customer rush during floor closing'
+      : 'Biometric scanner timeout';
+    setMissingReason(reason);
+    setCorrectionReason(`Verified attendance adjustment: ${reason}`);
     setManagerRemarks('');
-    setMissingReason(
-      rec.missingPunchType === 'MISSED_IN'
-        ? 'Forgot morning punch-in'
-        : rec.missingPunchType === 'MISSED_OUT'
-        ? 'Customer rush during evening closing'
-        : 'Biometric scanner timeout'
-    );
     setEditModalOpen(true);
   };
 
@@ -783,6 +826,57 @@ export default function MissedPunchingPage() {
               </span>
             </div>
 
+                        {/* Quick Issue Filter Chips */}
+            <div className="px-4 py-2.5 bg-slate-50/80 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2 overflow-x-auto no-scrollbar">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 flex-shrink-0">
+                <SlidersHorizontal className="w-3 h-3 text-sky-500" /> Quick Filter:
+              </span>
+              <button
+                type="button"
+                onClick={() => { setSelectedMissingType('ALL'); setPage(1); }}
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${
+                  selectedMissingType === 'ALL'
+                    ? 'bg-sky-600 text-white shadow-sm ring-2 ring-sky-500/20'
+                    : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                All Issues ({totalRecords})
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSelectedMissingType('MISSED_OUT'); setPage(1); }}
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap flex items-center gap-1 transition-all ${
+                  selectedMissingType === 'MISSED_OUT'
+                    ? 'bg-amber-600 text-white shadow-sm ring-2 ring-amber-500/20'
+                    : 'bg-white dark:bg-slate-800 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 hover:bg-amber-50 dark:hover:bg-amber-950/30'
+                }`}
+              >
+                <Clock className="w-3 h-3" /> Missed Punch-Out
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSelectedMissingType('MISSED_IN'); setPage(1); }}
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap flex items-center gap-1 transition-all ${
+                  selectedMissingType === 'MISSED_IN'
+                    ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-500/20'
+                    : 'bg-white dark:bg-slate-800 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950/30'
+                }`}
+              >
+                <AlertTriangle className="w-3 h-3" /> Missed Punch-In
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSelectedMissingType('UNDER_9_HOURS'); setPage(1); }}
+                className={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap flex items-center gap-1 transition-all ${
+                  selectedMissingType === 'UNDER_9_HOURS'
+                    ? 'bg-rose-600 text-white shadow-sm ring-2 ring-rose-500/20'
+                    : 'bg-white dark:bg-slate-800 text-rose-700 dark:text-rose-400 border border-rose-200 dark:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950/30'
+                }`}
+              >
+                <AlertCircle className="w-3 h-3" /> Under 9 Hours
+              </button>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -1161,10 +1255,21 @@ export default function MissedPunchingPage() {
                         {/* Actions */}
                         <td className="py-3.5 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {rec.firstPunchIn && !rec.lastPunchOut && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleOpenEdit(rec, true)}
+                                title="Pre-calculate compliant 9-hour exit"
+                                className="h-7 px-2 text-[11px] font-semibold border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40 flex items-center gap-1 shadow-2xs"
+                              >
+                                <Zap className="w-3 h-3 text-amber-500" /> Quick 9h Fix
+                              </Button>
+                            )}
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => handleOpenEdit(rec)}
+                              onClick={() => handleOpenEdit(rec, false)}
                               className="h-7 px-2.5 text-[11px] font-semibold border-sky-300 dark:border-sky-800 text-sky-700 dark:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-950/40 flex items-center gap-1 shadow-2xs"
                             >
                               <Edit3 className="w-3 h-3" /> Edit
@@ -1224,6 +1329,7 @@ export default function MissedPunchingPage() {
         open={editModalOpen}
         onClose={() => setEditModalOpen(false)}
         title="Correct Attendance & Working Hours"
+        className="max-w-xl"
       >
         {selectedRecord && (
           <div className="space-y-4 text-xs pt-1">
@@ -1253,6 +1359,50 @@ export default function MissedPunchingPage() {
               <span className="font-bold">Required Target: 09h 00m</span>
             </div>
 
+            {/* LIVE RECALCULATED WORKING HOURS PREVIEW CARD */}
+            {calculatedPreview && (
+              <div className={`p-3.5 rounded-xl border transition-all ${
+                calculatedPreview.isTargetMet
+                  ? 'bg-emerald-500/10 border-emerald-500/30 dark:bg-emerald-950/30'
+                  : 'bg-rose-500/10 border-rose-500/30 dark:bg-rose-950/30'
+              }`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Clock className={`w-4 h-4 ${calculatedPreview.isTargetMet ? 'text-emerald-500' : 'text-rose-500'}`} />
+                    <span className="font-bold text-xs text-slate-800 dark:text-slate-200">
+                      Live Recalculated Working Time:
+                    </span>
+                    <span className={`font-mono text-base font-extrabold ${calculatedPreview.isTargetMet ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                      {calculatedPreview.formattedNet}
+                    </span>
+                  </div>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+                    calculatedPreview.isTargetMet
+                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
+                      : 'bg-rose-100 text-rose-800 dark:bg-rose-900/60 dark:text-rose-300 border-rose-300 dark:border-rose-700'
+                  }`}>
+                    {calculatedPreview.isTargetMet ? `✓ Meets 9h Policy (${calculatedPreview.formattedDiff})` : `⚠ Under 9 Hours (${calculatedPreview.formattedDiff})`}
+                  </span>
+                </div>
+
+                {/* Animated Visual Progress Bar toward 9h Target */}
+                <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden mb-2">
+                  <div
+                    className={`h-full transition-all duration-300 rounded-full ${
+                      calculatedPreview.isTargetMet ? 'bg-emerald-500' : 'bg-rose-500'
+                    }`}
+                    style={{ width: `${Math.min(100, calculatedPreview.percentage)}%` }}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+                  <span>Gross: {Math.floor(calculatedPreview.grossMinutes / 60)}h {String(calculatedPreview.grossMinutes % 60).padStart(2, '0')}m</span>
+                  <span>Break: -{breakDuration || 0}m</span>
+                  <span>Target: 09h 00m ({calculatedPreview.percentage}% fulfilled)</span>
+                </div>
+              </div>
+            )}
+
             {/* Punch Correction Inputs */}
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1280,11 +1430,71 @@ export default function MissedPunchingPage() {
               </div>
             </div>
 
+            {/* QUICK PRESET BUTTONS */}
+            <div className="flex items-center gap-1.5 flex-wrap bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-amber-500" /> Presets:
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setPunchInTime('10:00');
+                  setPunchOutTime('19:30');
+                  setBreakDuration(30);
+                }}
+                className="px-2 py-0.5 rounded text-[10px] font-semibold bg-white dark:bg-slate-700 hover:bg-sky-50 dark:hover:bg-sky-950 text-slate-700 dark:text-slate-200 hover:text-sky-600 border border-slate-300 dark:border-slate-600 transition-colors"
+              >
+                Full Day Shift (10:00 - 19:30)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (punchInTime) {
+                    const [h, m] = punchInTime.split(':').map(Number);
+                    const targetMins = h * 60 + m + 9 * 60 + (Number(breakDuration) || 0);
+                    const outH = Math.floor(targetMins / 60) % 24;
+                    const outM = targetMins % 60;
+                    setPunchOutTime(`${String(outH).padStart(2, '0')}:${String(outM).padStart(2, '0')}`);
+                  }
+                }}
+                className="px-2 py-0.5 rounded text-[10px] font-semibold bg-white dark:bg-slate-700 hover:bg-sky-50 dark:hover:bg-sky-950 text-slate-700 dark:text-slate-200 hover:text-sky-600 border border-slate-300 dark:border-slate-600 transition-colors"
+              >
+                + Exact 9h from In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPunchOutTime('19:00');
+                }}
+                className="px-2 py-0.5 rounded text-[10px] font-semibold bg-white dark:bg-slate-700 hover:bg-sky-50 dark:hover:bg-sky-950 text-slate-700 dark:text-slate-200 hover:text-sky-600 border border-slate-300 dark:border-slate-600 transition-colors"
+              >
+                Store Closing (19:00)
+              </button>
+            </div>
+
             {/* Break Duration */}
             <div>
-              <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Unpaid Break Duration (Minutes)
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-bold text-slate-700 dark:text-slate-300">
+                  Unpaid Break Duration (Minutes)
+                </label>
+                <div className="flex items-center gap-1 text-[10px]">
+                  {[0, 30, 45, 60].map((mins) => (
+                    <button
+                      key={mins}
+                      type="button"
+                      onClick={() => setBreakDuration(mins)}
+                      className={`px-1.5 py-0.5 rounded border ${
+                        breakDuration === mins
+                          ? 'bg-sky-100 dark:bg-sky-950 text-sky-800 dark:text-sky-300 border-sky-300 dark:border-sky-800 font-bold'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {mins}m
+                    </button>
+                  ))}
+                </div>
+              </div>
               <Input
                 type="number"
                 min={0}
@@ -1303,7 +1513,13 @@ export default function MissedPunchingPage() {
               </label>
               <select
                 value={missingReason}
-                onChange={(e) => setMissingReason(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setMissingReason(val);
+                  if (!correctionReason || correctionReason.startsWith('Verified attendance adjustment:')) {
+                    setCorrectionReason(`Verified attendance adjustment: ${val}`);
+                  }
+                }}
                 className="w-full h-9 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs px-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
               >
                 <option value="Customer rush during floor closing">Customer rush during floor closing</option>
@@ -1312,6 +1528,7 @@ export default function MissedPunchingPage() {
                 <option value="Store inventory stock audit">Store inventory stock audit</option>
                 <option value="Offsite customer bridal delivery">Offsite customer bridal delivery</option>
                 <option value="Device synchronization delay">Device synchronization delay</option>
+                <option value="Approved on-duty store errands">Approved on-duty store errands</option>
               </select>
             </div>
 
@@ -1325,7 +1542,6 @@ export default function MissedPunchingPage() {
                 onChange={(e) => setCorrectionReason(e.target.value)}
                 placeholder="Explain why this correction is verified..."
                 className="text-xs h-9"
-                required
               />
             </div>
 
@@ -1348,30 +1564,44 @@ export default function MissedPunchingPage() {
               <strong>Audit Policy:</strong> Original biometric punches are permanently preserved in the database audit log. {isHRorAdmin ? 'As HR/Admin, this update will immediately recalculate verified working hours.' : 'As Folder/Floor Manager, this submission will be routed to HR for formal verification.'}
             </p>
 
-            {/* Actions */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setEditModalOpen(false)}
-                disabled={submitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSubmitCorrection}
-                disabled={submitting}
-                className="bg-sky-600 hover:bg-sky-700 text-white font-bold flex items-center gap-1.5 shadow-md"
-              >
-                {submitting ? (
-                  <>Saving...</>
-                ) : isHRorAdmin ? (
-                  <><Check className="w-4 h-4" /> Save &amp; Finalize</>
-                ) : (
-                  <><CheckSquare className="w-4 h-4" /> Submit for Approval</>
+            {/* STICKY ACTIONS FOOTER - PERMANENTLY VISIBLE */}
+            <div className="sticky bottom-0 bg-white/95 dark:bg-[#0e172a]/95 backdrop-blur-md pt-3 pb-2 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between -mx-5 -mb-5 px-5 py-3 shadow-xl z-20">
+              <div className="flex items-center gap-2">
+                {calculatedPreview && (
+                  <span className="text-[11px] font-mono font-bold text-slate-700 dark:text-slate-300">
+                    Net: <span className="text-sky-600 dark:text-sky-400 font-extrabold">{calculatedPreview.formattedNet}</span>
+                    <span className={`text-[10px] ml-1.5 px-1.5 py-0.5 rounded ${calculatedPreview.isTargetMet ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'}`}>
+                      {calculatedPreview.isTargetMet ? 'Meets Policy' : 'Under 9h'}
+                    </span>
+                  </span>
                 )}
-              </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditModalOpen(false)}
+                  disabled={submitting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleSubmitCorrection}
+                  disabled={submitting}
+                  className="bg-sky-600 hover:bg-sky-700 text-white font-bold flex items-center gap-1.5 shadow-md h-9 px-4"
+                >
+                  {submitting ? (
+                    <>Saving...</>
+                  ) : isHRorAdmin ? (
+                    <><Check className="w-4 h-4" /> Save &amp; Finalize</>
+                  ) : (
+                    <><CheckSquare className="w-4 h-4" /> Submit for Approval</>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         )}

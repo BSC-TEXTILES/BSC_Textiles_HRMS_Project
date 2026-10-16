@@ -140,8 +140,13 @@ app.get(['/ready', '/api/ready'], async (req, res) => {
   }
 });
 
+import admsRouter from './routes/adms.js';
+
 // Interactive OpenAPI 3.0 Documentation & Swagger Explorer
 app.use('/api/docs', docsRouter);
+
+// Hardware eSSL / ZKTeco ADMS Cloud Push Protocol listener
+app.use('/iclock', express.text({ type: '*/*' }), admsRouter);
 
 // Domain & Security Routes (v1 API + backwards-compatible /api alias)
 app.use('/api/v1', apiV1Router);
@@ -168,10 +173,13 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {});
 });
 
+import { shardManager } from './core/sharding/index.js';
+
 const PORT = Number(process.env.PORT) || 4000;
 httpServer.listen(PORT, () => {
   console.log(`🚀 BSC Textiles HRMS Security-Hardened Server running on port ${PORT}`);
   console.log(`📡 WebSocket server ready`);
+  shardManager.initialize().catch((err) => console.error('[ShardManager init warning]:', err.message));
   setupViews().catch((err) => console.warn('[setupViews warning]:', err.message));
   setupCustodyAssets().catch((err) => console.warn('[setupCustodyAssets warning]:', err.message));
   setupKycSchema().catch((err) => console.warn('[setupKycSchema warning]:', err.message));
@@ -187,6 +195,13 @@ httpServer.listen(PORT, () => {
 });
 
 process.on('SIGINT', async () => {
+  await shardManager.shutdown();
   await prisma.$disconnect();
   process.exit(0);
 });
+
+process.on('SIGTERM', async () => {
+  await shardManager.shutdown();
+  await prisma.$disconnect();
+  process.exit(0);
+});

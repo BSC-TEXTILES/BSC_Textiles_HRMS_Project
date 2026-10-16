@@ -29,6 +29,8 @@ interface TerminalDevice {
   name: string;
   location: string;
   ipAddress: string;
+  port?: number;
+  serialNumber?: string;
   status: 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
   latency: number;
   packetLoss: number;
@@ -908,7 +910,14 @@ export function TerminalsDetail({
                                   </td>
                                   <td className="px-4 py-3 text-slate-500">
                                     <div>{term.location || 'Not available'}</div>
-                                    <span className="font-mono text-[10px] text-slate-400">{term.ipAddress || 'Not available'}</span>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <span className="font-mono text-[10px] text-slate-400">{term.ipAddress || 'Not available'}{term.port ? (':' + term.port) : ''}</span>
+                                      {term.serialNumber && (
+                                        <span className="font-mono text-[9px] px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-100 font-semibold" title="Device Serial Number">
+                                          SN: {term.serialNumber}
+                                        </span>
+                                      )}
+                                    </div>
                                   </td>
                                   <td className="px-4 py-3 font-mono font-bold text-slate-800">
                                     {term.packetLoss != null ? `${term.packetLoss.toFixed(2)}%` : 'Not available'}

@@ -16,6 +16,7 @@ import { runAttendanceBoardTests } from './attendanceBoard.test.js';
 import { runMyDeskTests } from './myDesk.test.js';
 import { runAnalysisTests } from './analysis.test.js';
 import { runEmployeeImportTests } from './employeeImport.test.js';
+import { runBiometricIntegrationTests } from './biometricIntegration.test.js';
 
 const BASE_URL = (process.env.API_URL || 'http://localhost:4000').replace(/\/api\/?$/, '');
 
@@ -194,6 +195,11 @@ async function main() {
   console.log('▶ Executing Suite 17: Bulk Employee Import, ID Management & Data Quality...');
   const importResults = await runEmployeeImportTests(BASE_URL, adminToken);
   allResults.push(...importResults);
+
+  // 18. Biometric Attendance, eSSL IoT & Cloud MySQL Sync Suite
+  console.log('▶ Executing Suite 18: Biometric Attendance, eSSL IoT & Cloud MySQL Sync...');
+  const bioResults = await runBiometricIntegrationTests(BASE_URL, adminToken);
+  allResults.push(...bioResults.map((r) => ({ ...r, suite: 'biometric-iot' })));
 
   // Print Summary Table
   console.log('\n================================================================');

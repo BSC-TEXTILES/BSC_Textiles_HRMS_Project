@@ -5,16 +5,19 @@ import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ModalProps {
-  open: boolean;
+  open?: boolean;
+  isOpen?: boolean;
   onClose: () => void;
   title?: string;
   children: ReactNode;
   className?: string;
 }
 
-export function Modal({ open, onClose, title, children, className }: ModalProps) {
+export function Modal({ open, isOpen, onClose, title, children, className }: ModalProps) {
+  const isVisible = open ?? isOpen ?? false;
+
   useEffect(() => {
-    if (!open) return;
+    if (!isVisible) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
@@ -24,9 +27,9 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
       document.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
     };
-  }, [open, onClose]);
+  }, [isVisible, onClose]);
 
-  if (!open) return null;
+  if (!isVisible) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
