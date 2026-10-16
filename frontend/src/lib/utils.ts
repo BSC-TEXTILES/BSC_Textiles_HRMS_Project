@@ -22,6 +22,26 @@ export function formatDate(date: Date | string): string {
   }).format(new Date(date));
 }
 
+/**
+ * Optional-value date formatting. Employee fields such as lastLoginAt,
+ * exitDate or lastWorkingDay are frequently null or hold an unparseable
+ * legacy value — Intl throws on an Invalid Date, so never format those
+ * directly. Falls back to a placeholder instead of crashing the table row.
+ */
+function isDateLike(date: Date | string | null | undefined): boolean {
+  if (date === null || date === undefined || date === '') return false;
+  const ms = new Date(date).getTime();
+  return !Number.isNaN(ms);
+}
+
+export function formatDateSafe(date: Date | string | null | undefined, fallback = '—'): string {
+  return isDateLike(date) ? formatDate(date as Date | string) : fallback;
+}
+
+export function formatDateTimeSafe(date: Date | string | null | undefined, fallback = '—'): string {
+  return isDateLike(date) ? formatDateTime(date as Date | string) : fallback;
+}
+
 export function formatTime(date: Date | string): string {
   return new Intl.DateTimeFormat('en-IN', {
     hour: '2-digit',

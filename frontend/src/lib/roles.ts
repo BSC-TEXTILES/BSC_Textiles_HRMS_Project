@@ -16,6 +16,44 @@ export const HR_ROLES = [
   'FLOOR_MANAGER',
 ] as const;
 
+/**
+ * Route-level role groups. `middleware.ts` (server) and the sidebar
+ * (client) both read these, so a menu entry is never shown for a route the
+ * middleware would bounce to /403. The backend re-checks every API call with
+ * `authenticate` + `authorize`, so this list is convenience, not a gate.
+ */
+export const WORKFORCE_ROUTE_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN',
+  'HR',
+  'HR_MANAGER',
+  'HR_EXECUTIVE',
+  'FLOOR_MANAGER',
+] as const;
+
+export const PAYROLL_ROUTE_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN',
+  'HR',
+  'HR_MANAGER',
+  'HR_EXECUTIVE',
+  'PAYROLL_MANAGER',
+] as const;
+
+export const OPERATIONS_ROUTE_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN',
+  'HR',
+  'HR_MANAGER',
+  'HR_EXECUTIVE',
+  'LOCATION_MANAGER',
+  'FLOOR_MANAGER',
+] as const;
+
+export function roleInGroup(role: string | undefined | null, group: readonly string[]): boolean {
+  return Boolean(role && group.includes(role));
+}
+
 /** Everything else is treated as self-service (employee) access. */
 export const EMPLOYEE_HOME = '/my-desk';
 
