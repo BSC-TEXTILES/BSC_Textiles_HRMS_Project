@@ -188,32 +188,46 @@ io.on('connection', (socket) => {
 import { shardManager } from './core/sharding/index.js';
 
 const PORT = Number(process.env.PORT) || 4000;
-httpServer.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 BSC Textiles HRMS Security-Hardened Server running on port ${PORT}`);
-  console.log(`📡 WebSocket server ready`);
-  shardManager.initialize().catch((err) => console.error('[ShardManager init warning]:', err.message));
-  setupViews().catch((err) => console.warn('[setupViews warning]:', err.message));
-  setupCustodyAssets().catch((err) => console.warn('[setupCustodyAssets warning]:', err.message));
-  setupKycSchema().catch((err) => console.warn('[setupKycSchema warning]:', err.message));
-  setupEmployeeDocuments().catch((err) => console.warn('[setupEmployeeDocuments warning]:', err.message));
-  setupFormerEmployees().catch((err) => console.warn('[setupFormerEmployees warning]:', err.message));
-  setupOrganizationHubs().catch((err) => console.warn('[setupOrganizationHubs warning]:', err.message));
-  ensureEmployeeImportSchema().catch((err) => console.warn('[setupEmployeeImportSchema warning]:', err.message));
-  setupPayrollSchema().catch((err) => console.warn('[setupPayrollSchema warning]:', err.message));
-  setupLateFines().catch((err) => console.warn('[setupLateFines warning]:', err.message));
-  setupRetailOperations().catch((err) => console.warn('[setupRetailOperations warning]:', err.message));
-  setupBreaks().catch((err) => console.warn('[setupBreaks warning]:', err.message));
-  UserUploadService.syncAllUserFolders().catch((err) => console.warn('[UserUploadService warning]:', err.message));
-});
 
-process.on('SIGINT', async () => {
-  await shardManager.shutdown();
-  await prisma.$disconnect();
-  process.exit(0);
-});
+if (!process.env.VERCEL) {
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 BSC Textiles HRMS Security-Hardened Server running on port ${PORT}`);
+    console.log(`📡 WebSocket server ready`);
+    shardManager.initialize().catch((err) => console.error('[ShardManager init warning]:', err.message));
+    setupViews().catch((err) => console.warn('[setupViews warning]:', err.message));
+    setupCustodyAssets().catch((err) => console.warn('[setupCustodyAssets warning]:', err.message));
+    setupKycSchema().catch((err) => console.warn('[setupKycSchema warning]:', err.message));
+    setupEmployeeDocuments().catch((err) => console.warn('[setupEmployeeDocuments warning]:', err.message));
+    setupFormerEmployees().catch((err) => console.warn('[setupFormerEmployees warning]:', err.message));
+    setupOrganizationHubs().catch((err) => console.warn('[setupOrganizationHubs warning]:', err.message));
+    ensureEmployeeImportSchema().catch((err) => console.warn('[setupEmployeeImportSchema warning]:', err.message));
+    setupPayrollSchema().catch((err) => console.warn('[setupPayrollSchema warning]:', err.message));
+    setupLateFines().catch((err) => console.warn('[setupLateFines warning]:', err.message));
+    setupRetailOperations().catch((err) => console.warn('[setupRetailOperations warning]:', err.message));
+    setupBreaks().catch((err) => console.warn('[setupBreaks warning]:', err.message));
+    UserUploadService.syncAllUserFolders().catch((err) => console.warn('[UserUploadService warning]:', err.message));
+  });
 
-process.on('SIGTERM', async () => {
-  await shardManager.shutdown();
-  await prisma.$disconnect();
-  process.exit(0);
-});
+  process.on('SIGINT', async () => {
+    await shardManager.shutdown();
+    await prisma.$disconnect?.();
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', async () => {
+    await shardManager.shutdown();
+    await prisma.$disconnect?.();
+    process.exit(0);
+  });
+}
+
+// Universal module export for Vercel Serverless / Express framework
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = Object.assign(app, {
+    default: app,
+    app,
+    httpServer,
+    prisma,
+    socketIO,
+  });
+}
