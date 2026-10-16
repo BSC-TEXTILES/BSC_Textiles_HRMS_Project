@@ -218,6 +218,33 @@ export function DashboardLayoutFullShell({
     return () => clearInterval(interval);
   }, []);
 
+  const rawRole = (session?.user as any)?.role || 'EMPLOYEE';
+
+  /**
+   * Sidebar visibility = route roles (mirrors `middleware.ts`) AND the
+   * effective RBAC module map from `GET /roles/rbac/modules`. Hiding an entry
+   * is only a convenience: the route rule in middleware plus `authorize()` on
+   * every backend request are the actual gates.
+   *
+   * These memos sit above the auth early-returns below: a hook after a `return`
+   * runs a different number of times per render, which breaks React's hook order.
+   */
+  const visibleNavigation = useMemo<NavSectionConfig[]>(
+    () =>
+      buildVisibleNavigation(rawRole, myAccess).map((section) => ({
+        ...section,
+        items: section.items.map((item) =>
+          item.href === '/attendance/missed-punching' && missedAttentionCount
+            ? { ...item, badge: String(missedAttentionCount) }
+            : item
+        ),
+      })),
+    [rawRole, myAccess, missedAttentionCount]
+  );
+
+  /** Single active entry for nested/dynamic routes (longest prefix wins). */
+  const activeHref = useMemo(() => computeActiveHref(pathname, visibleNavigation), [pathname, visibleNavigation]);
+
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#111317] flex items-center justify-center">
@@ -236,7 +263,6 @@ export function DashboardLayoutFullShell({
     }
   }
 
-  const rawRole = (session?.user as any)?.role || 'EMPLOYEE';
   const roleDisplayNames: Record<string, string> = {
     SUPER_ADMIN: 'Super Admin',
     ADMIN: 'Admin',
@@ -266,28 +292,6 @@ export function DashboardLayoutFullShell({
       window.location.href = '/login';
     }
   };
-
-  /**
-   * Sidebar visibility = route roles (mirrors `middleware.ts`) AND the
-   * effective RBAC module map from `GET /roles/rbac/modules`. Hiding an entry
-   * is only a convenience: the route rule in middleware plus `authorize()` on
-   * every backend request are the actual gates.
-   */
-  const visibleNavigation = useMemo<NavSectionConfig[]>(
-    () =>
-      buildVisibleNavigation(rawRole, myAccess).map((section) => ({
-        ...section,
-        items: section.items.map((item) =>
-          item.href === '/attendance/missed-punching' && missedAttentionCount
-            ? { ...item, badge: String(missedAttentionCount) }
-            : item
-        ),
-      })),
-    [rawRole, myAccess, missedAttentionCount]
-  );
-
-  /** Single active entry for nested/dynamic routes (longest prefix wins). */
-  const activeHref = useMemo(() => computeActiveHref(pathname, visibleNavigation), [pathname, visibleNavigation]);
 
   const handleNotificationClick = async (notification: any) => {
     if (!notification.isRead) {
