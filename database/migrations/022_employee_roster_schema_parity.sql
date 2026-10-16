@@ -23,73 +23,59 @@
 -- ===========================================================================
 
 -- ---------------------------------------------------------------------------
--- 1. In-database backups (plain tables, no FKs — safe restore targets).
+-- 1. In-database backups (CREATE TABLE AS SELECT: a plain data snapshot.
+--    CTAS is required rather than CREATE TABLE LIKE because `attendance` carries
+--    VIRTUAL GENERATED columns that reject explicit values.)
 --    Rollback for phases 2-6 is: TRUNCATE the live table + INSERT ... SELECT
---    from its `_bak_022_*` counterpart.
+--    (naming the real columns) from its `_bak_022_*` counterpart.
 -- ---------------------------------------------------------------------------
 DROP TABLE IF EXISTS `_bak_022_employee`;
-CREATE TABLE `_bak_022_employee` LIKE `employee`;
-INSERT INTO `_bak_022_employee` SELECT * FROM `employee`;
+CREATE TABLE `_bak_022_employee` AS SELECT * FROM `employee`;
 
 DROP TABLE IF EXISTS `_bak_022_employees`;
-CREATE TABLE `_bak_022_employees` LIKE `employees`;
-INSERT INTO `_bak_022_employees` SELECT * FROM `employees`;
+CREATE TABLE `_bak_022_employees` AS SELECT * FROM `employees`;
 
 DROP TABLE IF EXISTS `_bak_022_user`;
-CREATE TABLE `_bak_022_user` LIKE `user`;
-INSERT INTO `_bak_022_user` SELECT * FROM `user`;
+CREATE TABLE `_bak_022_user` AS SELECT * FROM `user`;
 
 DROP TABLE IF EXISTS `_bak_022_users`;
-CREATE TABLE `_bak_022_users` LIKE `users`;
-INSERT INTO `_bak_022_users` SELECT * FROM `users`;
+CREATE TABLE `_bak_022_users` AS SELECT * FROM `users`;
 
 DROP TABLE IF EXISTS `_bak_022_location`;
-CREATE TABLE `_bak_022_location` LIKE `location`;
-INSERT INTO `_bak_022_location` SELECT * FROM `location`;
+CREATE TABLE `_bak_022_location` AS SELECT * FROM `location`;
 
 DROP TABLE IF EXISTS `_bak_022_locations`;
-CREATE TABLE `_bak_022_locations` LIKE `locations`;
-INSERT INTO `_bak_022_locations` SELECT * FROM `locations`;
+CREATE TABLE `_bak_022_locations` AS SELECT * FROM `locations`;
 
 DROP TABLE IF EXISTS `_bak_022_attendance`;
-CREATE TABLE `_bak_022_attendance` LIKE `attendance`;
-INSERT INTO `_bak_022_attendance` SELECT * FROM `attendance`;
+CREATE TABLE `_bak_022_attendance` AS SELECT * FROM `attendance`;
 
 DROP TABLE IF EXISTS `_bak_022_payrollitem`;
-CREATE TABLE `_bak_022_payrollitem` LIKE `payrollitem`;
-INSERT INTO `_bak_022_payrollitem` SELECT * FROM `payrollitem`;
+CREATE TABLE `_bak_022_payrollitem` AS SELECT * FROM `payrollitem`;
 
 DROP TABLE IF EXISTS `_bak_022_payroll_items`;
-CREATE TABLE `_bak_022_payroll_items` LIKE `payroll_items`;
-INSERT INTO `_bak_022_payroll_items` SELECT * FROM `payroll_items`;
+CREATE TABLE `_bak_022_payroll_items` AS SELECT * FROM `payroll_items`;
 
 DROP TABLE IF EXISTS `_bak_022_payrollrun`;
-CREATE TABLE `_bak_022_payrollrun` LIKE `payrollrun`;
-INSERT INTO `_bak_022_payrollrun` SELECT * FROM `payrollrun`;
+CREATE TABLE `_bak_022_payrollrun` AS SELECT * FROM `payrollrun`;
 
 DROP TABLE IF EXISTS `_bak_022_payroll_runs`;
-CREATE TABLE `_bak_022_payroll_runs` LIKE `payroll_runs`;
-INSERT INTO `_bak_022_payroll_runs` SELECT * FROM `payroll_runs`;
+CREATE TABLE `_bak_022_payroll_runs` AS SELECT * FROM `payroll_runs`;
 
 DROP TABLE IF EXISTS `_bak_022_leaverequest`;
-CREATE TABLE `_bak_022_leaverequest` LIKE `leaverequest`;
-INSERT INTO `_bak_022_leaverequest` SELECT * FROM `leaverequest`;
+CREATE TABLE `_bak_022_leaverequest` AS SELECT * FROM `leaverequest`;
 
 DROP TABLE IF EXISTS `_bak_022_employee_exits`;
-CREATE TABLE `_bak_022_employee_exits` LIKE `employee_exits`;
-INSERT INTO `_bak_022_employee_exits` SELECT * FROM `employee_exits`;
+CREATE TABLE `_bak_022_employee_exits` AS SELECT * FROM `employee_exits`;
 
 DROP TABLE IF EXISTS `_bak_022_fnf_settlements`;
-CREATE TABLE `_bak_022_fnf_settlements` LIKE `fnf_settlements`;
-INSERT INTO `_bak_022_fnf_settlements` SELECT * FROM `fnf_settlements`;
+CREATE TABLE `_bak_022_fnf_settlements` AS SELECT * FROM `fnf_settlements`;
 
 DROP TABLE IF EXISTS `_bak_022_employee_documents`;
-CREATE TABLE `_bak_022_employee_documents` LIKE `employee_documents`;
-INSERT INTO `_bak_022_employee_documents` SELECT * FROM `employee_documents`;
+CREATE TABLE `_bak_022_employee_documents` AS SELECT * FROM `employee_documents`;
 
 DROP TABLE IF EXISTS `_bak_022_employee_id_sequence`;
-CREATE TABLE `_bak_022_employee_id_sequence` LIKE `employee_id_sequence`;
-INSERT INTO `_bak_022_employee_id_sequence` SELECT * FROM `employee_id_sequence`;
+CREATE TABLE `_bak_022_employee_id_sequence` AS SELECT * FROM `employee_id_sequence`;
 
 -- ---------------------------------------------------------------------------
 -- 2. Column parity. These are preservation/audit columns and carry NO foreign
