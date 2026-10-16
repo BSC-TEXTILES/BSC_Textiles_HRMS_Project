@@ -75,17 +75,31 @@ export function KycComplianceDrawer({
     });
   }, [employees, drawerLocId, drawerDeptId]);
 
-  // Transform into KYC records with masked values
+  // Transform into KYC records from the values actually stored on the employee
+  // master record. Nothing is synthesised: a missing document simply reads
+  // "Not captured" and lowers the compliance counters.
+  const maskNumber = (raw: any, keep = 4) => {
+    const digits = String(raw ?? '').replace(/\D/g, '');
+    if (!digits) return null;
+    return `XXXX-XXXX-${digits.slice(-keep)}`;
+  };
+  const maskAccount = (raw: any, bank?: string) => {
+    const value = String(raw ?? '').trim();
+    if (!value) return null;
+    return `${bank ? `${bank} ` : ''}••••${value.slice(-4)}`;
+  };
+
   const kycRecords = useMemo(() => {
     return scopedEmployees.map((emp) => {
-      // 100% Compliance canonical state
-      const aadhaarMasked = 'XXXX-XXXX-8821';
-      const panMasked = 'ABZPP4912K';
-      const pfStatus = 'PF Linked (UAN)';
-      const esiStatus = 'ESI Registered';
-      const bankMasked = 'SBI ••••4819';
-      const digiLocker = 'DigiLocker Verified';
-      const overallStatus = 'Verified'; // Badges: Verified, Pending, Missing, Failed
+      const aadhaarMasked = maskNumber(emp.aadhaarNumber || emp.aadhaarNo);
+      const panMasked = emp.panNumber ? String(emp.panNumber).toUpperCase() : null;
+      const pfStatus = emp.pfNo || emp.uanNo ? `PF/UAN ${emp.pfNo || emp.uanNo}` : 'Not captured';
+      const esiStatus = emp.esiNo ? `ESI ${emp.esiNo}` : 'Not captured';
+      const bankMasked = maskAccount(emp.bankAccount, emp.bankName);
+      const digiLocker = emp.digiLockerStatus || emp.aadhaarVerificationStatus || 'Not linked';
+      const overallStatus =
+        emp.aadhaarVerificationStatus || emp.documentStatus || (panMasked && bankMasked ? 'Verified' : 'Pending');
+      const isComplete = Boolean(aadhaarMasked && panMasked && bankMasked && emp.pfNo);
 
       return {
         ...emp,
@@ -96,21 +110,23 @@ export function KycComplianceDrawer({
         bankMasked,
         digiLocker,
         overallStatus,
-        isComplete: true,
+        isComplete,
       };
     });
   }, [scopedEmployees]);
 
   const totalCount = kycRecords.length;
   const completeCount = kycRecords.filter((k) => k.isComplete).length;
-  const pendingCount = 0;
-  const missingCount = 0;
+  const pendingCount = kycRecords.filter(
+    (k) => !k.isComplete && (k.aadhaarMasked || k.panMasked || k.bankMasked || k.pfStatus !== 'Not captured')
+  ).length;
+  const missingCount = totalCount - completeCount - pendingCount;
 
   const filteredList = useMemo(() => {
     return kycRecords.filter((emp) => {
       if (filterChip === 'COMPLETE' && !emp.isComplete) return false;
-      if (filterChip === 'PENDING') return false;
-      if (filterChip === 'MISSING') return false;
+      if (filterChip === 'PENDING' && !(!emp.isComplete && emp.overallStatus !== 'Not captured' && (emp.aadhaarMasked || emp.panMasked || emp.bankMasked))) return false;
+      if (filterChip === 'MISSING' && !(!emp.aadhaarMasked && !emp.panMasked && !emp.bankMasked)) return false;
 
       if (search.trim()) {
         const query = search.toLowerCase();
@@ -166,9 +182,11 @@ export function KycComplianceDrawer({
             Overall Compliance
           </span>
           <div className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300 mt-1">
-            100%
+            {totalCount === 0 ? '—' : `${Math.round((completeCount / totalCount) * 100)}%`}
           </div>
-          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">Audit Certified</span>
+          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">
+            {completeCount}/{totalCount} records fully captured
+          </span>
         </div>
 
         <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 flex flex-col justify-between">
@@ -188,7 +206,9 @@ export function KycComplianceDrawer({
           <div className="text-2xl font-extrabold text-slate-400 dark:text-slate-500 mt-1">
             {pendingCount}
           </div>
-          <span className="text-[10px] text-emerald-600 font-semibold mt-0.5">Zero Backlog</span>
+          <span className="text-[10px] text-emerald-600 font-semibold mt-0.5">
+            {pendingCount === 0 ? 'Nothing awaiting verification' : 'Partially captured'}
+          </span>
         </div>
 
         <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 flex flex-col justify-between">
@@ -307,7 +327,7 @@ export function KycComplianceDrawer({
                 : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
             }`}
           >
-            Complete (100%)
+            Complete ({completeCount})
           </button>
           <button
             type="button"
