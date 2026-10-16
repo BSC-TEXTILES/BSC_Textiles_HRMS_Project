@@ -49,6 +49,7 @@ const corsOriginHandler = (origin: string | undefined, callback: (err: Error | n
     origin.startsWith('http://localhost:') ||
     origin.startsWith('http://127.0.0.1:') ||
     origin.startsWith('http://192.168.') ||
+    origin.endsWith('.vercel.app') ||
     process.env.NODE_ENV !== 'production'
   ) {
     callback(null, true);
