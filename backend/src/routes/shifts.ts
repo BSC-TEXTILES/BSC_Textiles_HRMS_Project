@@ -17,8 +17,8 @@ const timeOfDay = z
 const shiftSchema = z.object({
   body: z.object({
     name: z.string().min(2).max(50),
-    code: z.string().min(2).max(20).toUpperCase(),
-    locationId: z.string().min(1),
+    code: z.string().min(2).max(50).toUpperCase().optional(),
+    locationId: z.string().optional(),
     departmentId: z.string().optional(),
     startTime: timeOfDay,
     endTime: timeOfDay,
@@ -43,7 +43,7 @@ const shiftSchema = z.object({
     faceVerificationThreshold: z.number().min(0).max(100).optional(),
     qrDailyTokenEnabled: z.boolean().optional(),
     qrOneTimeScan: z.boolean().optional(),
-    scannerRoles: z.array(z.string()).optional(),
+    scannerRoles: z.any().optional(),
   }),
 });
 
@@ -263,22 +263,52 @@ router.post('/', authorize('ADD'), validate(shiftSchema), async (req: AuthReques
   try {
     const { name, code, locationId, departmentId, startTime, endTime, ...rest } = req.body;
     
-    if (req.user!.role !== 'SUPER_ADMIN' && locationId !== req.user!.locationId) {
+    let resolvedLocId = locationId;
+    if (!resolvedLocId || resolvedLocId === 'all') {
+      resolvedLocId = req.user?.locationId || 'cmuzam5fe00014n4pq25hkcww';
+    } else {
+      const locMatch = await prisma.location.findFirst({
+        where: {
+          OR: [
+            { id: resolvedLocId },
+            { code: String(resolvedLocId).toUpperCase() },
+          ],
+        },
+        select: { id: true },
+      });
+      if (locMatch) resolvedLocId = locMatch.id;
+    }
+
+    if (req.user!.role !== 'SUPER_ADMIN' && resolvedLocId !== req.user!.locationId) {
       return res.status(403).json({ error: 'Access denied' });
     }
-    
+
+    const trimmedName = typeof name === 'string' ? name.trim() : '';
+    const allShifts = await prisma.shift.findMany({ select: { name: true } });
+    if (allShifts.some((s: any) => s.name.trim().toLowerCase() === trimmedName.toLowerCase())) {
+      return res.status(400).json({ error: 'This shift name already exists' });
+    }
+
+    const finalCode = (
+      code ||
+      'S_' +
+        trimmedName.replace(/[^A-Z0-9]/gi, '').slice(0, 8) +
+        '_' +
+        Date.now().toString(36).slice(-4)
+    ).toUpperCase();
+
     const existing = await prisma.shift.findUnique({
-      where: { locationId_code: { locationId, code } },
+      where: { locationId_code: { locationId: resolvedLocId, code: finalCode } },
     });
     if (existing) {
       return res.status(400).json({ error: 'Shift code already exists for this location' });
     }
-    
+
     const shift = await prisma.shift.create({
       data: {
-        name,
-        code,
-        locationId,
+        name: trimmedName,
+        code: finalCode,
+        locationId: resolvedLocId,
         departmentId,
         startTime: new Date(`2024-01-01T${startTime}:00`),
         endTime: new Date(`2024-01-01T${endTime}:00`),

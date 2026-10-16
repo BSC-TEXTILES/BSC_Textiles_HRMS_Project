@@ -1,10 +1,10 @@
 # BSC Textiles HRMS — Enterprise Security Test Report
 
-**Execution Date:** October 10, 2026  
+**Execution Date:** October 15, 2026  
 **Environment:** Development / Staging Target (`http://localhost:4000`)  
 **Test Suite Runner:** `tsx src/tests/runAllTests.ts`  
-**Total Tests Run:** 69  
-**Passed:** 69 (100.0%)  
+**Total Tests Run:** 165  
+**Passed:** 165 (100.0%)  
 **Failed:** 0 (0.0%)  
 **Status:** **PASSED — 100% COMPLIANT WITH PRD SECTION 60 & ENTERPRISE SECURITY SPECIFICATION**  
 
@@ -12,9 +12,9 @@
 
 ## 1. Executive Summary
 
-An end-to-end automated test run was executed covering all enterprise security controls alongside the complete suite of existing business modules (Attendance, Breaks, Daily QR Codes, Face Biometrics, Store Isolation, Incentives, Aadhaar KYC, Form T Payroll, Full & Final Settlement, and Native Mobile APIs).
+An end-to-end automated test run was executed covering all enterprise security controls alongside the complete suite of existing business modules (Attendance, Breaks, Daily QR Codes, Face Biometrics, Store Isolation, Incentives, Aadhaar KYC, Form T Payroll, Full & Final Settlement, Document Management, Shifts Board, My-Desk, HR Analytics, Bulk Employee Import, and Native Mobile APIs).
 
-Zero regressions occurred. All 69 automated test cases passed cleanly.
+Zero regressions occurred. All 165 automated test cases passed cleanly.
 
 ---
 
