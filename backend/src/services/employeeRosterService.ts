@@ -588,7 +588,7 @@ export async function getHrCorrectionQueue(scope: CallerScope): Promise<any> {
             a.\`legacyShiftId\`, a.\`legacySellingPointId\`, a.\`note\`
        FROM \`_review_pending_org_assignment\` a
        JOIN \`employee\` e ON e.\`id\` = a.\`employeeId\`
-      WHERE 1 = 1 ${scoped}
+      WHERE 1 = 1 ${scopedEmployee}
       ORDER BY e.\`employeeCode\``,
     params
   );

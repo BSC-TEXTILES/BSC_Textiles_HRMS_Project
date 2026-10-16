@@ -13,7 +13,16 @@ interface ActiveOnFloorDrawerProps {
   locations: any[];
   departments: any[];
   /** Today's attendance rows keyed by employee id (GET /attendance/today). */
-  liveAttendance?: Record<string, { actualLogin?: string | null; actualLogout?: string | null; status?: string }>;
+  liveAttendance?: Record<
+    string,
+    {
+      actualLogin?: string | null;
+      actualLogout?: string | null;
+      status?: string;
+      /** Seconds the IN punch was after shift start; absent when the feed omits it. */
+      lateLoginSeconds?: number | null;
+    }
+  >;
   currentLocationId: string;
   currentDeptId: string;
   onApplyDirectoryFilter?: (filters: { locationId?: string; departmentId?: string; status?: string }) => void;
