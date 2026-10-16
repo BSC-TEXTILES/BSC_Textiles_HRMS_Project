@@ -275,7 +275,7 @@ export default function FloorOverviewPage() {
 
   // Download PDF
   const handleDownloadPdf = (payrollItemId: string, empName: string) => {
-    const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/payroll/payslip/${payrollItemId}/pdf`;
+    const url = `${process.env.NEXT_PUBLIC_API_URL || '/api'}/payroll/payslip/${payrollItemId}/pdf`;
     window.open(url, '_blank');
     toast.success(`Opening print-ready PDF for ${empName}`);
   };

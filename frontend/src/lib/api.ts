@@ -2,7 +2,13 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { getSession, signOut } from 'next-auth/react';
 
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api',
+  baseURL:
+    process.env.NEXT_PUBLIC_API_URL ||
+    (typeof window !== 'undefined'
+      ? '/api'
+      : process.env.BACKEND_URL
+      ? `${process.env.BACKEND_URL.replace(/\/+$/, '')}/api`
+      : 'http://localhost:4000/api'),
   withCredentials: true,
   timeout: 15000,
   headers: {
