@@ -366,7 +366,7 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res) => {
   }
 });
 
-router.post('/', authorize('ADD'), validate(employeeSchema), async (req: AuthRequest, res) => {
+router.post('/', authorize('ADD'), validate(employeeCreateSchema), async (req: AuthRequest, res) => {
   try {
     const { employeeCode, firstName, lastName, email, phone, gender, locationId, floorId, departmentId, sectionId, shiftId, designation, role, joiningDate } = req.body;
     
@@ -528,14 +528,14 @@ router.post('/', authorize('ADD'), validate(employeeSchema), async (req: AuthReq
     }
 
     await AuditService.log({
-      userId: req.user!.userId,
+      userId: req.user?.id,
       locationId: resolvedLocationId,
       action: 'CREATE',
       entityType: 'employee',
       entityId: employee.id,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
-      newValue: {
+      after: {
         employeeCode: finalCode,
         fullName,
         locationId: resolvedLocationId,
@@ -566,30 +566,80 @@ router.post('/', authorize('ADD'), validate(employeeSchema), async (req: AuthReq
   }
 });
 
-router.put('/:id', authorize('EDIT'), validate(employeeSchema), async (req: AuthRequest, res) => {
+router.put('/:id', authorize('EDIT'), validate(employeeUpdateSchema), async (req: AuthRequest, res) => {
   try {
-    const { firstName, lastName, email, phone, gender, floorId, departmentId, sectionId, shiftId, designation, role, status, exitDate } = req.body;
-    
+    const { firstName, lastName, email, phone, gender, floorId, departmentId, sectionId, shiftId, designation, role, expectedUpdatedAt } = req.body;
+
     const existing = await prisma.employee.findUnique({ where: { id: req.params.id } });
     if (!existing) {
       return res.status(404).json({ error: 'Employee not found' });
     }
-    
+
     const isEditElevated = ['SUPER_ADMIN', 'ADMIN'].includes(req.user!.role);
     if (!isEditElevated && existing.locationId !== req.user!.locationId) {
       return res.status(403).json({ error: 'Access denied' });
     }
-    
+
+    // Optimistic concurrency — never silently overwrite another user's write.
+    if (expectedUpdatedAt) {
+      const clientTs = new Date(expectedUpdatedAt).getTime();
+      const currentTs = new Date(existing.updatedAt).getTime();
+      if (!Number.isNaN(clientTs) && clientTs !== currentTs) {
+        return res.status(409).json({
+          error: 'This employee was modified by someone else after you opened it. Reload the record and re-apply your changes.',
+          currentUpdatedAt: existing.updatedAt,
+        });
+      }
+    }
+
+    // Role assignment is HR-controlled: ordinary employees/managers may not
+    // promote themselves or their peers.
+    const ROLE_EDIT_ROLES = ['SUPER_ADMIN', 'ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE'];
+    if (role && role !== existing.role && !ROLE_EDIT_ROLES.includes(req.user!.role)) {
+      return res.status(403).json({ error: 'Only HR/admin roles may change an employee role assignment.' });
+    }
+
+    const trimmedEmail = email ? String(email).trim().toLowerCase() || null : null;
+    if (trimmedEmail && trimmedEmail !== existing.email) {
+      const [dupeEmp, dupeUser] = await Promise.all([
+        prisma.employee.findFirst({ where: { email: trimmedEmail, NOT: { id: existing.id } } }),
+        prisma.user.findFirst({ where: { email: trimmedEmail } }),
+      ]);
+      if (dupeEmp || dupeUser) {
+        return res.status(409).json({ error: 'This email is already registered', field: 'email' });
+      }
+    }
+
+    const digits = phone ? String(phone).replace(/\D/g, '') : '';
+    const normalizedPhone = digits.length === 10 ? digits : phone ? String(phone).trim() : existing.phone;
+
     const fullName = `${firstName} ${lastName}`;
-    
+
+    // Field-level diff for the audit trail (sensitive changes are recorded).
+    const changes: Record<string, { from: any; to: any }> = {};
+    const track = (key: string, from: any, to: any) => {
+      if ((from ?? null) !== (to ?? null)) changes[key] = { from, to };
+    };
+    track('firstName', existing.firstName, firstName);
+    track('lastName', existing.lastName, lastName);
+    track('email', existing.email, trimmedEmail);
+    track('phone', existing.phone, normalizedPhone);
+    track('gender', existing.gender, gender);
+    track('floorId', existing.floorId, floorId ?? null);
+    track('departmentId', existing.departmentId, departmentId ?? null);
+    track('sectionId', existing.sectionId, sectionId ?? null);
+    track('shiftId', existing.shiftId, shiftId ?? null);
+    track('designation', existing.designation, designation);
+    track('role', existing.role, role);
+
     const employee = await prisma.employee.update({
       where: { id: req.params.id },
       data: {
         firstName,
         lastName,
         fullName,
-        email,
-        phone,
+        email: trimmedEmail,
+        phone: normalizedPhone,
         gender,
         floorId,
         departmentId,
@@ -597,39 +647,39 @@ router.put('/:id', authorize('EDIT'), validate(employeeSchema), async (req: Auth
         shiftId,
         designation,
         role,
-        status,
-        exitDate: exitDate ? new Date(exitDate) : null,
       },
     });
 
-    // Publish notification for employee profile update
-    const changes: string[] = [];
-    if (existing.firstName !== firstName || existing.lastName !== lastName) changes.push('name');
-    if (existing.email !== email) changes.push('email');
-    if (existing.phone !== phone) changes.push('phone');
-    if (existing.floorId !== floorId) changes.push('floor');
-    if (existing.departmentId !== departmentId) changes.push('department');
-    if (existing.sectionId !== sectionId) changes.push('section');
-    if (existing.shiftId !== shiftId) changes.push('shift');
-    if (existing.designation !== designation) changes.push('designation');
-    if (existing.role !== role) changes.push('role');
-    if (existing.status !== status) changes.push('status');
+    if (Object.keys(changes).length > 0) {
+      await AuditService.log({
+        userId: req.user?.id,
+        locationId: existing.locationId,
+        action: 'UPDATE',
+        entityType: 'employee',
+        entityId: existing.id,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+        before: Object.fromEntries(Object.entries(changes).map(([k, v]) => [k, v.from])),
+        after: Object.fromEntries(Object.entries(changes).map(([k, v]) => [k, v.to])),
+      });
+    }
 
-    if (changes.length > 0) {
+    const changedKeys = Object.keys(changes);
+
+    // Publish notification for employee profile update
+    if (changedKeys.length > 0) {
       await container.notificationService.publishEvent({
-        eventId: changes.includes('status') ? 'EMP.STATUS_CHANGED' : 
-               changes.some(c => ['department', 'floor', 'section'].includes(c)) ? 'EMP.DEPT_CHANGED' : 'EMP.PROFILE_UPDATED',
-        title: changes.includes('status') ? 'Employee Status Changed' : 
-               changes.some(c => ['department', 'floor', 'section'].includes(c)) ? 'Employee Department/Location Changed' : 'Employee Profile Updated',
-        message: `Employee ${fullName} (${existing.employeeCode}) profile updated. Changed fields: ${changes.join(', ')}.`,
-        type: changes.includes('status') ? 'CRITICAL' : 'INFO',
-        severity: changes.includes('status') ? 'CRITICAL' : 'MEDIUM',
+        eventId: changedKeys.some(c => ['department', 'floorId', 'sectionId'].includes(c)) ? 'EMP.DEPT_CHANGED' : 'EMP.PROFILE_UPDATED',
+        title: changedKeys.some(c => ['department', 'floorId', 'sectionId'].includes(c)) ? 'Employee Department/Location Changed' : 'Employee Profile Updated',
+        message: `Employee ${fullName} (${existing.employeeCode}) profile updated. Changed fields: ${changedKeys.join(', ')}.`,
+        type: 'INFO',
+        severity: 'MEDIUM',
         entityType: 'employee',
         entityId: employee.id,
         locationId: existing.locationId,
         actionUrl: `/employees/profile/${employee.id}`,
         correlationId: `emp_updated_${employee.id}_${Date.now()}`,
-        metadata: { changes, previousValues: { floorId: existing.floorId, departmentId: existing.departmentId, status: existing.status } },
+        metadata: { changes: changedKeys, previousValues: { floorId: existing.floorId, departmentId: existing.departmentId, status: existing.status } },
       });
     }
 

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSession, signOut } from 'next-auth/react';
@@ -10,40 +10,14 @@ import api from '@/lib/api';
 import { useNotifications } from '@/context/NotificationContext';
 import { GlobalHeaderSearch } from '@/components/layout/GlobalHeaderSearch';
 import { useDashboardShellContext } from '@/context/DashboardShellContext';
-import { 
-  LayoutDashboard,
-  Cpu,
-  UserCheck,
-  Users,
-  Contact,
-  UserMinus,
-  Building2,
+import {
+  Bell,
+  User,
   ShieldCheck,
-  Fingerprint,
-  FolderLock,
-  Calendar,
-  Coffee,
-  FileEdit,
-  ClipboardCheck,
-  Calculator,
-  Banknote,
-  Receipt,
-  Wallet,
-  BarChart3,
-  CalendarClock,
-  Coins,
-  ScanFace,
-  Store,
-  Eye,
-  FileText,
-  ShieldAlert,
-  Settings,
-  Bell, 
-  User, 
-  CheckCheck, 
-  ExternalLink, 
-  LogOut, 
-  Clock, 
+  CheckCheck,
+  ExternalLink,
+  LogOut,
+  Clock,
   ChevronDown,
   Menu,
   X,
@@ -52,33 +26,13 @@ import {
   AlertTriangle,
   Info,
   XCircle,
-  QrCode,
-  Database,
-  HardDrive,
-  Network,
-  ClipboardList,
 } from 'lucide-react';
-
-interface NavItem {
-  title: string;
-  href: string;
-  icon: any;
-  badge?: string;
-}
-
-interface NavSectionTheme {
-  color: string;
-  dotColor: string;
-  activeGradient: string;
-  hoverColor: string;
-  iconColor: string;
-}
-
-interface NavSectionConfig {
-  title: string;
-  theme: NavSectionTheme;
-  items: NavItem[];
-}
+import {
+  buildVisibleNavigation,
+  computeActiveHref,
+  type NavSectionConfig,
+} from './navigation';
+import { useMyAccess } from '@/lib/rbac';
 
 function getBadgeClasses(badgeText: string, isActive: boolean) {
   if (isActive) return 'bg-white/20 text-white font-bold';
@@ -95,187 +49,14 @@ function getBadgeClasses(badgeText: string, isActive: boolean) {
       return 'bg-purple-500/20 text-purple-300 border border-purple-400/40';
     case 'Scanner':
       return 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40';
-    case 'Daily':
-      return 'bg-blue-500/20 text-blue-300 border border-blue-400/40';
-    case 'Policy':
-      return 'bg-rose-500/20 text-rose-300 border border-rose-400/40';
     case 'Analytics':
       return 'bg-sky-500/20 text-sky-300 border border-sky-400/40 font-bold';
+    case 'Attention':
+      return 'bg-amber-500/25 text-amber-200 border border-amber-400/40 font-bold';
     default:
       return 'bg-white/10 text-blue-100 border border-white/15';
   }
 }
-
-const ClockAlertIndicator = ({ className, ...props }: { className?: string; [key: string]: any }) => (
-  <span className="relative inline-flex items-center justify-center">
-    <Clock className={className || 'w-4 h-4'} {...props} />
-    <span className="absolute -top-1 -right-1 flex h-2 w-2">
-      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-    </span>
-  </span>
-);
-
-const enterpriseNavigation: NavSectionConfig[] = [
-  {
-    title: 'Core Operations',
-    theme: {
-      color: 'text-sky-200',
-      dotColor: 'bg-sky-400',
-      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-sky-300',
-      hoverColor: 'hover:text-white hover:bg-white/10',
-      iconColor: 'text-sky-300 group-hover:text-white',
-    },
-    items: [
-      { title: 'Executive Dashboard', href: '/dashboard', icon: LayoutDashboard },
-      { title: 'My Desk Self-Service', href: '/my-desk', icon: UserCheck },
-    ],
-  },
-  {
-    title: 'Workforce Directory',
-    theme: {
-      color: 'text-emerald-200',
-      dotColor: 'bg-emerald-400',
-      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-emerald-300',
-      hoverColor: 'hover:text-white hover:bg-white/10',
-      iconColor: 'text-emerald-300 group-hover:text-white',
-    },
-    items: [
-      { title: 'All Employees', href: '/employees', icon: Users },
-      { title: 'Profile 360 & Dossier', href: '/employees/profile', icon: Contact },
-      { title: 'Analysis', href: '/employees/analysis', icon: BarChart3, badge: 'Analytics' },
-      { title: 'Employee Documents', href: '/employees/documents', icon: FolderLock, badge: 'Dossier' },
-      { title: 'Departments & Units', href: '/organization/departments', icon: Building2 },
-      { title: 'Former Staff & F&F', href: '/employees/former', icon: UserMinus, badge: 'Settlement' },
-    ],
-  },
-  {
-    title: 'Organization Management',
-    theme: {
-      color: 'text-amber-200',
-      dotColor: 'bg-amber-400',
-      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-amber-300',
-      hoverColor: 'hover:text-white hover:bg-white/10',
-      iconColor: 'text-amber-300 group-hover:text-white',
-    },
-    items: [
-      { title: 'Hierarchy Dashboard', href: '/organization/departments', icon: Network },
-      { title: 'Approval Queue', href: '/organization/approvals', icon: ClipboardList, badge: 'Workflow' },
-    ],
-  },
-  {
-    title: 'KYC & DigiLocker',
-    theme: {
-      color: 'text-purple-200',
-      dotColor: 'bg-purple-400',
-      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-purple-300',
-      hoverColor: 'hover:text-white hover:bg-white/10',
-      iconColor: 'text-purple-300 group-hover:text-white',
-    },
-    items: [
-      { title: 'KYC Verification', href: '/operations/kyc', icon: ShieldCheck, badge: 'DigiLocker' },
-      { title: 'Digital Document Verification', href: '/employees/profile?tab=documents', icon: FileText, badge: 'UIDAI' },
-    ],
-  },
-  {
-    title: 'QR Code Attendance',
-    theme: {
-      color: 'text-cyan-200',
-      dotColor: 'bg-cyan-400',
-      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-cyan-300',
-      hoverColor: 'hover:text-white hover:bg-white/10',
-      iconColor: 'text-cyan-300 group-hover:text-white',
-    },
-    items: [
-      { title: 'Digital QR Passes', href: '/attendance/qr-codes', icon: QrCode, badge: 'Live ID' },
-      { title: 'Contactless QR Scanner', href: '/operations/qr-scanner', icon: ScanFace, badge: 'Scanner' },
-    ],
-  },
-  {
-    title: 'Biometric Integration & IoT',
-    theme: {
-      color: 'text-violet-200',
-      dotColor: 'bg-violet-400',
-      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-violet-300',
-      hoverColor: 'hover:text-white hover:bg-white/10',
-      iconColor: 'text-violet-300 group-hover:text-white',
-    },
-    items: [
-      { title: 'Biometric Device Manager', href: '/attendance/devices', icon: Cpu, badge: 'eSSL IoT' },
-      { title: 'Biometric Punches Ledger', href: '/attendance/punches', icon: Fingerprint },
-      { title: 'Biometric Mappings', href: '/attendance/devices?tab=mappings', icon: UserCheck },
-    ],
-  },
-  {
-    title: 'Time & Attendance',
-    theme: {
-      color: 'text-amber-200',
-      dotColor: 'bg-amber-400',
-      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-amber-300',
-      hoverColor: 'hover:text-white hover:bg-white/10',
-      iconColor: 'text-amber-300 group-hover:text-white',
-    },
-    items: [
-      { title: 'Attendance Register', href: '/attendance/register', icon: ClipboardCheck },
-      { title: 'Missed Punching & Hours', href: '/attendance/missed-punching', icon: ClockAlertIndicator, badge: 'Attention' },
-      { title: 'Floor Shifts & Rosters', href: '/attendance/shifts', icon: Calendar },
-      { title: 'Late & Fine Management', href: '/attendance/late-fines', icon: AlertTriangle, badge: 'Policy' },
-      { title: 'Lunch & Break Tracker', href: '/attendance/breaks', icon: Coffee },
-      { title: 'Punch Corrections', href: '/attendance/corrections', icon: FileEdit },
-      { title: 'Attendance Calculation', href: '/attendance/calculation', icon: Calculator },
-    ],
-  },
-  {
-    title: 'Payroll Management',
-    theme: {
-      color: 'text-rose-200',
-      dotColor: 'bg-rose-400',
-      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-rose-300',
-      hoverColor: 'hover:text-white hover:bg-white/10',
-      iconColor: 'text-rose-300 group-hover:text-white',
-    },
-    items: [
-      { title: 'Payroll Dashboard', href: '/payroll', icon: Banknote },
-      { title: 'Employee Payslips', href: '/payroll/payslips', icon: Receipt },
-      { title: 'Salary Structure', href: '/payroll/salary-structure', icon: Wallet },
-      { title: 'Payroll Reports', href: '/payroll/reports', icon: BarChart3 },
-    ],
-  },
-  {
-    title: 'Leave & Incentives',
-    theme: {
-      color: 'text-fuchsia-200',
-      dotColor: 'bg-fuchsia-400',
-      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-fuchsia-300',
-      hoverColor: 'hover:text-white hover:bg-white/10',
-      iconColor: 'text-fuchsia-300 group-hover:text-white',
-    },
-    items: [
-      { title: 'Leave Approvals', href: '/leaves', icon: CalendarClock },
-      { title: 'Incentive Calculation', href: '/incentives/calculation', icon: Coins },
-    ],
-  },
-  {
-    title: 'Operations & Audits',
-    theme: {
-      color: 'text-indigo-200',
-      dotColor: 'bg-indigo-400',
-      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-indigo-300',
-      hoverColor: 'hover:text-white hover:bg-white/10',
-      iconColor: 'text-indigo-300 group-hover:text-white',
-    },
-    items: [
-      { title: 'Face Verification', href: '/operations/face-verification', icon: ScanFace },
-      { title: 'Selling Points & Audits', href: '/operations/selling-points', icon: Store },
-      { title: 'Observation Module', href: '/operations/observations', icon: Eye },
-      { title: 'Governance Reports', href: '/reports', icon: FileText },
-      { title: 'Database & Shards', href: '/admin/shards', icon: Database, badge: 'MySQL' },
-      { title: 'Local DB & Backups', href: '/admin/local-database', icon: HardDrive },
-      { title: 'Audit Logs & Security', href: '/admin/audit-logs', icon: ShieldAlert },
-      { title: 'System Settings', href: '/admin/settings', icon: Settings },
-    ],
-  },
-];
 
 function getSeverityIcon(type: string) {
   switch (type) {
@@ -302,37 +83,8 @@ function formatTimeAgo(dateString: string): string {
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' });
 }
 
-export function isNavItemActive(pathname: string, itemHref: string): boolean {
-  const itemPath = itemHref.split('?')[0];
-  if (pathname === itemHref || pathname === itemPath) return true;
-
-  if (itemPath === '/dashboard') return pathname === '/dashboard';
-  
-  if (itemPath === '/employees') {
-    return (
-      pathname === '/employees' ||
-      (pathname.startsWith('/employees/') &&
-        !pathname.startsWith('/employees/documents') &&
-        !pathname.startsWith('/employees/profile') &&
-        !pathname.startsWith('/employees/analysis') &&
-        !pathname.startsWith('/employees/former'))
-    );
-  }
-
-  if (itemPath === '/payroll') {
-    return pathname === '/payroll';
-  }
-
-  if (itemPath === '/attendance') {
-    return pathname === '/attendance';
-  }
-
-  if (itemPath === '/organization') {
-    return pathname === '/organization';
-  }
-
-  return pathname.startsWith(itemPath + '/');
-}
+/** Re-exported so older imports keep working; the sidebar uses computeActiveHref. */
+export { isNavItemActive } from './navigation';
 
 export function DashboardLayoutFullShell({
   children,
@@ -359,6 +111,30 @@ export function DashboardLayoutFullShell({
   } = useNotifications();
 
   const [missedAttentionCount, setMissedAttentionCount] = useState<number | null>(null);
+
+  /** Real module access of the logged-in user (drives sidebar visibility). */
+  const myAccess = useMyAccess();
+
+  /** Hub picker options come from the API — never from a hardcoded list. */
+  const [hubLocations, setHubLocations] = useState<Array<{ id: string; code: string; name: string; city?: string }>>([]);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get('/locations/all')
+      .then((res) => {
+        if (!active) return;
+        const list = Array.isArray(res.data) ? res.data : res.data?.locations || [];
+        setHubLocations(list);
+      })
+      .catch(() => {
+        // Location reference data is optional for the shell; the picker simply
+        // shows "All hubs" until /locations responds.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -491,45 +267,27 @@ export function DashboardLayoutFullShell({
     }
   };
 
-  const visibleNavigation = enterpriseNavigation
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => {
-        if (item.href === '/operations/kyc') {
-          return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'LOCATION_MANAGER'].includes(rawRole);
-        }
-        if (item.href.includes('tab=documents')) {
-          return true;
-        }
-        if (item.href.startsWith('/admin')) {
-          return rawRole === 'SUPER_ADMIN' || rawRole === 'ADMIN';
-        }
-        if (item.href.startsWith('/operations')) {
-          if (item.href === '/operations/qr-scanner') return true;
-          return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole);
-        }
-        if (item.href === '/payroll/payslips') {
-          return true;
-        }
-        if (item.href.startsWith('/payroll') || item.href.startsWith('/incentives')) {
-          return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'PAYROLL_MANAGER'].includes(rawRole);
-        }
-        if (item.href.startsWith('/organization')) {
-          return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole);
-        }
-        if (item.href.startsWith('/reports')) {
-          return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole);
-        }
-        if (item.href === '/attendance/calculation' || item.href === '/attendance/corrections' || item.href === '/attendance/missed-punching' || item.href === '/attendance/devices') {
-          return ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole);
-        }
-        if (item.href === '/employees' && !['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'].includes(rawRole)) {
-          return false;
-        }
-        return true;
-      }),
-    }))
-    .filter((section) => section.items.length > 0);
+  /**
+   * Sidebar visibility = route roles (mirrors `middleware.ts`) AND the
+   * effective RBAC module map from `GET /roles/rbac/modules`. Hiding an entry
+   * is only a convenience: the route rule in middleware plus `authorize()` on
+   * every backend request are the actual gates.
+   */
+  const visibleNavigation = useMemo<NavSectionConfig[]>(
+    () =>
+      buildVisibleNavigation(rawRole, myAccess).map((section) => ({
+        ...section,
+        items: section.items.map((item) =>
+          item.href === '/attendance/missed-punching' && missedAttentionCount
+            ? { ...item, badge: String(missedAttentionCount) }
+            : item
+        ),
+      })),
+    [rawRole, myAccess, missedAttentionCount]
+  );
+
+  /** Single active entry for nested/dynamic routes (longest prefix wins). */
+  const activeHref = useMemo(() => computeActiveHref(pathname, visibleNavigation), [pathname, visibleNavigation]);
 
   const handleNotificationClick = async (notification: any) => {
     if (!notification.isRead) {
@@ -598,7 +356,7 @@ export function DashboardLayoutFullShell({
                   )}
                   <div className="space-y-0.5">
                     {section.items.map((item) => {
-                      const isActive = isNavItemActive(pathname, item.href);
+                      const isActive = activeHref === item.href;
                       const IconComponent = item.icon;
                       return (
                         <Link
@@ -702,7 +460,7 @@ export function DashboardLayoutFullShell({
                       {sec.title}
                     </div>
                     {sec.items.map((i) => {
-                      const isItemActive = isNavItemActive(pathname, i.href);
+                      const isItemActive = activeHref === i.href;
                       const IconComp = i.icon;
                       return (
                         <Link
@@ -775,10 +533,12 @@ export function DashboardLayoutFullShell({
               onChange={(e) => setSelectedHub(e.target.value)}
               className="bg-transparent font-semibold text-xs text-white focus:outline-none cursor-pointer pr-1"
             >
-              <option value="all" className="bg-[#0e3882] text-white">All Hubs (Karnataka)</option>
-              <option value="bel" className="bg-[#0e3882] text-white">Belagavi Flagship (BEL-01)</option>
-              <option value="dav" className="bg-[#0e3882] text-white">Davanagere Hub (DAV-02)</option>
-              <option value="shi" className="bg-[#0e3882] text-white">Shivamogga Hub (SHI-03)</option>
+              <option value="all">All Hubs ({hubLocations.length} locations)</option>
+              {hubLocations.map((hub) => (
+                <option key={hub.id} value={hub.id} className="bg-[#0e3882] text-white">
+                  {hub.name} ({hub.code})
+                </option>
+              ))}
             </select>
           </div>
 
