@@ -7,16 +7,16 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
   // Prevent MIME type sniffing
   res.setHeader('X-Content-Type-Options', 'nosniff');
 
-  // Clickjacking defense
-  res.setHeader('X-Frame-Options', 'DENY');
+  // Clickjacking defense - Allow sameorigin for IDE and browser preview
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
 
   // Referrer Policy
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-  // Permissions Policy
+  // Permissions Policy - Allow camera for photo capture and geolocation for showroom check-in
   res.setHeader(
     'Permissions-Policy',
-    'geolocation=(self), camera=(), microphone=(), payment=(), usb=()'
+    'geolocation=(self), camera=(self), microphone=(self), payment=(), usb=()'
   );
 
   // Content Security Policy
@@ -24,10 +24,10 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
     "default-src 'self'",
     "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Needed for Next.js in dev
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
-    "font-src 'self' data: https:",
+    "img-src 'self' data: blob: https: http:",
+    "font-src 'self' data: https: http:",
     "connect-src 'self' ws: wss: http: https:",
-    "frame-ancestors 'none'",
+    "frame-ancestors 'self' http://localhost:* http://127.0.0.1:*",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

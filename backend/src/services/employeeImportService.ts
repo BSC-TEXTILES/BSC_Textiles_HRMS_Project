@@ -21,6 +21,8 @@
 import crypto from 'node:crypto';
 import ExcelJS from 'exceljs';
 import { prisma, pool } from '../db.js';
+import { shardManager } from '../core/sharding/ShardConnectionManager.js';
+import { DatabaseBackupService } from './databaseBackupService.js';
 import {
   parseCsv,
   toCsv,
@@ -37,7 +39,7 @@ import {
   EmployeeIdPolicy,
 } from './employeeIdService.js';
 
-export type ImportMode = 'new' | 'update' | 'upsert';
+export type ImportMode = 'new' | 'update' | 'upsert' | 'replace_roster';
 export type RowAction = 'CREATE' | 'UPDATE' | 'SKIP' | 'ERROR';
 
 export interface ImportColumn {
@@ -215,6 +217,16 @@ export interface ImportSummary {
   needsAttention: number;
   cannotImport: number;
   skipped: number;
+  absentActiveCount?: number;
+}
+
+export interface AbsentActiveEmployee {
+  id: string;
+  employeeCode: string;
+  fullName: string;
+  locationCode: string;
+  designation: string;
+  action: 'DEACTIVATE_ON_REPLACE';
 }
 
 export interface PreviewResult {
@@ -230,6 +242,7 @@ export interface PreviewResult {
   rows: PreviewRow[];
   summary: ImportSummary;
   duplicateFileWarning: string | null;
+  absentActiveEmployees?: AbsentActiveEmployee[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1498,10 +1511,37 @@ export async function validateAndPreview(csvText: string, options: PreviewOption
   const summary = summarise(rows);
   const duplicateFileWarning = await findRecentDuplicate(fileHash, mode);
 
+  let absentActiveEmployees: AbsentActiveEmployee[] | undefined;
+  if (mode === 'replace_roster') {
+    const matchedEmployeeIds = new Set<string>();
+    for (const r of rows) {
+      if (r.matchedEmployeeId) {
+        matchedEmployeeIds.add(r.matchedEmployeeId.toLowerCase());
+      }
+    }
+    const [activeDbEmployees]: any = await pool.query(`
+      SELECT e.id, e.employeeCode, e.fullName, l.code as locationCode, e.designation
+      FROM employee e
+      JOIN location l ON e.locationId = l.id
+      WHERE e.status = 'ACTIVE'
+    `);
+    absentActiveEmployees = (activeDbEmployees || [])
+      .filter((emp) => !matchedEmployeeIds.has(String(emp.employeeCode || '').toLowerCase()))
+      .map((emp) => ({
+        id: emp.id,
+        employeeCode: emp.employeeCode,
+        fullName: emp.fullName,
+        locationCode: emp.locationCode,
+        designation: emp.designation,
+        action: 'DEACTIVATE_ON_REPLACE' as const,
+      }));
+    summary.absentActiveCount = (absentActiveEmployees || []).length;
+  }
+
   return {
     batchRef, fileName, fileHash, mode, policy,
     columns: IMPORT_COLUMNS, unknownColumns, missingRequiredColumns, fileErrors,
-    rows, summary, duplicateFileWarning,
+    rows, summary, duplicateFileWarning, absentActiveEmployees,
   };
 }
 
@@ -1678,7 +1718,7 @@ function buildUpdateChanges(row: PreviewRow, payload: any, actor: ImportActor): 
 
 async function loadUserEmails(): Promise<Set<string>> {
   try {
-    const rows: any[] = await prisma.$queryRaw(`SELECT email FROM user`);
+    const rows: any[] = await prisma.$queryRaw(`SELECT email FROM user WHERE employeeId IS NOT NULL AND employeeId != ''`);
     return new Set((rows || []).map((r) => normalizeEmail(r.email)).filter(Boolean));
   } catch {
     return new Set();
@@ -1703,6 +1743,8 @@ export interface ExecuteResult {
   idFormatUsed: string;
   failureDetails: string | null;
   durationMs: number;
+  deactivatedAbsent?: number;
+  deactivatedEmployees?: Array<{ employeeId: string; name: string }>;
 }
 
 const MAX_IMPORT_ROWS = 5000;
@@ -1736,12 +1778,53 @@ export async function executeImport(preview: PreviewResult, actor: ImportActor):
     idFormatUsed: preview.policy.sampleFormat,
     failureDetails: null,
     durationMs: 0,
+    deactivatedAbsent: 0,
+    deactivatedEmployees: [],
   };
 
   const folderJobs: Array<() => Promise<void>> = [];
+  const shardSyncTasks: Array<() => Promise<void>> = [];
 
   try {
     await prisma.$transaction(async (tx: any) => {
+      // 1. If replace_roster mode, safely deactivate absent active employees without touching login accounts
+      if (preview.mode === 'replace_roster' && preview.absentActiveEmployees && preview.absentActiveEmployees.length > 0) {
+        for (const absent of preview.absentActiveEmployees) {
+          // Decouple user login so login account, credentials, and roles are 100% PRESERVED
+          await tx.$executeRawUnsafe('UPDATE user SET employeeId = NULL WHERE employeeId = ?', absent.id);
+
+          // Mark employee as INACTIVE in control DB
+          await tx.employee.update({
+            where: { id: absent.id },
+            data: {
+              status: 'INACTIVE',
+              remarks: '[Deactivated: Not present in approved roster replacement batch ' + preview.batchRef + ']',
+            },
+          });
+
+          result.deactivatedAbsent = (result.deactivatedAbsent || 0) + 1;
+          result.deactivatedEmployees!.push({ employeeId: absent.employeeCode, name: absent.fullName });
+
+          // Queue shard deactivation
+          const absentId = absent.id;
+          const absentLoc = absent.locationCode;
+          shardSyncTasks.push(async () => {
+            const shardId = absentLoc === 'BEL' ? 'BSC-SHARD-BEL-001' : absentLoc === 'DAV' ? 'BSC-SHARD-DAV-001' : absentLoc === 'SHI' ? 'BSC-SHARD-SHI-001' : null;
+            if (!shardId) return;
+            try {
+              const shardPool = shardManager.getPool(shardId);
+              const sConn = await shardPool.getConnection();
+              try {
+                await sConn.query('UPDATE employee SET status = \'INACTIVE\', updatedAt = NOW() WHERE id = ?', [absentId]);
+              } finally {
+                sConn.release();
+              }
+            } catch (err: any) {
+              console.warn('[EmployeeImportService] Shard sync deactivate error on ' + shardId + ':', err.message);
+            }
+          });
+        }
+      }
       for (const row of writable) {
         const payload = (row as any)._payload;
         if (!payload) continue;
@@ -1848,6 +1931,15 @@ export async function executeImport(preview: PreviewResult, actor: ImportActor):
             data: { qrCodeId: empQR.id, dailyQRCodeId: dailyQR.id },
           });
 
+          // Link matching login user account by email if exists and unlinked
+          if (created.email) {
+            await tx.$executeRawUnsafe(
+              `UPDATE user SET employeeId = ? WHERE LOWER(email) = LOWER(?) AND employeeId IS NULL`,
+              created.id,
+              created.email
+            );
+          }
+
           row.employeeId = employeeCode;
           row.employeeIdKind = classifyEmployeeCode(employeeCode, preview.policy);
           row.matchedEmployeeId = employeeCode;
@@ -1866,6 +1958,46 @@ export async function executeImport(preview: PreviewResult, actor: ImportActor):
               /* folder creation is best-effort */
             }
           });
+
+          // Queue shard insert
+          const createdCopy = { ...created };
+          const locCode = location.code;
+          shardSyncTasks.push(async () => {
+            const shardId = locCode === 'BEL' ? 'BSC-SHARD-BEL-001' : locCode === 'DAV' ? 'BSC-SHARD-DAV-001' : locCode === 'SHI' ? 'BSC-SHARD-SHI-001' : null;
+            if (!shardId) return;
+            try {
+              const shardPool = shardManager.getPool(shardId);
+              const sConn = await shardPool.getConnection();
+              try {
+                await sConn.query(
+                  `INSERT INTO employee (id, employeeCode, firstName, lastName, fullName, email, phone, gender, locationId, designation, role, status, joiningDate, legacyEmployeeCode, importBatchId, createdAt, updatedAt)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+                   ON DUPLICATE KEY UPDATE fullName = VALUES(fullName), status = VALUES(status), designation = VALUES(designation), role = VALUES(role), updatedAt = NOW()`,
+                  [
+                    createdCopy.id,
+                    createdCopy.employeeCode,
+                    createdCopy.firstName,
+                    createdCopy.lastName,
+                    createdCopy.fullName,
+                    createdCopy.email,
+                    createdCopy.phone,
+                    createdCopy.gender,
+                    createdCopy.locationId,
+                    createdCopy.designation,
+                    createdCopy.role,
+                    createdCopy.status,
+                    createdCopy.joiningDate,
+                    createdCopy.legacyEmployeeCode,
+                    preview.batchRef,
+                  ]
+                );
+              } finally {
+                sConn.release();
+              }
+            } catch (err: any) {
+              console.warn(`[EmployeeImportService] Shard sync create error on ${shardId}:`, err.message);
+            }
+          });
         } else {
           // UPDATE
           const data: Record<string, any> = { importBatchId: preview.batchRef };
@@ -1875,6 +2007,28 @@ export async function executeImport(preview: PreviewResult, actor: ImportActor):
           await tx.employee.update({ where: { id: match.id }, data });
           result.updated++;
           result.updatedEmployees.push({ employeeId: match.employeeCode, name: row.employeeName || match.fullName });
+
+          // Queue shard update
+          const updatedEmpId = match.id;
+          const updatedLocCode = match.locationCode || location?.code;
+          const updatedStatus = data.status;
+          shardSyncTasks.push(async () => {
+            const shardId = updatedLocCode === 'BEL' ? 'BSC-SHARD-BEL-001' : updatedLocCode === 'DAV' ? 'BSC-SHARD-DAV-001' : updatedLocCode === 'SHI' ? 'BSC-SHARD-SHI-001' : null;
+            if (!shardId) return;
+            try {
+              const shardPool = shardManager.getPool(shardId);
+              const sConn = await shardPool.getConnection();
+              try {
+                if (updatedStatus) {
+                  await sConn.query(`UPDATE employee SET status = ?, updatedAt = NOW() WHERE id = ?`, [updatedStatus, updatedEmpId]);
+                }
+              } finally {
+                sConn.release();
+              }
+            } catch (err: any) {
+              console.warn(`[EmployeeImportService] Shard sync update error on ${shardId}:`, err.message);
+            }
+          });
         }
       }
     });
@@ -1892,6 +2046,16 @@ export async function executeImport(preview: PreviewResult, actor: ImportActor):
     result.durationMs = Date.now() - started;
     await persistBatch(preview, actor, result);
     throw Object.assign(new Error(result.failureDetails), { executeResult: result, status: 400 });
+  }
+
+  // Execute shard synchronization
+  try {
+    await shardManager.initialize();
+    for (const syncTask of shardSyncTasks) {
+      await syncTask();
+    }
+  } catch (shardErr: any) {
+    console.warn('[EmployeeImportService] Shard sync warning:', shardErr.message);
   }
 
   for (const job of folderJobs) {

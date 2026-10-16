@@ -1177,7 +1177,7 @@ export function AnalysisKpiDrawer({
                             <td className="py-2.5 px-3 text-slate-500 font-mono text-[11px]">{r.lastLoginTime || '—'}</td>
                             <td className="py-2.5 px-3 font-bold text-slate-700 dark:text-slate-200">{r.loginCount}</td>
                             <td className="py-2.5 px-3 text-slate-500">{r.deviceType}</td>
-                            <td className="py-2.5 px-3 font-mono text-slate-400 text-[11px]">{r.ipAddress}</td>
+                            <td className="py-2.5 px-3 font-mono text-slate-400 text-[11px]">Protected LAN</td>
                           </>
                         )}
 
@@ -1247,7 +1247,7 @@ export function AnalysisKpiDrawer({
                             <td className="py-2.5 px-3 text-slate-500 font-mono text-[11px]">{r.lastActivity || '—'}</td>
                             <td className="py-2.5 px-3 text-slate-500 font-mono text-[11px]">{r.expiresAt || '—'}</td>
                             <td className="py-2.5 px-3 text-slate-500">{r.deviceType}</td>
-                            <td className="py-2.5 px-3 font-mono text-slate-400 text-[11px]">{r.ipAddress}</td>
+                            <td className="py-2.5 px-3 font-mono text-slate-400 text-[11px]">Protected LAN</td>
                           </>
                         )}
 

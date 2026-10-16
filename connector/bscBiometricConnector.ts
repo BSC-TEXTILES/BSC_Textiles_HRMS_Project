@@ -11,10 +11,10 @@
  * - Includes a local HTTP health check server for diagnostics.
  */
 
-import http from 'node:http';
-import fs from 'node:fs';
-import path from 'node:path';
-import crypto from 'node:crypto';
+import * as http from 'node:http';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import { ZkProtocolClient, ZkAttendanceRecord } from '../backend/src/services/zkProtocolAdapter.js';
 
 // Configuration (Loaded from environment or fallback defaults)
@@ -23,14 +23,28 @@ const CONNECTOR_KEY = process.env.BIOMETRIC_CONNECTOR_KEY || 'bsc-biometric-conn
 const POLL_INTERVAL_SECONDS = Number(process.env.CONNECTOR_POLL_INTERVAL) || 30;
 const HEALTH_PORT = Number(process.env.CONNECTOR_HEALTH_PORT) || 4371;
 
-// Target local devices for this connector instance
+// Target local devices for this Davangere showroom connector instance
 const SHOWROOM_DEVICES = [
   {
-    serialNumber: process.env.DEVICE_SERIAL || 'JNP2252300795',
-    name: process.env.DEVICE_NAME || 'eSSL Belagavi Flagship Main Terminal',
-    ipAddress: process.env.DEVICE_IP || '192.168.0.136',
-    port: Number(process.env.DEVICE_PORT) || 4370,
-    showroomCode: process.env.SHOWROOM_CODE || 'BEL',
+    serialNumber: process.env.BIOMETRIC_DEV1_SERIAL || 'JNP2252300795',
+    name: process.env.BIOMETRIC_DEV1_NAME || 'eSSL MB160 Davanagere Terminal 1 (Main Entrance)',
+    ipAddress: process.env.BIOMETRIC_DEV1_IP || '192.168.0.136',
+    port: Number(process.env.BIOMETRIC_TERMINAL_PORT) || 4370,
+    showroomCode: 'DAV',
+  },
+  {
+    serialNumber: process.env.BIOMETRIC_DEV2_SERIAL || 'JNPJNP2252300802',
+    name: process.env.BIOMETRIC_DEV2_NAME || 'eSSL MB160 Davanagere Terminal 2 (Staff Lounge)',
+    ipAddress: process.env.BIOMETRIC_DEV2_IP || '192.168.0.131',
+    port: Number(process.env.BIOMETRIC_TERMINAL_PORT) || 4370,
+    showroomCode: 'DAV',
+  },
+  {
+    serialNumber: process.env.BIOMETRIC_DEV3_SERIAL || 'JNP2252300797',
+    name: process.env.BIOMETRIC_DEV3_NAME || 'eSSL MB160 Davanagere Terminal 3 (Admin / Billing)',
+    ipAddress: process.env.BIOMETRIC_DEV3_IP || '192.168.30.131',
+    port: Number(process.env.BIOMETRIC_TERMINAL_PORT) || 4370,
+    showroomCode: 'DAV',
   },
 ];
 

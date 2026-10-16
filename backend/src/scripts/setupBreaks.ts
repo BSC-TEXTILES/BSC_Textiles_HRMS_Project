@@ -27,7 +27,7 @@ export async function setupBreaks() {
       }
     }
   } catch (e) {
-    // If MySQL, ensure table exists with proper schema
+    // If MySQL, ensure table exists and all required columns are present
     try {
       await conn.query(`
         CREATE TABLE IF NOT EXISTS \`employeebreak\` (
@@ -53,6 +53,27 @@ export async function setupBreaks() {
           PRIMARY KEY (\`id\`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
       `);
+
+      const [myCols]: any = await conn.query(`SHOW COLUMNS FROM employeebreak`);
+      const existingColNames = myCols.map((c: any) => c.Field.toLowerCase());
+      if (!existingColNames.includes('attendanceid')) {
+        await conn.query(`ALTER TABLE employeebreak ADD COLUMN attendanceId varchar(191) DEFAULT NULL`);
+      }
+      if (!existingColNames.includes('locationid')) {
+        await conn.query(`ALTER TABLE employeebreak ADD COLUMN locationId varchar(191) DEFAULT NULL`);
+      }
+      if (!existingColNames.includes('durationminutes')) {
+        await conn.query(`ALTER TABLE employeebreak ADD COLUMN durationMinutes double DEFAULT 0`);
+      }
+      if (!existingColNames.includes('overrunminutes')) {
+        await conn.query(`ALTER TABLE employeebreak ADD COLUMN overrunMinutes double DEFAULT 0`);
+      }
+      if (!existingColNames.includes('isoverrun')) {
+        await conn.query(`ALTER TABLE employeebreak ADD COLUMN isOverrun tinyint DEFAULT 0`);
+      }
+      if (!existingColNames.includes('penaltyamount')) {
+        await conn.query(`ALTER TABLE employeebreak ADD COLUMN penaltyAmount double DEFAULT 0`);
+      }
     } catch (err) {
       // Table already exists or handled by SQLite
     }
@@ -275,6 +296,11 @@ export async function setupBreaks() {
 
   try { await conn.query('PRAGMA foreign_keys = OFF'); } catch {}
 
+  const toSqlDateTime = (val: string | null) => {
+    if (!val) return null;
+    return val.replace('T', ' ').replace('Z', '').slice(0, 19);
+  };
+
   // Insert records into employeebreak table
   for (const r of recordsToInsert) {
     await conn.query(
@@ -288,8 +314,8 @@ export async function setupBreaks() {
         r.locationId,
         r.breakType,
         r.breakDate,
-        r.startTime,
-        r.endTime,
+        toSqlDateTime(r.startTime),
+        toSqlDateTime(r.endTime),
         r.allowedDuration,
         r.actualDuration,
         r.excessDuration,

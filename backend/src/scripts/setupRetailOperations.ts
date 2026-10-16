@@ -66,7 +66,10 @@ export async function setupRetailOperations() {
   const [employees]: any = await conn.query(`SELECT id, employeeCode, fullName, designation, locationId FROM employee ORDER BY employeeCode ASC`);
   console.log(`Found ${employees.length} employees.`);
 
-  // Update employee designations if empty
+  if (employees.length === 0) {
+    console.log('[setupRetailOperations] Zero employees in database. Skipping retail staff assignment & sample transactions.');
+    return;
+  }
   const defaultDesignations = [
     'Senior Silk Saree Specialist',
     'Ethnic Wear Consultant',

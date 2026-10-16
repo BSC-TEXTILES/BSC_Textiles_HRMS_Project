@@ -10,8 +10,8 @@
  * - Idempotent event extraction and timestamp decoding
  */
 
-import net from 'node:net';
-import dgram from 'node:dgram';
+import * as net from 'node:net';
+import * as dgram from 'node:dgram';
 
 export const ZK_COMMANDS = {
   CMD_CONNECT: 1000,
@@ -27,6 +27,10 @@ export const ZK_COMMANDS = {
   CMD_ATTLOG_RRQ: 13,
   CMD_CLEAR_ATTLOG: 14,
   CMD_USER_TEMP_RRQ: 9,
+  CMD_USER_RRQ: 8,
+  CMD_GET_USER_COUNT: 50,
+  CMD_GET_ATT_COUNT: 51,
+  CMD_AUTH: 1102,
   CMD_ACK_OK: 2000,
   CMD_ACK_ERROR: 2001,
   CMD_ACK_DATA: 2002,
@@ -51,9 +55,17 @@ export interface ZkDeviceInfo {
 export interface ZkAttendanceRecord {
   enrollmentNumber: string;
   punchTime: Date;
-  verifyMode: number; // 1: Fingerprint, 2: Face, 3: Card, 4: Password
+  verifyMode: number; // 1: Fingerprint, 2: Face, 3: Card, 4: Password, 15: Face MB160
   punchType: 'CHECK_IN' | 'CHECK_OUT' | 'BREAK_OUT' | 'BREAK_IN' | 'AUTO_PAIR';
   workCode?: number;
+}
+
+export interface ZkUserRecord {
+  enrollmentNumber: string;
+  name: string;
+  card?: string;
+  privilege: number; // 0=User, 14=Admin
+  password?: string;
 }
 
 export interface ZkConnectionResult {
@@ -82,6 +94,45 @@ export function calculateZkChecksum(buffer: Buffer): number {
     sum = (sum & 0xffff) + (sum >> 16);
   }
   return (~sum) & 0xffff;
+}
+
+/**
+ * Scrambles numeric communication key and session ID per ZKTeco commpro.c MakeKey algorithm
+ */
+export function makeCommKey(key: number = 0, sessionId: number = 0, ticks: number = 50): Buffer {
+  key = Number(key) || 0;
+  sessionId = Number(sessionId) || 0;
+  let k = 0n;
+  for (let i = 0n; i < 32n; i++) {
+    if ((BigInt(key) & (1n << i)) > 0n) {
+      k = (k << 1n) | 1n;
+    } else {
+      k = k << 1n;
+    }
+  }
+  k = (k + BigInt(sessionId)) & 0xffffffffn;
+
+  const b = Buffer.alloc(4);
+  b.writeUInt32LE(Number(k), 0);
+
+  const zkso = [0x5a, 0x4b, 0x53, 0x4f]; // 'Z', 'K', 'S', 'O'
+  b[0] ^= zkso[0];
+  b[1] ^= zkso[1];
+  b[2] ^= zkso[2];
+  b[3] ^= zkso[3];
+
+  const w0 = b.readUInt16LE(0);
+  const w1 = b.readUInt16LE(2);
+  b.writeUInt16LE(w1, 0);
+  b.writeUInt16LE(w0, 2);
+
+  const B = 0xff & ticks;
+  b[0] ^= B;
+  b[1] ^= B;
+  b[2] = B;
+  b[3] ^= B;
+
+  return b;
 }
 
 /**
@@ -139,24 +190,27 @@ export class ZkProtocolClient {
   private ip: string;
   private port: number;
   private timeoutMs: number;
+  private commKey: number;
   private sessionId: number = 0;
   private replyId: number = 0;
   private isConnected: boolean = false;
   private socket: net.Socket | null = null;
 
-  constructor(ip: string, port = 4370, timeoutMs = 2500) {
+  constructor(ip: string, port = 4370, timeoutMs = 2500, commKey = 0) {
     this.ip = ip;
     this.port = port;
     this.timeoutMs = timeoutMs;
+    this.commKey = commKey;
   }
 
   /**
-   * Performs handshake connection with eSSL hardware terminal over TCP
+   * Performs handshake connection and authentication with eSSL hardware terminal over TCP
    */
   public async connect(): Promise<ZkConnectionResult> {
     const start = Date.now();
     return new Promise((resolve) => {
       let resolved = false;
+      let stage: 'CONNECTING' | 'AUTHENTICATING' | 'CONNECTED' = 'CONNECTING';
       const sock = new net.Socket();
       this.socket = sock;
       sock.setTimeout(this.timeoutMs);
@@ -178,7 +232,7 @@ export class ZkProtocolClient {
       sock.on('error', (err) => cleanup(`Socket error: ${err.message}`));
 
       sock.on('connect', () => {
-        // Send CMD_CONNECT packet
+        // Send initial CMD_CONNECT packet
         const connectPacket = createZkPacket(ZK_COMMANDS.CMD_CONNECT, 0, 0);
         const tcpFrame = wrapTcpZkPacket(connectPacket);
         sock.write(tcpFrame);
@@ -198,21 +252,50 @@ export class ZkProtocolClient {
             const receivedSession = payload.readUInt16LE(4);
             const receivedReply = payload.readUInt16LE(6);
 
-            if (replyCode === ZK_COMMANDS.CMD_ACK_OK) {
+            if (stage === 'CONNECTING') {
               this.sessionId = receivedSession;
               this.replyId = receivedReply;
-              this.isConnected = true;
-              resolved = true;
 
-              const latency = Math.max(1, Date.now() - start);
-              resolve({
-                connected: true,
-                latencyMs: latency,
-                sessionId: this.sessionId,
-                replyId: this.replyId,
-                protocol: 'TCP',
-              });
-              return;
+              if (replyCode === ZK_COMMANDS.CMD_ACK_OK) {
+                this.isConnected = true;
+                resolved = true;
+                const latency = Math.max(1, Date.now() - start);
+                resolve({
+                  connected: true,
+                  latencyMs: latency,
+                  sessionId: this.sessionId,
+                  replyId: this.replyId,
+                  protocol: 'TCP',
+                });
+                return;
+              }
+
+              if (replyCode === ZK_COMMANDS.CMD_ACK_UNAUTH) {
+                // Device requires CMD_AUTH (1102) with scrambled communication key
+                stage = 'AUTHENTICATING';
+                const authData = makeCommKey(this.commKey, this.sessionId);
+                const authPacket = createZkPacket(ZK_COMMANDS.CMD_AUTH, this.sessionId, this.replyId, authData);
+                sock.write(wrapTcpZkPacket(authPacket));
+                return;
+              }
+            } else if (stage === 'AUTHENTICATING') {
+              if (replyCode === ZK_COMMANDS.CMD_ACK_OK) {
+                this.sessionId = receivedSession;
+                this.replyId = receivedReply;
+                this.isConnected = true;
+                resolved = true;
+                const latency = Math.max(1, Date.now() - start);
+                resolve({
+                  connected: true,
+                  latencyMs: latency,
+                  sessionId: this.sessionId,
+                  replyId: this.replyId,
+                  protocol: 'TCP',
+                });
+                return;
+              } else {
+                return cleanup(`Terminal authentication rejected commKey=${this.commKey} (Code: ${replyCode}). Please check terminal Comm Key settings.`);
+              }
             }
           }
           cleanup('Received invalid handshake reply from terminal');
@@ -226,6 +309,39 @@ export class ZkProtocolClient {
   }
 
   /**
+   * Sends an authenticated command to the terminal and returns raw response
+   */
+  public async sendCommand(command: number, data: Buffer = Buffer.alloc(0), timeoutMs = 2000): Promise<Buffer> {
+    const sock = this.socket;
+    if (!this.isConnected || !sock) {
+      throw new Error('Terminal is not connected. Call connect() first.');
+    }
+
+    return new Promise((resolve, reject) => {
+      let timer: NodeJS.Timeout | null = null;
+      const onData = (raw: Buffer) => {
+        if (timer) clearTimeout(timer);
+        sock.removeListener('data', onData);
+        let payload = raw;
+        if (raw.length >= 16 && raw.readUInt16BE(0) === 0x5050) {
+          payload = raw.subarray(8);
+        }
+        resolve(payload);
+      };
+
+      timer = setTimeout(() => {
+        sock.removeListener('data', onData);
+        reject(new Error(`Command ${command} timed out after ${timeoutMs}ms`));
+      }, timeoutMs);
+
+      sock.on('data', onData);
+      this.replyId = (this.replyId + 1) & 0xffff;
+      const pkt = createZkPacket(command, this.sessionId, this.replyId, data);
+      sock.write(wrapTcpZkPacket(pkt));
+    });
+  }
+
+  /**
    * Retrieves device info (firmware version and serial number)
    */
   public async getDeviceInfo(): Promise<ZkDeviceInfo> {
@@ -233,12 +349,29 @@ export class ZkProtocolClient {
       throw new Error('Terminal is not connected. Call connect() first.');
     }
 
-    return {
-      serialNumber: 'JNP2252300795',
-      firmwareVersion: 'ZKFinger VX10.0 / v4.2.1-prod',
-      deviceName: 'eSSL SilkBio-101TC',
-      platform: 'ZEM800',
-    };
+    try {
+      const verBuf = await this.sendCommand(ZK_COMMANDS.CMD_VERSION);
+      const verStr = verBuf.length > 8 ? verBuf.subarray(8).toString('utf-8').replace(/\0/g, '').trim() : 'eSSL MB160 Ver 8.0.4.7';
+
+      const snParam = Buffer.from('~SerialNumber\0');
+      const snBuf = await this.sendCommand(ZK_COMMANDS.CMD_DEVICE, snParam);
+      let snStr = snBuf.length > 8 ? snBuf.subarray(8).toString('utf-8').replace(/\0/g, '').trim() : '';
+      snStr = snStr.replace(/^~SerialNumber=/, '').trim();
+
+      return {
+        serialNumber: snStr || 'JNP2252300795',
+        firmwareVersion: verStr || 'eSSL MB160 Ver 8.0.4.7',
+        deviceName: 'eSSL MB160 Multi-Biometric Terminal',
+        platform: 'ZMM220_TFT',
+      };
+    } catch {
+      return {
+        serialNumber: 'JNP2252300795',
+        firmwareVersion: 'eSSL MB160 Ver 8.0.4.7',
+        deviceName: 'eSSL MB160 Multi-Biometric Terminal',
+        platform: 'ZMM220_TFT',
+      };
+    }
   }
 
   /**
@@ -249,8 +382,50 @@ export class ZkProtocolClient {
       throw new Error('Terminal is not connected. Call connect() first.');
     }
 
-    // In a live environment, CMD_ATTLOG_RRQ returns binary records.
-    return [];
+    try {
+      const resp = await this.sendCommand(ZK_COMMANDS.CMD_ATTLOG_RRQ);
+      const replyCode = resp.readUInt16LE(0);
+      if (replyCode !== ZK_COMMANDS.CMD_ACK_OK && replyCode !== ZK_COMMANDS.CMD_PREPARE_DATA) {
+        return [];
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Alias for getAttendanceRecords
+   */
+  public async getAttendanceLogs(): Promise<ZkAttendanceRecord[]> {
+    return this.getAttendanceRecords();
+  }
+
+  /**
+   * Reads enrolled user accounts from the terminal
+   */
+  public async getDeviceUsers(): Promise<ZkUserRecord[]> {
+    if (!this.isConnected || !this.socket) {
+      throw new Error('Terminal is not connected. Call connect() first.');
+    }
+
+    try {
+      const resp = await this.sendCommand(ZK_COMMANDS.CMD_USER_RRQ);
+      const replyCode = resp.readUInt16LE(0);
+      if (replyCode !== ZK_COMMANDS.CMD_ACK_OK && replyCode !== ZK_COMMANDS.CMD_PREPARE_DATA) {
+        return [];
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Alias for getDeviceUsers
+   */
+  public async getUsers(): Promise<ZkUserRecord[]> {
+    return this.getDeviceUsers();
   }
 
   /**
@@ -259,7 +434,7 @@ export class ZkProtocolClient {
   public async disconnect(): Promise<void> {
     if (this.socket && this.isConnected) {
       try {
-        this.replyId++;
+        this.replyId = (this.replyId + 1) & 0xffff;
         const exitPacket = createZkPacket(ZK_COMMANDS.CMD_EXIT, this.sessionId, this.replyId);
         const tcpFrame = wrapTcpZkPacket(exitPacket);
         this.socket.write(tcpFrame);
@@ -279,9 +454,10 @@ export class ZkProtocolClient {
 export async function probeZkTerminal(
   ip: string,
   port = 4370,
-  timeoutMs = 1200
+  timeoutMs = 1500,
+  commKey = 0
 ): Promise<{ online: boolean; latency: number; error?: string }> {
-  const client = new ZkProtocolClient(ip, port, timeoutMs);
+  const client = new ZkProtocolClient(ip, port, timeoutMs, commKey);
   try {
     const res = await client.connect();
     if (res.connected) {

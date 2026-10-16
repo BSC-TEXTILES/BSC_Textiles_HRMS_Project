@@ -28,7 +28,7 @@ export default function AuditLogsPage() {
           entityType: 'ATTENDANCE_CORRECTION',
           entityId: 'CORR-4029',
           user: { fullName: 'S. B. Angadi', email: 'admin@bsctextiles.com' },
-          ipAddress: '192.168.1.104',
+          ipAddress: 'Internal Showroom LAN',
           newValue: {
             employeeId: 'BSC-EMP-0042',
             punchOverride: '19:15:00 IST',
@@ -44,7 +44,7 @@ export default function AuditLogsPage() {
           entityType: 'LEAVE_APPLICATION',
           entityId: 'LV-9921',
           user: { fullName: 'Sneha Kulkarni', email: 'sneha.k@bsctextiles.in' },
-          ipAddress: '192.168.1.52',
+          ipAddress: 'Internal Showroom LAN',
           newValue: {
             type: 'Casual Leave (CL)',
             duration: 1.0,
@@ -59,7 +59,7 @@ export default function AuditLogsPage() {
           entityType: 'SECURITY_AUTH',
           entityId: 'USR-ADMIN-01',
           user: { fullName: 'S. B. Angadi', email: 'admin@bsctextiles.com' },
-          ipAddress: '192.168.1.104',
+          ipAddress: 'Internal Showroom LAN',
           newValue: {
             method: '2FA Password + Token',
             terminal: 'HQ-EXECUTIVE-DESK',
@@ -73,7 +73,7 @@ export default function AuditLogsPage() {
           entityType: 'EMPLOYEE_ROSTER',
           entityId: 'BSC-EMP-0089',
           user: { fullName: 'Sunita Deshmukh', email: 'hr.belagavi@bsctextiles.in' },
-          ipAddress: '192.168.1.88',
+          ipAddress: 'Internal Showroom LAN',
           newValue: {
             fieldModified: 'shiftSchedule',
             oldValue: 'Shift A',
@@ -294,7 +294,7 @@ export default function AuditLogsPage() {
                         <div className="text-[11px] text-on-surface-variant">{log.user?.email || 'daemon@system'}</div>
                       </td>
                       <td className="py-space-sm px-space-md font-mono text-xs text-on-surface-variant">
-                        {log.ipAddress || '192.168.1.104'}
+                        {log.ipAddress ? 'Protected Internal LAN' : 'Local Daemon'}
                       </td>
                     </tr>
                   ))

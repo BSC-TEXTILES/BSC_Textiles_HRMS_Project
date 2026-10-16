@@ -54,7 +54,9 @@ import {
   XCircle,
   QrCode,
   Database,
-  HardDrive
+  HardDrive,
+  Network,
+  ClipboardList,
 } from 'lucide-react';
 
 interface NavItem {
@@ -145,6 +147,20 @@ const enterpriseNavigation: NavSectionConfig[] = [
       { title: 'Employee Documents', href: '/employees/documents', icon: FolderLock, badge: 'Dossier' },
       { title: 'Departments & Units', href: '/organization/departments', icon: Building2 },
       { title: 'Former Staff & F&F', href: '/employees/former', icon: UserMinus, badge: 'Settlement' },
+    ],
+  },
+  {
+    title: 'Organization Management',
+    theme: {
+      color: 'text-amber-200',
+      dotColor: 'bg-amber-400',
+      activeGradient: 'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-amber-300',
+      hoverColor: 'hover:text-white hover:bg-white/10',
+      iconColor: 'text-amber-300 group-hover:text-white',
+    },
+    items: [
+      { title: 'Hierarchy Dashboard', href: '/organization/departments', icon: Network },
+      { title: 'Approval Queue', href: '/organization/approvals', icon: ClipboardList, badge: 'Workflow' },
     ],
   },
   {

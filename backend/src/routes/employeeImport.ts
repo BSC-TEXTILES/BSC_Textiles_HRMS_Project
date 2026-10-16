@@ -12,6 +12,8 @@ import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { uploadLimiter, exportLimiter } from '../middleware/rateLimiting.js';
 import { AuditService } from '../services/auditService.js';
 import { getUserModuleAccess, accessRank } from '../services/rbacService.js';
+import { EmployeeResetService } from '../services/employeeResetService.js';
+import { DatabaseBackupService } from '../services/databaseBackupService.js';
 import {
   IMPORT_COLUMNS,
   ImportActor,
@@ -111,7 +113,7 @@ const csvBodySchema = z.object({
   csv: z.string().max(MAX_CSV_BYTES, 'CSV file is too large (max 5 MB)').optional().default(''),
   fileBase64: z.string().optional(),
   fileName: z.string().max(255).optional().default('employees.csv'),
-  mode: z.enum(['new', 'update', 'upsert']),
+  mode: z.enum(['new', 'update', 'upsert', 'replace_roster']),
 });
 
 function rejectUnsafeFile(fileName: string, res: Response): boolean {
@@ -489,6 +491,66 @@ router.get('/data-quality', authorize('VIEW'), importAccess('view'), async (req:
 // ─────────────────────────────────────────────────────────────────────────────
 router.get('/columns', authorize('VIEW'), importAccess('view'), async (_req: AuthRequest, res: Response) => {
   res.json({ columns: IMPORT_COLUMNS });
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /backups — list verified database backups
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/backups', authorize('VIEW'), importAccess('view'), async (_req: AuthRequest, res: Response) => {
+  try {
+    const backups = await DatabaseBackupService.listBackups();
+    return res.json({ backups });
+  } catch (err: any) {
+    console.error('List backups error:', err);
+    return res.status(500).json({ error: 'Failed to list database backups', message: err?.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /reset — controlled reset of employee database (PRESERVES 100% OF LOGINS)
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/reset', authorize('DELETE'), async (req: AuthRequest, res: Response) => {
+  if (!['SUPER_ADMIN', 'ADMIN'].includes(req.user!.role)) {
+    return res.status(403).json({
+      error: 'Forbidden: Super Admin or Admin role required',
+      message: 'Only a Super Admin or Admin may perform an employee database reset.',
+    });
+  }
+
+  const resetSchema = z.object({
+    confirm: z.literal('RESET_APPROVED_EMPLOYEES'),
+    reason: z.string().optional(),
+  });
+
+  const parsed = resetSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: 'Confirmation required',
+      message: 'You must supply { confirm: "RESET_APPROVED_EMPLOYEES" } to execute employee cleanup.',
+    });
+  }
+
+  try {
+    const result = await EmployeeResetService.resetEmployeeDatabase({
+      userId: req.user!.id,
+      userName: req.user!.fullName || req.user!.email,
+      role: req.user!.role,
+      ipAddress: req.ip || req.socket.remoteAddress || '127.0.0.1',
+    });
+
+    return res.json({
+      success: true,
+      message: 'Employee database successfully reset with verified disk backup. All user logins, credentials, roles, and permissions are 100% PRESERVED.',
+      result,
+    });
+  } catch (err: any) {
+    console.error('Employee reset error:', err);
+    return res.status(500).json({
+      error: 'Employee database reset failed',
+      message: err?.message,
+    });
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

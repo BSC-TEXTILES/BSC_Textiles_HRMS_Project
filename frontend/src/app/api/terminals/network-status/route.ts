@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 
 // Helper to probe a biometric terminal socket on port 4370
 async function probeTerminal(ip: string, port: number = 4370, timeoutMs: number = 1000): Promise<{ online: boolean; latency: number }> {
+  if (!ip) return { online: false, latency: 0 };
   const start = Date.now();
   return new Promise((resolve) => {
     const socket = new net.Socket();
@@ -30,9 +31,9 @@ async function probeTerminal(ip: string, port: number = 4370, timeoutMs: number 
 }
 
 export async function GET(request: Request) {
-  const ipDev1 = process.env.BIOMETRIC_DEV1_IP || '192.168.0.136';
-  const ipDev2 = process.env.BIOMETRIC_DEV2_IP || '192.168.0.131';
-  const ipDev3 = process.env.BIOMETRIC_DEV3_IP || '192.168.30.131';
+  const ipDev1 = process.env.BIOMETRIC_DEV1_IP || '';
+  const ipDev2 = process.env.BIOMETRIC_DEV2_IP || '';
+  const ipDev3 = process.env.BIOMETRIC_DEV3_IP || '';
 
   // Live Store Terminals on port 4370
   const [probe1, probe2, probe3] = await Promise.all([
@@ -44,18 +45,17 @@ export async function GET(request: Request) {
   const terminals = [
     {
       id: 'TERM-01',
-      code: 'BEL-BIO-01',
+      code: 'DAV-BIO-01',
       serialNumber: process.env.BIOMETRIC_DEV1_SERIAL || 'JNP2252300795',
-      name: 'BEL-BIO-01 Main Face & Fingerprint Terminal A',
-      location: 'Belagavi Flagship (Karnataka HQ · Ground Floor)',
-      ipAddress: ipDev1,
-      port: 4370,
+      name: 'DAV-BIO-01 Main Face & Fingerprint Terminal 1',
+      location: 'Davangere Store (Main Entrance · Ground Floor)',
+      ipAddress: 'Protected Showroom LAN',
       status: probe1.online ? 'ONLINE' : 'OFFLINE',
       latency: probe1.latency,
       packetLoss: probe1.online ? 0.0 : 100.0,
       heartbeat: probe1.online ? 'Just now' : 'Unreachable',
       uptime: probe1.online ? 99.9 : 0.0,
-      firmwareVersion: 'ZKTeco / eSSL v4.2.1-prod',
+      firmwareVersion: 'Ver 8.0.4.7-20220624 / ZKFinger VX10.0',
       updateAvailable: false,
       punchesRecordedToday: 65,
       cameraActive: true,
@@ -64,17 +64,16 @@ export async function GET(request: Request) {
     {
       id: 'TERM-02',
       code: 'DAV-BIO-02',
-      serialNumber: process.env.BIOMETRIC_DEV2_SERIAL || 'JNP2252300802',
-      name: 'DAV-BIO-02 Staff Lounge Biometric Terminal B',
-      location: 'Davanagere Mega Store (KB Extension · Floor 1)',
-      ipAddress: ipDev2,
-      port: 4370,
+      serialNumber: process.env.BIOMETRIC_DEV2_SERIAL || 'JNPJNP2252300802',
+      name: 'DAV-BIO-02 Staff Lounge Biometric Terminal 2',
+      location: 'Davangere Store (Staff Lounge · Floor 1)',
+      ipAddress: 'Protected Showroom LAN',
       status: probe2.online ? 'ONLINE' : 'OFFLINE',
       latency: probe2.latency,
       packetLoss: probe2.online ? 0.0 : 100.0,
       heartbeat: probe2.online ? 'Just now' : 'Unreachable',
       uptime: probe2.online ? 99.8 : 0.0,
-      firmwareVersion: 'ZKTeco / eSSL v4.2.1-prod',
+      firmwareVersion: 'Ver 8.0.4.7-20220624 / ZKFinger VX10.0',
       updateAvailable: false,
       punchesRecordedToday: 35,
       cameraActive: true,
@@ -82,18 +81,17 @@ export async function GET(request: Request) {
     },
     {
       id: 'TERM-03',
-      code: 'SHI-BIO-03',
+      code: 'DAV-BIO-03',
       serialNumber: process.env.BIOMETRIC_DEV3_SERIAL || 'JNP2252300797',
-      name: 'SHI-BIO-03 Concierge Floor Biometric Terminal C',
-      location: 'Shivamogga Flagship (B.H. Road Apex · Floor 1)',
-      ipAddress: ipDev3,
-      port: 4370,
+      name: 'DAV-BIO-03 Admin & Billing Biometric Terminal 3',
+      location: 'Davangere Store (Admin / Billing Floor)',
+      ipAddress: 'Protected Showroom LAN',
       status: probe3.online ? 'ONLINE' : 'OFFLINE',
       latency: probe3.latency,
       packetLoss: probe3.online ? 0.0 : 100.0,
       heartbeat: probe3.online ? 'Just now' : 'Unreachable',
       uptime: probe3.online ? 100.0 : 0.0,
-      firmwareVersion: 'ZKTeco / eSSL v4.2.1-prod',
+      firmwareVersion: 'Ver 8.0.4.7-20220624 / ZKFinger VX10.0',
       updateAvailable: false,
       punchesRecordedToday: 24,
       cameraActive: true,
@@ -104,8 +102,7 @@ export async function GET(request: Request) {
       code: 'BEL-QR-02',
       name: 'BEL-QR-02 Refreshment & Tea Break Scanner',
       location: 'Belagavi Flagship (Break Zone)',
-      ipAddress: ipDev1,
-      port: 4370,
+      ipAddress: 'Protected Showroom LAN',
       status: probe1.online ? 'ONLINE' : 'OFFLINE',
       latency: probe1.latency + 2,
       packetLoss: 0.0,
@@ -122,8 +119,7 @@ export async function GET(request: Request) {
       code: 'DAV-QR-01',
       name: 'DAV-QR-01 Weaving & Loom Floor Terminal',
       location: 'Davanagere Showroom (Fitting Wing)',
-      ipAddress: ipDev2,
-      port: 4370,
+      ipAddress: 'Protected Showroom LAN',
       status: probe2.online ? 'ONLINE' : 'OFFLINE',
       latency: probe2.latency + 3,
       packetLoss: 0.0,
@@ -140,8 +136,7 @@ export async function GET(request: Request) {
       code: 'SHI-QR-01',
       name: 'SHI-QR-01 Inventory Bay Gate Scanner',
       location: 'Shivamogga Retail Apex (Inventory Base)',
-      ipAddress: ipDev3,
-      port: 4370,
+      ipAddress: 'Protected Showroom LAN',
       status: probe3.online ? 'ONLINE' : 'OFFLINE',
       latency: probe3.latency + 2,
       packetLoss: 0.0,
@@ -185,9 +180,9 @@ export async function GET(request: Request) {
       { bucket: '> 50ms (Degraded)', count: offlineCount, color: '#ef4444' },
     ],
     hubsSummary: [
-      { hub: `Belagavi Flagship (BEL · ${ipDev1} · SN: ${process.env.BIOMETRIC_DEV1_SERIAL || 'JNP2252300795'})`, terminals: 2, status: probe1.online ? 'Online (Port 4370)' : 'Offline' },
-      { hub: `Davanagere Mega Store (DAV · ${ipDev2} · SN: ${process.env.BIOMETRIC_DEV2_SERIAL || 'JNPJNP2252300802'})`, terminals: 2, status: probe2.online ? 'Online (Port 4370)' : 'Offline' },
-      { hub: `Shivamogga Flagship (SHI · ${ipDev3} · SN: ${process.env.BIOMETRIC_DEV3_SERIAL || 'JNP2252300797'})`, terminals: 2, status: probe3.online ? 'Online (Port 4370)' : 'Offline' },
+      { hub: `Belagavi Flagship (BEL · Protected LAN · SN: ${process.env.BIOMETRIC_DEV1_SERIAL || 'JNP2252300795'})`, terminals: 2, status: probe1.online ? 'Online (Encrypted Link)' : 'Offline' },
+      { hub: `Davanagere Mega Store (DAV · Protected LAN · SN: ${process.env.BIOMETRIC_DEV2_SERIAL || 'JNP2252300802'})`, terminals: 2, status: probe2.online ? 'Online (Encrypted Link)' : 'Offline' },
+      { hub: `Shivamogga Flagship (SHI · Protected LAN · SN: ${process.env.BIOMETRIC_DEV3_SERIAL || 'JNP2252300797'})`, terminals: 2, status: probe3.online ? 'Online (Encrypted Link)' : 'Offline' },
     ],
   };
 

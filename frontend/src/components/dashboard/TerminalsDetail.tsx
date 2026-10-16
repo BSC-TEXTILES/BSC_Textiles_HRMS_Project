@@ -68,7 +68,7 @@ const FALLBACK_TERMINALS_DATA: TerminalsApiResponse = {
       code: 'BEL-01',
       name: 'BEL-01 Entrance Face Gate A',
       location: 'Belagavi Flagship (Karnataka HQ)',
-      ipAddress: '192.168.10.21',
+      ipAddress: 'Protected Showroom LAN',
       status: 'ONLINE',
       latency: 12,
       packetLoss: 0.0,
@@ -85,7 +85,7 @@ const FALLBACK_TERMINALS_DATA: TerminalsApiResponse = {
       code: 'BEL-02',
       name: 'BEL-02 Floor 1 Loom Terminal B',
       location: 'Belagavi Flagship (Weaving Bay)',
-      ipAddress: '192.168.10.22',
+      ipAddress: 'Protected Showroom LAN',
       status: 'ONLINE',
       latency: 18,
       packetLoss: 0.0,
@@ -102,7 +102,7 @@ const FALLBACK_TERMINALS_DATA: TerminalsApiResponse = {
       code: 'BEL-03',
       name: 'BEL-03 Tea & Canteen Scanner C',
       location: 'Belagavi Flagship (Refreshment Hub)',
-      ipAddress: '192.168.10.23',
+      ipAddress: 'Protected Showroom LAN',
       status: 'ONLINE',
       latency: 15,
       packetLoss: 0.0,
@@ -119,7 +119,7 @@ const FALLBACK_TERMINALS_DATA: TerminalsApiResponse = {
       code: 'BEL-04',
       name: 'BEL-04 Dispatch Gate Terminal D',
       location: 'Belagavi Flagship (Loading Bay)',
-      ipAddress: '192.168.10.24',
+      ipAddress: 'Protected Showroom LAN',
       status: 'ONLINE',
       latency: 22,
       packetLoss: 0.0,
@@ -136,7 +136,7 @@ const FALLBACK_TERMINALS_DATA: TerminalsApiResponse = {
       code: 'DAV-02A',
       name: 'DAV-02 Main Showroom Scanner 1',
       location: 'Davanagere Showroom (KB Extension)',
-      ipAddress: '192.168.20.15',
+      ipAddress: 'Protected Showroom LAN',
       status: 'ONLINE',
       latency: 19,
       packetLoss: 0.0,
@@ -153,7 +153,7 @@ const FALLBACK_TERMINALS_DATA: TerminalsApiResponse = {
       code: 'DAV-02B',
       name: 'DAV-02 Staff Lounge Biometric 2',
       location: 'Davanagere Showroom (Fitting Wing)',
-      ipAddress: '192.168.20.16',
+      ipAddress: 'Protected Showroom LAN',
       status: 'ONLINE',
       latency: 24,
       packetLoss: 0.0,
@@ -170,7 +170,7 @@ const FALLBACK_TERMINALS_DATA: TerminalsApiResponse = {
       code: 'SHI-03A',
       name: 'SHI-03 Front Concierge Face Cam 1',
       location: 'Shivamogga Retail Apex (B.H. Road)',
-      ipAddress: '192.168.30.10',
+      ipAddress: 'Protected Showroom LAN',
       status: 'ONLINE',
       latency: 16,
       packetLoss: 0.0,
@@ -187,7 +187,7 @@ const FALLBACK_TERMINALS_DATA: TerminalsApiResponse = {
       code: 'SHI-03B',
       name: 'SHI-03 Weaving Stock Entry Cam 2',
       location: 'Shivamogga Retail Apex (Inventory Base)',
-      ipAddress: '192.168.30.11',
+      ipAddress: 'Protected Showroom LAN',
       status: 'ONLINE',
       latency: 20,
       packetLoss: 0.0,
@@ -336,7 +336,7 @@ export function TerminalsDetail({
     toast.promise(
       new Promise((resolve) => setTimeout(resolve, 1200)),
       {
-        loading: `Sending graceful restart signal to ${term.name} (${term.ipAddress})...`,
+        loading: `Sending graceful restart signal to ${term.name}...`,
         success: `${term.name} restarted successfully! Telemetry resumed in 14ms.`,
         error: 'Failed to restart terminal',
       }
@@ -649,9 +649,9 @@ export function TerminalsDetail({
                                 </span>
                               </div>
                               <div>
-                                <span className="text-slate-400 block">IP Address:</span>
+                                <span className="text-slate-400 block">Network Link:</span>
                                 <span className="font-mono font-semibold text-slate-700">
-                                  {term.ipAddress || 'Not available'}
+                                  'Protected Showroom LAN'
                                 </span>
                               </div>
                               <div>
@@ -911,7 +911,7 @@ export function TerminalsDetail({
                                   <td className="px-4 py-3 text-slate-500">
                                     <div>{term.location || 'Not available'}</div>
                                     <div className="flex items-center gap-1.5 mt-0.5">
-                                      <span className="font-mono text-[10px] text-slate-400">{term.ipAddress || 'Not available'}{term.port ? (':' + term.port) : ''}</span>
+                                      <span className="font-mono text-[10px] text-slate-400">Protected Showroom LAN</span>
                                       {term.serialNumber && (
                                         <span className="font-mono text-[9px] px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-100 font-semibold" title="Device Serial Number">
                                           SN: {term.serialNumber}
@@ -1127,7 +1127,7 @@ export function TerminalsDetail({
                                   </td>
                                   <td className="px-4 py-3 text-slate-500">
                                     <div>{term.location || 'Not available'}</div>
-                                    <span className="font-mono text-[10px] text-slate-400">{term.ipAddress || 'Not available'}</span>
+                                    <span className="font-mono text-[10px] text-slate-400">'Protected Showroom LAN'</span>
                                   </td>
                                   <td className="px-4 py-3 font-mono font-bold text-slate-800">
                                     {term.latency != null ? `${term.latency}ms` : 'Not available'}
@@ -1286,8 +1286,8 @@ export function TerminalsDetail({
 
                                       <div className="grid grid-cols-3 gap-2 text-[10px] bg-white p-2 rounded border border-slate-100">
                                         <div>
-                                          <span className="text-slate-400 block">IP:</span>
-                                          <span className="font-mono font-semibold text-slate-700">{term.ipAddress || 'Not available'}</span>
+                                          <span className="text-slate-400 block">Network:</span>
+                                          <span className="font-mono font-semibold text-slate-700">'Protected Showroom LAN'</span>
                                         </div>
                                         <div>
                                           <span className="text-slate-400 block">Latency:</span>
@@ -1453,8 +1453,8 @@ export function TerminalsDetail({
                           {/* Device Specs & Vital stats */}
                           <div className="grid grid-cols-2 gap-2 text-[10px] bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                             <div>
-                              <span className="text-slate-400 block">IP Address:</span>
-                              <span className="font-mono font-semibold text-slate-700">{term.ipAddress}</span>
+                              <span className="text-slate-400 block">Network Link:</span>
+                              <span className="font-mono font-semibold text-slate-700">'Protected Showroom LAN'</span>
                             </div>
                             <div>
                               <span className="text-slate-400 block">Heartbeat:</span>
@@ -1535,7 +1535,7 @@ export function TerminalsDetail({
                     {selectedCameraTerminal.name} — Live Camera Stream
                   </h3>
                   <span className="text-[10px] text-slate-500 font-mono">
-                    {selectedCameraTerminal.ipAddress}:8554/live-feed
+                    Protected Showroom Video Channel (Encrypted)
                   </span>
                 </div>
               </div>

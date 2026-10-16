@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../index.js';
+import { pool } from '../nativeDb.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
 import { container } from '../core/container/ServiceContainer.js';
@@ -10,6 +11,8 @@ import { PasswordService } from '../services/passwordService.js';
 import { generateEmployeeProfilePdf } from '../services/employeeProfilePdfService.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { EmployeeResetService } from '../services/employeeResetService.js';
+import { DatabaseBackupService } from '../services/databaseBackupService.js';
 
 const router = Router();
 
@@ -131,6 +134,66 @@ router.get('/lookup', authorize('VIEW'), async (req: AuthRequest, res) => {
   }
 });
 
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /backups — list verified database backups
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/backups', authorize('VIEW'), async (_req: AuthRequest, res) => {
+  try {
+    const backups = await DatabaseBackupService.listBackups();
+    return res.json({ backups });
+  } catch (err: any) {
+    console.error('List backups error:', err);
+    return res.status(500).json({ error: 'Failed to list database backups', message: err?.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /reset — controlled reset of employee database (PRESERVES 100% OF LOGINS)
+// ─────────────────────────────────────────────────────────────────────────────
+router.post('/reset', authorize('DELETE'), async (req: AuthRequest, res) => {
+  if (!['SUPER_ADMIN', 'ADMIN'].includes(req.user!.role)) {
+    return res.status(403).json({
+      error: 'Forbidden: Super Admin or Admin role required',
+      message: 'Only a Super Admin or Admin may perform an employee database reset.',
+    });
+  }
+
+  const resetSchema = z.object({
+    confirm: z.literal('RESET_APPROVED_EMPLOYEES'),
+    reason: z.string().optional(),
+  });
+
+  const parsed = resetSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: 'Confirmation required',
+      message: 'You must supply { confirm: "RESET_APPROVED_EMPLOYEES" } to execute employee cleanup.',
+    });
+  }
+
+  try {
+    const result = await EmployeeResetService.resetEmployeeDatabase({
+      userId: req.user!.id,
+      userName: req.user!.fullName || req.user!.email,
+      role: req.user!.role,
+      ipAddress: req.ip || req.socket.remoteAddress || '127.0.0.1',
+    });
+
+    return res.json({
+      success: true,
+      message: 'Employee database successfully reset with verified disk backup. All user logins, credentials, roles, and permissions are 100% PRESERVED.',
+      result,
+    });
+  } catch (err: any) {
+    console.error('Employee reset error:', err);
+    return res.status(500).json({
+      error: 'Employee database reset failed',
+      message: err?.message,
+    });
+  }
+});
+
 router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
     const employee = await prisma.employee.findFirst({
@@ -138,6 +201,8 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res) => {
         OR: [
           { id: req.params.id },
           { employeeCode: req.params.id },
+          { legacyEmployeeCode: req.params.id },
+          { biometricDeviceEmployeeId: req.params.id },
         ],
       },
       include: {
@@ -159,7 +224,33 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res) => {
     });
     
     if (!employee) {
-      return res.status(404).json({ error: 'Employee not found' });
+      // Diagnostic check for requested ID (e.g. 1604) in biometric mappings and devices
+      const queryId = req.params.id.trim();
+      const [mapRows]: any = await pool.query(
+        `SELECT * FROM biometric_employee_mappings WHERE enrollmentNumber = ? OR employeeId = ? LIMIT 1`,
+        [queryId, queryId]
+      );
+      const [devRows]: any = await pool.query(
+        `SELECT id, name, model, serialNumber, status, lastConnectionAt, lastSyncAt FROM biometric_devices WHERE locationCode = 'DAV' AND isActive = 1`
+      );
+
+      return res.status(404).json({
+        error: 'Employee not found',
+        employeeId: queryId,
+        locationCode: 'DAV',
+        locationName: 'Davanagere Mega Store',
+        biometricSync: {
+          mapped: mapRows.length > 0,
+          enrollmentNumber: queryId,
+          showroomCode: 'DAV',
+          status: mapRows.length > 0 ? 'PENDING_HR_PROFILE' : 'AWAITING_ENROLLMENT',
+          statusMessage: mapRows.length > 0 
+            ? `Terminal mapping found for PIN ${queryId}, but HR employee profile is not yet created.`
+            : `Employee ID ${queryId} is not found in HRMS database. Biometric terminal (eSSL MB160) is ready for enrollment in Davanagere.`,
+          devices: devRows,
+          mapping: mapRows[0] || null,
+        },
+      });
     }
     
     const isProfileElevated = ['SUPER_ADMIN', 'ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE', 'HR_AUDITOR'].includes(req.user!.role);
@@ -169,8 +260,69 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res) => {
     if (!isProfileElevated && !isOwnProfile && !isSameLocation) {
       return res.status(403).json({ error: 'Access denied' });
     }
+
+    // Query live biometric synchronization details
+    const showroomCode = employee.location?.code || 'DAV';
+    const [mapRows]: any = await pool.query(
+      `SELECT * FROM biometric_employee_mappings 
+       WHERE (employeeId = ? OR enrollmentNumber = ?) AND showroomCode = ? LIMIT 1`,
+      [employee.id, employee.biometricDeviceEmployeeId || employee.employeeCode, showroomCode]
+    );
+    const mapping = mapRows[0] || null;
+
+    const [devices]: any = await pool.query(
+      `SELECT id, serialNumber, name, model, firmwareVersion, ipAddress, port, status, protocol, lastConnectionAt, lastHeartbeatAt, lastSyncAt 
+       FROM biometric_devices 
+       WHERE locationCode = ? AND isActive = 1 
+       ORDER BY status = 'CONNECTED' DESC, lastHeartbeatAt DESC`,
+      [showroomCode]
+    );
+
+    const isDeviceOnline = devices.some((d: any) => d.status === 'CONNECTED');
+    const primaryDevice = devices[0] || null;
+
+    const [recentPunches]: any = await pool.query(
+      `SELECT id, serialNumber, enrollmentNumber, punchTime, punchType, verifyMode, syncStatus, isProcessed 
+       FROM biometric_raw_punches 
+       WHERE enrollmentNumber = ? 
+       ORDER BY punchTime DESC LIMIT 5`,
+      [mapping?.enrollmentNumber || employee.biometricDeviceEmployeeId || employee.employeeCode]
+    );
+
+    let syncStatus = 'UNMAPPED';
+    let statusMessage = 'No biometric terminal mapped';
+    if (mapping && isDeviceOnline) {
+      syncStatus = 'CONNECTED';
+      statusMessage = `Terminal active (MB160 - ${primaryDevice?.name || 'Davanagere'})`;
+    } else if (mapping && !isDeviceOnline) {
+      syncStatus = 'DISCONNECTED';
+      statusMessage = 'Terminal offline / communication timeout';
+    } else if (!mapping) {
+      syncStatus = 'AWAITING_ENROLLMENT';
+      statusMessage = `Awaiting enrollment on Davanagere eSSL MB160 terminal`;
+    }
+
+    const biometricSync = {
+      mapped: Boolean(mapping),
+      enrollmentNumber: mapping?.enrollmentNumber || employee.biometricDeviceEmployeeId || null,
+      showroomCode,
+      status: syncStatus,
+      statusMessage,
+      lastSyncAt: mapping?.updatedAt || primaryDevice?.lastSyncAt || null,
+      primaryDevice: primaryDevice ? {
+        id: primaryDevice.id,
+        name: primaryDevice.name,
+        model: primaryDevice.model,
+        serialNumber: primaryDevice.serialNumber,
+        ipAddress: primaryDevice.ipAddress,
+        port: primaryDevice.port,
+        status: primaryDevice.status,
+      } : null,
+      devices,
+      recentPunches,
+    };
     
-    res.json(employee);
+    res.json({ ...employee, biometricSync });
   } catch (error) {
     console.error('Get employee error:', error);
     res.status(500).json({ error: 'Failed to get employee' });
@@ -787,6 +939,29 @@ router.post('/:id/photo', authorize('EDIT'), async (req: AuthRequest, res) => {
   } catch (error: any) {
     console.error('[Employee Photo Upload Error]:', error);
     return res.status(500).json({ error: 'Failed to save profile photo' });
+  }
+});
+
+// GET /:id/photo - Retrieve profile photo
+router.get('/:id/photo', async (req: AuthRequest, res) => {
+  try {
+    const employeeId = req.params.id;
+    const employee = await prisma.employee.findUnique({ where: { id: employeeId } });
+    const empName = employee?.fullName || 'Employee';
+    const empCode = employee?.employeeCode || employeeId;
+
+    const userFolders = UserUploadService.ensureUserFolder(empName, empCode);
+    for (const folder of userFolders) {
+      const photoPath = path.join(folder, 'photos', 'avatar.png');
+      try {
+        await fs.access(photoPath);
+        return res.sendFile(photoPath);
+      } catch {}
+    }
+
+    return res.status(404).json({ error: 'Profile photo not found' });
+  } catch (error: any) {
+    return res.status(500).json({ error: 'Failed to retrieve profile photo' });
   }
 });
 

@@ -5,44 +5,31 @@
   "workspaces": [
     "frontend",
     "backend",
-    "database",
-    "desktop"
+    "database"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "npm run dev --workspace=backend",
     "dev:frontend": "npm run dev --workspace=frontend",
-    "dev:desktop": "concurrently -k \"npm run dev:backend\" \"npm run dev:frontend\" \"wait-on http://127.0.0.1:3000 http://127.0.0.1:4000/api/health && electron desktop/dist/main.js\"",
     "build": "npm run build --workspaces",
     "build:backend": "npm run build --workspace=backend",
     "build:frontend": "npm run build --workspace=frontend",
-    "build:desktop": "npm run build --workspace=desktop",
-    "package:win": "electron-builder --project desktop",
     "db:migrate": "npm run db:migrate --workspace=database",
     "db:seed": "npm run db:seed --workspace=database",
     "db:setup": "npm run db:setup --workspace=database",
     "db:schema": "npm run db:schema --workspace=database",
-    "db:migrate-to-sqlite": "tsx scripts/migrateToSqlite.ts",
-    "icons:generate": "tsx scripts/generateDesktopIcons.ts",
     "install:all": "npm install",
     "test": "npm test --workspace=backend",
     "benchmark": "npm run benchmark --workspace=backend",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present",
-    "mobile:start": "npm start --prefix mobile",
-    "mobile:typecheck": "npm run typecheck --prefix mobile"
+    "lint": "npm run lint --workspaces --if-present"
   },
   "devDependencies": {
     "concurrently": "^9.2.5",
-    "electron": "^44.7.0",
-    "electron-builder": "^26.17.0",
     "tsx": "^4.7.0",
-    "typescript": "^5.3.3",
-    "wait-on": "^9.5.1"
+    "typescript": "^5.3.3"
   },
   "overrides": {
-    "@electron/get": "^5.1.0",
-    "builder-util-runtime": "^9.7.0",
     "next": "15.5.27",
     "eslint-config-next": "15.5.27",
     "next-auth": {
