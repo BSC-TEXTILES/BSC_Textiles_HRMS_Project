@@ -16,11 +16,65 @@ import {
   ingestRawPunches,
   recordDeviceHeartbeat,
   updateDeviceSpecs,
+  ingestDeviceUsers,
+  popDeviceCommand,
 } from '../services/biometricService.js';
 import { pool } from '../nativeDb.js';
 import { socketIO } from '../socket.js';
 
 export const admsRouter = Router();
+
+/**
+ * Parses ADMS tab-separated or space-separated user profile records from eSSL MB160
+ * Standard format: <PIN>\t<Name>\t<Pri>\t<Passwd>\t<Card>\t<Grp>\t<TZ>
+ */
+export function parseUserInfoBody(bodyText: string) {
+  const lines = bodyText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const users: Array<{ pin: string; name: string; privilege?: number; card?: string; password?: string }> = [];
+
+  for (const line of lines) {
+    if (line.startsWith('#') || line.startsWith('//')) continue;
+    if (line.includes('=')) {
+      const parts = line.split(/[\t\s]+/);
+      const u: any = {};
+      for (const p of parts) {
+        const [k, v] = p.split('=');
+        if (k && v !== undefined) u[k.toUpperCase()] = v.trim();
+      }
+      if (u.PIN) {
+        users.push({
+          pin: u.PIN,
+          name: u.NAME || '',
+          privilege: Number(u.PRI) || 0,
+          card: u.CARD || '',
+          password: u.PASSWD || '',
+        });
+      }
+    } else if (line.includes('\t')) {
+      const parts = line.split('\t');
+      if (parts.length >= 1 && parts[0].trim()) {
+        users.push({
+          pin: parts[0].trim(),
+          name: parts[1] ? parts[1].trim() : '',
+          privilege: parts[2] ? Number(parts[2].trim()) : 0,
+          password: parts[3] ? parts[3].trim() : '',
+          card: parts[4] ? parts[4].trim() : '',
+        });
+      }
+    } else {
+      const parts = line.split(/\s+/);
+      if (parts.length >= 1 && parts[0].trim()) {
+        users.push({
+          pin: parts[0].trim(),
+          name: parts[1] ? parts[1].trim() : '',
+          privilege: parts[2] ? Number(parts[2].trim()) : 0,
+          card: parts[3] ? parts[3].trim() : '',
+        });
+      }
+    }
+  }
+  return users;
+}
 
 /**
  * Parses ADMS tab-separated or space-separated attendance log lines from eSSL MB160
@@ -176,6 +230,17 @@ admsRouter.post(['/cdata', '/api/devices/adms/cdata'], async (req: Request, res:
         res.setHeader('Content-Type', 'text/plain');
         return res.send(`OK: ${punches.length}`);
       }
+    } else if ((table === 'USERINFO' || table === 'USER') && rawBody) {
+      const users = parseUserInfoBody(rawBody);
+      if (users.length > 0) {
+        const result = await ingestDeviceUsers(sn, users);
+        console.log(
+          `[ADMS User Push] Ingested ${users.length} user records from ${sn}: ` +
+          `${result.updatedEmployees} matched existing employees, ${result.mapped} registered in mappings`
+        );
+        res.setHeader('Content-Type', 'text/plain');
+        return res.send(`OK: ${users.length}`);
+      }
     } else if (table === 'OPTIONS' && rawBody) {
       // Terminal specification registration (Firmware, UserCount, FaceCount, etc.)
       const specs = parseSpecsBody(rawBody);
@@ -206,6 +271,12 @@ admsRouter.get(['/getrequest', '/api/devices/adms/getrequest'], async (req: Requ
   const sn = (req.query.SN as string || '').trim();
   if (sn) {
     await recordDeviceHeartbeat(sn, req.ip);
+    const cmd = popDeviceCommand(sn);
+    if (cmd) {
+      console.log(`[ADMS Command Dispatch] Sending ${cmd.command} (ID: ${cmd.id}) to ${sn}`);
+      res.setHeader('Content-Type', 'text/plain');
+      return res.send(`C:${cmd.id}:${cmd.command}\n`);
+    }
   }
 
   res.setHeader('Content-Type', 'text/plain');
@@ -218,9 +289,12 @@ admsRouter.get(['/getrequest', '/api/devices/adms/getrequest'], async (req: Requ
  */
 admsRouter.post(['/devicecmd', '/api/devices/adms/devicecmd'], async (req: Request, res: Response) => {
   const sn = (req.query.SN as string || '').trim();
+  const cmdId = (req.query.ID as string || '').trim();
+  const ret = (req.query.Return as string || '0').trim();
   if (sn) {
     await recordDeviceHeartbeat(sn, req.ip);
   }
+  console.log(`[ADMS DeviceCmd Ack] SN: ${sn || 'UNKNOWN'}, CmdID: ${cmdId || 'N/A'}, Return: ${ret}`);
   res.setHeader('Content-Type', 'text/plain');
   res.send('OK');
 });

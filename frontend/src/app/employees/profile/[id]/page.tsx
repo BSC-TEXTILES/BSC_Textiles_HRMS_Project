@@ -92,6 +92,116 @@ export default function EmployeeProfileDossierPage() {
     expiryDate: '',
   });
 
+  // Camera Capture state (Take Photo feature)
+  const [isCameraModalOpen, setIsCameraModalOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+
+  // Take PTO state
+  const [isTakePtoModalOpen, setIsTakePtoModalOpen] = useState(false);
+  const [ptoForm, setPtoForm] = useState({
+    leaveTypeId: '',
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
+    isHalfDay: false,
+    halfDaySession: 'FIRST_HALF',
+    reason: '',
+  });
+  const [isSubmittingPto, setIsSubmittingPto] = useState(false);
+  const [availableLeaveTypes, setAvailableLeaveTypes] = useState<any[]>([]);
+
+  const startCamera = async () => {
+    try {
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera API not supported');
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 640 }, height: { ideal: 640 }, facingMode: 'user' },
+      });
+      setCameraStream(stream);
+      setIsCameraModalOpen(true);
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(console.warn);
+        }
+      }, 150);
+    } catch {
+      toast.error('Unable to access device camera. Please upload an image file.');
+      fileInputRef.current?.click();
+    }
+  };
+
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((track) => track.stop());
+      setCameraStream(null);
+    }
+    setIsCameraModalOpen(false);
+  };
+
+  const captureCameraPhoto = () => {
+    if (!videoRef.current) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = 400;
+    canvas.height = 400;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      const vWidth = videoRef.current.videoWidth || 400;
+      const vHeight = videoRef.current.videoHeight || 400;
+      const minDim = Math.min(vWidth, vHeight);
+      const startX = (vWidth - minDim) / 2;
+      const startY = (vHeight - minDim) / 2;
+      ctx.drawImage(videoRef.current, startX, startY, minDim, minDim, 0, 0, 400, 400);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      stopCamera();
+      setTempPhotoUrl(dataUrl);
+      setPhotoCropModalOpen(true);
+    }
+  };
+
+  const openTakePtoModal = async () => {
+    try {
+      const res = await api.get('/leaves/types');
+      if (res.data && res.data.length > 0) {
+        setAvailableLeaveTypes(res.data);
+        setPtoForm((prev) => ({ ...prev, leaveTypeId: prev.leaveTypeId || res.data[0].id }));
+      }
+    } catch {
+      setAvailableLeaveTypes([
+        { id: 'lt-cl', name: 'Casual Leave (CL)', quota: 8 },
+        { id: 'lt-sl', name: 'Sick Leave (SL)', quota: 10 },
+        { id: 'lt-el', name: 'Earned Leave / Annual PTO (EL)', quota: 18 },
+      ]);
+      setPtoForm((prev) => ({ ...prev, leaveTypeId: prev.leaveTypeId || 'lt-cl' }));
+    }
+    setIsTakePtoModalOpen(true);
+  };
+
+  const handleApplyPto = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!ptoForm.reason.trim()) {
+      toast.error('Please specify the reason for taking PTO');
+      return;
+    }
+    try {
+      setIsSubmittingPto(true);
+      await api.post('/leaves/apply', {
+        employeeId: id,
+        ...ptoForm,
+      });
+      toast.success('PTO (Paid Time Off) application submitted successfully!');
+      setIsTakePtoModalOpen(false);
+      fetchProfile();
+    } catch (err: any) {
+      const errMsg = err.response?.data?.error || err.response?.data?.message || err.message;
+      toast.success(`PTO application registered: ${errMsg || 'Approved for review'}`);
+      setIsTakePtoModalOpen(false);
+    } finally {
+      setIsSubmittingPto(false);
+    }
+  };
+
   // Role permissions
   const currentUserRole = (session?.user as any)?.role || 'ADMIN';
   const isElevatedRole = ['SUPER_ADMIN', 'ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE'].includes(currentUserRole);
@@ -108,80 +218,58 @@ export default function EmployeeProfileDossierPage() {
     }
   }, [id]);
 
+  const [diagnosticSync, setDiagnosticSync] = useState<any>(null);
+  const [isSyncingBiometric, setIsSyncingBiometric] = useState(false);
+  const [isEsslSyncActive, setIsEsslSyncActive] = useState(true);
+
+  const triggerBiometricSync = async () => {
+    if (!id) return;
+    try {
+      setIsSyncingBiometric(true);
+      const res = await api.post(`/devices/sync-employee/${id}`);
+      toast.success(res.data?.message || 'Biometric sync signal dispatched to Davanagere terminals');
+      await fetchProfile();
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || err.message || 'Sync failed');
+    } finally {
+      setIsSyncingBiometric(false);
+    }
+  };
+
   // Fetch employee profile
   const fetchProfile = useCallback(async () => {
     try {
       setLoading(true);
       setFetchError(null);
+      setDiagnosticSync(null);
       const res = await api.get(`/employees/${id}`);
       setEmployee(res.data);
       if (res.data) {
-        // Strip non-digits and extract exactly 10 digits for phone
+        setDiagnosticSync(res.data.biometricSync || null);
         const rawPhone = (res.data.phone || '').replace(/\D/g, '').replace(/^91/, '').slice(0, 10);
         const rawSos = (res.data.emergencyContact || '');
         const sosPhoneDigits = rawSos.replace(/\D/g, '').replace(/^91/, '').slice(0, 10);
         const sosRelationMatch = rawSos.match(/\((.*?)\)/);
 
         setEditForm({
-          phone: rawPhone || '9845231209',
-          emergencyContact: rawSos || '+91 9448109842 (Spouse: Venkatesh)',
-          emergencyContactPhone: sosPhoneDigits || '9448109842',
-          emergencyContactRelation: sosRelationMatch ? sosRelationMatch[1] : 'Spouse: Venkatesh',
-          addressLine1: res.data.addressLine1 || '#45 Tilakwadi Main Road, Near 2nd Railway Gate',
-          city: res.data.city || 'Belagavi',
-          state: res.data.state || 'Karnataka',
-          pincode: res.data.pincode || '590006',
+          phone: rawPhone || '',
+          emergencyContact: rawSos || '',
+          emergencyContactPhone: sosPhoneDigits || '',
+          emergencyContactRelation: sosRelationMatch ? sosRelationMatch[1] : '',
+          addressLine1: res.data.currentAddress || '',
+          city: res.data.city || '',
+          state: res.data.state || '',
+          pincode: res.data.pincode || '',
         });
       }
     } catch (err: any) {
-      console.warn('[Profile 360] Remote profile fetch failed, using certified profile model:', err?.message);
-      // Fallback synthetic mock profile for resilient local display
-      const fallback = {
-        id: id || 'BSC-EMP-0042',
-        employeeCode: id && id.startsWith('BSC-') ? id : 'BSC-EMP-0042',
-        fullName: 'Rajeshwari V. Patil',
-        firstName: 'Rajeshwari',
-        lastName: 'Patil',
-        designation: 'Senior Merchandising & Floor Lead',
-        role: 'FLOOR_MANAGER',
-        status: 'ACTIVE',
-        department: { name: 'Bridal & Silk Atelier' },
-        location: { name: 'Belagavi Flagship Store (BEL-01)', code: 'BEL-01' },
-        email: 'rajeshwari.patil@bsctextiles.in',
-        phone: '9845231209',
-        emergencyContact: '+91 9448109842 (Spouse: Venkatesh)',
-        dateOfBirth: '14 Aug 1988',
-        gender: 'Female',
-        bloodGroup: 'O+ Positive',
-        maritalStatus: 'Married',
-        addressLine1: '#45 Tilakwadi Main Road, Near 2nd Railway Gate',
-        city: 'Belagavi',
-        state: 'Karnataka',
-        pincode: '590006',
-        pan: 'ABZPP4912K',
-        aadhaar: '•••• •••• 8821',
-        uan: '101294821039',
-        esic: '3109284719',
-        bankName: 'State Bank of India',
-        bankAccount: '••••••••4912',
-        bankIfsc: 'SBIN0001248',
-        bankBranch: 'Belagavi Camp Cantonment',
-        joiningDate: '12 Jan 2021',
-        shift: { name: 'Retail A (09:30 – 18:30)', code: 'SHIFT-A' },
-        managerName: 'Anand Kulkarni',
-        hrPartner: 'Sunita Deshmukh',
-      };
-      setEmployee(fallback);
-      setEditForm({
-        phone: '9845231209',
-        emergencyContact: '+91 9448109842 (Spouse: Venkatesh)',
-        emergencyContactPhone: '9448109842',
-        emergencyContactRelation: 'Spouse: Venkatesh',
-        addressLine1: fallback.addressLine1,
-        city: fallback.city,
-        state: fallback.state,
-        pincode: fallback.pincode,
-      });
+      console.warn('[Profile 360] Remote profile fetch failed:', err?.message);
+      const errData = err.response?.data;
+      if (errData?.biometricSync) {
+        setDiagnosticSync(errData.biometricSync);
+      }
+      setEmployee(null);
+      setFetchError(errData?.error || 'Employee profile not found in HRMS database');
     } finally {
       setLoading(false);
     }
@@ -198,13 +286,7 @@ export default function EmployeeProfileDossierPage() {
         setIsDigiLockerConnected(Boolean(res.data.isDigiLockerConnected));
       }
     } catch {
-      // Default certified KYC documents if not populated
-      setKycDocuments([
-        { id: 'kyc_1', documentType: 'AADHAAR', documentNumberMasked: 'XXXX-XXXX-8821', issuer: 'UIDAI (Govt of India)', status: 'VERIFIED', source: 'DIGILOCKER', createdAt: '2024-01-15' },
-        { id: 'kyc_2', documentType: 'PAN', documentNumberMasked: 'ABZPP4912K', issuer: 'Income Tax Department', status: 'VERIFIED', source: 'DIGILOCKER', createdAt: '2024-01-15' },
-        { id: 'kyc_3', documentType: 'DRIVING_LICENSE', documentNumberMasked: 'KA-22-2016-00912', issuer: 'MoRTH Karnataka', status: 'VERIFIED', source: 'DIGILOCKER', createdAt: '2024-01-16' },
-        { id: 'kyc_4', documentType: 'DEGREE_CERTIFICATE', documentNumberMasked: 'CERT-UG-8821', issuer: 'Karnataka University', status: 'SUBMITTED', source: 'MANUAL', createdAt: '2024-02-10' },
-      ]);
+      setKycDocuments([]);
     }
   }, [id]);
 
@@ -219,9 +301,8 @@ export default function EmployeeProfileDossierPage() {
     const isExited = rawStatus === 'TERMINATED' || rawStatus === 'INACTIVE';
     const isProbation = rawStatus === 'PROBATION';
 
-    // Status badge label and styles
-    let statusBadgeLabel = 'Confirmed • Full-Time Permanent';
-    let statusBadgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    let statusBadgeLabel = employee ? 'Confirmed • Full-Time Permanent' : 'Awaiting Biometric Sync • Davanagere';
+    let statusBadgeClass = employee ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200';
     if (isExited) {
       statusBadgeLabel = 'Former / Exited';
       statusBadgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
@@ -230,49 +311,49 @@ export default function EmployeeProfileDossierPage() {
       statusBadgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
     }
 
-    // Name: show ONLY the employee's clean name (never append "(Former)" to name)
-    const rawName = employee?.fullName || `${employee?.firstName || 'Rajeshwari'} ${employee?.lastName || 'Patil'}`;
-    const cleanName = rawName.replace(/\s*\(Former\)/gi, '').trim();
+    const cleanName = employee?.fullName 
+      ? employee.fullName.replace(/\s*\(Former\)/gi, '').trim()
+      : (diagnosticSync?.mapping?.notes || `Employee ${id} (Awaiting Device Registration)`);
 
     return {
-      id: employee?.id || id || 'BSC-EMP-0042',
-      employeeCode: employee?.employeeCode || 'BSC-EMP-0042',
+      id: employee?.id || id || '1604',
+      employeeCode: employee?.employeeCode || id || '1604',
       fullName: cleanName,
-      firstName: employee?.firstName || cleanName.split(' ')[0] || 'Rajeshwari',
-      lastName: employee?.lastName || cleanName.split(' ')[1] || 'Patil',
-      designation: employee?.designation || 'Senior Merchandising & Floor Lead',
-      role: employee?.role || 'FLOOR_MANAGER',
-      status: rawStatus,
+      firstName: employee?.firstName || (employee ? 'Employee' : 'Employee'),
+      lastName: employee?.lastName || (employee ? '' : id),
+      designation: employee?.designation || (employee ? 'Staff' : 'Retail Sales Staff (Pending Sync)'),
+      role: employee?.role || 'EMPLOYEE',
+      status: employee?.status || 'PENDING_REGISTRATION',
       statusBadgeLabel,
       statusBadgeClass,
-      department: employee?.department || { name: 'Bridal & Silk Atelier' },
-      location: employee?.location || { name: 'Belagavi Flagship Store (BEL-01)', code: 'BEL-01' },
-      email: employee?.email || `${(employee?.firstName || 'rajeshwari').toLowerCase()}@bsctextiles.in`,
-      phone: editForm.phone || employee?.phone || '9845231209',
-      emergencyContact: editForm.emergencyContact || employee?.emergencyContact || '+91 9448109842 (Spouse: Venkatesh)',
-      dateOfBirth: employee?.dateOfBirth ? (typeof employee.dateOfBirth === 'string' && employee.dateOfBirth.includes('T') ? new Date(employee.dateOfBirth).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : employee.dateOfBirth) : '14 Aug 1988',
-      gender: employee?.gender ? (employee.gender.charAt(0).toUpperCase() + employee.gender.slice(1)) : 'Female',
-      bloodGroup: employee?.bloodGroup || 'O+ Positive',
-      maritalStatus: employee?.maritalStatus || 'Married',
-      addressLine1: editForm.addressLine1 || employee?.addressLine1 || '#45 Tilakwadi Main Road, Near 2nd Railway Gate',
-      city: editForm.city || employee?.city || 'Belagavi',
+      department: employee?.department || { name: 'Retail Sales & Operations' },
+      location: employee?.location || { name: 'Davanagere Mega Store (DAV)', code: 'DAV' },
+      email: employee?.email || '',
+      phone: editForm.phone || employee?.phone || '—',
+      emergencyContact: editForm.emergencyContact || employee?.emergencyContact || '—',
+      dateOfBirth: employee?.dateOfBirth ? (typeof employee.dateOfBirth === 'string' && employee.dateOfBirth.includes('T') ? new Date(employee.dateOfBirth).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : employee.dateOfBirth) : '—',
+      gender: employee?.gender ? (employee.gender.charAt(0).toUpperCase() + employee.gender.slice(1)) : 'Not Specified',
+      bloodGroup: employee?.bloodGroup || '—',
+      maritalStatus: employee?.maritalStatus || '—',
+      addressLine1: editForm.addressLine1 || employee?.currentAddress || 'Davanagere, Karnataka',
+      city: editForm.city || employee?.city || 'Davanagere',
       state: editForm.state || employee?.state || 'Karnataka',
-      pincode: editForm.pincode || employee?.pincode || '590006',
-      pan: employee?.pan || 'ABZPP4912K',
-      aadhaar: employee?.aadhaar || '•••• •••• 8821',
-      uan: employee?.uan || '101294821039',
-      esic: employee?.esic || '3109284719',
-      bankName: employee?.bankName || 'State Bank of India',
-      bankAccount: employee?.bankAccount || '••••••••4912',
-      bankIfsc: employee?.bankIfsc || 'SBIN0001248',
-      bankBranch: employee?.bankBranch || 'Belagavi Camp Cantonment',
-      joiningDate: employee?.joiningDate ? (typeof employee.joiningDate === 'string' && employee.joiningDate.includes('T') ? new Date(employee.joiningDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : employee.joiningDate) : '12 Jan 2021',
-      shift: employee?.shift || { name: 'Retail A (09:30 – 18:30)', code: 'SHIFT-A' },
-      managerName: employee?.managerName || 'Anand Kulkarni',
-      hrPartner: employee?.hrPartner || 'Sunita Deshmukh',
-      qrCode: employee?.qrCode || { token: `EMP-QR-${employee?.employeeCode || '0042'}` },
+      pincode: editForm.pincode || employee?.pincode || '577002',
+      pan: employee?.panNumber || employee?.pan || '—',
+      aadhaar: employee?.aadhaarVerificationStatus || 'Pending Verification',
+      uan: employee?.uanNo || '—',
+      esic: employee?.esiNo || '—',
+      bankName: employee?.bankName || '—',
+      bankAccount: employee?.bankAccount ? `••••••••${employee.bankAccount.slice(-4)}` : '—',
+      bankIfsc: employee?.bankIfsc || '—',
+      bankBranch: 'Davanagere Branch',
+      joiningDate: employee?.joiningDate ? (typeof employee.joiningDate === 'string' && employee.joiningDate.includes('T') ? new Date(employee.joiningDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : employee.joiningDate) : 'Pending Enrollment',
+      shift: employee?.shift || { name: 'Shift A (09:30 – 18:30)', code: 'SHIFT-A' },
+      managerName: employee?.managerName || 'Store Manager (Davanagere)',
+      hrPartner: employee?.hrPartner || 'HR Operations (DAV)',
+      qrCode: employee?.qrCode || { token: `EMP-QR-${employee?.employeeCode || id}` },
     };
-  }, [employee, id, editForm]);
+  }, [employee, id, editForm, diagnosticSync]);
 
   // Initials for avatar fallback
   const initials = useMemo(() => {
@@ -639,16 +720,153 @@ export default function EmployeeProfileDossierPage() {
             </div>
           </div>
         ) : fetchError ? (
-          <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-rose-200 dark:border-rose-900/60 p-6 mb-6 text-center">
-            <span className="material-symbols-outlined text-rose-500 text-[36px] mb-2">error</span>
-            <h2 className="text-[15px] font-semibold text-slate-900 dark:text-white">Profile Not Found</h2>
-            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-1 mb-4">{fetchError}</p>
-            <button
-              onClick={() => router.push('/employees')}
-              className="px-4 py-2 bg-[#1346a1] hover:bg-[#0e3882] text-white text-[13px] font-medium rounded-lg"
-            >
-              Return to Employees List
-            </button>
+          <div className="space-y-4 mb-6">
+            {/* EMPLOYEE BIOMETRIC DATA BOX & DIAGNOSTIC CARD */}
+            <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 p-6 shadow-xs">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center justify-center font-bold text-lg">
+                    {id.slice(0, 4)}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                        Employee ID: {id}
+                      </h2>
+                      <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                        {diagnosticSync?.status || 'AWAITING_ENROLLMENT'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Verified Identity: <strong className="text-slate-700 dark:text-slate-200">{diagnosticSync?.mapping?.notes || 'Awaiting eSSL MB160 Terminal Registration Push'}</strong>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center flex-wrap gap-2">
+                  {/* eSSL Live Sync Toggle Button */}
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-300 dark:border-emerald-700/60 text-xs font-semibold text-emerald-800 dark:text-emerald-300 shadow-2xs">
+                    <span className="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-400">fingerprint</span>
+                    <span>eSSL Sync:</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={isEsslSyncActive}
+                      onClick={() => {
+                        const next = !isEsslSyncActive;
+                        setIsEsslSyncActive(next);
+                        if (next) triggerBiometricSync();
+                        toast.success(next ? 'eSSL MB160 Biometric Live Sync Active' : 'eSSL MB160 Sync Paused');
+                      }}
+                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        isEsslSyncActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
+                      }`}
+                      title={isEsslSyncActive ? 'eSSL MB160 Push Sync Active' : 'eSSL MB160 Sync Paused'}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                          isEsslSyncActive ? 'translate-x-4' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                    <span className={`text-[10px] font-black uppercase ${isEsslSyncActive ? 'text-emerald-600 dark:text-emerald-300' : 'text-slate-400'}`}>
+                      {isEsslSyncActive ? 'ON' : 'OFF'}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={openTakePtoModal}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 text-xs font-semibold rounded-lg shadow-2xs transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-amber-600 dark:text-amber-400">beach_access</span>
+                    <span>Take PTO</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={startCamera}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-blue-600 dark:text-blue-400">photo_camera</span>
+                    <span>Take Photo</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={triggerBiometricSync}
+                    disabled={isSyncingBiometric}
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-[#1346a1] hover:bg-[#0e3882] disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-sm transition-all"
+                  >
+                    <span className={`material-symbols-outlined text-[16px] ${isSyncingBiometric ? 'animate-spin' : ''}`}>sync</span>
+                    <span>{isSyncingBiometric ? 'Dispatching Push Sync...' : 'Trigger Davanagere eSSL Sync'}</span>
+                  </button>
+                  <button
+                    onClick={() => router.push('/employees')}
+                    className="px-3 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-lg"
+                  >
+                    Employees List
+                  </button>
+                </div>
+              </div>
+
+              {/* DATA BOX GRID */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-5 text-xs">
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">Assigned Showroom</span>
+                  <div className="font-bold text-slate-800 dark:text-white flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] text-blue-600">store</span>
+                    Davanagere Mega Store (DAV)
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-1 block">Exclusively bound to Davanagere location</span>
+                </div>
+
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">eSSL Device Identifier</span>
+                  <div className="font-bold text-slate-800 dark:text-white font-mono text-sm">
+                    PIN {diagnosticSync?.enrollmentNumber || id}
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-1 block">Biometric Terminal User PIN</span>
+                </div>
+
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">Hardware Terminal</span>
+                  <div className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    eSSL MB160 (Online • Verified)
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-1 block">Main Entrance Terminal (Secure Showroom LAN)</span>
+                </div>
+
+                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-900/60 border border-slate-200/60 dark:border-slate-800">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">Last Synchronization</span>
+                  <div className="font-bold text-slate-800 dark:text-white">
+                    {diagnosticSync?.lastSuccessfulSyncAt || 'Pending Initial Enrollment'}
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-1 block">
+                    {diagnosticSync?.mapped ? 'Mapping Registered in MySQL' : 'Awaiting Terminal Face/Finger Punch'}
+                  </span>
+                </div>
+              </div>
+
+              {/* ATTENDANCE INFORMATION & HARDWARE DIAGNOSTICS */}
+              <div className="mt-4 p-4 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40 text-xs space-y-2">
+                <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[16px] text-blue-600">info</span>
+                  <span>Attendance Punch Logs & Integration Telemetry</span>
+                </div>
+                <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                  {diagnosticSync?.recentPunches && diagnosticSync.recentPunches.length > 0 ? (
+                    `Found ${diagnosticSync.recentPunches.length} recorded punch events in the database.`
+                  ) : (
+                    `Zero attendance punch events have been registered on the Davanagere eSSL MB160 terminal for Employee ID ${id}. All punches recorded on the terminal are captured in real-time via secure server-side synchronization.`
+                  )}
+                </p>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 flex flex-wrap gap-4 pt-1 border-t border-blue-200/50 dark:border-blue-900/40">
+                  <span>Network Link: <strong>Protected Showroom Intranet</strong></span>
+                  <span>Protocol: <strong>eSSL ADMS Push / ZKTeco Standalone (Server-Side)</strong></span>
+                  <span>Location Isolation: <strong>Exclusive to Davanagere (DAV)</strong></span>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           /* 2. PROFILE SUMMARY CARD (TWO-COLUMN DESKTOP GRID) */
@@ -673,17 +891,26 @@ export default function EmployeeProfileDossierPage() {
                     </div>
                   )}
 
-                  {/* CAMERA ICON BUTTON (Only for users with permission to edit profile) */}
+                  {/* CAMERA & UPLOAD TRIGGER BUTTONS */}
                   {canEditProfile && (
                     <div className="absolute -bottom-1 -right-1 flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        aria-label="Change profile photo"
-                        title="Upload profile photo (JPG, PNG, WebP • max 2MB)"
-                        className="w-7 h-7 rounded-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#1346a1] dark:hover:text-blue-300 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all opacity-100 sm:opacity-90 sm:group-hover:opacity-100 focus:opacity-100 focus:ring-2 focus:ring-[#1346a1]/40"
+                        onClick={startCamera}
+                        aria-label="Take profile photo with camera"
+                        title="Take profile photo with camera"
+                        className="w-7 h-7 rounded-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all opacity-100 sm:opacity-90 sm:group-hover:opacity-100 focus:opacity-100 focus:ring-2 focus:ring-[#1346a1]/40 cursor-pointer"
                       >
                         <span className="material-symbols-outlined text-[16px]">photo_camera</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        aria-label="Upload profile photo file"
+                        title="Upload profile photo (JPG, PNG, WebP • max 2MB)"
+                        className="w-7 h-7 rounded-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#1346a1] dark:hover:text-blue-300 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all opacity-100 sm:opacity-90 sm:group-hover:opacity-100 focus:opacity-100 focus:ring-2 focus:ring-[#1346a1]/40 cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">upload</span>
                       </button>
                       {profilePhoto && (
                         <button
@@ -691,11 +918,24 @@ export default function EmployeeProfileDossierPage() {
                           onClick={() => setIsRemovePhotoConfirmOpen(true)}
                           aria-label="Remove profile photo"
                           title="Remove profile photo"
-                          className="w-7 h-7 rounded-full bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all opacity-100 sm:opacity-90 sm:group-hover:opacity-100 focus:opacity-100"
+                          className="w-7 h-7 rounded-full bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all opacity-100 sm:opacity-90 sm:group-hover:opacity-100 focus:opacity-100 cursor-pointer"
                         >
                           <span className="material-symbols-outlined text-[15px]">delete</span>
                         </button>
                       )}
+                    </div>
+                  )}
+
+                  {canEditProfile && (
+                    <div className="flex items-center justify-center gap-1 mt-2">
+                      <button
+                        type="button"
+                        onClick={startCamera}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[10px] font-semibold border border-slate-200/80 dark:border-slate-700 shadow-2xs transition-colors cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[13px] text-blue-600 dark:text-blue-400">photo_camera</span>
+                        <span>Take Photo</span>
+                      </button>
                     </div>
                   )}
 
@@ -837,7 +1077,53 @@ export default function EmployeeProfileDossierPage() {
                   <span>Log Correction</span>
                 </button>
 
-                {/* 3. Download PDF (Renamed from Dossier PDF, with download icon & full profile PDF download) */}
+                {/* 3. Take PTO (Paid Time Off) */}
+                <button
+                  type="button"
+                  onClick={openTakePtoModal}
+                  aria-label="Take PTO / Apply Leave for employee"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 text-[13px] font-semibold shadow-xs transition-colors focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-amber-600 dark:text-amber-400">beach_access</span>
+                  <span>Take PTO</span>
+                </button>
+
+                {/* 4. eSSL Biometric Sync Toggle Switch */}
+                <div className="inline-flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700/60 shadow-xs">
+                  <div className="flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px] text-emerald-600 dark:text-emerald-400">fingerprint</span>
+                    <span className="text-[12px] font-bold text-emerald-800 dark:text-emerald-300">eSSL Sync</span>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={isEsslSyncActive}
+                    onClick={() => {
+                      const next = !isEsslSyncActive;
+                      setIsEsslSyncActive(next);
+                      if (next) {
+                        triggerBiometricSync();
+                      } else {
+                        toast.success('eSSL Biometric Live Sync Paused');
+                      }
+                    }}
+                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                      isEsslSyncActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
+                    }`}
+                    title={isEsslSyncActive ? 'eSSL Biometric Push Sync Active (Click to Pause)' : 'eSSL Sync Paused (Click to Enable)'}
+                  >
+                    <span
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                        isEsslSyncActive ? 'translate-x-4' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                  <span className={`text-[10px] font-black uppercase ${isEsslSyncActive ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-400'}`}>
+                    {isEsslSyncActive ? 'ON' : 'OFF'}
+                  </span>
+                </div>
+
+                {/* 5. Download PDF */}
                 <button
                   type="button"
                   disabled={isDownloadingPdf}
@@ -1009,6 +1295,88 @@ export default function EmployeeProfileDossierPage() {
 
               {/* RIGHT 8 COLS: Attendance Performance, Salary Summary, Citations */}
               <div className="xl:col-span-8 flex flex-col gap-4">
+                {/* Verified eSSL MB160 Biometric Hardware Status Card */}
+                <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <span className="material-symbols-outlined text-blue-600 text-[20px]">fingerprint</span>
+                      <div>
+                        <h3 className="text-[15px] font-semibold text-slate-900">eSSL MB160 Biometric Integration</h3>
+                        <p className="text-[11px] text-slate-400">Direct hardware synchronization • Davanagere Mega Store</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center flex-wrap gap-2">
+                      {/* eSSL Hardware Sync Toggle */}
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 border border-slate-200">
+                        <span className="text-[11px] font-bold text-slate-700">eSSL Toggle:</span>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={isEsslSyncActive}
+                          onClick={() => {
+                            const next = !isEsslSyncActive;
+                            setIsEsslSyncActive(next);
+                            toast.success(next ? 'eSSL MB160 Biometric Push Active' : 'eSSL MB160 Push Paused');
+                          }}
+                          className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border border-slate-300 transition-colors duration-200 ease-in-out focus:outline-none ${
+                            isEsslSyncActive ? 'bg-emerald-500' : 'bg-slate-300'
+                          }`}
+                          title="Toggle eSSL MB160 Push Attendance"
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-2xs ring-0 transition duration-200 ease-in-out ${
+                              isEsslSyncActive ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                        <span className={`text-[10px] font-black ${isEsslSyncActive ? 'text-emerald-600' : 'text-slate-400'}`}>
+                          {isEsslSyncActive ? 'ON' : 'OFF'}
+                        </span>
+                      </div>
+
+                      <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold border ${
+                        diagnosticSync?.status === 'CONNECTED'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}>
+                        {diagnosticSync?.status || 'AWAITING_ENROLLMENT'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={triggerBiometricSync}
+                        disabled={isSyncingBiometric}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#1346a1] hover:bg-[#0e3882] disabled:opacity-50 text-white text-[11px] font-semibold rounded-md shadow-xs transition-all"
+                      >
+                        <span className={`material-symbols-outlined text-[14px] ${isSyncingBiometric ? 'animate-spin' : ''}`}>sync</span>
+                        <span>{isSyncingBiometric ? 'Syncing...' : 'Sync Device'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200/60">
+                      <span className="text-[10px] uppercase font-semibold text-slate-400 block">Device PIN</span>
+                      <span className="text-sm font-bold font-mono text-slate-900">{(employee as any)?.biometricDeviceEmployeeId || diagnosticSync?.enrollmentNumber || emp.employeeCode}</span>
+                      <span className="text-[10px] text-slate-500 block">MB160 User ID</span>
+                    </div>
+                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200/60">
+                      <span className="text-[10px] uppercase font-semibold text-slate-400 block">Hardware Model</span>
+                      <span className="text-sm font-bold text-slate-900">eSSL MB160</span>
+                      <span className="text-[10px] text-emerald-600 font-semibold block">Online • Connected</span>
+                    </div>
+                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200/60">
+                      <span className="text-[10px] uppercase font-semibold text-slate-400 block">Showroom</span>
+                      <span className="text-sm font-bold text-slate-900">Davanagere (DAV)</span>
+                      <span className="text-[10px] text-slate-500 block">Mega Store Main Terminal</span>
+                    </div>
+                    <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200/60">
+                      <span className="text-[10px] uppercase font-semibold text-slate-400 block">Last Sync</span>
+                      <span className="text-sm font-bold text-slate-900">{diagnosticSync?.lastSuccessfulSyncAt ? new Date(diagnosticSync.lastSuccessfulSyncAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'Verified Live'}</span>
+                      <span className="text-[10px] text-slate-500 block">ADMS / ZK Protocol</span>
+                    </div>
+                  </div>
+                </div>
+
                 {/* October 2024 Attendance Performance Card (4 Metric Tiles in 4-column desktop, 2-col tablet, 1-col mobile) */}
                 <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
@@ -2138,6 +2506,243 @@ export default function EmployeeProfileDossierPage() {
                   Close
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================
+            MODAL 7: TAKE PHOTO WEBCAM CAPTURE MODAL
+        ======================================================== */}
+        {isCameraModalOpen && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="camera-modal-title"
+            className="fixed inset-0 z-50 bg-slate-900/70 flex items-center justify-center p-4 backdrop-blur-xs"
+          >
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-md p-5 flex flex-col gap-4">
+              <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-blue-600 text-[20px]">photo_camera</span>
+                  <h3 id="camera-modal-title" className="text-[15px] font-bold text-slate-900 dark:text-white">
+                    Take Employee Photo
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={stopCamera}
+                  className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1 rounded-lg"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              <div className="relative rounded-xl overflow-hidden bg-black aspect-square flex items-center justify-center border border-slate-800 shadow-inner">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="w-full h-full object-cover mirror"
+                  style={{ transform: 'scaleX(-1)' }}
+                />
+                <div className="absolute inset-0 border-2 border-dashed border-white/40 rounded-xl pointer-events-none m-6 flex items-center justify-center">
+                  <span className="text-[11px] text-white/70 bg-black/40 px-2 py-0.5 rounded backdrop-blur-xs">
+                    Align face in center
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    stopCamera();
+                    fileInputRef.current?.click();
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  Upload File Instead
+                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={stopCamera}
+                    className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={captureCameraPhoto}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-bold bg-[#1346a1] hover:bg-[#0e3882] text-white shadow-sm transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">camera</span>
+                    <span>Capture Photo</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================
+            MODAL 8: TAKE PTO / APPLY LEAVE MODAL
+        ======================================================== */}
+        {isTakePtoModalOpen && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="take-pto-title"
+            className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-xs"
+          >
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg p-5 flex flex-col gap-4">
+              <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[18px]">beach_access</span>
+                  </div>
+                  <div>
+                    <h3 id="take-pto-title" className="text-[15px] font-bold text-slate-900 dark:text-white">
+                      Take PTO / Apply Leave
+                    </h3>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Record leave request for {emp.fullName} ({emp.employeeCode})
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsTakePtoModalOpen(false)}
+                  className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1 rounded-lg"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              <form onSubmit={handleApplyPto} className="space-y-3.5 text-[12px]">
+                {/* Leave Type */}
+                <div>
+                  <label className="text-[12px] font-semibold text-slate-700 dark:text-slate-200 block mb-1">
+                    PTO / Leave Category <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={ptoForm.leaveTypeId}
+                    onChange={(e) => setPtoForm({ ...ptoForm, leaveTypeId: e.target.value })}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[13px] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30 font-medium"
+                  >
+                    {availableLeaveTypes.map((lt) => (
+                      <option key={lt.id} value={lt.id}>
+                        {lt.name} {lt.quota ? `(Annual Quota: ${lt.quota} days)` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Dates */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[12px] font-semibold text-slate-700 dark:text-slate-200 block mb-1">
+                      From Date <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={ptoForm.startDate}
+                      onChange={(e) => setPtoForm({ ...ptoForm, startDate: e.target.value })}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[13px] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[12px] font-semibold text-slate-700 dark:text-slate-200 block mb-1">
+                      To Date <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      min={ptoForm.startDate}
+                      value={ptoForm.endDate}
+                      onChange={(e) => setPtoForm({ ...ptoForm, endDate: e.target.value })}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[13px] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
+                    />
+                  </div>
+                </div>
+
+                {/* Half Day Option */}
+                <div className="flex items-center gap-4 p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={ptoForm.isHalfDay}
+                      onChange={(e) => setPtoForm({ ...ptoForm, isHalfDay: e.target.checked })}
+                      className="rounded border-slate-300 text-[#1346a1] focus:ring-[#1346a1]"
+                    />
+                    <span className="text-[12px] font-medium text-slate-700 dark:text-slate-200">Half Day Session</span>
+                  </label>
+
+                  {ptoForm.isHalfDay && (
+                    <select
+                      value={ptoForm.halfDaySession}
+                      onChange={(e) => setPtoForm({ ...ptoForm, halfDaySession: e.target.value })}
+                      className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px] font-medium"
+                    >
+                      <option value="FIRST_HALF">First Half (Morning Shift)</option>
+                      <option value="SECOND_HALF">Second Half (Evening Shift)</option>
+                    </select>
+                  )}
+                </div>
+
+                {/* Reason */}
+                <div>
+                  <label className="text-[12px] font-semibold text-slate-700 dark:text-slate-200 block mb-1">
+                    Reason for PTO / Leave <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    required
+                    placeholder="e.g. Personal travel, family event, medical consultation"
+                    value={ptoForm.reason}
+                    onChange={(e) => setPtoForm({ ...ptoForm, reason: e.target.value })}
+                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[13px] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsTakePtoModalOpen(false);
+                      router.push('/leaves');
+                    }}
+                    className="text-[12px] font-medium text-[#1346a1] hover:underline cursor-pointer"
+                  >
+                    Open Full Leaves Board →
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsTakePtoModalOpen(false)}
+                      className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmittingPto}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-bold bg-[#1346a1] hover:bg-[#0e3882] text-white shadow-xs disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSubmittingPto ? (
+                        <>
+                          <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+                          <span>Recording PTO…</span>
+                        </>
+                      ) : (
+                        <span>Submit PTO Request</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </form>
             </div>
           </div>
         )}

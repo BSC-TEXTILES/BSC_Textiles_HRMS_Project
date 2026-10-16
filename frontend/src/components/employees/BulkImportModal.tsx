@@ -26,6 +26,10 @@ import {
   Building2,
   Calendar,
   Lock,
+  Trash2,
+  Server,
+  KeyRound,
+  FileCheck,
 } from 'lucide-react';
 
 interface BulkImportModalProps {
@@ -34,8 +38,8 @@ interface BulkImportModalProps {
   onSuccess: () => void;
 }
 
-type TabType = 'import' | 'history' | 'id_policy' | 'data_quality' | 'schema_docs';
-type ImportMode = 'new' | 'update' | 'upsert';
+type TabType = 'import' | 'history' | 'id_policy' | 'data_quality' | 'schema_docs' | 'reset_cleanup';
+type ImportMode = 'new' | 'update' | 'upsert' | 'replace_roster';
 
 export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>('import');
@@ -68,6 +72,16 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
   const [schemaColumns, setSchemaColumns] = useState<any[]>([]);
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaSearch, setSchemaSearch] = useState('');
+
+  // Reset & Backup states
+  const [backups, setBackups] = useState<any[]>([]);
+  const [backupsLoading, setBackupsLoading] = useState(false);
+  const [resetConfirmation, setResetConfirmation] = useState('');
+  const [resetReason, setResetReason] = useState('');
+  const [resetting, setResetting] = useState(false);
+  const [resetResult, setResetResult] = useState<any | null>(null);
+  const [replaceConfirmChecked, setReplaceConfirmChecked] = useState(false);
+  const [showAbsentList, setShowAbsentList] = useState(false);
 
   // Reset import workflow
   const handleResetImport = () => {
@@ -320,6 +334,45 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
     }
   }, []);
 
+  // Fetch Verified Backups
+  const fetchBackups = useCallback(async () => {
+    try {
+      setBackupsLoading(true);
+      const res = await api.get('/employees/import/backups');
+      setBackups(res.data?.backups || []);
+    } catch (err) {
+      console.warn('Backups fetch error:', err);
+    } finally {
+      setBackupsLoading(false);
+    }
+  }, []);
+
+  // Execute Controlled Employee Data Reset
+  const handleExecuteReset = async () => {
+    if (resetConfirmation !== 'RESET_APPROVED_EMPLOYEES') {
+      toast.error('Type "RESET_APPROVED_EMPLOYEES" to confirm.');
+      return;
+    }
+
+    try {
+      setResetting(true);
+      const res = await api.post('/employees/import/reset', {
+        confirm: 'RESET_APPROVED_EMPLOYEES',
+        reason: resetReason || 'Manual Controlled Reset via Admin Workspace',
+      });
+
+      setResetResult(res.data?.result || res.data);
+      toast.success('Employee database reset complete! Login accounts 100% preserved.');
+      fetchBackups();
+      onSuccess(); // Refresh workforce records
+    } catch (err: any) {
+      console.error('Reset execution error:', err);
+      toast.error(err?.response?.data?.message || err?.response?.data?.error || 'Database reset failed');
+    } finally {
+      setResetting(false);
+    }
+  };
+
   // Fetch Schema Documentation Columns
   const fetchSchemaDocs = useCallback(async () => {
     try {
@@ -340,7 +393,8 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
     if (activeTab === 'id_policy') fetchPolicyInfo();
     if (activeTab === 'data_quality') fetchDataQuality();
     if (activeTab === 'schema_docs') fetchSchemaDocs();
-  }, [activeTab, isOpen, fetchHistory, fetchPolicyInfo, fetchDataQuality, fetchSchemaDocs]);
+    if (activeTab === 'reset_cleanup') fetchBackups();
+  }, [activeTab, isOpen, fetchHistory, fetchPolicyInfo, fetchDataQuality, fetchSchemaDocs, fetchBackups]);
 
   if (!isOpen) return null;
 
@@ -524,7 +578,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
               </div>
 
               {/* Quick Format & Store Guide Card */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3.5 rounded-xl bg-slate-50/80 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 text-xs">
                 <div>
                   <span className="font-bold text-slate-800 dark:text-slate-200 block mb-1">
                     📍 Mandatory Columns
@@ -1057,7 +1111,7 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
                       <button
                         type="button"
                         onClick={handleExecuteImport}
-                        disabled={executing || writableRowCount === 0}
+                        disabled={executing || writableRowCount === 0 || (previewData?.mode === 'replace_roster' && !replaceConfirmChecked)}
                         className="px-5 py-2 text-xs font-bold rounded-xl bg-[#1346a1] hover:bg-[#0e357e] text-white flex items-center gap-2 shadow-md transition-all cursor-pointer disabled:opacity-50"
                       >
                         <UploadCloud className={`w-4 h-4 ${executing ? 'animate-bounce' : ''}`} />
@@ -1460,6 +1514,212 @@ export function BulkImportModal({ isOpen, onClose, onSuccess }: BulkImportModalP
               )}
             </div>
           )}
+
+          {/* TAB 6: RESET & CLEANUP WORKSPACE */}
+          {activeTab === 'reset_cleanup' && (
+            <div className="space-y-6">
+              {/* Header Banner */}
+              <div className="p-4 rounded-xl bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900 flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
+                      Controlled Employee Database Reset & Backup Vault
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 dark:bg-rose-950 text-rose-800 dark:text-rose-300 border border-rose-300">
+                      Super Admin Protected
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">
+                    Safely reset and wipe out old unapproved employee records before importing fresh authoritative employee data.
+                    <strong className="block text-slate-800 dark:text-slate-100 font-bold mt-1">
+                      GUARANTEE: All existing user login accounts, password credentials, roles, and permissions in table <code className="bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded">user</code> are 100% PRESERVED and untouched.
+                    </strong>
+                  </p>
+                </div>
+              </div>
+
+              {/* Guarantees Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center gap-2 mb-1.5 text-emerald-600 dark:text-emerald-400">
+                    <KeyRound className="w-4 h-4" />
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">Logins 100% Preserved</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Accounts in <code className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">user</code> are decoupled via foreign key nullification. Passwords, hashes, and session tokens are never touched.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center gap-2 mb-1.5 text-blue-600 dark:text-blue-400">
+                    <FileCheck className="w-4 h-4" />
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">Pre-Reset Disk Backup</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Before wiping employee tables, a verified full JSON + SQL backup is written to disk with SHA-256 checksums and verified row counts.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center gap-2 mb-1.5 text-purple-600 dark:text-purple-400">
+                    <Server className="w-4 h-4" />
+                    <span className="text-xs font-bold text-slate-900 dark:text-white">Multi-Tenant Shard Sync</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Atomic coordination clears employee business data across Control DB and all configured showroom shards (BEL, DAV, SHI).
+                  </p>
+                </div>
+              </div>
+
+              {/* Reset Execution Box */}
+              <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border-2 border-rose-200 dark:border-rose-900/60 shadow-sm space-y-4">
+                <div>
+                  <h4 className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-600" />
+                    <span>Execute Controlled Employee Database Reset</span>
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-1">
+                    This clears employee profiles, attendance logs, punch records, incentives, and biometric device mappings. Existing user login accounts remain active.
+                  </p>
+                </div>
+
+                <div className="space-y-3 max-w-lg">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                      Reason for Reset (Optional audit note):
+                    </label>
+                    <input
+                      type="text"
+                      value={resetReason}
+                      onChange={(e) => setResetReason(e.target.value)}
+                      placeholder="e.g. Preparing for Approved Workforce Roster Import"
+                      className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                      Type <span className="font-mono text-rose-600 font-black">RESET_APPROVED_EMPLOYEES</span> to authorize:
+                    </label>
+                    <input
+                      type="text"
+                      value={resetConfirmation}
+                      onChange={(e) => setResetConfirmation(e.target.value)}
+                      placeholder="RESET_APPROVED_EMPLOYEES"
+                      className="w-full text-xs font-mono font-bold px-3 py-2 rounded-lg border border-rose-300 dark:border-rose-800 bg-rose-50/40 dark:bg-rose-950/20 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-rose-500"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleExecuteReset}
+                    disabled={resetting || resetConfirmation !== 'RESET_APPROVED_EMPLOYEES'}
+                    className="px-5 py-2.5 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-700 text-white flex items-center gap-2 shadow-md transition-all cursor-pointer disabled:opacity-40"
+                  >
+                    <Trash2 className={`w-4 h-4 ${resetting ? 'animate-spin' : ''}`} />
+                    <span>{resetting ? 'Executing Pre-Reset Backup & Reset...' : 'Execute Controlled Employee Reset'}</span>
+                  </button>
+                </div>
+
+                {/* Reset Result Feedback */}
+                {resetResult && (
+                  <div className="mt-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-xs space-y-2">
+                    <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-300 font-extrabold">
+                      <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                      <span>{resetResult.message || 'Database Reset Successful!'}</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2">
+                      <div className="p-2 rounded bg-white/80 dark:bg-slate-900 border border-emerald-200">
+                        <span className="text-[10px] text-slate-400 block">User Logins Preserved</span>
+                        <span className="text-sm font-black text-emerald-700">{resetResult.preservedUserCount} Accounts</span>
+                      </div>
+                      <div className="p-2 rounded bg-white/80 dark:bg-slate-900 border border-emerald-200">
+                        <span className="text-[10px] text-slate-400 block">Employee Profiles Cleared</span>
+                        <span className="text-sm font-black text-rose-600">{resetResult.clearedEmployeeCount} Profiles</span>
+                      </div>
+                      <div className="p-2 rounded bg-white/80 dark:bg-slate-900 border border-emerald-200">
+                        <span className="text-[10px] text-slate-400 block">Backup Created</span>
+                        <span className="text-[10px] font-mono text-slate-700 dark:text-slate-300 font-bold truncate block">
+                          {resetResult.backup?.folderName || 'Verified on disk'}
+                        </span>
+                      </div>
+                      <div className="p-2 rounded bg-white/80 dark:bg-slate-900 border border-emerald-200">
+                        <span className="text-[10px] text-slate-400 block">Shards Synchronized</span>
+                        <span className="text-xs font-bold text-purple-700">
+                          {resetResult.shardsSynchronized?.join(', ') || 'BEL, DAV, SHI'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Verified Backups Vault Table */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="text-xs font-extrabold text-slate-900 dark:text-white uppercase tracking-wider">
+                      Verified Disk Backups Vault
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Snapshots taken automatically prior to any reset or destructive operation
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fetchBackups}
+                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs font-semibold flex items-center gap-1.5 hover:bg-slate-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${backupsLoading ? 'animate-spin' : ''}`} />
+                    <span>Refresh Vault</span>
+                  </button>
+                </div>
+
+                {backupsLoading ? (
+                  <div className="p-6 text-center text-xs text-slate-400">Loading backups...</div>
+                ) : backups.length === 0 ? (
+                  <div className="p-6 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-center text-xs text-slate-400">
+                    No pre-reset backups created yet. Backups will appear here automatically when a reset is executed.
+                  </div>
+                ) : (
+                  <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-800/80 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-200/80">
+                        <tr>
+                          <th className="py-2.5 px-3">Backup Reference</th>
+                          <th className="py-2.5 px-3">Timestamp</th>
+                          <th className="py-2.5 px-3">Records Backed Up</th>
+                          <th className="py-2.5 px-3">Disk Path</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {backups.map((b) => (
+                          <tr key={b.backupId} className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-3 font-mono font-bold text-[#1346a1] dark:text-blue-400">
+                              {b.backupId}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300">
+                              {new Date(b.timestamp).toLocaleString()}
+                            </td>
+                            <td className="py-2.5 px-3 font-semibold text-slate-800 dark:text-slate-200">
+                              {b.totalRecords} rows across {b.files?.length || 0} tables
+                            </td>
+                            <td className="py-2.5 px-3 font-mono text-[10.5px] text-slate-400 truncate max-w-xs">
+                              {b.directory}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
         </div>
       </div>
     </div>

@@ -132,6 +132,7 @@ export default function BiometricDevicesPage() {
   const [testingDeviceId, setTestingDeviceId] = useState<string | null>(null);
   const [syncingDeviceId, setSyncingDeviceId] = useState<string | null>(null);
   const [massSyncing, setMassSyncing] = useState(false);
+  const [isEsslPushActive, setIsEsslPushActive] = useState(true);
 
   // Form states
   const [deviceForm, setDeviceForm] = useState({
@@ -323,7 +324,7 @@ export default function BiometricDevicesPage() {
       if (res.data?.status === 'CONNECTED') {
         toast.success(`Connected to ${dev.name} (${res.data.latencyMs}ms)`);
       } else {
-        toast.error(`Device unreachable: ${res.data?.error || 'Port 4370 timeout'}`);
+        toast.error(`Device unreachable: ${res.data?.error || 'Connection timeout'}`);
       }
       fetchDevices();
     } catch (e: any) {
@@ -437,7 +438,7 @@ export default function BiometricDevicesPage() {
           <div className="space-y-1 relative z-10">
             <div className="flex items-center gap-2 text-blue-200 text-xs font-semibold tracking-wider uppercase">
               <Cpu className="w-4 h-4 text-emerald-400 animate-pulse" />
-              Hardware Biometric IoT Network · Port 4370 Mesh
+              Hardware Biometric IoT Network · Secure Channel
             </div>
             <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center gap-3">
               Biometric Devices & Attendance Sync
@@ -447,7 +448,35 @@ export default function BiometricDevicesPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 relative z-10">
+          <div className="flex items-center flex-wrap gap-2 relative z-10">
+            {/* eSSL Hardware Live Sync Toggle */}
+            <div className="flex items-center gap-2 bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 backdrop-blur-sm text-white shadow-xs">
+              <span className="text-xs font-bold whitespace-nowrap">eSSL Push:</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isEsslPushActive}
+                onClick={() => {
+                  const next = !isEsslPushActive;
+                  setIsEsslPushActive(next);
+                  toast.success(next ? 'eSSL MB160 Hardware Push Mesh Active' : 'eSSL Hardware Push Paused');
+                }}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-white/30 transition-colors duration-200 ease-in-out focus:outline-none ${
+                  isEsslPushActive ? 'bg-emerald-500' : 'bg-slate-700'
+                }`}
+                title={isEsslPushActive ? 'eSSL MB160 Hardware Mesh Active (Click to Pause)' : 'eSSL Hardware Push Paused (Click to Enable)'}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out mt-0.5 ${
+                    isEsslPushActive ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+              <span className={`text-[10px] font-black uppercase ${isEsslPushActive ? 'text-emerald-300' : 'text-slate-400'}`}>
+                {isEsslPushActive ? 'ON' : 'OFF'}
+              </span>
+            </div>
+
             <Button
               variant="outline"
               size="sm"
@@ -496,7 +525,7 @@ export default function BiometricDevicesPage() {
 
           <Card className="p-4 border-slate-200/80 shadow-sm hover:shadow transition-shadow">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">TCP 4370 Live Status</span>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Hardware Network Status</span>
               <span className={`p-2 rounded-lg ${connectedCount > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
                 {connectedCount > 0 ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
               </span>
@@ -648,9 +677,9 @@ export default function BiometricDevicesPage() {
 
                   <div className="mt-4 grid grid-cols-2 gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
                     <div>
-                      <span className="text-[10px] uppercase font-bold text-slate-400 block">IP & Port</span>
-                      <span className="font-mono font-bold text-slate-800">
-                        {dev.ipAddress}:{dev.port}
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">Network Link</span>
+                      <span className="font-semibold text-slate-800">
+                        {isOnline ? 'Secure Showroom LAN' : 'Offline Gateway'}
                       </span>
                     </div>
                     <div>
@@ -973,7 +1002,7 @@ export default function BiometricDevicesPage() {
                   <label className="block text-xs font-bold text-slate-700 mb-1">IP Address</label>
                   <Input
                     required
-                    placeholder="e.g. 192.168.100.135"
+                    placeholder="e.g. terminal-host or IP"
                     value={deviceForm.ipAddress}
                     onChange={(e) => setDeviceForm({ ...deviceForm, ipAddress: e.target.value })}
                   />

@@ -62,3 +62,5 @@ nginx/ssl/
 .memory/
 *.tmp
 *.bak
+backups/
+backend/backups/

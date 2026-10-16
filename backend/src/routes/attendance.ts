@@ -23,10 +23,12 @@ import {
 } from '../core/services/AttendanceCalculationService.js';
 import lateFineRoutes from './lateFines.js';
 import missedPunchingRoutes from './missedPunching.js';
+import employeeAttendanceRoutes from './employeeAttendance.js';
 
 const router = Router();
 
 router.use('/late-fines', lateFineRoutes);
+router.use('/employee', employeeAttendanceRoutes);
 router.use(authenticate);
 
 /**

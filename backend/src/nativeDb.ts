@@ -1157,8 +1157,15 @@ export class NativeMySQLClient {
       sql = Array.isArray(query) ? query.join('?') : query.sql;
       params = query.values || values;
     }
+    if (params.length === 1 && Array.isArray(params[0])) {
+      params = params[0];
+    }
     const [rows]: any = await client.query(sql, params);
     return rows;
+  }
+
+  async $queryRawUnsafe(query: any, ...values: any[]): Promise<any> {
+    return this.$queryRaw(query, ...values);
   }
 
   async $executeRaw(query: any, ...values: any[]): Promise<any> {
@@ -1169,8 +1176,15 @@ export class NativeMySQLClient {
       sql = Array.isArray(query) ? query.join('?') : query.sql;
       params = query.values || values;
     }
+    if (params.length === 1 && Array.isArray(params[0])) {
+      params = params[0];
+    }
     const [result]: any = await client.query(sql, params);
     return result?.affectedRows || 0;
+  }
+
+  async $executeRawUnsafe(query: any, ...values: any[]): Promise<any> {
+    return this.$executeRaw(query, ...values);
   }
 
   async $transaction(input: any[] | ((tx: any) => Promise<any>)): Promise<any> {

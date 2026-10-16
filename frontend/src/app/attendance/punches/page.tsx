@@ -741,7 +741,7 @@ export default function BiometricPunchesPage() {
                       BEL-T1 (Belagavi Tablet A)
                     </span>
                     <span className="font-mono text-[10px] text-slate-400 block">
-                      Gateway: 192.168.1.104 • 14ms
+                      Gateway: Showroom Edge LAN • 14ms
                     </span>
                   </div>
 

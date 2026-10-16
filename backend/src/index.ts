@@ -166,6 +166,16 @@ io.on('connection', (socket) => {
     socket.join(`location:${locationId}`);
   });
 
+  // Organization Management module rooms (live hierarchy updates)
+  socket.on('join:organization', () => {
+    socket.join('organization');
+  });
+  socket.on('join:location', (locationId: string) => {
+    if (typeof locationId === 'string' && locationId) {
+      socket.join(`location:${locationId}`);
+    }
+  });
+
   socket.on('join-stream', (streamId: string) => {
     socket.join(`stream:${streamId}`);
   });
@@ -176,7 +186,7 @@ io.on('connection', (socket) => {
 import { shardManager } from './core/sharding/index.js';
 
 const PORT = Number(process.env.PORT) || 4000;
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 BSC Textiles HRMS Security-Hardened Server running on port ${PORT}`);
   console.log(`📡 WebSocket server ready`);
   shardManager.initialize().catch((err) => console.error('[ShardManager init warning]:', err.message));

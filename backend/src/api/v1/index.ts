@@ -41,6 +41,8 @@ import analysisRoutes from '../../routes/analysis.js';
 import employeeImportRoutes, { employeeExportRouter } from '../../routes/employeeImport.js';
 import searchRoutes from '../../routes/search.js';
 import shardsRouter from '../../routes/shards.js';
+import organizationRoutes from '../../routes/organization.js';
+import orgApprovalsRoutes from '../../routes/orgApprovals.js';
 
 export const apiV1Router = Router();
 
@@ -91,5 +93,11 @@ apiV1Router.use('/kyc', kycRoutes);
 apiV1Router.use('/exits', exitRoutes);
 apiV1Router.use('/leaves', leaveRoutes);
 apiV1Router.use('/mobile', mobileRoutes);
+
+// Organization Management module
+// Mount approvals before the general organization router so
+// /organization/approvals/* is handled by the approvals router.
+apiV1Router.use('/organization/approvals', orgApprovalsRoutes);
+apiV1Router.use('/organization', organizationRoutes);
 
 export default apiV1Router;
