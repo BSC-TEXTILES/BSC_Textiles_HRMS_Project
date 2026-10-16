@@ -36,7 +36,7 @@ import { ActiveOnFloorDrawer } from '@/components/employees/drawers/ActiveOnFloo
 import { KycComplianceDrawer } from '@/components/employees/drawers/KycComplianceDrawer';
 import { BiometricProfilesDrawer } from '@/components/employees/drawers/BiometricProfilesDrawer';
 import { StoreLocationsDrawer } from '@/components/employees/drawers/StoreLocationsDrawer';
-import { CANONICAL_HUB_STORES } from '@/components/employees/drawers/storeLocationsHelper';
+import { CANONICAL_HUB_STORES, type CanonicalHubStore } from '@/components/employees/drawers/storeLocationsHelper';
 import { AddEmployeeDialog } from '@/components/employees/AddEmployeeDialog';
 import { BulkImportModal } from '@/components/employees/BulkImportModal';
 
@@ -122,7 +122,7 @@ export default function EmployeesPage() {
         }),
       ]);
       const fetchedLocs = Array.isArray(locRes.data) && locRes.data.length > 0 ? locRes.data : CANONICAL_HUB_STORES;
-      const mergedLocs = CANONICAL_HUB_STORES.map((canonical) => {
+      const mergedLocs = CANONICAL_HUB_STORES.map((canonical: CanonicalHubStore) => {
         const found = fetchedLocs.find(
           (l: any) =>
             l.code?.toUpperCase() === canonical.code.toUpperCase() ||

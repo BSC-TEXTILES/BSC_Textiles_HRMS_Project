@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Search, Store, Info, CheckCircle2, Clock, X, AlertCircle } from 'lucide-react';
 import { EmployeeDrawerWrapper } from './EmployeeDrawerWrapper';
+import { formatDateTimeSafe } from '@/lib/utils';
 
 interface ActiveOnFloorDrawerProps {
   open: boolean;
@@ -11,6 +12,8 @@ interface ActiveOnFloorDrawerProps {
   employees: any[];
   locations: any[];
   departments: any[];
+  /** Today's attendance rows keyed by employee id (GET /attendance/today). */
+  liveAttendance?: Record<string, { actualLogin?: string | null; actualLogout?: string | null; status?: string }>;
   currentLocationId: string;
   currentDeptId: string;
   onApplyDirectoryFilter?: (filters: { locationId?: string; departmentId?: string; status?: string }) => void;
@@ -28,6 +31,7 @@ export function ActiveOnFloorDrawer({
   employees,
   locations,
   departments,
+  liveAttendance,
   currentLocationId,
   currentDeptId,
   onApplyDirectoryFilter,
@@ -76,35 +80,35 @@ export function ActiveOnFloorDrawer({
     });
   }, [employees, drawerLocId, drawerDeptId]);
 
-  // Operational determination of "On Floor"
-  // Canonical data: exactly 12 active staff on floor across Karnataka stores for Shift A (e.g. indices 0 to 11 in seed)
+  // "On floor" is live attendance, not an estimate: the directory passes the
+  // employee ids that have an attendance row for today (GET /attendance/today).
   const rosterData = useMemo(() => {
-    return scopedEmployees.map((emp, index) => {
-      // First 12 staff in canonical list are active on-floor in Shift A (09:30 - 18:30)
-      const isOnFloor = index < 12;
-      const clockInTimes = [
-        '09:18 AM', '09:22 AM', '09:15 AM', '09:28 AM',
-        '09:20 AM', '09:24 AM', '09:12 AM', '09:25 AM',
-        '09:19 AM', '09:27 AM', '09:21 AM', '09:23 AM'
-      ];
-      const clockInTime = isOnFloor ? clockInTimes[index % clockInTimes.length] : 'Off-Duty / Rest';
-      const lastPunchTime = isOnFloor
-        ? `Today, ${clockInTime} (Terminal ${emp.location?.code || 'BEL'}-01-A)`
-        : 'Scheduled for Next Cadence';
+    return scopedEmployees.map((emp) => {
+      const live = liveAttendance?.[String(emp.id)];
+      const isOnFloor = Boolean(live);
+      const clockInTime = live?.actualLogin ? formatDateTimeSafe(live.actualLogin) : '—';
+      const lastPunchTime = live?.actualLogout
+        ? `Out ${formatDateTimeSafe(live.actualLogout)}`
+        : live?.actualLogin
+          ? `In ${formatDateTimeSafe(live.actualLogin)} — no out-punch yet`
+          : 'No attendance recorded today';
 
       return {
         ...emp,
         isOnFloor,
-        floorLocation: emp.floor?.name || 'Ground Floor (Sales)',
-        shiftName: emp.shift?.name || 'Shift A (09:30 - 18:30)',
+        floorLocation: emp.floor?.name || 'Not assigned',
+        shiftName: emp.shift?.name || 'No shift mapped',
         clockInTime,
         lastPunchTime,
-        attendanceStatus: isOnFloor ? 'Present' : 'Off',
+        attendanceStatus: live?.status || (isOnFloor ? 'Present' : 'Not present today'),
       };
     });
-  }, [scopedEmployees]);
+  }, [scopedEmployees, liveAttendance]);
 
   const onFloorCount = rosterData.filter((e) => e.isOnFloor).length;
+  const lateLoginCount = rosterData.filter(
+    (e) => Number((liveAttendance?.[String(e.id)] as any)?.lateLoginSeconds || 0) > 0
+  ).length;
   const offDutyCount = rosterData.filter((e) => !e.isOnFloor).length;
   const totalCount = rosterData.length;
 
@@ -200,12 +204,14 @@ export function ActiveOnFloorDrawer({
 
         <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 flex flex-col justify-between">
           <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-            Late Logins
+            Late Logins Today
           </span>
           <div className="text-2xl font-extrabold text-slate-400 dark:text-slate-500 mt-1">
-            0
+            {lateLoginCount}
           </div>
-          <span className="text-[10px] text-emerald-600 font-semibold mt-0.5">100% Punctual</span>
+          <span className="text-[10px] text-emerald-600 font-semibold mt-0.5">
+            {onFloorCount === 0 ? 'No attendance recorded today' : `${Math.round(((onFloorCount - lateLoginCount) / onFloorCount) * 100)}% on time`}
+          </span>
         </div>
 
         <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 flex flex-col justify-between">

@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Search, Fingerprint, ScanFace, QrCode, Radio, X, AlertCircle } from 'lucide-react';
 import { EmployeeDrawerWrapper } from './EmployeeDrawerWrapper';
+import { formatDateTimeSafe } from '@/lib/utils';
 
 interface BiometricProfilesDrawerProps {
   open: boolean;
@@ -75,30 +76,27 @@ export function BiometricProfilesDrawer({
     });
   }, [employees, drawerLocId, drawerDeptId]);
 
-  // Construct Biometric Profiles
+  // Biometric profile state, read from the fields the employee master record
+  // actually carries. No invented terminals, sync timestamps or "enrolled"
+  // flags: when a device mapping does not exist the row says so.
   const biometricProfiles = useMemo(() => {
-    return scopedEmployees.map((emp, idx) => {
-      const storeCode = emp.location?.code || 'BEL';
-      const terminalName = `POS-${storeCode}-0${(idx % 3) + 1} (Tablet Scanner)`;
-      const syncTimes = [
-        'Today, 09:18 AM',
-        'Today, 09:22 AM',
-        'Today, 09:15 AM',
-        'Today, 09:28 AM',
-        'Today, 09:20 AM',
-        '12 Oct 2026, 18:32 PM',
-      ];
-      const lastSync = syncTimes[idx % syncTimes.length];
+    return scopedEmployees.map((emp) => {
+      const hasFace = Boolean(emp.faceProfileId || emp.faceEnrolled || emp.faceEnrollmentUrl);
+      const hasQr = Boolean(emp.qrCodeId || emp.dailyQRCodeId);
+      const storeCode = emp.location?.code || '—';
 
       return {
         ...emp,
-        faceStatus: 'Enrolled', // 100% Face Enrolled (35/35)
-        qrStatus: 'QR Ready',   // 100% QR Ready (35/35)
-        rfidStatus: 'Linked',   // Active smart card
-        lastSync,
-        assignedTerminal: terminalName,
-        notes: 'Active & Biometrically Synced',
-        isFailedOrMissing: false,
+        faceStatus: hasFace ? 'Enrolled' : 'Not enrolled',
+        qrStatus: hasQr ? 'QR Ready' : 'No QR pass',
+        rfidStatus: 'Not configured',
+        lastSync: emp.biometricLastSyncAt || emp.faceProfile?.enrolledAt || null,
+        biometricDeviceEmployeeId: emp.biometricDeviceEmployeeId || null,
+        assignedTerminal: emp.biometricDeviceName || `No device mapping (${storeCode})`,
+        notes: emp.biometricDeviceEmployeeId
+          ? `Terminal PIN ${emp.biometricDeviceEmployeeId}`
+          : 'Not mapped on any biometric terminal',
+        isFailedOrMissing: !hasFace && !hasQr,
       };
     });
   }, [scopedEmployees]);
@@ -177,7 +175,9 @@ export function BiometricProfilesDrawer({
           <div className="text-2xl font-extrabold text-[#1346a1] dark:text-rose-400 mt-1">
             {faceCount}
           </div>
-          <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">100% Mobile & Terminal</span>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+            {totalCount === 0 ? 'No roster loaded' : `${totalCount - faceCount} without a face profile`}
+          </span>
         </div>
 
         <div className="p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800 flex flex-col justify-between">
@@ -378,33 +378,45 @@ export function BiometricProfilesDrawer({
                         </div>
                       </td>
                       <td className="py-2.5 px-3 whitespace-nowrap text-slate-600 dark:text-slate-300">
-                        {emp.location?.name || 'Belagavi Head Store'}
+                        {emp.location?.name || '—'}
                       </td>
                       <td className="py-2.5 px-3 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${
+                            emp.faceStatus === 'Enrolled'
+                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                              : 'bg-slate-50 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
                           <ScanFace className="w-3 h-3" />
-                          <span>Enrolled</span>
+                          <span>{emp.faceStatus}</span>
                         </span>
                       </td>
                       <td className="py-2.5 px-3 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                        <span
+                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${
+                            emp.qrStatus === 'QR Ready'
+                              ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+                              : 'bg-slate-50 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
+                          }`}
+                        >
                           <QrCode className="w-3 h-3" />
-                          <span>QR Ready</span>
+                          <span>{emp.qrStatus}</span>
                         </span>
                       </td>
                       <td className="py-2.5 px-3 whitespace-nowrap">
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
                           <Radio className="w-3 h-3" />
-                          <span>Linked</span>
+                          <span>{emp.rfidStatus}</span>
                         </span>
                       </td>
                       <td className="py-2.5 px-3 whitespace-nowrap font-mono text-[11px] text-slate-600 dark:text-slate-300">
-                        {emp.lastSync}
+                        {emp.lastSync ? formatDateTimeSafe(emp.lastSync) : 'No sync recorded'}
                       </td>
                       <td className="py-2.5 px-3 whitespace-nowrap text-[11px] text-slate-600 dark:text-slate-300">
                         {emp.assignedTerminal}
                       </td>
-                      <td className="py-2.5 px-3 whitespace-nowrap text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
+                      <td className={`py-2.5 px-3 whitespace-nowrap text-[11px] font-medium ${emp.isFailedOrMissing ? 'text-amber-700 dark:text-amber-400' : 'text-emerald-700 dark:text-emerald-400'}`}>
                         {emp.notes}
                       </td>
                     </tr>

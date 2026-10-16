@@ -95,7 +95,16 @@ export async function runMigration(supabaseConnString: string) {
       createSql += '\n);';
 
       await pgClient.query(createSql);
-      console.log(`  ✓ Table public."${table}" created`);
+
+      for (const col of colMetaList) {
+        try {
+          await pgClient.query(`ALTER TABLE public."${table}" ADD COLUMN IF NOT EXISTS "${col.name}" ${col.type};`);
+        } catch {
+          // ignore
+        }
+      }
+
+      console.log(`  ✓ Table public."${table}" created/reconciled`);
     } catch (err: any) {
       console.error(`  ✗ Error creating table "${table}":`, err.message);
     }
@@ -121,6 +130,12 @@ export async function runMigration(supabaseConnString: string) {
       const rowList = rows as any[];
       if (rowList.length === 0) continue;
 
+      try {
+        await pgClient.query(`TRUNCATE TABLE public."${table}" CASCADE;`);
+      } catch {
+        // ignore
+      }
+
       const meta = tableColumnMeta[table] || [];
       const colKeys = meta.map(m => m.name);
       const quotedCols = colKeys.map(c => `"${c}"`).join(', ');
@@ -143,8 +158,15 @@ export async function runMigration(supabaseConnString: string) {
             } else if (m.isBool) {
               val = val === 1 || val === true || val === '1';
             } else if (m.isDate) {
-              if (typeof val === 'string' && (val.startsWith('0000-00-00') || val === '')) {
+              if (val instanceof Date) {
+                if (isNaN(val.getTime())) {
+                  val = null;
+                }
+              } else if (typeof val === 'string' && (val.startsWith('0000-00-00') || val.includes('NaN') || val === '')) {
                 val = null;
+              }
+              if (val === null && (m.name === 'updatedAt' || m.name === 'createdAt')) {
+                val = new Date().toISOString();
               }
             } else if (m.isJson) {
               if (typeof val === 'object') {
