@@ -177,7 +177,7 @@ export default function PublicApplyPage() {
   }, [resolution]);
 
   const schema: HiringFormSchema | null = resolution?.schema ?? null;
-  const steps = schema?.steps ?? [];
+  const steps = useMemo(() => schema?.steps ?? [], [schema]);
   const currentStep = steps[stepIndex];
   const primaryColor = resolution?.settings.primaryColor || '#0f766e';
   const schemaConsentKey = useMemo(

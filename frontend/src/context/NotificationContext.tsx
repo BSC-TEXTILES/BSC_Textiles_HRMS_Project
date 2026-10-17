@@ -98,7 +98,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         console.warn('[NotificationContext] Could not fetch unread count:', err?.message || err);
       }
     }
-  }, [session]);
+  }, []);
 
   const fetchNotifications = useCallback(async (params: any = {}) => {
     if (typeof window === 'undefined' || window.location.pathname.startsWith('/login')) return;
@@ -123,7 +123,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [session]);
+  }, []);
 
   const markAsRead = useCallback(async (id: string) => {
     try {

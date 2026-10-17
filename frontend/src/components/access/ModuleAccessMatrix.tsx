@@ -97,9 +97,9 @@ export function ModuleAccessMatrix({ modules, widgets, draft, widgetDraft, readO
     );
     const byArea = new Map<string, MatrixModule[]>();
     for (const area of AREA_ORDER) byArea.set(area, []);
-    for (const module of visible) {
-      const area = byArea.has(module.area || 'SYSTEM') ? (module.area as string) : 'SYSTEM';
-      byArea.get(area)!.push(module);
+    for (const mod of visible) {
+      const area = byArea.has(mod.area || 'SYSTEM') ? (mod.area as string) : 'SYSTEM';
+      byArea.get(area)!.push(mod);
     }
     return [...byArea.entries()].filter(([, list]) => list.length > 0);
   }, [modules, filter]);
@@ -108,38 +108,38 @@ export function ModuleAccessMatrix({ modules, widgets, draft, widgetDraft, readO
     onChange({ ...draft, [key]: next });
   };
 
-  const toggleModule = (module: MatrixModule, enabled: boolean) => {
-    const current = draft[module.key] || { module: module.key, enabled: false, actions: emptyActions() };
+  const toggleModule = (moduleItem: MatrixModule, enabled: boolean) => {
+    const current = draft[moduleItem.key] || { module: moduleItem.key, enabled: false, actions: emptyActions() };
     if (enabled) {
       // Turning a module on always grants View — a module with no actions is
       // not a meaningful state, and the server would normalise it away anyway.
-      setGrant(module.key, { ...current, enabled: true, actions: { ...current.actions, view: true } });
+      setGrant(moduleItem.key, { ...current, enabled: true, actions: { ...current.actions, view: true } });
     } else {
-      setGrant(module.key, { ...current, enabled: false, actions: emptyActions() });
+      setGrant(moduleItem.key, { ...current, enabled: false, actions: emptyActions() });
     }
   };
 
-  const toggleAction = (module: MatrixModule, action: RbacAction, value: boolean) => {
-    const current = draft[module.key] || { module: module.key, enabled: false, actions: emptyActions() };
+  const toggleAction = (moduleItem: MatrixModule, action: RbacAction, value: boolean) => {
+    const current = draft[moduleItem.key] || { module: moduleItem.key, enabled: false, actions: emptyActions() };
     const actions = { ...current.actions, [action]: value };
     // View is the floor of the grant: it cannot be taken away while the module
     // stays enabled, because every other action implies being able to see it.
     if (action === 'view' && !value) {
-      setGrant(module.key, { module: module.key, enabled: false, actions: emptyActions() });
+      setGrant(moduleItem.key, { module: moduleItem.key, enabled: false, actions: emptyActions() });
       return;
     }
-    setGrant(module.key, { ...current, enabled: true, actions });
+    setGrant(moduleItem.key, { ...current, enabled: true, actions });
   };
 
   const applyToAll = (mode: 'all' | 'none' | 'view') => {
     const next: DraftGrants = {};
-    for (const module of modules) {
+    for (const mod of modules) {
       if (mode === 'none') {
-        next[module.key] = { module: module.key, enabled: false, actions: emptyActions() };
+        next[mod.key] = { module: mod.key, enabled: false, actions: emptyActions() };
       } else if (mode === 'view') {
-        next[module.key] = { module: module.key, enabled: true, actions: { ...emptyActions(), view: true } };
+        next[mod.key] = { module: mod.key, enabled: true, actions: { ...emptyActions(), view: true } };
       } else {
-        next[module.key] = { module: module.key, enabled: true, actions: emptyActions(true) };
+        next[mod.key] = { module: mod.key, enabled: true, actions: emptyActions(true) };
       }
     }
     onChange(next);

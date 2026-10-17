@@ -156,12 +156,12 @@ function toMyAccess(payload: any): MyAccess {
     Array.isArray(payload.modules) && payload.modules.length > 0 ? payload.modules : RBAC_MODULES;
   const grants: Record<string, ModuleGrant> = {};
   const access: Record<string, AccessLevel> = {};
-  for (const module of modules) {
-    const actions = { ...EMPTY_ACTIONS, ...(module.actions || {}) };
-    const enabled = Boolean(module.enabled) && Boolean(actions.view);
-    grants[module.key] = { module: module.key, enabled, actions };
+  for (const mod of modules) {
+    const actions = { ...EMPTY_ACTIONS, ...(mod.actions || {}) };
+    const enabled = Boolean(mod.enabled) && Boolean(actions.view);
+    grants[mod.key] = { module: mod.key, enabled, actions };
     const writes = RBAC_ACTIONS.filter((a) => a !== 'view').some((a) => actions[a]);
-    access[module.key] = !enabled ? 'none' : writes ? 'edit' : 'view';
+    access[mod.key] = !enabled ? 'none' : writes ? 'edit' : 'view';
   }
   return {
     modules,
