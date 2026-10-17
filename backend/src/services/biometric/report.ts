@@ -18,7 +18,9 @@ export interface ReportFilters {
   from?: string;            // YYYY-MM-DD, inclusive, in `timeZone`
   to?: string;              // YYYY-MM-DD, inclusive, in `timeZone`
   employeeId?: string;
+  employeeCode?: string;
   employeeQuery?: string;   // matches code, name, or device id
+  employeeRange?: '1601-1610' | string;
   verifyMethod?: string[];  // labels from verify_mode_mapping
   serialNumber?: string;
   deviceId?: string;
@@ -77,6 +79,23 @@ const COLUMNS: Array<{ key: keyof ReportRow; header: string }> = [
   { key: 'syncStatus', header: 'Status' },
 ];
 
+export const ALLOWED_DAV_RANGE_CODES = [
+  '1601', '1602', '1603', '1604', '1605',
+  '1606', '1607', '1608', '1609', '1610',
+];
+
+export const MB160_DAV_1601_1610_COLUMNS: Array<{ key: keyof ReportRow | 'store'; header: string }> = [
+  { key: 'employeeCode', header: 'Employee Number' },
+  { key: 'employeeName', header: 'Employee Name' },
+  { key: 'locationCode', header: 'Store' },
+  { key: 'deviceName', header: 'Terminal Name' },
+  { key: 'serialNumber', header: 'Device Serial Number' },
+  { key: 'attendanceDate', header: 'Attendance Date' },
+  { key: 'punchTimeLocal', header: 'Attendance Time (IST)' },
+  { key: 'verifyMethod', header: 'Verification Mode' },
+  { key: 'syncStatus', header: 'Synchronization Status' },
+];
+
 /** A calendar day edge in `timeZone`, rendered as the UTC wall string that
  *  punchTimeUtc stores, so the comparison never depends on the DB session zone. */
 function dayBoundary(dateYmd: string, endOfDay: boolean, timeZone: string): string {
@@ -98,6 +117,15 @@ export async function buildAttendanceReport(filters: ReportFilters): Promise<{
   const where: string[] = ['1=1'];
   const params: any[] = [];
 
+  if (filters.employeeRange === '1601-1610') {
+    where.push(`e.employeeCode IN (${ALLOWED_DAV_RANGE_CODES.map(() => '?').join(',')})`);
+    params.push(...ALLOWED_DAV_RANGE_CODES);
+    where.push("r.mappingStatus = 'MAPPED'");
+  }
+  if (filters.employeeCode) {
+    where.push('e.employeeCode = ?');
+    params.push(filters.employeeCode.trim());
+  }
   if (filters.from) {
     where.push('r.punchTimeUtc >= ?');
     params.push(dayBoundary(filters.from, false, timeZone));
@@ -199,16 +227,34 @@ export async function buildAttendanceReport(filters: ReportFilters): Promise<{
   return { rows: mapped, total: Number(countRows[0]?.total ?? mapped.length), timeZone, appliedFilters: filters };
 }
 
-/** RFC 4180 escaping: quote when needed, double embedded quotes. */
-export function toCsv(rows: ReportRow[], columns = COLUMNS): string {
-  const escape = (value: unknown): string => {
-    if (value === null || value === undefined) return '';
-    const text = String(value);
-    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
-  };
+/** Sanitize value for CSV and prevent spreadsheet formula injection. */
+export function sanitizeCsvField(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  let text = String(value);
+  // Neutralize formula injection if string starts with =, +, -, @, \t, or \r
+  if (/^[=+\-@\t\r]/.test(text)) {
+    text = `'${text}`;
+  }
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
 
-  const header = columns.map((c) => escape(c.header)).join(',');
-  const body = rows.map((row) => columns.map((c) => escape(row[c.key])).join(','));
+/** RFC 4180 escaping with formula injection defense. */
+export function toCsv(
+  rows: ReportRow[],
+  columns: Array<{ key: any; header: string }> = COLUMNS
+): string {
+  const header = columns.map((c) => sanitizeCsvField(c.header)).join(',');
+  const body = rows.map((row) =>
+    columns
+      .map((c) => {
+        let val: any = (row as any)[c.key];
+        if (c.key === 'locationCode' && (!val || val === 'DAV')) {
+          val = 'DAV - Davanagere';
+        }
+        return sanitizeCsvField(val);
+      })
+      .join(',')
+  );
   return [header, ...body].join('\r\n');
 }
 

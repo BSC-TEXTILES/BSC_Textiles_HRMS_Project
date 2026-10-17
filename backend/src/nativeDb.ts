@@ -48,7 +48,19 @@ export const mysqlPool: Pool = isMysql
       enableKeepAlive: true,
       keepAliveInitialDelay: 10000,
       decimalNumbers: true,
-      dateStrings: false,
+      /**
+       * Return DATE columns as plain 'YYYY-MM-DD' strings.
+       *
+       * With dateStrings disabled, mysql2 materialises a DATE as midnight in the
+       * connection timezone (+05:30 here), and JSON.stringify then shifts it back
+       * to UTC — so an attendanceDate of 2026-10-17 leaves the API as
+       * "2026-10-16T18:30:00.000Z". Any client that derives a calendar date from
+       * that string lands on the previous day and silently loses the record.
+       *
+       * Scoped to DATE only: DATETIME and TIMESTAMP still come back as Date
+       * objects, so punch timestamps keep their existing behaviour.
+       */
+      dateStrings: ['DATE'],
       timezone: '+05:30',
       multipleStatements: true,
     })

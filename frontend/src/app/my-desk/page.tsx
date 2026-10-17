@@ -6,6 +6,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { HrSuperAdminDashboard } from '@/components/dashboard/HrSuperAdminDashboard';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
+import { toCalendarDateIST } from '@/lib/utils';
 import Link from 'next/link';
 import {
   Clock,
@@ -1671,7 +1672,7 @@ export default function MyDeskPage() {
                       <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200/80 dark:border-slate-700 space-y-1.5 text-xs">
                         <div className="flex items-center justify-between">
                           <span className="font-bold text-slate-900 dark:text-white">
-                            {new Date(corr.attendanceDate).toISOString().slice(0, 10)}
+                            {toCalendarDateIST(corr.attendanceDate)}
                           </span>
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-bold ${

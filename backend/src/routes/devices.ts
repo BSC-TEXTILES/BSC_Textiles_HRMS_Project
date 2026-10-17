@@ -61,6 +61,8 @@ import {
   sendXlsx,
   describeFilters,
   ReportFilters,
+  ALLOWED_DAV_RANGE_CODES,
+  MB160_DAV_1601_1610_COLUMNS,
 } from '../services/biometric/report.js';
 import { deviceLog, classifyDeviceError } from '../services/biometric/logger.js';
 import {
@@ -1196,7 +1198,9 @@ function reportFiltersFrom(req: AuthRequest): ReportFilters {
     from: req.query.from as string,
     to: req.query.to as string,
     employeeId: req.query.employeeId as string,
+    employeeCode: req.query.employeeCode as string,
     employeeQuery: req.query.employeeQuery as string,
+    employeeRange: req.query.employeeRange as any,
     verifyMethod,
     serialNumber: req.query.serialNumber as string,
     deviceId: req.query.deviceId as string,
@@ -1235,6 +1239,35 @@ router.get('/report/export', authorize('VIEW'), async (req: AuthRequest, res) =>
     sendCsv(res, toCsv(report.rows), `BSC_Attendance_${stamp}.csv`);
   } catch (error: any) {
     res.status(500).json({ error: 'Export failed: ' + error.message });
+  }
+});
+
+router.get('/report/export-1601-1610', authorize('VIEW'), async (req: AuthRequest, res) => {
+  try {
+    const baseFilters = reportFiltersFrom(req);
+    // Backend-enforced filter: strictly range 1601 to 1610 only
+    const filters: ReportFilters = {
+      ...baseFilters,
+      employeeRange: '1601-1610',
+      limit: 10000,
+    };
+    if (baseFilters.employeeCode) {
+      const code = baseFilters.employeeCode.trim();
+      if (ALLOWED_DAV_RANGE_CODES.includes(code)) {
+        filters.employeeCode = code;
+      } else {
+        return res.status(400).json({ error: 'Selected employee code must be within 1601-1610' });
+      }
+    }
+
+    const report = await buildAttendanceReport(filters);
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = `BSC_DAV_MB160_Attendance_1601-1610_${stamp}.csv`;
+
+    const csvData = toCsv(report.rows, MB160_DAV_1601_1610_COLUMNS);
+    sendCsv(res, csvData, filename);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Export 1601-1610 failed: ' + error.message });
   }
 });
 
