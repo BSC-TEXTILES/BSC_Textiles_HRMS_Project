@@ -3,9 +3,19 @@ import crypto from 'node:crypto';
 
 export const dynamic = 'force-dynamic';
 
-const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET || 'bsc-textiles-hrms-super-secret-jwt-key-2024-production-ready-32chars';
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret || secret.trim().length === 0) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Security Error: JWT_SECRET or NEXTAUTH_SECRET must be defined in production.');
+    }
+    return 'bsc-textiles-dev-only-secret-do-not-use-in-production-32c';
+  }
+  return secret.trim();
+}
 
 function createToken(payload: any): string {
+  const secret = getJwtSecret();
   const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
   const body = Buffer.from(
     JSON.stringify({
@@ -14,7 +24,7 @@ function createToken(payload: any): string {
       exp: Math.floor(Date.now() / 1000) + 7 * 24 * 3600,
     })
   ).toString('base64url');
-  const signature = crypto.createHmac('sha256', JWT_SECRET).update(`${header}.${body}`).digest('base64url');
+  const signature = crypto.createHmac('sha256', secret).update(`${header}.${body}`).digest('base64url');
   return `${header}.${body}.${signature}`;
 }
 
@@ -117,17 +127,49 @@ export async function POST(request: Request) {
     const cleanEmail = String(email).trim().toLowerCase();
     const cleanPassword = String(password).trim();
 
-    // 1. Direct match for enterprise accounts
-    const user = ENTERPRISE_USERS[cleanEmail];
+    // 1. Authenticate against authoritative backend service
+    const backendCandidates = [
+      process.env.BACKEND_URL ? `${process.env.BACKEND_URL.replace(/\/+$/, '')}/api` : null,
+      process.env.API_URL,
+      'http://127.0.0.1:4000/api',
+      'http://localhost:4000/api',
+    ].filter(Boolean) as string[];
 
-    if (user) {
-      // Standard password validation (accepts default enterprise passwords)
-      if (
-        cleanPassword === 'password123' ||
-        cleanPassword === 'admin123' ||
-        cleanPassword === 'Admin@123' ||
-        cleanPassword === 'Admin123'
-      ) {
+    let backendResponded = false;
+    for (const backendUrl of backendCandidates) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const res = await fetch(`${backendUrl}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail, password: cleanPassword }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        backendResponded = true;
+        const data = await res.json().catch(() => null);
+
+        if (res.ok && data?.user && data?.token) {
+          return NextResponse.json(data);
+        }
+
+        if (res.status === 401 || res.status === 400 || res.status === 429) {
+          return NextResponse.json(
+            { error: data?.error || 'Invalid email or password' },
+            { status: res.status }
+          );
+        }
+      } catch {
+        // Backend not reachable at this candidate URL, try next
+      }
+    }
+
+    // 2. Local development fallback (strictly non-production only)
+    if (process.env.NODE_ENV !== 'production' && !backendResponded && process.env.ALLOW_DEV_MOCK_LOGIN === 'true') {
+      const user = ENTERPRISE_USERS[cleanEmail];
+      if (user && cleanPassword === (process.env.DEV_MOCK_PASSWORD || 'DevPassword@2026')) {
         const token = createToken({
           userId: user.id,
           email: user.email,
@@ -136,7 +178,7 @@ export async function POST(request: Request) {
         });
 
         return NextResponse.json({
-          message: 'Login successful',
+          message: 'Development Mock Login Successful',
           token,
           user: {
             id: user.id,
@@ -148,37 +190,6 @@ export async function POST(request: Request) {
             employeeId: user.employeeId,
           },
         });
-      }
-    }
-
-    // 2. Try proxying to backend service if BACKEND_URL or API_URL is reachable
-    const backendCandidates = [
-      process.env.BACKEND_URL ? `${process.env.BACKEND_URL.replace(/\/+$/, '')}/api` : null,
-      process.env.API_URL,
-      'http://127.0.0.1:4000/api',
-      'http://localhost:4000/api',
-    ].filter(Boolean) as string[];
-
-    for (const backendUrl of backendCandidates) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000);
-        const res = await fetch(`${backendUrl}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: cleanEmail, password: cleanPassword }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-
-        if (res.ok) {
-          const data = await res.json().catch(() => null);
-          if (data?.user && data?.token) {
-            return NextResponse.json(data);
-          }
-        }
-      } catch {
-        // Continue to next candidate
       }
     }
 

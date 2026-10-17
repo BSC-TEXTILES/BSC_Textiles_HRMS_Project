@@ -14,12 +14,24 @@ database/sqlite/*.db
 database/sqlite/backups/
 *.pdf
 
-# Environment files
+# Environment files & Secrets
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
+!.env.example
+!.env.*.example
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+*.key
+*.pem
+*.crt
+*.cert
+*.pfx
+*.p12
+*.vault
+id_rsa
+id_rsa.pub
 
 # IDE
 .idea/

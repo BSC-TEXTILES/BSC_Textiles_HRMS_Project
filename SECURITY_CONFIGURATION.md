@@ -13,11 +13,11 @@ Production deployments must define all required configuration variables in the h
 
 ```bash
 # ── Database Isolation ──
-DATABASE_URL="mysql://app_user:STRONG_PASSWORD@db-host:3306/bsc_textiles_hrms"
+DATABASE_URL="mysql://app_user:<STRONG_PASSWORD>@db-host:3306/bsc_textiles_hrms"
 
 # ── JWT Authentication ──
 # Minimum 32-character high-entropy secret (generate with: openssl rand -hex 32)
-JWT_SECRET="GENERATE_A_CRYPTOGRAPHICALLY_RANDOM_SECRET_MIN_32_CHARS"
+JWT_SECRET="<GENERATE_A_CRYPTOGRAPHICALLY_RANDOM_SECRET_MIN_32_CHARS>"
 JWT_EXPIRES_IN="12h"
 JWT_ISSUER="bsc-textiles-hrms"
 
@@ -32,12 +32,12 @@ SMTP_HOST="smtp.sendgrid.net"
 SMTP_PORT="587"
 SMTP_SECURE="false"
 SMTP_USER="apikey"
-SMTP_PASS="YOUR_SENDGRID_PRODUCTION_KEY"
+SMTP_PASS="<YOUR_SENDGRID_PRODUCTION_KEY>"
 SMTP_FROM="BSC Textiles HRMS <security@bsctextiles.com>"
 HR_ADMIN_EMAIL="hr-notifications@bsctextiles.com"
 
 # ── Rate Limiting (Redis Backend) ──
-REDIS_URL="redis://:REDIS_AUTH_PASSWORD@redis-host:6379/0"
+REDIS_URL="redis://:<REDIS_AUTH_PASSWORD>@redis-host:6379/0"
 ```
 
 ---

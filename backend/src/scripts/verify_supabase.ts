@@ -1,7 +1,22 @@
 import { Client } from 'pg';
+import dotenv from 'dotenv';
+import path from 'path';
+
+dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
+dotenv.config();
+
+const connectionString =
+  process.env.SUPABASE_POOLER_URL ||
+  process.env.SUPABASE_DB_URL ||
+  process.env.DATABASE_URL;
+
+if (!connectionString) {
+  console.error('[Error] Missing SUPABASE_POOLER_URL, SUPABASE_DB_URL, or DATABASE_URL in environment.');
+  process.exit(1);
+}
 
 const client = new Client({
-  connectionString: 'postgresql://postgres.opoeigmbiwctvqtzxkde:HRMS_Project%402026@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres',
+  connectionString,
   ssl: { rejectUnauthorized: false }
 });
 

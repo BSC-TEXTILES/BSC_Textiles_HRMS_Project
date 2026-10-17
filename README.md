@@ -1297,12 +1297,14 @@ The application requires configuration across three primary tiers. Store these i
 # BSC TEXTILES HRMS - MASTER PRODUCTION CONFIGURATION
 # ==============================================================================
 
-# 1. DATABASE CONFIGURATION (MySQL 8.0)
-DATABASE_URL="mysql://root:YourSecurePassword@localhost:3306/bsc_textiles_hrms?connection_limit=20"
+# 1. DATABASE CONFIGURATION (MySQL 8.0 or PostgreSQL)
+DATABASE_URL="mysql://app_user:<DB_PASSWORD>@localhost:3306/bsc_textiles_hrms?connection_limit=20"
+# For Supabase PostgreSQL:
+# SUPABASE_POOLER_URL="postgresql://postgres.<PROJECT_REF>:<DB_PASSWORD>@aws-0-<REGION>.pooler.supabase.com:6543/postgres"
 
 # 2. AUTHENTICATION & SECURITY
 # Must be at least 32 characters in length (generate with crypto.randomBytes(48).toString('base64url'))
-JWT_SECRET="z6lINkScqALnxoh8e-jZxp2NiZigeDKzPdyxLt3y2V63GWTReQ90e3IJjsqICO62"
+JWT_SECRET="<GENERATE_RANDOM_BASE64_64_CHAR_SECRET>"
 JWT_EXPIRES_IN="12h"
 
 # 3. BACKEND SERVER
@@ -1313,7 +1315,7 @@ FRONTEND_URL="http://localhost:3000"
 # 4. FRONTEND APPLICATION (Next.js 14)
 NEXT_PUBLIC_API_URL="http://localhost:4000/api"
 NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="bsc-textiles-hrms-nextauth-secret-2024"
+NEXTAUTH_SECRET="<GENERATE_RANDOM_BASE64_64_CHAR_SECRET>"
 
 # 5. STORAGE & FILE HANDLING
 UPLOAD_DIR="./uploads"
@@ -1722,4 +1724,5 @@ All rights reserved. Unauthorized reproduction, modification, distribution, or d
 
 ```text
 © 2026 BSC Textiles Pvt Ltd. All Rights Reserved.
-```
+```
+# BSC_Textiles_HRMS_Project

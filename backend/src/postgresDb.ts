@@ -11,20 +11,30 @@ import path from 'path';
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 dotenv.config();
 
-const DEFAULT_SUPABASE_URL =
-  'postgresql://postgres.opoeigmbiwctvqtzxkde:HRMS_Project%402026@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres';
+function resolveDatabaseUri(connectionUri?: string): string {
+  const uri =
+    connectionUri ||
+    process.env.SUPABASE_POOLER_URL ||
+    process.env.SUPABASE_DB_URL ||
+    process.env.DATABASE_URL;
+
+  if (uri && uri.trim().length > 0) {
+    return uri.trim();
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Database configuration error: SUPABASE_POOLER_URL, SUPABASE_DB_URL, or DATABASE_URL must be defined.');
+  }
+
+  return 'postgresql://postgres:postgres@localhost:5432/postgres';
+}
 
 export class PostgresPoolAdapter {
   public pgPool: Pool;
   private uri: string;
 
   constructor(connectionUri?: string) {
-    this.uri =
-      connectionUri ||
-      process.env.SUPABASE_POOLER_URL ||
-      process.env.SUPABASE_DB_URL ||
-      process.env.DATABASE_URL ||
-      DEFAULT_SUPABASE_URL;
+    this.uri = resolveDatabaseUri(connectionUri);
 
     this.pgPool = new Pool({
       connectionString: this.uri,

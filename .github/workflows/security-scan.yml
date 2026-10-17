@@ -1,0 +1,31 @@
+name: Security & Secret Scan
+
+on:
+  push:
+    branches: [main, v2-production-clean]
+  pull_request:
+    branches: [main, v2-production-clean]
+
+jobs:
+  secret-scan:
+    name: Secret Scanning Protection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run Repository Secret Scanner
+        run: node scripts/scan-secrets.mjs
+
+      - name: Run Gitleaks Secret Detector
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: false
