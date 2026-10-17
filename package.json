@@ -34,7 +34,8 @@
     "db:seed:rbac-demo": "npm run db:seed:rbac-demo --workspace=database",
     "test:rbac": "npm run test:rbac --workspace=backend",
     "test:security": "npm run test:security --workspace=backend",
-    "test:live": "npm run test:live --workspace=backend"
+    "test:live": "npm run test:live --workspace=backend",
+    "secret-scan": "node scripts/scan-secrets.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.5",

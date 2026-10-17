@@ -38,6 +38,7 @@ import { setupRetailOperations } from './scripts/setupRetailOperations.js';
 import { setupBreaks } from './scripts/setupBreaks.js';
 import { registerLocationRegistryRefresh } from './services/locationRegistry.js';
 import { UserUploadService } from './services/userUploadService.js';
+import { EmailNotificationService } from './services/emailNotificationService.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -160,6 +161,29 @@ app.get('/api/health', async (req, res) => {
     },
     biometric,
   });
+});
+
+app.get('/api/health/email', async (req, res) => {
+  try {
+    const emailHealth = await EmailNotificationService.verifyConnection();
+    const statusCode = emailHealth.status === 'healthy' ? 200 : 503;
+    res.status(statusCode).json({
+      status: emailHealth.status,
+      timestamp: new Date().toISOString(),
+      email: emailHealth,
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      status: 'error',
+      timestamp: new Date().toISOString(),
+      email: {
+        status: 'degraded',
+        configured: false,
+        transport: 'error',
+        message: 'Internal email health check failure',
+      },
+    });
+  }
 });
 
 // Deep readiness probe for Kubernetes / load balancers

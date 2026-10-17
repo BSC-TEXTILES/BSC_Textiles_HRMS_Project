@@ -1300,11 +1300,11 @@ The application requires configuration across three primary tiers. Store these i
 # ==============================================================================
 
 # 1. DATABASE CONFIGURATION (MySQL 8.0)
-DATABASE_URL="mysql://root:YourSecurePassword@localhost:3306/bsc_textiles_hrms?connection_limit=20"
+DATABASE_URL="mysql://app_user:<STRONG_PASSWORD>@localhost:3306/bsc_textiles_hrms?connection_limit=20"
 
 # 2. AUTHENTICATION & SECURITY
 # Must be at least 32 characters in length (generate with crypto.randomBytes(48).toString('base64url'))
-JWT_SECRET="z6lINkScqALnxoh8e-jZxp2NiZigeDKzPdyxLt3y2V63GWTReQ90e3IJjsqICO62"
+JWT_SECRET="<GENERATE_A_CRYPTOGRAPHICALLY_RANDOM_SECRET_MIN_32_CHARS>"
 JWT_EXPIRES_IN="12h"
 
 # 3. BACKEND SERVER
@@ -1315,7 +1315,7 @@ FRONTEND_URL="http://localhost:3000"
 # 4. FRONTEND APPLICATION (Next.js 14)
 NEXT_PUBLIC_API_URL="http://localhost:4000/api"
 NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="bsc-textiles-hrms-nextauth-secret-2024"
+NEXTAUTH_SECRET="<GENERATE_A_CRYPTOGRAPHICALLY_RANDOM_SECRET_MIN_32_CHARS>"
 
 # 5. STORAGE & FILE HANDLING
 UPLOAD_DIR="./uploads"

@@ -253,4 +253,45 @@ export class EmailNotificationService {
 
     return await this.send({ to: params.to, subject, text, html });
   }
+
+  /**
+   * Health check to safely verify SMTP connectivity without exposing credentials or sending test messages
+   */
+  public static async verifyConnection(): Promise<{
+    status: 'healthy' | 'degraded';
+    configured: boolean;
+    transport: 'smtp' | 'mock_development';
+    message: string;
+  }> {
+    const host = process.env.SMTP_HOST;
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+
+    if (!host || !user || !pass) {
+      return {
+        status: 'healthy',
+        configured: false,
+        transport: 'mock_development',
+        message: 'SMTP credentials not configured; application is using safe non-delivering development transport.',
+      };
+    }
+
+    try {
+      const transporter = this.getTransporter();
+      await transporter.verify();
+      return {
+        status: 'healthy',
+        configured: true,
+        transport: 'smtp',
+        message: 'SMTP transport connection and authentication verified successfully.',
+      };
+    } catch {
+      return {
+        status: 'degraded',
+        configured: true,
+        transport: 'smtp',
+        message: 'SMTP server rejected connectivity or authentication check.',
+      };
+    }
+  }
 }

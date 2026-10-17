@@ -80,7 +80,19 @@ import { fromUtcMysqlString, formatWallString } from '../services/biometric/time
 import { STANDARD_ZK_VERIFY_MODES, MethodFamily } from '../services/biometric/verifyMode.js';
 
 const router = Router();
-const CONNECTOR_KEY = process.env.BIOMETRIC_CONNECTOR_KEY || 'bsc-biometric-connector-secret-key-2024';
+
+function getBiometricConnectorKey(): string {
+  const key = process.env.BIOMETRIC_CONNECTOR_KEY;
+  if (!key || key.trim().length === 0) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Security Error: BIOMETRIC_CONNECTOR_KEY must be configured in production.');
+    }
+    return 'bsc-dev-connector-key-not-for-production';
+  }
+  return key.trim();
+}
+
+const CONNECTOR_KEY = getBiometricConnectorKey();
 
 function checkDeviceLocationAccess(
   user: AuthRequest['user'] | undefined,
