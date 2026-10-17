@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import crypto from 'node:crypto';
+import { ACCESS_COOKIE, CSRF_COOKIE, cookieNames } from '../services/authCookies.js';
 
-const CSRF_COOKIE_NAME = 'csrf_token';
+const CSRF_COOKIE_NAME = CSRF_COOKIE;
 const CSRF_HEADER_NAME = 'x-csrf-token';
 
 /**
@@ -12,9 +13,19 @@ export function generateCsrfToken(): string {
 }
 
 /**
- * CSRF Protection Middleware using the Double Submit Cookie pattern.
- * Applies to mutating methods (POST, PUT, DELETE, PATCH).
- * Requests using Bearer tokens in Authorization header are API clients and exempt.
+ * CSRF protection for cookie-authenticated requests.
+ *
+ * Two layers, per the specification:
+ *   1. `SameSite=Strict` on the session cookies — the browser will not attach
+ *      them to a cross-site request at all, which also covers login CSRF;
+ *   2. double-submit — a mutating request that carries a session cookie must
+ *      also send the matching `x-csrf-token` header. `authenticate` adds the
+ *      server-side half by checking that token against the value bound to the
+ *      session, so an attacker who can plant a cookie still cannot guess it.
+ *
+ * Requests with no session cookie (sign-in, captcha, the consent banner on the
+ * login page) are skipped: there is no session to forge, and blocking them
+ * would make sign-in impossible.
  */
 export function csrfProtection(req: Request, res: Response, next: NextFunction) {
   // Safe HTTP methods do not mutate state
@@ -37,15 +48,25 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
     return next();
   }
 
-  // Exempt auth bootstrap endpoints (login/register/refresh/forgot-password)
-  const exemptPaths = [
-    '/api/auth/login',
-    '/api/auth/register',
-    '/api/auth/forgot-password',
-    '/api/auth/reset-password',
-    '/api/auth/verify-email',
-  ];
-  if (exemptPaths.some((p) => req.path.startsWith(p))) {
+  const names = cookieNames();
+  const hasSessionCookie = Boolean(req.cookies?.[names.access] || req.cookies?.[ACCESS_COOKIE]);
+  if (!hasSessionCookie) {
+    return next();
+  }
+
+  // Refresh and logout change no application state beyond the caller's own
+  // session, and both are already unreachable cross-site because the cookies
+  // are SameSite=Strict. Exempting them avoids a dead end when the readable
+  // CSRF cookie expires before the session does.
+  const csrfExempt = [
+  '/api/session/refresh',
+  '/api/session/logout',
+  '/api/auth/session/refresh',
+  '/api/auth/session/logout',
+  '/api/auth/refresh',
+  '/api/auth/logout',
+];
+  if (csrfExempt.some((path) => req.path === path || req.path.endsWith(path))) {
     return next();
   }
 
@@ -56,6 +77,7 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   if (!cookieToken || !headerToken || cookieToken !== headerToken) {
     return res.status(403).json({
       error: 'CSRF token validation failed',
+      code: 'CSRF_FAILED',
       message: 'Invalid or missing CSRF token for state-changing request',
     });
   }

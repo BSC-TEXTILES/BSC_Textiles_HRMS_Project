@@ -4,11 +4,14 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { WidgetGate } from '@/components/access/Can';
+import { useMyAccess } from '@/lib/rbac';
 import type { MetricKey } from '@/components/dashboard/MetricDrillDownModal';
 import { DashboardCards } from '@/components/dashboard/DashboardCards';
 import type { MetricDetailType } from '@/types/metricDetail';
 import { BscHolidaysCalendar } from '@/components/dashboard/BscHolidaysCalendar';
 import { KarnatakaHubsCardSection } from '@/components/dashboard/KarnatakaHubsCardSection';
+import { LiveActivitiesSection } from '@/components/dashboard/LiveActivitiesSection';
 import { ExecutiveShiftFilter, type ShiftOptionItem } from '@/components/dashboard/ExecutiveShiftFilter';
 import { ExecutiveDeptFilter, type DeptOptionItem } from '@/components/dashboard/ExecutiveDeptFilter';
 import { SHIFT_I_LABEL } from '@/config/shiftPolicyConfig';
@@ -289,6 +292,9 @@ function processShifts(rawShifts: any[], isAllHubs: boolean): ShiftOptionItem[] 
 }
 
 export default function DashboardPage() {
+  // Role-based section visibility: the widgets a role may see come from the
+  // access-control matrix (Admin assigns them, Super Admin owns the roles).
+  const access = useMyAccess();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedHub, setSelectedHubState] = useState(() => {
@@ -675,7 +681,6 @@ export default function DashboardPage() {
   const activeFloor = presentCount;
   const lateCount = stats?.late ?? 0;
   const onBreakCount = (stats?.onLunch ?? 0) + (stats?.onTeaBreak ?? 0);
-  const punchesToday = (stats?.qrScans ?? 52) + (stats?.faceVerified ?? 35);
   const totalIncentive = stats?.incentiveToday ?? 6900;
 
   // Shared interactive styles for the 5 drill-down KPI cards.
@@ -894,7 +899,10 @@ export default function DashboardPage() {
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-[#0058be]"></span>
                   </span>
                   <span className="text-[10px] font-bold text-[#0b1c30] dark:text-slate-100 uppercase tracking-wider">
-                    {loading ? 'Refreshing Feed...' : 'Terminal Sync: Live 99.8%'}
+                    {/* No real uptime figure exists for the terminal fleet, so
+                        none is invented here. The pill reports transport state;
+                        per-device health is on /attendance/devices. */}
+                    {loading ? 'Refreshing feed…' : 'Terminal feed connected'}
                   </span>
                 </div>
                 <button
@@ -990,28 +998,47 @@ export default function DashboardPage() {
         </div>
 
         {/* 5 KEY METRIC KPI CARDS (INTERACTIVE DETAIL DRILL-DOWN) */}
-        <DashboardCards
-          onSelectMetric={(metric) => setActiveMetric(metric)}
-          stats={stats}
-        />
+        <WidgetGate widgetKey="EXECUTIVE_KPI" access={access}>
+          <DashboardCards
+            onSelectMetric={(metric) => setActiveMetric(metric)}
+            stats={stats}
+          />
+        </WidgetGate>
 
         {/* MAIN OPERATIONAL & STATUTORY CALENDAR GRID */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           {/* LEFT SIDE: BSC CALENDAR & HOLIDAYS WITH HR CSV UPLOAD & TEMPLATE */}
           <div className="lg:col-span-4 xl:col-span-4 flex flex-col gap-4">
-            <BscHolidaysCalendar />
+            <WidgetGate widgetKey="HOLIDAY_CALENDAR" access={access}>
+              <BscHolidaysCalendar />
+            </WidgetGate>
           </div>
 
           {/* RIGHT SIDE: STORE HUBS, LIVE BIOMETRICS & SHIFTS */}
           <div className="lg:col-span-8 xl:col-span-8 flex flex-col gap-5">
             {/* SECTION 2: KARNATAKA STORE HUBS MONITOR & INTERACTIVE CARD CRUD */}
-            <KarnatakaHubsCardSection
-              selectedHub={selectedHub}
-              onSelectHub={setSelectedHub}
-              selectedShiftLabel={selectedShift !== 'all' ? activeShiftName : undefined}
-            />
+            <WidgetGate widgetKey="STORE_HUBS" access={access}>
+              <KarnatakaHubsCardSection
+                selectedHub={selectedHub}
+                onSelectHub={setSelectedHub}
+                selectedShiftLabel={selectedShift !== 'all' ? activeShiftName : undefined}
+              />
+            </WidgetGate>
+
+            {/* SECTION 2B: LIVE ACTIVITIES — the real-time workforce feed. */}
+            {/*
+              Previously this was a session-only strip of socket messages with
+              client-generated ids, and it shared the PUNCH_LEDGER widget gate
+              with the punch ledger below it, so one dashboard toggle hid two
+              unrelated sections. It now has its own widget key and its own
+              persisted, filterable, past-date-aware data source.
+            */}
+            <WidgetGate widgetKey="LIVE_ACTIVITIES" access={access}>
+              <LiveActivitiesSection selectedDate={selectedDate} />
+            </WidgetGate>
 
             {/* SECTION 3: RECENT BIOMETRIC TERMINAL PUNCHES LEDGER */}
+            <WidgetGate widgetKey="PUNCH_LEDGER" access={access}>
             <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
               <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -1116,6 +1143,7 @@ export default function DashboardPage() {
                 )}
               </div>
             </div>
+            </WidgetGate>
 
             {/* SECTION 4: FLOOR SHIFT ALLOCATION & ROSTER SUMMARY */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

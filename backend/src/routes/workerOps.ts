@@ -76,8 +76,11 @@ staffOpsRouter.get('/live-status', authorize('VIEW'), async (req: AuthRequest, r
           status: a.status,
           checkIn: a.actualLogin,
           checkOut: a.actualLogout,
-          lateMinutes: a.lateLoginSeconds ? Math.round(a.lateLoginSeconds / 60000) : 0,
-          otMinutes: a.overtimeSeconds ? Math.round(a.overtimeSeconds / 60000) : 0,
+          // lateLoginSeconds and overtimeSeconds are stored in SECONDS (see
+          // services/biometric/ingest.ts and attendance.ts). Dividing by 60000
+          // treated them as milliseconds, so a 40-minute lateness reported as 0.
+          lateMinutes: a.lateLoginSeconds ? Math.round(a.lateLoginSeconds / 60) : 0,
+          otMinutes: a.overtimeSeconds ? Math.round(a.overtimeSeconds / 60) : 0,
           isWeekOff: a.status === 'WEEKLY_OFF',
         },
         break: null,

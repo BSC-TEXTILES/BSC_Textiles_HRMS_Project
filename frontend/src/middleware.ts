@@ -52,6 +52,13 @@ const ROUTE_RULES: Array<{ prefix: string; roles: string[]; except?: string[] }>
     roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'],
   },
   {
+    // Candidate hiring is HR work; store managers screen walk-ins at their
+    // location. The public candidate form lives under /apply, which is not in
+    // the matcher below and therefore never passes through this middleware.
+    prefix: '/hiring',
+    roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'LOCATION_MANAGER', 'FLOOR_MANAGER'],
+  },
+  {
     prefix: '/employees',
     roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'],
     // Every signed-in user may open the profile dossier (their own record is
@@ -123,14 +130,31 @@ export default withAuth(
     pages: {
       signIn: '/login',
     },
-    secret: process.env.NEXTAUTH_SECRET || 'bsc-textiles-hrms-super-secret-jwt-key-2024-production-ready-32chars',
+    // A committed fallback secret means anyone with the repository can mint a
+    // session token, so production refuses to boot without a real one.
+    secret:
+      process.env.NEXTAUTH_SECRET ||
+      (process.env.NODE_ENV === 'production'
+        ? (() => {
+            throw new Error('NEXTAUTH_SECRET is required in production');
+          })()
+        : 'bsc-textiles-hrms-dev-nextauth-secret-change-me-32-chars'),
     callbacks: {
       authorized: ({ token, req }: { token: any; req: any }) => {
         const pathname = req.nextUrl.pathname;
 
-        // Public routes.
+        // Public routes. The four policy documents must be readable from the
+        // sign-in screen, before anyone has a session.
         if (pathname === '/login' || pathname === '/403') return true;
         if (pathname.startsWith('/api/')) return true;
+        if (
+          pathname === '/privacy-policy' ||
+          pathname === '/terms-of-use' ||
+          pathname === '/cookie-policy' ||
+          pathname === '/data-retention'
+        ) {
+          return true;
+        }
 
         return !!token;
       },
@@ -159,6 +183,8 @@ export const config = {
     '/organization/:path*',
     '/operations',
     '/operations/:path*',
+    '/hiring',
+    '/hiring/:path*',
     '/admin',
     '/admin/:path*',
     '/my-desk',

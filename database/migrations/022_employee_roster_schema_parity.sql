@@ -38,53 +38,78 @@
 SET @pre_022_sql_mode = @@SESSION.sql_mode;
 SET SESSION sql_mode = 'IGNORE_SPACE,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
 
+-- ---------------------------------------------------------------------------
+-- 1b. Snapshot helper. The plural `employees` / `users` / `locations` /
+--     `payroll_items` / `payroll_runs` / `employee_documents` /
+--     `employee_id_sequence` tables come from the deprecated seed schema and
+--     are absent on a freshly migrated database, so each snapshot runs only
+--     when its source table exists. Source names are fixed literals below.
+--     (Written as PREPARE/EXECUTE because DELIMITER-based procedures cannot be
+--     sent through a multi-statement driver.)
+-- ---------------------------------------------------------------------------
 DROP TABLE IF EXISTS `_bak_022_employee`;
-CREATE TABLE `_bak_022_employee` AS SELECT * FROM `employee`;
+SET @o = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employee') > 0, 'CREATE TABLE `_bak_022_employee` AS SELECT * FROM `employee`', 'SELECT 1');
+PREPARE st FROM @o; EXECUTE st; DEALLOCATE PREPARE st;
 
 DROP TABLE IF EXISTS `_bak_022_employees`;
-CREATE TABLE `_bak_022_employees` AS SELECT * FROM `employees`;
+SET @o = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employees') > 0, 'CREATE TABLE `_bak_022_employees` AS SELECT * FROM `employees`', 'SELECT 1');
+PREPARE st FROM @o; EXECUTE st; DEALLOCATE PREPARE st;
 
 DROP TABLE IF EXISTS `_bak_022_user`;
-CREATE TABLE `_bak_022_user` AS SELECT * FROM `user`;
+SET @o = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'user') > 0, 'CREATE TABLE `_bak_022_user` AS SELECT * FROM `user`', 'SELECT 1');
+PREPARE st FROM @o; EXECUTE st; DEALLOCATE PREPARE st;
 
 DROP TABLE IF EXISTS `_bak_022_users`;
-CREATE TABLE `_bak_022_users` AS SELECT * FROM `users`;
+SET @o = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users') > 0, 'CREATE TABLE `_bak_022_users` AS SELECT * FROM `users`', 'SELECT 1');
+PREPARE st FROM @o; EXECUTE st; DEALLOCATE PREPARE st;
 
 DROP TABLE IF EXISTS `_bak_022_location`;
-CREATE TABLE `_bak_022_location` AS SELECT * FROM `location`;
+SET @o = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'location') > 0, 'CREATE TABLE `_bak_022_location` AS SELECT * FROM `location`', 'SELECT 1');
+PREPARE st FROM @o; EXECUTE st; DEALLOCATE PREPARE st;
 
 DROP TABLE IF EXISTS `_bak_022_locations`;
-CREATE TABLE `_bak_022_locations` AS SELECT * FROM `locations`;
+SET @o = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'locations') > 0, 'CREATE TABLE `_bak_022_locations` AS SELECT * FROM `locations`', 'SELECT 1');
+PREPARE st FROM @o; EXECUTE st; DEALLOCATE PREPARE st;
 
 DROP TABLE IF EXISTS `_bak_022_attendance`;
-CREATE TABLE `_bak_022_attendance` AS SELECT * FROM `attendance`;
+SET @o = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'attendance') > 0, 'CREATE TABLE `_bak_022_attendance` AS SELECT * FROM `attendance`', 'SELECT 1');
+PREPARE st FROM @o; EXECUTE st; DEALLOCATE PREPARE st;
 
 DROP TABLE IF EXISTS `_bak_022_payrollitem`;
-CREATE TABLE `_bak_022_payrollitem` AS SELECT * FROM `payrollitem`;
+SET @o = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'payrollitem') > 0, 'CREATE TABLE `_bak_022_payrollitem` AS SELECT * FROM `payrollitem`', 'SELECT 1');
+PREPARE st FROM @o; EXECUTE st; DEALLOCATE PREPARE st;
 
 DROP TABLE IF EXISTS `_bak_022_payroll_items`;
-CREATE TABLE `_bak_022_payroll_items` AS SELECT * FROM `payroll_items`;
+SET @o = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'payroll_items') > 0, 'CREATE TABLE `_bak_022_payroll_items` AS SELECT * FROM `payroll_items`', 'SELECT 1');
+PREPARE st FROM @o; EXECUTE st; DEALLOCATE PREPARE st;
 
 DROP TABLE IF EXISTS `_bak_022_payrollrun`;
-CREATE TABLE `_bak_022_payrollrun` AS SELECT * FROM `payrollrun`;
+SET @o = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'payrollrun') > 0, 'CREATE TABLE `_bak_022_payrollrun` AS SELECT * FROM `payrollrun`', 'SELECT 1');
+PREPARE st FROM @o; EXECUTE st; DEALLOCATE PREPARE st;
 
 DROP TABLE IF EXISTS `_bak_022_payroll_runs`;
-CREATE TABLE `_bak_022_payroll_runs` AS SELECT * FROM `payroll_runs`;
+SET @o = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'payroll_runs') > 0, 'CREATE TABLE `_bak_022_payroll_runs` AS SELECT * FROM `payroll_runs`', 'SELECT 1');
+PREPARE st FROM @o; EXECUTE st; DEALLOCATE PREPARE st;
 
 DROP TABLE IF EXISTS `_bak_022_leaverequest`;
-CREATE TABLE `_bak_022_leaverequest` AS SELECT * FROM `leaverequest`;
+SET @o = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'leaverequest') > 0, 'CREATE TABLE `_bak_022_leaverequest` AS SELECT * FROM `leaverequest`', 'SELECT 1');
+PREPARE st FROM @o; EXECUTE st; DEALLOCATE PREPARE st;
 
 DROP TABLE IF EXISTS `_bak_022_employee_exits`;
-CREATE TABLE `_bak_022_employee_exits` AS SELECT * FROM `employee_exits`;
+SET @o = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employee_exits') > 0, 'CREATE TABLE `_bak_022_employee_exits` AS SELECT * FROM `employee_exits`', 'SELECT 1');
+PREPARE st FROM @o; EXECUTE st; DEALLOCATE PREPARE st;
 
 DROP TABLE IF EXISTS `_bak_022_fnf_settlements`;
-CREATE TABLE `_bak_022_fnf_settlements` AS SELECT * FROM `fnf_settlements`;
+SET @o = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'fnf_settlements') > 0, 'CREATE TABLE `_bak_022_fnf_settlements` AS SELECT * FROM `fnf_settlements`', 'SELECT 1');
+PREPARE st FROM @o; EXECUTE st; DEALLOCATE PREPARE st;
 
 DROP TABLE IF EXISTS `_bak_022_employee_documents`;
-CREATE TABLE `_bak_022_employee_documents` AS SELECT * FROM `employee_documents`;
+SET @o = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employee_documents') > 0, 'CREATE TABLE `_bak_022_employee_documents` AS SELECT * FROM `employee_documents`', 'SELECT 1');
+PREPARE st FROM @o; EXECUTE st; DEALLOCATE PREPARE st;
 
 DROP TABLE IF EXISTS `_bak_022_employee_id_sequence`;
-CREATE TABLE `_bak_022_employee_id_sequence` AS SELECT * FROM `employee_id_sequence`;
+SET @o = IF((SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'employee_id_sequence') > 0, 'CREATE TABLE `_bak_022_employee_id_sequence` AS SELECT * FROM `employee_id_sequence`', 'SELECT 1');
+PREPARE st FROM @o; EXECUTE st; DEALLOCATE PREPARE st;
 
 -- Snapshot mode over: restore the server default strictness for every DDL/DML
 -- statement below (and for the rest of the migration run).

@@ -4,8 +4,8 @@
  * Every href here must point at a route that exists under `src/app`
  * (verified against the real page tree). Visibility is driven by two
  * complementary sources — never by the sidebar alone:
- *   1. `moduleKey` → the logged-in user's effective RBAC module access map
- *      (`GET /roles/rbac/modules`, see `lib/rbac.ts`);
+ *   1. `moduleKey` → the logged-in user's effective access map
+ *      (`GET /access/me/permissions`, see `lib/rbac.ts`);
  *   2. `roles` → the same route groups `middleware.ts` enforces, so an entry
  *      is never rendered for a route that would bounce to /403.
  * The Express API re-checks `authorize()` on every request, so hiding an entry
@@ -52,11 +52,13 @@ import {
   ListChecks,
   AlarmClock,
   PartyPopper,
+  Briefcase,
 } from 'lucide-react';
 import type { MyAccess } from '@/lib/rbac';
 import { canEditModule, canViewModule } from '@/lib/rbac';
 import {
   ADMIN_ROLES,
+  HIRING_ROUTE_ROLES,
   OPERATIONS_ROUTE_ROLES,
   PAYROLL_ROUTE_ROLES,
   WORKFORCE_ROUTE_ROLES,
@@ -67,6 +69,7 @@ const ADMIN = [...ADMIN_ROLES];
 const WORKFORCE = [...WORKFORCE_ROUTE_ROLES];
 const PAYROLL = [...PAYROLL_ROUTE_ROLES];
 const OPERATIONS = [...OPERATIONS_ROUTE_ROLES];
+const HIRING = [...HIRING_ROUTE_ROLES];
 
 export interface NavItem {
   title: string;
@@ -116,6 +119,7 @@ export const enterpriseNavigation: NavSectionConfig[] = [
     items: [
       { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, moduleKey: 'DASHBOARD' },
       { title: 'My Desk Self-Service', href: '/my-desk', icon: UserCheck },
+      { title: 'My Privacy', href: '/privacy', icon: ShieldCheck },
       { title: 'Notifications', href: '/notifications', icon: CalendarClock },
     ],
   },
@@ -139,7 +143,7 @@ export const enterpriseNavigation: NavSectionConfig[] = [
         badge: 'Exit / Block',
       },
       { title: 'Employee History', href: '/employees/history', icon: History, roles: WORKFORCE },
-      { title: 'Profile 360 & Dossier', href: '/employees/profile', icon: Contact },
+      { title: 'Profile 360 & Dossier', href: '/employees/profile', icon: Contact, moduleKey: 'MY_PROFILE' },
       {
         title: 'Analysis & Reports',
         href: '/employees/analysis',
@@ -173,7 +177,7 @@ export const enterpriseNavigation: NavSectionConfig[] = [
       'text-amber-300 group-hover:text-white'
     ),
     items: [
-      { title: 'Attendance Register', href: '/attendance/register', icon: ClipboardCheck },
+      { title: 'Attendance Register', href: '/attendance/register', icon: ClipboardCheck, moduleKey: 'MY_ATTENDANCE' },
       {
         title: 'Missed Punching Details',
         href: '/attendance/missed-punching',
@@ -181,9 +185,9 @@ export const enterpriseNavigation: NavSectionConfig[] = [
         badge: 'Attention',
         roles: WORKFORCE,
       },
-      { title: 'Biometric Punches Ledger', href: '/attendance/punches', icon: Fingerprint },
-      { title: 'Floor Shifts & Rosters', href: '/attendance/shifts', icon: Calendar },
-      { title: 'Lunch & Break Tracker', href: '/attendance/breaks', icon: Coffee },
+      { title: 'Biometric Punches Ledger', href: '/attendance/punches', icon: Fingerprint, moduleKey: 'ATTENDANCE' },
+      { title: 'Floor Shifts & Rosters', href: '/attendance/shifts', icon: Calendar, moduleKey: 'SHIFT_SCHEDULING' },
+      { title: 'Lunch & Break Tracker', href: '/attendance/breaks', icon: Coffee, moduleKey: 'MY_ATTENDANCE' },
       {
         title: 'Punch Corrections',
         href: '/attendance/corrections',
@@ -247,6 +251,22 @@ export const enterpriseNavigation: NavSectionConfig[] = [
     ],
   },
   {
+    title: 'Talent Acquisition',
+    theme: theme(
+      'text-teal-200',
+      'bg-teal-400',
+      'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-teal-300',
+      'hover:text-white hover:bg-white/10',
+      'text-teal-300 group-hover:text-white'
+    ),
+    items: [
+      { title: 'Hiring Dashboard', href: '/hiring', icon: Briefcase, moduleKey: 'RECRUITMENT', roles: HIRING },
+      { title: 'Job Openings & Forms', href: '/hiring/forms', icon: ClipboardList, moduleKey: 'RECRUITMENT', roles: HIRING },
+      { title: 'Candidate Pipeline', href: '/hiring/candidates', icon: Users, moduleKey: 'RECRUITMENT', roles: HIRING },
+      { title: 'Hiring Settings', href: '/hiring/settings', icon: Settings, moduleKey: 'RECRUITMENT', roles: HIRING },
+    ],
+  },
+  {
     title: 'Payroll & Settlements',
     theme: theme(
       'text-rose-200',
@@ -274,7 +294,7 @@ export const enterpriseNavigation: NavSectionConfig[] = [
       },
       { title: 'Payroll Reports', href: '/payroll/reports', icon: BarChart3, roles: PAYROLL },
       { title: 'Floor Salary Overview', href: '/payroll/floor-overview', icon: Store, roles: PAYROLL },
-      { title: 'Leave Approvals', href: '/leaves', icon: CalendarClock },
+      { title: 'Leave Approvals', href: '/leaves', icon: CalendarClock, moduleKey: 'LEAVE_APPROVAL' },
       { title: 'Incentive Calculation', href: '/incentives/calculation', icon: Coins, roles: PAYROLL },
     ],
   },
@@ -310,19 +330,49 @@ export const enterpriseNavigation: NavSectionConfig[] = [
     ),
     items: [
       { title: 'Governance Reports', href: '/reports', icon: FileText, roles: WORKFORCE },
-      { title: 'User & Role Management', href: '/admin/users', icon: UserCog, badge: 'RBAC', roles: ADMIN },
       {
-        title: 'Roles & Permissions',
+        title: 'Access Overview',
+        href: '/admin/access',
+        icon: ShieldCheck,
+        badge: 'RBAC',
+        moduleKey: 'ROLES_PERMISSIONS',
+        roles: ADMIN,
+      },
+      {
+        title: 'Role Management',
         href: '/admin/roles',
         icon: KeyRound,
         moduleKey: 'ROLES_PERMISSIONS',
         roles: ADMIN,
       },
       {
+        title: 'Module Access',
+        href: '/admin/module-access',
+        icon: Network,
+        moduleKey: 'MODULE_ACCESS',
+        roles: ADMIN,
+      },
+      { title: 'Users & Assignments', href: '/admin/users', icon: UserCog, roles: ADMIN },
+      {
         title: 'Audit Logs & Security',
         href: '/admin/audit-logs',
         icon: ShieldAlert,
         moduleKey: 'AUDIT_LOGS',
+        roles: ADMIN,
+      },
+      {
+        title: 'User Credentials',
+        href: '/admin/credentials',
+        icon: KeyRound,
+        badge: 'Admin',
+        moduleKey: 'USER_CREDENTIALS',
+        roles: ADMIN,
+      },
+      {
+        title: 'Security Operations',
+        href: '/admin/security',
+        icon: ShieldAlert,
+        moduleKey: 'SECURITY_MONITORING',
         roles: ADMIN,
       },
       { title: 'System Settings', href: '/admin/settings', icon: Settings, roles: ADMIN },

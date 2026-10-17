@@ -9,6 +9,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import api from '@/lib/api';
 import { useNotifications } from '@/context/NotificationContext';
 import { GlobalHeaderSearch } from '@/components/layout/GlobalHeaderSearch';
+import { SiteFooter } from '@/components/layout/SiteFooter';
 import { useDashboardShellContext } from '@/context/DashboardShellContext';
 import {
   Bell,
@@ -180,24 +181,25 @@ export function DashboardLayoutFullShell({
     }
   }, [pathname]);
 
-  // Auth redirect check
+  // Auth redirect check. There is no client-side token to look for any more —
+  // the session lives in HttpOnly cookies — so NextAuth's status is the signal
+  // and `/auth/me` is the confirmation that the API agrees.
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      const token = typeof window !== 'undefined' ? (localStorage.getItem('bsc_token') || localStorage.getItem('token')) : null;
-      if (!token) {
-        window.location.href = `/login?callbackUrl=${encodeURIComponent(pathname)}`;
-      } else {
-        api.get('/auth/me').catch(() => {
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem('bsc_token');
-            localStorage.removeItem('token');
-            localStorage.removeItem('bsc_user');
-            document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-            window.location.href = `/login?callbackUrl=${encodeURIComponent(pathname)}`;
-          }
-        });
-      }
-    }
+    if (status !== 'unauthenticated') return;
+    let cancelled = false;
+    api
+      .get('/session/status', { timeout: 8000 })
+      .then((response) => {
+        if (!cancelled && !response.data?.authenticated) {
+          window.location.href = `/login?callbackUrl=${encodeURIComponent(pathname)}`;
+        }
+      })
+      .catch(() => {
+        if (!cancelled) window.location.href = `/login?callbackUrl=${encodeURIComponent(pathname)}`;
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [status, pathname]);
 
   // Clock timer (single persistent interval)
@@ -256,11 +258,10 @@ export function DashboardLayoutFullShell({
     );
   }
 
+  // Nothing to render for a signed-out visitor; the effect above is sending
+  // them to /login.
   if (status === 'unauthenticated') {
-    const hasToken = typeof window !== 'undefined' ? (localStorage.getItem('bsc_token') || localStorage.getItem('token')) : null;
-    if (!hasToken) {
-      return null;
-    }
+    return null;
   }
 
   const roleDisplayNames: Record<string, string> = {
@@ -282,11 +283,8 @@ export function DashboardLayoutFullShell({
 
   const handleSignOut = async () => {
     try {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('bsc_token');
-        localStorage.removeItem('token');
-        localStorage.removeItem('bsc_user');
-      }
+      // The API has to clear the HttpOnly cookies; script cannot touch them.
+      await api.post('/session/logout', {}).catch(() => undefined);
       await signOut({ callbackUrl: '/login', redirect: true });
     } catch {
       window.location.href = '/login';
@@ -762,6 +760,7 @@ export function DashboardLayoutFullShell({
         <div className="w-full max-w-[1600px] mx-auto p-4 sm:p-5 lg:p-6 space-y-5">
           {children}
         </div>
+        <SiteFooter />
       </main>
     </div>
   );

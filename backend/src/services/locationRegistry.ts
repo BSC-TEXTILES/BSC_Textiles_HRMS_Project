@@ -108,6 +108,26 @@ export function resolveLocationAlias(value?: unknown): string | undefined {
   return snapshot.aliases.get(normalise(raw)) ?? raw;
 }
 
+let refreshTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Load the snapshot once at boot and keep it fresh on a TTL.
+ *
+ * Without this call the snapshot stays empty and `resolveLocationAlias` degrades
+ * to pass-through, so a location CODE reaches a place that expects the location
+ * ID (e.g. the `auditlog.locationId` foreign key) and the write fails.
+ */
+export async function registerLocationRegistryRefresh(): Promise<void> {
+  await refreshLocationRegistry(true);
+  if (refreshTimer) return;
+  refreshTimer = setInterval(() => {
+    refreshLocationRegistry(true).catch((err) => {
+      console.warn('[locationRegistry] refresh failed:', err?.message || err);
+    });
+  }, REFRESH_TTL_MS);
+  if (typeof refreshTimer.unref === 'function') refreshTimer.unref();
+}
+
 /** Every live location, for filter option lists. Never a hard-coded array. */
 export function listKnownLocations(includeArchived = false): LocationSummary[] {
   const all = [...snapshot.byId.values()];

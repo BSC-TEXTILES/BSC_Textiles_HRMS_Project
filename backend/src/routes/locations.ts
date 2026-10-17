@@ -4,6 +4,7 @@ import { prisma } from '../index.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { validate, schemas } from '../middleware/validation.js';
 import { cacheService } from '../services/cacheService.js';
+import { ensureHiringShardForLocation } from '../services/hiring/hiringShardProvisioner.js';
 
 const router = Router();
 
@@ -162,9 +163,28 @@ router.post('/', authorize('ADD'), validate(schemas.location), async (req: AuthR
         logoutTime: new Date('2024-01-01T18:30:00'),
       },
     });
-    
+
+    // Automatically provision the location's hiring data shard (database +
+    // hiring schema + registry row). Failure never blocks location creation —
+    // it is surfaced in the response and can be retried from Location Management.
+    let hiringShard: Awaited<ReturnType<typeof ensureHiringShardForLocation>> | null = null;
+    if (process.env.HIRING_AUTO_PROVISION !== 'false') {
+      try {
+        hiringShard = await ensureHiringShardForLocation({
+          id: location.id,
+          code: location.code,
+          name: location.name,
+        });
+        if (hiringShard.error) {
+          console.error(`Hiring shard provisioning failed for ${location.code}: ${hiringShard.error}`);
+        }
+      } catch (err: any) {
+        console.error(`Hiring shard provisioning threw for ${location.code}:`, err.message);
+      }
+    }
+
     cacheService.invalidateLocations();
-    res.status(201).json(location);
+    res.status(201).json({ ...location, hiringShard });
   } catch (error) {
     console.error('Create location error:', error);
     res.status(500).json({ error: 'Failed to create location' });

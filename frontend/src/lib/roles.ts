@@ -50,6 +50,21 @@ export const OPERATIONS_ROUTE_ROLES = [
   'FLOOR_MANAGER',
 ] as const;
 
+/**
+ * Candidate Hiring routes. Store managers are included because they run
+ * walk-in interviews at their location; the backend still narrows every
+ * candidate query to the locations their RECRUITMENT scope allows.
+ */
+export const HIRING_ROUTE_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN',
+  'HR',
+  'HR_MANAGER',
+  'HR_EXECUTIVE',
+  'LOCATION_MANAGER',
+  'FLOOR_MANAGER',
+] as const;
+
 export function roleInGroup(role: string | undefined | null, group: readonly string[]): boolean {
   return Boolean(role && group.includes(role));
 }
@@ -60,16 +75,20 @@ export const EMPLOYEE_HOME = '/my-desk';
 /** Management landing page (executive overview). */
 export const STAFF_HOME = '/dashboard';
 
+/** Governance landing page — the access-control dashboard a Super Admin owns. */
+export const GOVERNANCE_HOME = '/admin/access';
+
 /**
  * Resolve the page a user should land on after authenticating.
  *
- * - Admin  → executive/admin dashboard
- * - HR     → staff dashboard
+ * - Super Admin → access-control governance dashboard
+ * - Admin / HR / Floor Manager → staff dashboard
  * - Employee → self-service desk
  */
 export function getRoleHomePath(role?: string | null): string {
   if (!role) return STAFF_HOME;
 
+  if (role === 'SUPER_ADMIN') return GOVERNANCE_HOME;
   if ((ADMIN_ROLES as readonly string[]).includes(role)) return STAFF_HOME;
   if ((HR_ROLES as readonly string[]).includes(role)) return STAFF_HOME;
 

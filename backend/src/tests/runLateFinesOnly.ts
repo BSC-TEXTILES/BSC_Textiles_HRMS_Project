@@ -19,7 +19,7 @@ async function loginUser(email: string, password = 'password123'): Promise<strin
 async function main() {
   console.log('--- Testing Late Attendance & Fine Management Suite ---');
   const adminToken = await loginUser('admin@bsctextiles.com');
-  const hrToken = await loginUser('kavita.bhat@bsctextiles.com');
+  const hrToken = await loginUser('rbac.hr@bsctextiles.com');
   console.log('Authenticated admin and HR.');
 
   const results = await runLateFinesTests(adminToken, hrToken);

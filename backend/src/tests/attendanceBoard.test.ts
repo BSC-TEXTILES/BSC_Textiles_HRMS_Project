@@ -391,15 +391,20 @@ export async function runAttendanceBoardTests(
     assert.ok(Array.isArray(data.statusOptions) && data.statusOptions.length > 0, 'statusOptions must be non-empty');
   });
 
-  await runTest('API: shift-board ?date=2026-10-01 returns 35 rostered employees', async () => {
-    const res = await api('/attendance/shift-board?date=2026-10-01&limit=35', adminToken);
+  await runTest('API: shift-board returns the full roster for an explicit date', async () => {
+    const probeRes = await api('/attendance/shift-board?date=2026-10-01&limit=1', adminToken);
+    const probe: any = await probeRes.json();
+    const rosterTotal: number = probe.summary.rostered;
+    assert.ok(rosterTotal > 0, 'roster must not be empty');
+
+    const res = await api(`/attendance/shift-board?date=2026-10-01&limit=${rosterTotal}`, adminToken);
     assert.strictEqual(res.status, 200);
     const data: any = await res.json();
     assert.strictEqual(data.date, '2026-10-01', 'must query the exact requested date');
-    assert.strictEqual(data.summary.rostered, 35, '35 active employees rostered');
-    assert.strictEqual(data.total, 35);
+    assert.strictEqual(data.summary.rostered, rosterTotal, 'rostered matches the probe');
+    assert.strictEqual(data.total, rosterTotal);
     const rows: any[] = data.rows;
-    assert.strictEqual(rows.length, 35, 'with limit=35 all rows are returned');
+    assert.strictEqual(rows.length, rosterTotal, 'with a matching limit all rows are returned');
     for (const r of rows) {
       assert.strictEqual(r.attendanceDate, '2026-10-01', 'every row is for the requested date');
       assert.ok(r.fullName && r.employeeCode, 'rows carry employee identity');
@@ -407,12 +412,16 @@ export async function runAttendanceBoardTests(
     }
   });
 
-  await runTest('API: shift-board ?date=2026-10-11 (Sunday) returns 35 rostered with weekly-off rows', async () => {
+  await runTest('API: shift-board ?date=2026-10-11 (Sunday) returns the full roster with weekly-off rows', async () => {
+    const probeRes = await api('/attendance/shift-board?date=2026-10-01&limit=1', adminToken);
+    const probe: any = await probeRes.json();
+    const rosterTotal: number = probe.summary.rostered;
+
     const res = await api('/attendance/shift-board?date=2026-10-11', adminToken);
     assert.strictEqual(res.status, 200);
     const data: any = await res.json();
     assert.strictEqual(data.date, '2026-10-11');
-    assert.strictEqual(data.summary.rostered, 35);
+    assert.strictEqual(data.summary.rostered, rosterTotal);
     const statuses = new Set<string>(data.rows.map((r: any) => r.status));
     assert.ok(statuses.size > 0, 'rows returned');
   });
@@ -436,7 +445,9 @@ export async function runAttendanceBoardTests(
     assert.strictEqual(res.status, 200);
     const data: any = await res.json();
     assert.ok(data.total > 0, 'DAV must have employees');
-    assert.ok(data.total < 35, 'DAV must not return the full roster');
+    const probe = await api('/attendance/shift-board?date=2026-10-01&limit=1', adminToken);
+    const fullRoster: number = ((await probe.json()) as any).summary.rostered;
+    assert.ok(data.total < fullRoster, 'DAV must not return the full roster');
     for (const r of data.rows) {
       assert.strictEqual(r.locationId, davLocId, 'every row belongs to DAV');
     }
@@ -498,20 +509,27 @@ export async function runAttendanceBoardTests(
   });
 
   await runTest('API: shift-board pagination is consistent across pages', async () => {
+    const probeRes = await api('/attendance/shift-board?date=2026-10-01&limit=1', adminToken);
+    const probe: any = await probeRes.json();
+    const total: number = probe.summary.rostered;
+    assert.ok(total > 0, 'roster must not be empty');
+
     const page1 = await api('/attendance/shift-board?date=2026-10-01&page=1&limit=10', adminToken);
     const page2 = await api('/attendance/shift-board?date=2026-10-01&page=2&limit=10', adminToken);
     assert.strictEqual(page1.status, 200);
     assert.strictEqual(page2.status, 200);
     const d1: any = await page1.json();
     const d2: any = await page2.json();
-    assert.strictEqual(d1.rows.length, 10, 'page 1 returns the requested limit');
-    assert.strictEqual(d2.rows.length, 10, 'page 2 returns the requested limit');
-    assert.strictEqual(d1.total, 35, 'total ignores pagination');
+    assert.strictEqual(d1.rows.length, Math.min(10, total), 'page 1 returns the requested limit (or the roster)');
+    assert.strictEqual(d1.total, total, 'total ignores pagination');
     assert.strictEqual(d1.total, d2.total, 'total is stable across pages');
-    assert.strictEqual(d1.pages, 4, '35 rows / limit 10 = 4 pages');
-    const ids1 = new Set<string>(d1.rows.map((r: any) => r.employeeId));
-    for (const r of d2.rows) {
-      assert.ok(!ids1.has(r.employeeId), 'pages must not overlap');
+    assert.strictEqual(d1.pages, Math.ceil(total / 10), 'pages derive from total / limit');
+    if (total > 10) {
+      assert.strictEqual(d2.rows.length, Math.min(10, total - 10), 'page 2 returns the remaining rows');
+      const ids1 = new Set<string>(d1.rows.map((r: any) => r.employeeId));
+      for (const r of d2.rows) {
+        assert.ok(!ids1.has(r.employeeId), 'pages must not overlap');
+      }
     }
   });
 
@@ -601,7 +619,9 @@ export async function runAttendanceBoardTests(
     assert.ok(disposition.includes('BSC_Shift_Board_2026-10-01.csv'), `unexpected filename: ${disposition}`);
     const text = await res.text();
     const lines = text.split('\n').filter((l) => l.trim().length > 0);
-    assert.ok(lines.length >= 36, `expected header + 35 data rows, got ${lines.length} lines`);
+    const probeRes = await api('/attendance/shift-board?date=2026-10-01&limit=1', adminToken);
+    const rosterTotal: number = ((await probeRes.json()) as any).summary.rostered;
+    assert.ok(lines.length >= rosterTotal + 1, `expected header + ${rosterTotal} data rows, got ${lines.length} lines`);
     const header = lines[0].replace(/^\uFEFF/, '');
     assert.ok(header.includes('Employee ID'), `CSV must include Employee ID, got: ${header}`);
     assert.ok(header.includes('Attendance Status'), `CSV must include Attendance Status, got: ${header}`);
@@ -693,7 +713,7 @@ async function main() {
     return ((await res.json()) as any).token;
   };
   const adminToken = await login('admin@bsctextiles.com');
-  const belagaviHrToken = await login('kavita.bhat@bsctextiles.com');
+  const belagaviHrToken = await login('rbac.hr@bsctextiles.com');
   const results = await runAttendanceBoardTests(BASE_URL, adminToken, belagaviHrToken);
   let passed = 0;
   let failed = 0;

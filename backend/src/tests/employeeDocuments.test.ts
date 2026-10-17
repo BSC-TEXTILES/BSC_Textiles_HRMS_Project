@@ -83,14 +83,26 @@ export async function runEmployeeDocumentsTests(
   });
 
   // 4. Employee dossier & checklist
+  let dossierEmployeeId = '';
+  let dossierEmployeeCode = '';
   await runTest('4. Employee Dossier returns full documents list with required checklist', async () => {
-    const res = await fetch(`${BASE_URL}/api/employees/documents/employee/TEST-EMP-001`, {
+    const dirRes = await fetch(`${BASE_URL}/api/employees/documents/directory?limit=1`, {
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    if (!dirRes.ok) throw new Error(`Directory status ${dirRes.status}`);
+    const dirJson: any = await dirRes.json();
+    const directory = dirJson.data || [];
+    if (!directory.length) throw new Error('Directory is empty');
+    dossierEmployeeId = directory[0].id;
+    dossierEmployeeCode = directory[0].employeeCode;
+
+    const res = await fetch(`${BASE_URL}/api/employees/documents/employee/${dossierEmployeeId}`, {
       headers: { Authorization: `Bearer ${adminToken}` }
     });
     if (!res.ok) throw new Error(`Status ${res.status}`);
     const json: any = await res.json();
-    if (!json.employee || json.employee.employeeCode !== 'TEST-EMP-001') throw new Error('Employee mismatch');
-    if (!Array.isArray(json.documents) || json.documents.length === 0) throw new Error('No documents found for employee');
+    if (!json.employee || json.employee.employeeCode !== dossierEmployeeCode) throw new Error('Employee mismatch');
+    if (!Array.isArray(json.documents)) throw new Error('Missing documents array');
     if (!Array.isArray(json.checklist) || json.checklist.length === 0) throw new Error('Checklist missing');
   });
 
@@ -103,7 +115,7 @@ export async function runEmployeeDocumentsTests(
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${adminToken}` },
       body: JSON.stringify({
-        employeeId: 'TEST-EMP-003',
+        employeeId: dossierEmployeeId,
         category: 'IDENTITY',
         documentType: 'VOTER_ID',
         title: 'Election Commission Voter ID Card',
@@ -118,6 +130,15 @@ export async function runEmployeeDocumentsTests(
     const uploadJson: any = await uploadRes.json();
     if (!uploadJson.success || !uploadJson.documentId) throw new Error('Document ID missing in response');
     uploadedDocId = uploadJson.documentId;
+
+    const dossierRes = await fetch(`${BASE_URL}/api/employees/documents/employee/${dossierEmployeeId}`, {
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    if (!dossierRes.ok) throw new Error(`Dossier status ${dossierRes.status}`);
+    const dossierJson: any = await dossierRes.json();
+    if (!Array.isArray(dossierJson.documents) || dossierJson.documents.length === 0) {
+      throw new Error('Uploaded document did not appear in the employee dossier');
+    }
   });
 
   // 6. Preview / download secure streaming

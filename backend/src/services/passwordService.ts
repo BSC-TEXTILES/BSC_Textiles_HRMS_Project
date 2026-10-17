@@ -2,6 +2,7 @@ import { hash as argon2Hash, verify as argon2Verify } from '@node-rs/argon2';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import { prisma, pool } from '../db.js';
+import { securityConfig } from '../config/security.js';
 
 export interface PasswordValidationResult {
   isValid: boolean;
@@ -16,55 +17,93 @@ export class PasswordService {
     parallelism: 4,    // 4 threads
   };
 
-  private static readonly MAX_HISTORY_CHECK = 12;
-  private static readonly MAX_FAILED_ATTEMPTS = 10;
-  private static readonly LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+  private static get MAX_HISTORY_CHECK(): number {
+    return securityConfig.password.historyCount;
+  }
+
+  private static get MAX_FAILED_ATTEMPTS(): number {
+    return securityConfig.login.maxAttempts;
+  }
+
+  private static get LOCKOUT_DURATION_MS(): number {
+    return securityConfig.login.lockoutSeconds * 1000;
+  }
 
   /**
-   * Hash a plain password using Argon2id
+   * Pepper before hash, so a stolen hash table is useless without the secret
+   * that never leaves the server (PASSWORD_PEPPER or SECRETS_DIR/password_pepper).
+   * Argon2's input is a byte string, so the HMAC digest is used as-is.
+   */
+  private static applyPepper(password: string): string {
+    return crypto
+      .createHmac('sha256', securityConfig.password.pepper)
+      .update(password, 'utf8')
+      .digest('base64');
+  }
+
+  /**
+   * Hash a plain password using Argon2id over the peppered value
    */
   public static async hashPassword(password: string): Promise<string> {
     try {
-      return await argon2Hash(password, this.ARGON2_OPTIONS);
+      return await argon2Hash(this.applyPepper(password), this.ARGON2_OPTIONS);
     } catch (err) {
       // Fallback to high-work-factor bcrypt if native module ever fails
       console.warn('[PasswordService] Argon2 hashing failed, falling back to bcrypt:', err);
-      return await bcrypt.hash(password, 12);
+      return await bcrypt.hash(this.applyPepper(password), 12);
     }
   }
 
   /**
-   * Verify password against hash (supports both Argon2id and legacy bcrypt)
+   * Verify password against hash.
+   *
+   * Three formats are accepted, newest first: the current peppered Argon2id,
+   * the legacy peppered-bcrypt, and the pre-pepper hashes that were in the
+   * database before the pepper existed. A match on anything but the first sets
+   * `needsRehash`, which is how a stored credential is upgraded on the owner's
+   * next successful login instead of by a bulk migration.
    */
   public static async verifyPassword(
     password: string,
     hash: string
-  ): Promise<{ valid: boolean; isLegacyBcrypt: boolean }> {
+  ): Promise<{ valid: boolean; isLegacyBcrypt: boolean; needsRehash: boolean }> {
     if (!hash || !password) {
-      return { valid: false, isLegacyBcrypt: false };
+      return { valid: false, isLegacyBcrypt: false, needsRehash: false };
     }
 
-    // Check if hash is Argon2id
+    const peppered = this.applyPepper(password);
+
     if (hash.startsWith('$argon2')) {
       try {
-        const valid = await argon2Verify(hash, password);
-        return { valid, isLegacyBcrypt: false };
+        if (await argon2Verify(hash, peppered)) return { valid: true, isLegacyBcrypt: false, needsRehash: false };
       } catch {
-        return { valid: false, isLegacyBcrypt: false };
+        /* fall through to the legacy formats */
       }
     }
 
-    // Check if hash is legacy bcrypt
     if (hash.startsWith('$2a$') || hash.startsWith('$2b$')) {
       try {
-        const valid = await bcrypt.compare(password, hash);
-        return { valid, isLegacyBcrypt: valid };
+        if (await bcrypt.compare(peppered, hash)) return { valid: true, isLegacyBcrypt: true, needsRehash: true };
       } catch {
-        return { valid: false, isLegacyBcrypt: false };
+        /* fall through */
       }
     }
 
-    return { valid: false, isLegacyBcrypt: false };
+    // Credentials hashed before the pepper was introduced.
+    try {
+      if (hash.startsWith('$argon2') && (await argon2Verify(hash, password))) {
+        return { valid: true, isLegacyBcrypt: false, needsRehash: true };
+      }
+      if (hash.startsWith('$2a$') || hash.startsWith('$2b$')) {
+        if (await bcrypt.compare(password, hash)) {
+          return { valid: true, isLegacyBcrypt: true, needsRehash: true };
+        }
+      }
+    } catch {
+      return { valid: false, isLegacyBcrypt: false, needsRehash: false };
+    }
+
+    return { valid: false, isLegacyBcrypt: false, needsRehash: false };
   }
 
   /**
@@ -73,8 +112,8 @@ export class PasswordService {
   public static validateStrength(password: string): PasswordValidationResult {
     const errors: string[] = [];
 
-    if (!password || password.length < 12) {
-      errors.push('Password must be at least 12 characters long');
+    if (!password || password.length < securityConfig.password.minLength) {
+      errors.push(`Password must be at least ${securityConfig.password.minLength} characters long`);
     }
 
     if (!/[A-Z]/.test(password)) {
@@ -215,29 +254,33 @@ export class PasswordService {
   }
 
   /**
-   * Record a failed login attempt and apply progressive lockout if threshold reached
+   * Record a failed login attempt and start the cooldown once the threshold is
+   * reached. The durable copy lives here; the fast, shared counter lives in
+   * Redis (`loginProtection.ts`) so a restart cannot forget an active lockout.
    */
-  public static async recordFailedLogin(userId?: string): Promise<{ locked: boolean; remainingSeconds: number }> {
-    if (!userId) return { locked: false, remainingSeconds: 0 };
+  public static async recordFailedLogin(
+    userId?: string
+  ): Promise<{ locked: boolean; remainingSeconds: number; attempts: number; consecutiveLockouts: number }> {
+    if (!userId) return { locked: false, remainingSeconds: 0, attempts: 0, consecutiveLockouts: 0 };
 
     try {
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { id: true, failedLoginAttempts: true },
+        select: { id: true, failedLoginAttempts: true, consecutiveLockouts: true },
       });
 
-      if (!user) return { locked: false, remainingSeconds: 0 };
+      if (!user) return { locked: false, remainingSeconds: 0, attempts: 0, consecutiveLockouts: 0 };
 
       const attempts = (user.failedLoginAttempts || 0) + 1;
       let lockedUntil: Date | null = null;
       let remainingSeconds = 0;
+      let consecutiveLockouts = user.consecutiveLockouts || 0;
 
       if (attempts >= this.MAX_FAILED_ATTEMPTS) {
-        // Multiplier based on how many times attempts exceeded 5
-        const multiplier = Math.min(Math.floor(attempts / this.MAX_FAILED_ATTEMPTS), 4);
-        const duration = this.LOCKOUT_DURATION_MS * multiplier;
-        lockedUntil = new Date(Date.now() + duration);
-        remainingSeconds = Math.ceil(duration / 1000);
+        const durationMs = this.LOCKOUT_DURATION_MS;
+        lockedUntil = new Date(Date.now() + durationMs);
+        remainingSeconds = Math.ceil(durationMs / 1000);
+        consecutiveLockouts += 1;
       }
 
       await prisma.user.update({
@@ -246,16 +289,19 @@ export class PasswordService {
           failedLoginAttempts: attempts,
           lastFailedLoginAt: new Date(),
           lockedUntil,
+          consecutiveLockouts,
         },
       });
 
       return {
         locked: Boolean(lockedUntil),
         remainingSeconds,
+        attempts,
+        consecutiveLockouts,
       };
     } catch (err) {
       console.error('[PasswordService] Error recording failed login:', err);
-      return { locked: false, remainingSeconds: 0 };
+      return { locked: false, remainingSeconds: 0, attempts: 0, consecutiveLockouts: 0 };
     }
   }
 
@@ -270,10 +316,26 @@ export class PasswordService {
           failedLoginAttempts: 0,
           lockedUntil: null,
           lastFailedLoginAt: null,
+          consecutiveLockouts: 0,
         },
       });
     } catch (err) {
       console.error('[PasswordService] Error resetting failed logins:', err);
     }
+  }
+
+  /** Admin unlock: clears the cooldown and the lockout counter in one place. */
+  public static async clearLockout(userId: string, unlockedById: string): Promise<void> {
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        lastFailedLoginAt: null,
+        consecutiveLockouts: 0,
+        unlockedAt: new Date(),
+        unlockedById,
+      },
+    });
   }
 }

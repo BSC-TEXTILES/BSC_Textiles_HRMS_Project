@@ -1,340 +1,427 @@
 /**
- * BSC Textiles HRMS - eSSL MB160 ADMS (Automatic Data Master Server) Cloud Push Protocol
- * 
- * Hardware Model: eSSL MB160 (Multi-Biometric Face & Fingerprint Time Attendance Terminal)
- * Direct Device-to-Cloud Integration without showroom computer gateways:
- * - GET /iclock/cdata: Device handshake, push parameters (Realtime=1, TransInterval=1, TimeZone=330)
- * - POST /iclock/cdata?table=ATTLOG / RTLOG: Real-time attendance log push
- * - POST /iclock/cdata?table=options: Hardware metadata & specifications registration
- * - GET /iclock/getrequest: Heartbeat polling & command retrieval
- * - POST /iclock/devicecmd: Command execution confirmation
- * - POST /iclock/registry: Terminal cloud registration
+ * eSSL MB160 ADMS / "cloud server" push endpoints.
+ *
+ * This is the transport that actually delivers punches in real time: the
+ * terminal is pointed at this server (Menu → Comm → Cloud Server Setting) and
+ * pushes ATTLOG/RTLOG rows itself, with `Realtime=1` making it push within a
+ * second of a verification. The standalone pull protocol has no equivalent of a
+ * device-initiated event, so push is the real-time path and polling is the
+ * fallback.
+ *
+ * Handled paths (mounted at both `/iclock` and `/api/devices/adms`):
+ *   GET  /cdata            — handshake; returns Realtime/TransInterval/TimeZone
+ *   POST /cdata?table=ATTLOG|RTLOG   — punch push
+ *   POST /cdata?table=ATTPHOTO       — face snapshot push (firmware dependent)
+ *   POST /cdata?table=USERINFO|USER  — enrollment list push
+ *   POST /cdata?table=options        — firmware/telemetry registration
+ *   GET  /getrequest       — heartbeat; the server queues commands here
+ *   POST /devicecmd        — command result
+ *   POST /registry         — initial registration
+ *
+ * Deliberately absent: no default verify mode. A line without a verify code is
+ * ingested as "not reported", which the UI shows as Unknown.
  */
 
 import { Router, Request, Response } from 'express';
 import {
   ingestRawPunches,
+  ingestDeviceUsers,
   recordDeviceHeartbeat,
   updateDeviceSpecs,
-  ingestDeviceUsers,
   popDeviceCommand,
 } from '../services/biometricService.js';
+import { loadGlobalSettings, getDeviceConfig } from '../services/biometric/settings.js';
+import { deviceLog } from '../services/biometric/logger.js';
 import { pool } from '../nativeDb.js';
-import { socketIO } from '../socket.js';
 
 export const admsRouter = Router();
 
+/** Buffer bodies up to the photo limit without parsing them as JSON. */
+const rawBody = (req: Request): string => {
+  if (typeof req.body === 'string') return req.body;
+  if (Buffer.isBuffer(req.body)) return req.body.toString('utf8');
+  if (req.body instanceof Uint8Array) return Buffer.from(req.body).toString('utf8');
+  if (req.body && typeof req.body === 'object') return Object.keys(req.body).join('\n');
+  return '';
+};
+
 /**
- * Parses ADMS tab-separated or space-separated user profile records from eSSL MB160
- * Standard format: <PIN>\t<Name>\t<Pri>\t<Passwd>\t<Card>\t<Grp>\t<TZ>
+ * `<PIN>\t<YYYY-MM-DD HH:MM:SS>\t<Status>\t<VerifyMode>` — tab separated, but
+ * eSSL firmware is inconsistent about spaces vs tabs, and about whether the
+ * timestamp is one field or split across two.
+ *
+ * @returns parsed punches plus lines that could not be understood, so a silent
+ *          format change on the device shows up as a count instead of lost data.
  */
-export function parseUserInfoBody(bodyText: string) {
-  const lines = bodyText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+export function parseAttLogBody(bodyText: string, serialNumber: string): {
+  punches: Array<{
+    serialNumber: string;
+    enrollmentNumber: string;
+    punchTime: string;
+    punchState: number | null;
+    verifyMode: number | null;
+  }>;
+  malformed: string[];
+} {
+  const lines = bodyText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const punches: ReturnType<typeof buildEmpty>['punches'] = [];
+  const malformed: string[] = [];
+
+  for (const line of lines) {
+    if (line.startsWith('#') || line.startsWith('//')) continue;
+    if (/^GET\s+OPTION/i.test(line) || /=\s*$/.test(line) && !line.includes('\t')) {
+      // Handshake option echoes can arrive on a POST; ignore, not malformed.
+      continue;
+    }
+
+    const fields = line.includes('\t')
+      ? line.split('\t').map((f) => f.trim())
+      : line.split(/\s+/).map((f) => f.trim());
+
+    if (fields.length < 2) {
+      malformed.push(line);
+      continue;
+    }
+
+    const enrollmentNumber = fields[0];
+    if (!enrollmentNumber || !/^[\w-]{1,24}$/.test(enrollmentNumber)) {
+      malformed.push(line);
+      continue;
+    }
+
+    // Timestamp is either one field ("2026-10-16 09:12:34" after a tab) or two
+    // space-separated fields when the whole line was split on whitespace.
+    let punchTime = fields[1];
+    let restStart = 2;
+    if (!/\d{4}.\d{2}.\d{2}/.test(punchTime) && /\d{2}:\d{2}/.test(fields[1] ?? '')) {
+      punchTime = fields[1];
+    } else if (/\d{4}.\d{2}.\d{2}$/.test(punchTime)) {
+      // Date-only first field; the clock time follows.
+      punchTime = `${punchTime} ${fields[2] ?? '00:00:00'}`;
+      restStart = 3;
+    }
+
+    if (!/\d{4}.\d{2}.\d{2}/.test(punchTime)) {
+      malformed.push(line);
+      continue;
+    }
+    // A time of day is required; date-only lines would land at 00:00 and look
+    // like a real midnight punch.
+    if (!/(\d{1,2}):(\d{2})(?::(\d{2}))?/.test(punchTime)) {
+      punchTime = `${punchTime} 00:00:00`;
+    }
+
+    const statusField = fields[restStart];
+    const verifyField = fields[restStart + 1];
+
+    punches.push({
+      serialNumber,
+      enrollmentNumber,
+      punchTime,
+      // null keeps "the device did not say" instead of inventing a value.
+      punchState: statusField !== undefined && statusField !== '' && Number.isFinite(Number(statusField)) ? Number(statusField) : null,
+      verifyMode: verifyField !== undefined && verifyField !== '' && Number.isFinite(Number(verifyField)) ? Number(verifyField) : null,
+    });
+  }
+
+  return { punches, malformed };
+}
+
+function buildEmpty() {
+  return { punches: [] as any[], malformed: [] as string[] };
+}
+
+/**
+ * USERINFO push. Formats vary: `PIN\tName\tPri\tPasswd\tCard`, space separated,
+ * or `PIN=.. Name=..` key=value lines.
+ */
+export function parseUserInfoBody(bodyText: string): Array<{ pin: string; name: string; privilege?: number; card?: string; password?: string }> {
+  const lines = bodyText.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const users: Array<{ pin: string; name: string; privilege?: number; card?: string; password?: string }> = [];
 
   for (const line of lines) {
     if (line.startsWith('#') || line.startsWith('//')) continue;
-    if (line.includes('=')) {
-      const parts = line.split(/[\t\s]+/);
-      const u: any = {};
-      for (const p of parts) {
-        const [k, v] = p.split('=');
-        if (k && v !== undefined) u[k.toUpperCase()] = v.trim();
+
+    if (line.includes('=') && !line.includes('\t')) {
+      const parsed: Record<string, string> = {};
+      for (const part of line.split(/[\t ]+/)) {
+        const eq = part.indexOf('=');
+        if (eq > 0) parsed[part.slice(0, eq).toUpperCase()] = part.slice(eq + 1).trim();
       }
-      if (u.PIN) {
+      if (parsed.PIN) {
         users.push({
-          pin: u.PIN,
-          name: u.NAME || '',
-          privilege: Number(u.PRI) || 0,
-          card: u.CARD || '',
-          password: u.PASSWD || '',
+          pin: parsed.PIN,
+          name: parsed.NAME || '',
+          privilege: parsed.PRI !== undefined ? Number(parsed.PRI) || 0 : 0,
+          card: parsed.CARD || '',
+          password: parsed.PASSWD || '',
         });
       }
-    } else if (line.includes('\t')) {
-      const parts = line.split('\t');
-      if (parts.length >= 1 && parts[0].trim()) {
-        users.push({
-          pin: parts[0].trim(),
-          name: parts[1] ? parts[1].trim() : '',
-          privilege: parts[2] ? Number(parts[2].trim()) : 0,
-          password: parts[3] ? parts[3].trim() : '',
-          card: parts[4] ? parts[4].trim() : '',
-        });
-      }
-    } else {
-      const parts = line.split(/\s+/);
-      if (parts.length >= 1 && parts[0].trim()) {
-        users.push({
-          pin: parts[0].trim(),
-          name: parts[1] ? parts[1].trim() : '',
-          privilege: parts[2] ? Number(parts[2].trim()) : 0,
-          card: parts[3] ? parts[3].trim() : '',
-        });
-      }
+      continue;
     }
+
+    const fields = line.includes('\t') ? line.split('\t').map((f) => f.trim()) : line.split(/\s+/).map((f) => f.trim());
+    if (!fields[0]) continue;
+    users.push({
+      pin: fields[0],
+      name: fields[1] || '',
+      privilege: fields[2] !== undefined ? Number(fields[2]) || 0 : 0,
+      password: fields[3] || '',
+      card: fields[4] || '',
+    });
   }
+
   return users;
 }
 
 /**
- * Parses ADMS tab-separated or space-separated attendance log lines from eSSL MB160
- * Standard eSSL format: <PIN>\t<YYYY-MM-DD HH:mm:ss>\t<Status>\t<VerifyMode>
- * e.g. "1\t2026-10-16 09:12:34\t0\t15" (15=Face, 1=Fingerprint, 2=Card, 0=Password)
+ * ATTPHOTO push: `<PIN>\t<YYYY-MM-DD HH:MM:SS>\t<size>\t<base64 JPEG>`.
+ * The size field and base64 payload make this the one ADMS table that must not
+ * be line-trimmed, so it is parsed on its own.
  */
-export function parseAttLogBody(bodyText: string, serialNumber: string) {
-  const lines = bodyText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-  const punches: Array<{
-    serialNumber: string;
-    enrollmentNumber: string;
-    punchTime: string;
-    punchType?: string;
-    verifyMode?: number;
-  }> = [];
-
-  for (const line of lines) {
-    if (line.startsWith('#') || line.startsWith('//')) continue;
-
-    let enrollmentNumber = '';
-    let punchTime = '';
-    let status = '0';
-    let verifyMode = 15; // Default MB160 face verify
-
-    if (line.includes('\t')) {
-      const parts = line.split('\t');
-      if (parts.length >= 2) {
-        enrollmentNumber = parts[0].trim();
-        punchTime = parts[1].trim();
-        status = parts[2] ? parts[2].trim() : '0';
-        verifyMode = parts[3] ? Number(parts[3].trim()) : 15;
-      }
-    } else {
-      // Space or multi-space separated format fallback
-      const parts = line.split(/\s+/);
-      if (parts.length >= 3) {
-        enrollmentNumber = parts[0].trim();
-        punchTime = `${parts[1]} ${parts[2]}`.trim();
-        status = parts[3] ? parts[3].trim() : '0';
-        verifyMode = parts[4] ? Number(parts[4].trim()) : 15;
-      }
-    }
-
-    if (enrollmentNumber && punchTime) {
-      // Status mapping: 0=CheckIn, 1=CheckOut, 2=BreakOut, 3=BreakIn, 4=OTIn, 5=OTOut
-      let punchType = 'AUTO_PAIR';
-      if (status === '0') punchType = 'CHECK_IN';
-      else if (status === '1') punchType = 'CHECK_OUT';
-      else if (status === '2') punchType = 'BREAK_OUT';
-      else if (status === '3') punchType = 'BREAK_IN';
-      else if (status === '4') punchType = 'CHECK_IN';
-      else if (status === '5') punchType = 'CHECK_OUT';
-
-      punches.push({
-        serialNumber,
-        enrollmentNumber,
-        punchTime,
-        punchType,
-        verifyMode: isNaN(verifyMode) ? 15 : verifyMode,
-      });
-    }
+export function parseAttPhotoBody(bodyText: string): Array<{ pin: string; punchTime: string; size: number | null; base64: string }> {
+  const photos: Array<{ pin: string; punchTime: string; size: number | null; base64: string }> = [];
+  for (const line of bodyText.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const fields = trimmed.includes('\t') ? trimmed.split('\t') : trimmed.split(/\s+/);
+    if (fields.length < 4) continue;
+    const [pin, punchTime, sizeRaw, payload] = fields;
+    if (!/^[\w-]{1,24}$/.test(pin.trim())) continue;
+    if (!/\d{4}.\d{2}.\d{2}/.test(punchTime.trim())) continue;
+    const base64 = (payload || '').replace(/\s+/g, '');
+    if (!base64) continue;
+    photos.push({
+      pin: pin.trim(),
+      punchTime: punchTime.trim(),
+      size: Number.isFinite(Number(sizeRaw)) ? Number(sizeRaw) : null,
+      base64,
+    });
   }
-
-  return punches;
+  return photos;
 }
 
 /**
- * Parses key-value specifications from ADMS table=options push
+ * GET /cdata — handshake. The values returned here configure the device:
+ * Realtime=1 makes it push on each verification, TransInterval=1 tightens the
+ * transaction cadence, and TimeZone is the offset the device will stamp its own
+ * wall clock with, taken from the stored device timezone rather than hardcoded.
  */
-function parseSpecsBody(bodyText: string): Record<string, string> {
-  const specs: Record<string, string> = {};
-  const lines = bodyText.split(/[\r\n&]+/).map(l => l.trim()).filter(Boolean);
-
-  for (const line of lines) {
-    const eqIdx = line.indexOf('=');
-    if (eqIdx > 0) {
-      const key = line.slice(0, eqIdx).replace(/^[~_]/, '').trim();
-      const val = line.slice(eqIdx + 1).trim();
-      specs[key] = val;
-    }
-  }
-
-  return specs;
-}
-
-/**
- * GET /iclock/cdata & /api/devices/adms/cdata
- * eSSL MB160 terminal handshake & configuration response
- */
-admsRouter.get(['/cdata', '/api/devices/adms/cdata'], async (req: Request, res: Response) => {
-  const sn = (req.query.SN as string || '').trim();
-  const pushver = (req.query.pushver as string || '2.4.1').trim();
-  const options = (req.query.options as string || '').trim();
-
-  console.log(`[ADMS Handshake] Terminal SN: ${sn || 'UNKNOWN'} (PushVer: ${pushver}, Opt: ${options})`);
+admsRouter.get('/cdata', async (req: Request, res: Response) => {
+  const sn = String(req.query.SN || '').trim();
+  const pushver = String(req.query.pushver || '').trim();
+  const settings = await loadGlobalSettings();
+  const device = sn ? await getDeviceConfig(sn) : null;
+  const timeZoneOffsetMinutes = offsetMinutesFor(device?.timezone || settings.defaultTimezone, new Date());
 
   if (sn) {
     await recordDeviceHeartbeat(sn, req.ip);
-    if (pushver) {
-      await updateDeviceSpecs(sn, { pushVersion: pushver });
-    }
+    if (pushver) await updateDeviceSpecs(sn, { pushVersion: pushver });
   }
 
-  // Response required by eSSL MB160 ADMS Cloud Push firmware:
-  // - Realtime=1: Immediate event transmission upon employee face/finger verification (<1 sec)
-  // - TransInterval=1: Transaction polling frequency (1s)
-  // - TimeZone=330: Indian Standard Time (UTC+05:30)
-  // - Delay=10: Reconnection retry delay
+  deviceLog.info('ADMS handshake', {
+    serialNumber: sn || 'UNKNOWN',
+    detail: `pushver=${pushver || 'unset'} tzOffset=${timeZoneOffsetMinutes / 60}`,
+  });
+
   res.setHeader('Content-Type', 'text/plain');
   res.send(
-    `GET OPTION FROM: ${sn}\n` +
-    `Stamp=9999\n` +
-    `OpStamp=9999\n` +
-    `ErrorDelay=60\n` +
-    `Delay=10\n` +
-    `TransTimes=00:00;14:00\n` +
-    `TransInterval=1\n` +
-    `TransFlag=1111000000\n` +
-    `TimeZone=330\n` +
-    `Realtime=1\n` +
-    `Encrypt=0\n` +
-    `ServerVersion=3.1.1\n` +
-    `PushOptionsFlag=1\n`
+    [
+      `GET OPTION FROM: ${sn || 'unknown'}`,
+      `Stamp=${Math.floor(Date.now() / 1000)}`,
+      `OpStamp=${Math.floor(Date.now() / 1000)}`,
+      `ErrorDelay=30`,
+      `Delay=5`,
+      `TransTimes=00:00;12:00`,
+      `TransInterval=1`,
+      `TransFlag=1111111111`,
+      `TimeZone=${timeZoneOffsetMinutes}`,
+      `Realtime=1`,
+      `Encrypt=0`,
+      `ServerVersion=3.1.1`,
+      `PushOptionsFlag=1`,
+      '',
+    ].join('\n')
   );
 });
 
+function offsetMinutesFor(timeZone: string, at: Date): number {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+    }).formatToParts(at);
+    const get = (t: string) => Number(parts.find((p) => p.type === t)?.value ?? '0');
+    const asUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour') % 24, get('minute'), get('second'));
+    return Math.round((asUtc - Math.floor(at.getTime() / 1000) * 1000) / 60000);
+  } catch {
+    return 330;
+  }
+}
+
 /**
- * POST /iclock/cdata & /api/devices/adms/cdata
- * Ingestion of biometric punches and hardware telemetry from terminal
+ * POST /cdata?table=… — the payload paths.
  */
-admsRouter.post(['/cdata', '/api/devices/adms/cdata'], async (req: Request, res: Response) => {
-  const sn = (req.query.SN as string || '').trim();
-  const table = (req.query.table as string || 'ATTLOG').toUpperCase();
+admsRouter.post('/cdata', async (req: Request, res: Response) => {
+  const sn = String(req.query.SN || '').trim();
+  const table = String(req.query.table || 'ATTLOG').toUpperCase();
+  const body = rawBody(req);
 
   try {
-    let rawBody = '';
-    if (typeof req.body === 'string') {
-      rawBody = req.body;
-    } else if (Buffer.isBuffer(req.body)) {
-      rawBody = req.body.toString('utf-8');
-    } else if (typeof req.body === 'object') {
-      rawBody = JSON.stringify(req.body);
-    }
+    if (sn) await recordDeviceHeartbeat(sn, req.ip);
 
-    if ((table === 'ATTLOG' || table === 'RTLOG') && rawBody) {
-      const punches = parseAttLogBody(rawBody, sn);
+    if ((table === 'ATTLOG' || table === 'RTLOG') && body) {
+      const { punches, malformed } = parseAttLogBody(body, sn);
+      if (malformed.length > 0) {
+        deviceLog.warn('ADMS punch lines could not be parsed', {
+          serialNumber: sn, code: 'PROTOCOL_PARSE_FAILURE',
+          detail: `${malformed.length} line(s), first: ${malformed[0].slice(0, 80)}`,
+        });
+      }
       if (punches.length > 0) {
-        const result = await ingestRawPunches(punches);
-        console.log(
-          `[ADMS Push] Processed ${punches.length} punches from ${sn}: ` +
-          `${result.processed} matched, ${result.duplicates} dups, ${result.unmapped} unmapped (avg latency: ${result.latencyMs}ms)`
+        const result = await ingestRawPunches(
+          punches.map((p) => ({
+            serialNumber: p.serialNumber,
+            enrollmentNumber: p.enrollmentNumber,
+            punchTime: p.punchTime,
+            punchState: p.punchState,
+            verifyMode: p.verifyMode,
+            source: 'ADMS_PUSH' as const,
+          }))
         );
+        deviceLog.info('ADMS punch push processed', {
+          serialNumber: sn,
+          detail: `${result.inserted} new, ${result.duplicates} replayed, ${result.unmapped + result.ambiguous} need review, ${result.rejected} rejected, ${result.latencyMs}ms`,
+        });
         res.setHeader('Content-Type', 'text/plain');
         return res.send(`OK: ${punches.length}`);
       }
-    } else if ((table === 'USERINFO' || table === 'USER') && rawBody) {
-      const users = parseUserInfoBody(rawBody);
+      res.setHeader('Content-Type', 'text/plain');
+      return res.send('OK: 0');
+    }
+
+    if (table === 'ATTPHOTO' && body) {
+      const photos = parseAttPhotoBody(body);
+      const device = sn ? await getDeviceConfig(sn) : null;
+      if (device && !device.photoPushEnabled) {
+        await pool.query('UPDATE biometric_devices SET photoPushEnabled = 1 WHERE id = ?', [device.id]).catch(() => undefined);
+        deviceLog.info('Terminal is pushing photos — flag enabled automatically', { serialNumber: sn });
+      }
+      if (photos.length > 0) {
+        // Route the snapshot through the ingestion engine with the punch it
+        // belongs to, so storage and linking share one code path.
+        await ingestRawPunches(
+          photos.map((p) => ({
+            serialNumber: sn,
+            enrollmentNumber: p.pin,
+            // A photo only makes sense attached to its punch timestamp.
+            punchTime: p.punchTime,
+            photoBase64: p.base64,
+            source: 'ADMS_PUSH' as const,
+          }))
+        );
+        res.setHeader('Content-Type', 'text/plain');
+        return res.send(`OK: ${photos.length}`);
+      }
+      res.setHeader('Content-Type', 'text/plain');
+      return res.send('OK: 0');
+    }
+
+    if ((table === 'USERINFO' || table === 'USER' || table === 'ENROLLDPASS') && body) {
+      const users = parseUserInfoBody(body);
       if (users.length > 0) {
         const result = await ingestDeviceUsers(sn, users);
-        console.log(
-          `[ADMS User Push] Ingested ${users.length} user records from ${sn}: ` +
-          `${result.updatedEmployees} matched existing employees, ${result.mapped} registered in mappings`
-        );
+        deviceLog.info('ADMS user push processed', {
+          serialNumber: sn,
+          detail: `${result.processed} read, ${result.mapped} matched, ${result.ambiguous} ambiguous, ${result.unlinked} unlinked`,
+        });
         res.setHeader('Content-Type', 'text/plain');
         return res.send(`OK: ${users.length}`);
       }
-    } else if (table === 'OPTIONS' && rawBody) {
-      // Terminal specification registration (Firmware, UserCount, FaceCount, etc.)
-      const specs = parseSpecsBody(rawBody);
-      console.log(`[ADMS Options] Registering hardware telemetry from ${sn}:`, specs);
+    }
+
+    if (table === 'OPTIONS' && body) {
+      const specs = parseOptionsBody(body);
       await updateDeviceSpecs(sn, specs);
+      deviceLog.info('ADMS options registered', { serialNumber: sn, detail: Object.keys(specs).join(',') });
       res.setHeader('Content-Type', 'text/plain');
       return res.send('OK');
     }
 
-    // Touch device heartbeat
-    if (sn) {
-      await recordDeviceHeartbeat(sn, req.ip);
-    }
-
     res.setHeader('Content-Type', 'text/plain');
-    res.send('OK');
-  } catch (error: any) {
-    console.error(`[ADMS Push Error] SN: ${sn}:`, error.message);
-    res.status(500).send('ERROR');
+    return res.send('OK');
+  } catch (err: any) {
+    deviceLog.error('ADMS push failed', { serialNumber: sn, code: 'PROTOCOL_PARSE_FAILURE', detail: err?.message });
+    // A device treats any non-OK body as a failed transaction and retries; 500
+    // would make it stop pushing entirely on some firmwares.
+    res.status(500).setHeader('Content-Type', 'text/plain');
+    return res.send('ERROR');
   }
 });
 
+function parseOptionsBody(bodyText: string): Record<string, string> {
+  const specs: Record<string, string> = {};
+  for (const line of bodyText.split(/[\r\n&]+/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) continue;
+    specs[trimmed.slice(0, eq).replace(/^[~_]/, '').trim()] = trimmed.slice(eq + 1).trim();
+  }
+  return specs;
+}
+
 /**
- * GET /iclock/getrequest & /api/devices/adms/getrequest
- * Command retrieval and continuous heartbeat monitoring loop
+ * GET /getrequest — heartbeat plus command dispatch. Anything the server wants
+ * the terminal to do (re-read logs after an outage, set time) is answered here.
  */
-admsRouter.get(['/getrequest', '/api/devices/adms/getrequest'], async (req: Request, res: Response) => {
-  const sn = (req.query.SN as string || '').trim();
+admsRouter.get('/getrequest', async (req: Request, res: Response) => {
+  const sn = String(req.query.SN || '').trim();
+  const commands: string[] = [];
+
   if (sn) {
     await recordDeviceHeartbeat(sn, req.ip);
-    const cmd = popDeviceCommand(sn);
-    if (cmd) {
-      console.log(`[ADMS Command Dispatch] Sending ${cmd.command} (ID: ${cmd.id}) to ${sn}`);
-      res.setHeader('Content-Type', 'text/plain');
-      return res.send(`C:${cmd.id}:${cmd.command}\n`);
+    let command = popDeviceCommand(sn);
+    while (command && commands.length < 5) {
+      commands.push(`C:${command.id}:${command.command}`);
+      command = popDeviceCommand(sn);
     }
   }
 
   res.setHeader('Content-Type', 'text/plain');
-  res.send('OK');
+  res.send(commands.length ? `${commands.join('\n')}\n` : 'N');
 });
 
-/**
- * POST /iclock/devicecmd & /api/devices/adms/devicecmd
- * Hardware command execution confirmation
- */
-admsRouter.post(['/devicecmd', '/api/devices/adms/devicecmd'], async (req: Request, res: Response) => {
-  const sn = (req.query.SN as string || '').trim();
-  const cmdId = (req.query.ID as string || '').trim();
-  const ret = (req.query.Return as string || '0').trim();
-  if (sn) {
-    await recordDeviceHeartbeat(sn, req.ip);
-  }
-  console.log(`[ADMS DeviceCmd Ack] SN: ${sn || 'UNKNOWN'}, CmdID: ${cmdId || 'N/A'}, Return: ${ret}`);
+admsRouter.post('/devicecmd', async (req: Request, res: Response) => {
+  const sn = String(req.query.SN || '').trim();
+  if (sn) await recordDeviceHeartbeat(sn, req.ip);
+  deviceLog.info('ADMS command result', {
+    serialNumber: sn,
+    detail: `id=${req.query.ID || '-'} return=${req.query.Return || '-'}`,
+  });
   res.setHeader('Content-Type', 'text/plain');
   res.send('OK');
 });
 
-/**
- * POST /iclock/registry
- * Initial terminal discovery & cloud server registration handshake
- */
-admsRouter.post(['/registry', '/api/devices/adms/registry'], async (req: Request, res: Response) => {
-  const sn = (req.query.SN as string || '').trim();
-  if (sn) {
-    await recordDeviceHeartbeat(sn, req.ip);
-  }
-
+admsRouter.post('/registry', async (req: Request, res: Response) => {
+  const sn = String(req.query.SN || '').trim();
+  deviceLog.info('ADMS registry handshake', { serialNumber: sn || 'UNKNOWN' });
   res.setHeader('Content-Type', 'text/plain');
-  res.send(
-    `RegistryCode=1\n` +
-    `ServerVersion=3.1.1\n` +
-    `ServerName=BSC-HRMS-PUSH\n` +
-    `PushVersion=2.4.1\n`
-  );
+  res.send('OK');
 });
 
-/**
- * POST /iclock/push & /api/devices/adms/push
- * Fallback alias for direct punch payload POST
- */
-admsRouter.post(['/push', '/api/devices/adms/push'], async (req: Request, res: Response) => {
-  const sn = (req.query.SN as string || '').trim();
-  const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-  const punches = parseAttLogBody(rawBody, sn);
-
+/** Convenience alias some deployments configure instead of /cdata. */
+admsRouter.post('/push', async (req: Request, res: Response) => {
+  const sn = String(req.query.SN || '').trim();
+  const body = rawBody(req);
+  const { punches } = parseAttLogBody(body, sn);
   if (punches.length > 0) {
-    const result = await ingestRawPunches(punches);
+    const result = await ingestRawPunches(punches.map((p) => ({ ...p, source: 'ADMS_PUSH' as const })));
     res.setHeader('Content-Type', 'text/plain');
-    return res.send(`OK: ${result.processed}`);
+    return res.send(`OK: ${result.inserted}`);
   }
-
   res.setHeader('Content-Type', 'text/plain');
-  res.send('OK');
+  res.send('OK: 0');
 });
 
 export default admsRouter;

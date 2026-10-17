@@ -30,6 +30,8 @@ Weaving Dreams, Building Futures
 - 🧪 **[QA & Offline Test Report (docs/TESTING.md)](docs/TESTING.md)**
 - 📋 **[Release Changelog (docs/CHANGELOG.md)](docs/CHANGELOG.md)**
 - 🧠 **[Project Memory & Architectural Ledger (docs/PROJECT_MEMORY.md)](docs/PROJECT_MEMORY.md)**
+- 🔐 **[Role-Based Access Control — model, API & permission matrix (docs/RBAC.md)](docs/RBAC.md)**
+- 🧬 **[eSSL MB160 Biometric Sync & Attendance Pipeline (docs/BIOMETRIC_MB160.md)](docs/BIOMETRIC_MB160.md)**
 
 ---
 
@@ -1429,14 +1431,27 @@ The repository contains an automated integration test runner compliant with **PR
 npm run test --workspace=backend
 ```
 
-### Verified Test Categories (43 / 43 Passed — 100% Pass Rate):
+### Verified Test Categories (20 Suites — 212 / 212 Passed — 100% Pass Rate):
 1. **Attendance Suite:** On-time calculation, ₹1/min early incentive formula, 5-minute grace protection, late penalties, overtime accumulation.
 2. **Breaks Suite:** Gendered break durations (100m, 40m, 20m, 15m), countdown timer calculations, break overrun penalties.
 3. **QR System Suite:** Cryptographic token entropy ($\ge 24$ chars), single-use badge retrieval, invalidation of expired tokens, duplicate scan rejection, cross-location scan rejection.
 4. **Face Verification Suite:** Match score thresholding ($\ge 85.0\% \rightarrow \text{VERIFIED}$, $< 85.0\% \rightarrow \text{FAILED}$), boundary compliance, non-fabricated score validation.
 5. **Permissions & Location Isolation Suite:** Super Admin global visibility, Belagavi HR data isolation, Shivamogga HR isolation, URL tampering interception, role privilege gating.
-6. **Incentives & Penalties Suite:** Per-second, milestone, and target calculations with formula explainability metadata.
+6. **Incentives & Penalties Suite:** Per-second, milestone, and target calculations with formula explainability metadata against seeded rules.
 7. **Security & Auth Suite:** Bcrypt salt verification, invalid credential rejection, forged JWT signature blocking, Zod request body validation.
+8. **Enterprise Security Core Suite:** Argon2id hashing, password policy/history, enumeration defense, registration workflow, MFA backup codes, session revocation, CSRF tokens, security headers, malware magic-byte checks, tamper-evident audit chain.
+9. **KYC & DigiLocker Suite:** Aadhaar masking, consent lifecycle, PKCE OAuth URL generation, verified fetch, manual fallback review, location-scoped HR review.
+10. **Full & Final / Leaves / Mobile Suite:** Leave types and balances, ex-employee settlement dashboard, mobile profile and geofenced punching.
+11. **Floor Operations Suite:** Floor hierarchy metrics, salesmen directory, billing reconciliation, staff assignment, transaction audit, showroom scoping.
+12. **Late Attendance & Fine Management Suite:** Dashboard KPIs, grace periods, ₹1/min formulas, waiver/approval lifecycle, payroll idempotence, employee history.
+13. **Employee Document Management Suite:** Dashboard metrics, dossier checklist, upload validation, secure streaming, rejection/verification, versioning, location security, verification queue.
+14. **Attendance & Shifts Board Suite:** Shift-window math (including overnight), display status derivation, filters, pagination, export CSV, department/shift scoping (unit + API).
+15. **My Desk Self-Service Suite:** Summary metrics, monthly velocity, punch in/out, tea-break cycles, asset acknowledgement, corrections.
+16. **HR Analytics Suite:** Date-range presets, summary/timeline/hourly distributions, location and punctuality analysis, drilldown pagination.
+17. **Bulk Employee Import Suite:** 49-column template contract, BSC-EMP-XXXX ID allocation, data-quality audit, preview matching, export and history endpoints.
+18. **Biometric IoT Suite:** Device registry and IP subnets, SDK status reporting, SHA-256 dedupe idempotence, connector-key auth, unmapped enrollment preservation, sync audit history.
+19. **Hiring Validators Suite:** Phone/email/pincode/PAN/Aadhaar (Verhoeff) formats, file type and magic-byte rules, conditional logic, submission sanitization, stage transition rules.
+20. **Candidate Hiring API Suite:** Scoped dashboard, draft/publish/versioning, share links, captcha + consent, public submission and duplicate handling, pipeline stage moves, interviews, masked dossier aggregation, link analytics, CSV export, shard registry and outbox stats.
 
 ---
 
@@ -1692,7 +1707,7 @@ Built using **React Native with Expo**, integrating directly with the shared bac
 ### 55.1 Test Execution Results (100% Passing)
 ```text
 ================================================================
-📊 TEST EXECUTION SUMMARY REPORT (57/57 PASSED)
+📊 TEST EXECUTION SUMMARY REPORT (212/212 PASSED)
 ================================================================
 📁 [ATTENDANCE]                    7/7 Passed  (Sub-millisecond)
 📁 [BREAKS]                        6/6 Passed  (Sub-millisecond)
@@ -1701,10 +1716,21 @@ Built using **React Native with Expo**, integrating directly with the shared bac
 📁 [PERMISSIONS & LOCATION]        6/6 Passed  (Multi-tenant hub isolated)
 📁 [INCENTIVES & PENALTIES]        8/8 Passed  (₹1/min transparent math)
 📁 [SECURITY & AUTH]               6/6 Passed  (bcrypt, JWT, XSS protected)
+📁 [ENTERPRISE SECURITY CORE]     12/12 Passed (Argon2id, MFA, CSRF, tamper-proof audit)
 📁 [KYC & DIGILOCKER]              8/8 Passed  (PKCE OAuth S256, UID masked)
 📁 [FULL & FINAL & LEAVES]         6/6 Passed  (Sub-25ms indexed DB queries)
+📁 [FLOOR OPERATIONS]              6/6 Passed  (Selling-point attribution)
+📁 [LATE ATTENDANCE & FINES]      12/12 Passed (Fine lifecycle & payroll idempotence)
+📁 [EMPLOYEE DOCUMENTS]           12/12 Passed (Versioning, masking, dossier security)
+📁 [ATTENDANCE BOARD]             41/41 Passed (Shift math, filters, CSV export)
+📁 [MY-DESK]                       6/6 Passed  (Self-service punches & corrections)
+📁 [HR ANALYSIS MODULE]            8/8 Passed  (Connected-dot analytics & drilldown)
+📁 [BULK EMPLOYEE IMPORT]         11/11 Passed (49-column contract & ID policy)
+📁 [BIOMETRIC-IOT]                 6/6 Passed  (SHA-256 dedupe, connector auth)
+📁 [HIRING VALIDATORS]            17/17 Passed (Verhoeff Aadhaar, PAN, conditional logic)
+📁 [CANDIDATE HIRING (API)]       24/24 Passed (Public funnel, pipeline, shard isolation)
 ----------------------------------------------------------------
-Total Tests Run: 57 | Passed: 57 (100.0%) | Failed: 0
+Total Tests Run: 212 | Passed: 212 (100.0%) | Failed: 0
 ```
 
 ### 55.2 Performance Benchmarks
@@ -1715,7 +1741,21 @@ Total Tests Run: 57 | Passed: 57 (100.0%) | Failed: 0
 
 ---
 
-## 56. License
+## 56. Candidate Hiring Module (`/hiring` & Public `/apply`)
+
+End-to-end recruitment: from branded public application forms to a sharded candidate pipeline.
+
+- **Recruitment Dashboard (`/hiring`):** Location-scoped KPIs, stage funnel, shard summaries and upcoming interviews.
+- **Form Builder (`/hiring/forms`):** Draft → publish workflow with versioned JSON schema, folders, templates, archive/close/reopen/duplicate and share links with per-link analytics (views, submissions).
+- **Candidate Directory & Dossier (`/hiring/candidates`):** Scoped list with masked identifiers; detail view aggregates applications, uploaded documents, interview timeline, star rating and notes. Aadhaar/PAN are stored AES-256-GCM encrypted and never exposed raw.
+- **Pipeline Management:** Validated stage transitions (terminal-stage moves blocked), bulk stage moves, interview scheduling/completion with audit trail.
+- **Public Apply Page (`/apply/[code]`):** Mobile-first form with captcha, consent enforcement, multi-location selection, conditional fields, magic-byte-validated uploads, field-level validation errors and a reference number on success.
+- **Sharded Storage:** Control database owns hiring structure (forms, links, settings, templates); each showroom shard (`bsc_shard_<code>`) owns candidate data. Provision with `npm run provision:hiring-shards`; an outbox worker tracks cross-shard writes (`/api/hiring/outbox/stats`).
+- **Public API Rate Limiting:** `HIRING_PUBLIC_SUBMIT_MAX` (default 5 per 15 minutes per IP; 200 in dev/test).
+
+---
+
+## 57. License
 
 Proprietary enterprise software owned by **BSC Textiles Pvt Ltd**.  
 All rights reserved. Unauthorized reproduction, modification, distribution, or decompilation of this software is strictly prohibited.

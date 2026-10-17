@@ -18,6 +18,28 @@ npm run dev
 
 Then open **http://localhost:3000/login**.
 
+## eSSL MB160 / ZKTeco attendance sync
+
+`npm run dev` now starts three processes: the API (:4000), the web app (:3000)
+and the supervised device worker. Full setup, the device-side settings
+checklist, the timestamp/mode rules and troubleshooting live in
+**[docs/BIOMETRIC_MB160.md](docs/BIOMETRIC_MB160.md)**.
+
+```bash
+npm run worker:supervised                        # background device sync only
+npm run device:simulator -- --mode=both --photos # simulated MB160, no hardware needed
+npm run test:biometric                           # time / id / mode / dedup checks
+npm run diagnose                                 # why isn't a device syncing?
+```
+
+Two things that used to break the sync and are now required configuration:
+
+* `NEXT_PUBLIC_WS_URL` must point at the API origin (`http://localhost:4000`).
+  Without it the browser opens its socket against `:3000`, where no Socket.IO
+  server exists, and live punches never arrive.
+* `setup-database.ps1` applies `schema.sql` before the migration chain; the
+  migrations alone leave `employee` missing columns the rest of the app reads.
+
 > After a reboot, just run `.\start-mysql.ps1` (or `.\start-dev.ps1`, which
 > calls it) before `npm run dev` - MySQL runs as a background process, not as
 > a Windows service.
@@ -39,13 +61,18 @@ All accounts use password: **`password123`**
 | Email | Role shown in seed | Location |
 |-------|--------------------|----------|
 | `admin@bsctextiles.com` | Super Admin | All |
-| `kavita.bhat@bsctextiles.com` | HR Executive | Belagavi |
+| `rbac.admin@bsctextiles.com` | Super Admin | All |
+| `rbac.hr@bsctextiles.com` | HR Manager (Kavita Rao) | Belagavi |
 | `vikram.singh@bsctextiles.com` | HR Manager | Shivamogga |
 | `amit.patel@bsctextiles.com` | Floor Manager | Belagavi |
+| `rbac.floor@bsctextiles.com` | Floor Manager | Belagavi |
 | `ramesh.gowda@bsctextiles.com` | Tea Break Manager | Belagavi |
-| `rajesh.kumar@bsctextiles.com` | Sales Employee | Belagavi |
+| `rbac.employee@bsctextiles.com` | Sales Employee | Belagavi |
 
 The login page offers these as one-click personas (36 users total after seeding).
+Legacy personas `kavita.bhat@` and `rajesh.kumar@` no longer exist in the user
+table; use the `rbac.*` accounts above. New accounts are created with status
+`PENDING_EMAIL_VERIFICATION` — set `status='ACTIVE'` to allow login.
 
 ## URLs
 

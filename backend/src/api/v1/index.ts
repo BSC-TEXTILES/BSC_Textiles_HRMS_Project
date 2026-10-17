@@ -43,6 +43,14 @@ import searchRoutes from '../../routes/search.js';
 import shardsRouter from '../../routes/shards.js';
 import organizationRoutes from '../../routes/organization.js';
 import orgApprovalsRoutes from '../../routes/orgApprovals.js';
+import accessControlRoutes, { moduleAccessRouter, meRouter } from '../../routes/accessControl.js';
+import authSessionRouter from '../../routes/authSession.js';
+import credentialsRouter from '../../routes/credentials.js';
+import securityAdminRouter from '../../routes/securityAdmin.js';
+import privacyRouter from '../../routes/privacy.js';
+import liveActivitiesRouter from '../../routes/liveActivities.js';
+import hiringRoutes from '../../routes/hiring.js';
+import hiringPublicRoutes from '../../routes/hiringPublic.js';
 
 export const apiV1Router = Router();
 
@@ -99,5 +107,38 @@ apiV1Router.use('/mobile', mobileRoutes);
 // /organization/approvals/* is handled by the approvals router.
 apiV1Router.use('/organization/approvals', orgApprovalsRoutes);
 apiV1Router.use('/organization', organizationRoutes);
+
+// Access control administration. Mounted under /access, plus the two
+// spec-documented surface paths so /api/module-access/:roleId and
+// /api/me/permissions resolve without a client-side alias table.
+apiV1Router.use('/access', accessControlRoutes);
+apiV1Router.use('/module-access', moduleAccessRouter);
+apiV1Router.use('/me', meRouter);
+
+// Credential management (Admin), security operations, privacy self-service,
+// and the cookie-based session endpoints the browser signs in through.
+apiV1Router.use('/credentials', credentialsRouter);
+apiV1Router.use('/admin/security', securityAdminRouter);
+apiV1Router.use('/privacy', privacyRouter);
+apiV1Router.use('/live-activities', liveActivitiesRouter);
+
+// Mounted at /api/session, NOT under /api/auth. Next.js exposes NextAuth at
+// /api/auth/* via a catch-all route, and with NEXT_PUBLIC_API_URL=/api the
+// browser's fetch('/api/auth/session/login') is matched by that route before
+// the /api rewrite ever runs — so the request is answered by NextAuth (a
+// session JSON object for GET, a 404-ish error for POST) instead of reaching
+// this server. Login worked in development only because the login page used an
+// absolute backend base URL; under the production same-origin setup it would
+// have failed for everyone. /auth/session stays mounted as an alias for direct
+// API clients (mobile, curl, the connector) that are never proxied through
+// Next.js and so were never affected.
+apiV1Router.use('/session', authSessionRouter);
+apiV1Router.use('/auth/session', authSessionRouter);
+
+// Candidate Hiring. The public router must be mounted before the
+// authenticated one, otherwise /hiring's `authenticate` guard swallows
+// /hiring/public/* and candidates get 401s.
+apiV1Router.use('/hiring/public', hiringPublicRoutes);
+apiV1Router.use('/hiring', hiringRoutes);
 
 export default apiV1Router;

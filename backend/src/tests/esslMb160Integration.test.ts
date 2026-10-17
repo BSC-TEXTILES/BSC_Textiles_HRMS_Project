@@ -71,17 +71,17 @@ export async function runEsslMb160Tests(): Promise<void> {
     const rawBody = `1\t2026-10-16 09:12:30\t0\t15\r\n2\t2026-10-16 09:14:10\t0\t1\r\n3 2026-10-16 09:15:00 0 15`;
     const parsed = parseAttLogBody(rawBody, belTerminalSn);
 
-    assert.equal(parsed.length, 3, 'Expected 3 parsed punches');
-    assert.equal(parsed[0].enrollmentNumber, '1');
-    assert.equal(parsed[0].punchTime, '2026-10-16 09:12:30');
-    assert.equal(parsed[0].punchType, 'CHECK_IN');
-    assert.equal(parsed[0].verifyMode, 15, '15 corresponds to MB160 Face Verification');
+    assert.equal(parsed.punches.length, 3, 'Expected 3 parsed punches');
+    assert.equal(parsed.punches[0].enrollmentNumber, '1');
+    assert.equal(parsed.punches[0].punchTime, '2026-10-16 09:12:30');
+    assert.equal(parsed.punches[0].punchState, 0, 'status byte 0 = check-in');
+    assert.equal(parsed.punches[0].verifyMode, 15, '15 corresponds to MB160 Face Verification');
 
-    assert.equal(parsed[1].enrollmentNumber, '2');
-    assert.equal(parsed[1].verifyMode, 1, '1 corresponds to Fingerprint Verification');
+    assert.equal(parsed.punches[1].enrollmentNumber, '2');
+    assert.equal(parsed.punches[1].verifyMode, 1, '1 corresponds to Fingerprint Verification');
 
-    assert.equal(parsed[2].enrollmentNumber, '3');
-    assert.equal(parsed[2].punchTime, '2026-10-16 09:15:00');
+    assert.equal(parsed.punches[2].enrollmentNumber, '3');
+    assert.equal(parsed.punches[2].punchTime, '2026-10-16 09:15:00');
   })) passed++;
 
   // --------------------------------------------------------------------------

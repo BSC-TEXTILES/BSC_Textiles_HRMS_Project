@@ -23,10 +23,21 @@ export async function runQRTests(baseUrl: string, adminToken: string, scannerTok
     }
   };
 
-  let testEmployeeId = 'TEST-EMP-001';
+  let testEmployeeId = '';
+  let secondEmployeeId = '';
   let activeQRToken = '';
 
   await runTest('API: Generate or fetch daily QR badge for an employee', async () => {
+    const empRes = await fetch(`${baseUrl}/api/employees?limit=2`, {
+      headers: { Authorization: `Bearer ${adminToken}` },
+    });
+    assert.strictEqual(empRes.status, 200, `Expected employees list, got ${empRes.status}`);
+    const empData: any = await empRes.json();
+    const employees: any[] = empData.employees || [];
+    assert.ok(employees.length >= 2, 'Seed data must include at least two employees');
+    testEmployeeId = employees[0].id;
+    secondEmployeeId = employees[1].id;
+
     const res = await fetch(`${baseUrl}/api/qr-codes/daily/${testEmployeeId}`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
@@ -63,8 +74,8 @@ export async function runQRTests(baseUrl: string, adminToken: string, scannerTok
   });
 
   await runTest('Duplicate scan protection: scanning the same QR token a second time is rejected', async () => {
-    // Generate fresh single-use QR for employee 2
-    const dailyRes = await fetch(`${baseUrl}/api/qr-codes/daily/TEST-EMP-002`, {
+    // Generate fresh single-use QR for the second employee
+    const dailyRes = await fetch(`${baseUrl}/api/qr-codes/daily/${secondEmployeeId}`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     const dailyData: any = await dailyRes.json();

@@ -8,6 +8,8 @@ import { NotificationProvider } from '@/context/NotificationContext';
 
 import { DashboardShellProvider } from '@/context/DashboardShellContext';
 import { AppShell } from '@/components/layout/AppShell';
+import { SessionGuard } from '@/components/security/SessionGuard';
+import { CookieConsentBanner } from '@/components/security/CookieConsentBanner';
 
 export function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
@@ -40,6 +42,10 @@ export function Providers({ children }: { children: ReactNode }) {
             </AppShell>
           </DashboardShellProvider>
         </NotificationProvider>
+        {/* Mounted above the shell so the timeout modal and the consent banner
+            also appear on /login, where the shell is intentionally absent. */}
+        <SessionGuard />
+        <CookieConsentBanner />
         <Toaster position="top-right" />
       </ThemeProvider>
     </SessionProvider>

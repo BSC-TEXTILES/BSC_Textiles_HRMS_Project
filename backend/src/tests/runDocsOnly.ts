@@ -19,7 +19,7 @@ async function loginUser(email: string, password = 'password123'): Promise<strin
 async function main() {
   console.log('--- Testing Employee Document Management Suite ---');
   const adminToken = await loginUser('admin@bsctextiles.com');
-  const belagaviHrToken = await loginUser('kavita.bhat@bsctextiles.com');
+  const belagaviHrToken = await loginUser('rbac.hr@bsctextiles.com');
   const shivamoggaHrToken = await loginUser('vikram.singh@bsctextiles.com');
   console.log('Authenticated personas.');
 

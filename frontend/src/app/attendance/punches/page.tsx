@@ -114,6 +114,12 @@ export default function BiometricPunchesPage() {
     if (!socket) return;
 
     const handleRealtimePunch = (data: any) => {
+      // The API sends the instant (UTC) and a display string already computed in
+      // the terminal's timezone; use those rather than re-deriving in the
+      // browser's zone.
+      const punchInstant = data.punchTimeUtc || data.punchTime;
+      const faceInvolved = data.methodFamily === 'FACE' || /face/i.test(data.verifyMethod || '');
+
       setPunches((prev) => {
         const existingIdx = prev.findIndex(
           (p) => p.employeeId === data.employeeId || p.employee?.id === data.employeeId
@@ -122,9 +128,9 @@ export default function BiometricPunchesPage() {
           const updated = [...prev];
           updated[existingIdx] = {
             ...updated[existingIdx],
-            actualLogout: data.punchType === 'CHECK_OUT' ? data.punchTime : updated[existingIdx].actualLogout,
-            actualLogin: data.punchType === 'CHECK_IN' ? data.punchTime : updated[existingIdx].actualLogin,
-            faceVerified: data.isFaceVerified ? 1 : updated[existingIdx].faceVerified,
+            actualLogout: data.punchType === 'CHECK_OUT' ? punchInstant : updated[existingIdx].actualLogout,
+            actualLogin: data.punchType === 'CHECK_IN' ? punchInstant : updated[existingIdx].actualLogin,
+            faceVerified: faceInvolved ? 1 : updated[existingIdx].faceVerified,
             status: 'PRESENT',
           };
           return updated;
@@ -133,11 +139,16 @@ export default function BiometricPunchesPage() {
             id: data.attendanceId || `att-${data.employeeId}`,
             employeeId: data.employeeId,
             locationId: data.locationId,
-            actualLogin: data.punchTime,
-            scheduledLogin: data.punchTime,
+            actualLogin: punchInstant,
+            scheduledLogin: punchInstant,
             status: 'PRESENT',
-            faceVerified: data.isFaceVerified ? 1 : 0,
-            faceMatchPercentage: data.isFaceVerified ? 98.5 : 0,
+            faceVerified: faceInvolved ? 1 : 0,
+            // Only a score the device reported is shown. The old code invented
+            // 98.5% for every face punch, which made an unverified terminal look
+            // like a high-confidence match.
+            faceMatchPercentage: typeof data.matchValue === 'number' ? data.matchValue : null,
+            verifyMethod: data.verifyMethod || 'Unknown',
+            deviceName: data.deviceName || null,
             employee: {
               id: data.employeeId,
               fullName: data.employeeName,
@@ -145,9 +156,7 @@ export default function BiometricPunchesPage() {
               designation: data.designation,
             },
             location: {
-              name: data.locationCode === 'BEL' ? 'Belagavi Flagship (BEL-01)' :
-                    data.locationCode === 'DAV' ? 'Davanagere Showroom (DAV-02)' :
-                    'Shivamogga Megastore (SHI-03)',
+              name: data.locationCode || 'Unassigned showroom',
               code: data.locationCode,
             },
           };
@@ -161,7 +170,8 @@ export default function BiometricPunchesPage() {
       );
     };
 
-    socket.on('attendance:punch', handleRealtimePunch);
+    // The server publishes the same payload under two event names; listening to
+    // both would run the handler twice per punch (and toast twice).
     socket.on('biometric:punch', handleRealtimePunch);
 
     return () => {
@@ -199,8 +209,12 @@ export default function BiometricPunchesPage() {
     const headers = 'Employee Code,Employee Name,Location,Punch Time,Status,Face Verified,Early Incentive INR,Terminal\n';
     const rows = punches.map(p => {
       const emp = p.employee || {};
-      const timeStr = p.actualLogin ? new Date(p.actualLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '09:12 AM';
-      return `"${emp.employeeCode || ''}","${emp.fullName || ''}","${p.location?.name || 'Belagavi Flagship (BEL-01)'}","${timeStr}","${p.status}","${p.faceVerified ? 'YES' : 'NO'}","${p.earlyLoginIncentive || 0}","BEL-T1"`;
+      // A missing punch must export as blank, not as a plausible time, and the
+      // terminal column has to say which device reported the row.
+      const timeStr = p.actualLogin
+        ? new Date(p.actualLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+        : '';
+      return `"${emp.employeeCode || ''}","${emp.fullName || ''}","${p.location?.name || p.location?.code || ''}","${timeStr}","${p.status}","${p.faceVerified ? 'YES' : 'NO'}","${p.earlyLoginIncentive || 0}","${p.deviceName || ''}"`;
     }).join('\n');
     const blob = new Blob([headers + rows], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);

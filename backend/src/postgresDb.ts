@@ -6,29 +6,51 @@
 
 import pg, { Pool, PoolClient } from 'pg';
 import dotenv from 'dotenv';
+import fs from 'fs';
 import path from 'path';
 
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 dotenv.config();
 
-const DEFAULT_SUPABASE_URL =
-  'postgresql://postgres.opoeigmbiwctvqtzxkde:HRMS_Project%402026@aws-0-ap-northeast-2.pooler.supabase.com:6543/postgres';
+// A connection string with a real password used to be the fallback here, in
+// three files, in a public repo. Credentials come from the environment or the
+// mounted secret now; there is no default and there never should have been one.
+function requireSupabaseUri(): string {
+  const uri =
+    process.env.SUPABASE_POOLER_URL ||
+    process.env.SUPABASE_DB_URL ||
+    (/^postgres(ql)?:\/\//i.test(process.env.DATABASE_URL || '') ? process.env.DATABASE_URL : '');
+  if (!uri) {
+    throw new Error(
+      '[PostgreSQL] SUPABASE_POOLER_URL (or SUPABASE_DB_URL / a postgresql:// DATABASE_URL) is required. ' +
+        'Set it in the environment or provide it as a file under SECRETS_DIR.'
+    );
+  }
+  return uri;
+}
 
 export class PostgresPoolAdapter {
   public pgPool: Pool;
   private uri: string;
 
   constructor(connectionUri?: string) {
-    this.uri =
-      connectionUri ||
-      process.env.SUPABASE_POOLER_URL ||
-      process.env.SUPABASE_DB_URL ||
-      process.env.DATABASE_URL ||
-      DEFAULT_SUPABASE_URL;
+    this.uri = connectionUri || requireSupabaseUri();
 
     this.pgPool = new Pool({
       connectionString: this.uri,
-      ssl: { rejectUnauthorized: false },
+      // Verify by default. `rejectUnauthorized: false` turns TLS into
+      // encryption anyone can intercept, so the escape hatch is explicit and
+      // should only be set against a database you control on a network you
+      // control.
+      ssl:
+        (process.env.PGSSL_REJECT_UNAUTHORIZED || '').trim().toLowerCase() === 'false'
+          ? { rejectUnauthorized: false }
+          : {
+              rejectUnauthorized: true,
+              ...(process.env.PGSSL_CA_FILE
+                ? { ca: fs.readFileSync(process.env.PGSSL_CA_FILE, 'utf8') }
+                : {}),
+            },
       max: process.env.VERCEL ? 10 : 25,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
@@ -189,5 +211,29 @@ export class PostgresPoolAdapter {
   }
 }
 
-export const postgresPool = new PostgresPoolAdapter();
+export async function endPostgresPool(): Promise<void> {
+  if (lazyInstance) await lazyInstance.end();
+}
+
+// The adapter is created on first use, not at import time. With MySQL or
+// SQLite selected, `nativeDb` still imports this module — an eager `new Pool`
+// here would demand a Supabase URI (and open sockets) the process never uses.
+let lazyInstance: PostgresPoolAdapter | null = null;
+
+function getPostgresPool(): PostgresPoolAdapter {
+  if (!lazyInstance) lazyInstance = new PostgresPoolAdapter();
+  return lazyInstance;
+}
+
+export const postgresPool = new Proxy({} as PostgresPoolAdapter, {
+  get(_target, prop, receiver) {
+    const instance = getPostgresPool();
+    const value = Reflect.get(instance as any, prop, instance);
+    return typeof value === 'function' ? value.bind(instance) : value;
+  },
+  set(_target, prop, value) {
+    (getPostgresPool() as any)[prop] = value;
+    return true;
+  },
+});
 export default postgresPool;

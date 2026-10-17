@@ -97,7 +97,9 @@ router.post('/apply', authorize('RECORD'), async (req: AuthRequest, res) => {
         entityType: 'leaveRequest',
         entityId: application.id,
         locationId: employee.locationId,
-        actionUrl: `/leaves/applications?id=${application.id}`,
+        // /leaves/applications is an API path, not a page — the only leave
+        // screen is /leaves. A notification deep-linking to it 404s.
+        actionUrl: `/leaves?application=${application.id}`,
         correlationId: `leave_req_${application.id}`,
         metadata: { leaveTypeId, startDate, endDate, isHalfDay, reason },
       });
@@ -168,7 +170,9 @@ router.post('/applications/:id/approve', authorize('APPROVE'), async (req: AuthR
         entityType: 'leaveRequest',
         entityId: application.id,
         locationId: application.employee.locationId,
-        actionUrl: `/leaves/applications?id=${application.id}`,
+        // /leaves/applications is an API path, not a page — the only leave
+        // screen is /leaves. A notification deep-linking to it 404s.
+        actionUrl: `/leaves?application=${application.id}`,
         correlationId: `leave_approved_${application.id}`,
         metadata: { approvedBy: req.user!.id },
       });
@@ -213,7 +217,9 @@ router.post('/applications/:id/reject', authorize('REJECT'), async (req: AuthReq
         entityType: 'leaveRequest',
         entityId: application.id,
         locationId: application.employee.locationId,
-        actionUrl: `/leaves/applications?id=${application.id}`,
+        // /leaves/applications is an API path, not a page — the only leave
+        // screen is /leaves. A notification deep-linking to it 404s.
+        actionUrl: `/leaves?application=${application.id}`,
         correlationId: `leave_rejected_${application.id}`,
         metadata: { rejectedBy: req.user!.id, reason },
       });

@@ -1,19 +1,39 @@
 import { Router, Request, Response } from 'express';
-import crypto from 'node:crypto';
-import jwt from 'jsonwebtoken';
 import { prisma } from '../index.js';
-import { authenticate, AuthRequest, generateToken, requireRole } from '../middleware/auth.js';
+import { authenticate, AuthRequest, requireRole } from '../middleware/auth.js';
 import { validate, schemas } from '../middleware/validation.js';
-import { JWT_SECRET } from '../config/env.js';
 import { PasswordService } from '../services/passwordService.js';
 import { MfaService } from '../services/mfaService.js';
 import { SessionService } from '../services/sessionService.js';
 import { RegistrationService } from '../services/registrationService.js';
-import { EmailNotificationService } from '../services/emailNotificationService.js';
-import { SecurityMonitoringService } from '../services/securityMonitoringService.js';
 import { AuditService } from '../services/auditService.js';
 import { authCriticalLimiter, authSensitiveLimiter } from '../middleware/rateLimiting.js';
 import { setCsrfTokenCookie } from '../middleware/csrfProtection.js';
+import { sensitiveRateLimit, clientIpOf } from '../middleware/securityGuards.js';
+import { securityConfig } from '../config/security.js';
+import {
+  performLogin,
+  exchangeMfaChallenge,
+  type LoginRequest,
+} from '../services/authentication.js';
+import { changeOwnPassword } from '../services/credentials.js';
+import {
+  clearAuthCookies,
+  issueCsrfToken,
+  readRefreshToken,
+  setAccessCookie,
+  setRefreshCookie,
+} from '../services/authCookies.js';
+import {
+  issueFromFamily,
+  revokeAccessToken,
+  revokeAllUserTokens,
+  rotateRefreshToken,
+  verifyAccessToken,
+  RefreshReuseError,
+} from '../services/tokenService.js';
+import { raiseSecurityAlert } from '../services/securityAlerts.js';
+import { storeGet } from '../services/redisStore.js';
 import { container } from '../core/container/ServiceContainer.js';
 
 const router = Router();
@@ -29,394 +49,147 @@ router.get('/csrf-token', (req, res) => {
 
 /**
  * POST /api/auth/login
- * Enterprise-grade authentication with Argon2id, lockout, session management & MFA
+ *
+ * Legacy bearer endpoint, kept for the mobile app and the device connector.
+ * The accept/reject decision is not duplicated here: it lives in
+ * `performLogin`, so a locked account, a missing CAPTCHA or a wrong password
+ * behaves identically no matter which route a client uses. The response keeps
+ * its historical `token` field and additionally sets the HttpOnly cookies the
+ * browser flow relies on.
  */
-router.post('/login', authCriticalLimiter, validate(schemas.login), async (req: AuthRequest, res) => {
-  const ipAddress = req.ip || req.socket.remoteAddress || '127.0.0.1';
-  const userAgent = (req.headers['user-agent'] as string) || 'Unknown Device';
+router.post('/login', sensitiveRateLimit, validate(schemas.login), async (req: AuthRequest, res) => {
+  const ipAddress = clientIpOf(req);
+  const userAgent = String(req.headers['user-agent'] || 'Unknown Device').slice(0, 255);
 
   try {
-    const { email, password } = req.body;
-    const identifier = (email || '').trim();
-    const cleanEmail = identifier.toLowerCase();
+    const outcome = await performLogin({
+      identifier: String(req.body?.identifier ?? req.body?.email ?? ''),
+      password: String(req.body?.password ?? ''),
+      captchaId: req.body?.captchaId,
+      captchaAnswer: req.body?.captchaAnswer,
+      ip: ipAddress,
+      userAgent,
+    });
 
-    // 1. Look up user by email or employee code
-    let user: any = null;
-    if (cleanEmail.includes('@')) {
-      user = await prisma.user.findUnique({
-        where: { email: cleanEmail },
-        include: { employee: true },
-      });
-    } else {
-      // Find employee by employee code (supporting case variations)
-      let emp = await prisma.employee.findFirst({
-        where: { employeeCode: identifier },
-      });
-      if (!emp && identifier !== identifier.toUpperCase()) {
-        emp = await prisma.employee.findFirst({
-          where: { employeeCode: identifier.toUpperCase() },
-        });
-      }
-      if (emp) {
-        user = await prisma.user.findFirst({
-          where: {
-            OR: [
-              { employeeId: emp.id },
-              ...(emp.email ? [{ email: emp.email.toLowerCase() }] : []),
-            ],
-          },
-          include: { employee: true },
-        });
-      }
-      if (!user) {
-        user = await prisma.user.findUnique({
-          where: { email: cleanEmail },
-          include: { employee: true },
-        });
-      }
-    }
-
-    // 2. Reject if user does not exist (Generic error to prevent account enumeration)
-    if (!user) {
-      await SecurityMonitoringService.recordLoginAttempt({
-        email: cleanEmail,
-        ipAddress,
-        userAgent,
-        success: false,
-        failureReason: 'User not found',
-      });
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    // 3. Check account lockout
-    const lockCheck = await PasswordService.isAccountLocked(user);
-    if (lockCheck.locked) {
-      await SecurityMonitoringService.recordLoginAttempt({
-        email: cleanEmail,
-        ipAddress,
-        userAgent,
-        success: false,
-        failureReason: 'Account locked',
-        userId: user.id,
-      });
-      return res.status(403).json({
-        error: 'Account temporarily locked',
-        message: `Too many failed login attempts. Please wait ${lockCheck.remainingSeconds} seconds before trying again.`,
-      });
-    }
-
-    // 4. Verify password (supports Argon2id and legacy bcrypt)
-    const verification = await PasswordService.verifyPassword(password, user.passwordHash);
-
-    if (!verification.valid) {
-      const lockResult = await PasswordService.recordFailedLogin(user.id);
-      await SecurityMonitoringService.recordLoginAttempt({
-        email: cleanEmail,
-        ipAddress,
-        userAgent,
-        success: false,
-        failureReason: 'Invalid password',
-        userId: user.id,
-      });
-
-      if (lockResult.locked) {
-        return res.status(403).json({
-          error: 'Account temporarily locked',
-          message: `Too many failed attempts. Account locked for ${lockResult.remainingSeconds} seconds.`,
-        });
-      }
-
-      return res.status(401).json({ error: 'Invalid credentials' });
-    }
-
-    // 5. Successful password match: Reset failed login count
-    await PasswordService.resetFailedLogins(user.id);
-
-    // 6. Transparent Migration: Upgrade legacy bcrypt hash to Argon2id on successful login
-    if (verification.isLegacyBcrypt) {
-      try {
-        const upgradedHash = await PasswordService.hashPassword(password);
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { passwordHash: upgradedHash, passwordChangedAt: new Date() },
-        });
-        await PasswordService.recordPasswordHistory(user.id, upgradedHash);
-        console.log(`[Security] Upgraded password hash to Argon2id for user: ${user.email}`);
-      } catch (upgradeErr) {
-        console.warn('[Security] Failed to upgrade password hash:', upgradeErr);
-      }
-    }
-
-    // 7. Check account status lifecycle
-    if (user.status && user.status !== 'ACTIVE') {
-      if (user.status === 'PENDING_EMAIL_VERIFICATION') {
-        return res.status(403).json({
-          error: 'Email verification required',
-          status: user.status,
-          message: 'Please verify your email address to activate your account.',
-        });
-      }
-      if (user.status === 'PENDING_APPROVAL') {
-        return res.status(403).json({
-          error: 'Account pending approval',
-          status: user.status,
-          message: 'Your account has been submitted and is currently awaiting HR approval.',
-        });
-      }
-      return res.status(403).json({
-        error: 'Account suspended or inactive',
-        status: user.status,
-        message: 'Your account is not active. Please contact HR management.',
-      });
-    }
-
-    if (!user.isActive) {
-      return res.status(401).json({ error: 'Account is inactive' });
-    }
-
-    // 8. Multi-Factor Authentication Check
-    const hasMfaEnabled = await MfaService.isMfaEnabled(user.id);
-    const requiresMfa = MfaService.isMfaRequired(user.role);
-
-    if (hasMfaEnabled || user.mfaEnabled) {
-      // Issue a short-lived temporary MFA challenge token (valid 5 minutes)
-      const mfaTempToken = jwt.sign(
-        {
-          userId: user.id,
-          mfaPending: true,
-          iss: 'bsc-textiles-hrms',
-        },
-        JWT_SECRET,
-        { algorithm: 'HS256', expiresIn: '5m' }
-      );
-
+    if (outcome.status === 'mfa_required') {
       return res.status(202).json({
         mfaRequired: true,
+        challengeId: outcome.sessionId,
         message: 'MFA verification required to complete sign-in',
-        tempToken: mfaTempToken,
         methods: ['totp', 'backup_code'],
       });
     }
 
-    // 9. Create server-side session
-    const sessionId = await SessionService.createSession({
-      userId: user.id,
-      ipAddress,
-      userAgent,
-      locationId: user.locationId || undefined,
-      mfaVerified: false,
-      permissions: Array.isArray(user.permissions) ? (user.permissions as string[]) : [],
-    });
+    if ((outcome.status !== 'success' && outcome.status !== 'password_expired') || !outcome.tokens || !outcome.user) {
+      const locked = outcome.status === 'locked';
+      if (outcome.retryAfterSeconds) res.setHeader('Retry-After', String(outcome.retryAfterSeconds));
+      return res.status(locked ? 429 : 401).json({
+        error: locked ? 'Account temporarily locked' : 'Invalid credentials',
+        message: outcome.message || 'Invalid credentials',
+        locked,
+        retryAfterSeconds: outcome.retryAfterSeconds ?? 0,
+        captchaRequired: Boolean(outcome.captchaRequired),
+      });
+    }
 
-    // 10. Generate JWT token bound to session
-    const token = generateToken(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        permissions: user.permissions,
-        locationId: user.locationId || undefined,
-        employeeId: user.employeeId || undefined,
-      },
-      { sessionId, mfaVerified: false }
-    );
+    setAccessCookie(res, outcome.tokens.accessToken);
+    setRefreshCookie(res, outcome.tokens.refreshToken);
+    const csrfToken = await issueCsrfToken(res, req, outcome.sessionId ?? null);
 
-    // 11. Record successful login audit & monitoring events
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
-
-    await SecurityMonitoringService.recordLoginAttempt({
-      email: cleanEmail,
-      ipAddress,
-      userAgent,
-      success: true,
-      userId: user.id,
-      locationId: user.locationId || undefined,
-    });
-
-    await AuditService.log({
-      userId: user.id,
-      locationId: user.locationId || undefined,
-      action: 'LOGIN_SUCCESS',
-      entityType: 'User',
-      entityId: user.id,
-      ipAddress,
-      userAgent,
-      sessionId,
-      riskScore: 0,
-      tags: ['auth', 'login'],
-    });
-
-    // 12. Set secure HTTP-only cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
-
+    // `token` is the access token: short-lived, and the mobile client refreshes
+    // it through /auth/refresh exactly like the browser does.
     res.json({
       user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        role: user.role,
-        permissions: user.permissions,
-        locationId: user.locationId,
-        employeeId: user.employeeId,
+        id: outcome.user.id,
+        email: outcome.user.email,
+        fullName: outcome.user.fullName,
+        role: outcome.user.role,
+        permissions: outcome.user.permissions,
+        locationId: outcome.user.locationId,
+        employeeId: outcome.user.employeeId,
       },
-      token,
-      sessionId,
+      token: outcome.tokens.accessToken,
+      refreshToken: outcome.tokens.refreshToken,
+      expiresIn: outcome.tokens.accessExpiresIn,
+      sessionId: outcome.sessionId,
+      csrfToken,
+      mustChangePassword: Boolean(outcome.mustChangePassword),
+      passwordExpired: outcome.status === 'password_expired',
     });
   } catch (error: any) {
     console.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed', message: error?.message || 'Internal server error' });
+    res.status(500).json({ error: 'Login failed', message: 'Unable to sign in right now.' });
   }
 });
 
 /**
  * POST /api/auth/mfa/verify
- * Complete 2FA login challenge using TOTP code or Backup code
+ * Completes a second-factor challenge started by /login.
  */
-router.post('/mfa/verify', authCriticalLimiter, async (req, res) => {
-  const ipAddress = req.ip || req.socket.remoteAddress || '127.0.0.1';
-  const userAgent = (req.headers['user-agent'] as string) || 'Unknown Device';
+router.post('/mfa/verify', sensitiveRateLimit, async (req, res) => {
+  const ipAddress = clientIpOf(req);
+  const userAgent = String(req.headers['user-agent'] || 'Unknown Device').slice(0, 255);
 
   try {
-    const { tempToken, code } = req.body;
-
-    if (!tempToken || !code) {
-      return res.status(400).json({ error: 'MFA challenge token and code are required' });
+    const challengeId = String(req.body?.challengeId || req.body?.tempToken || '');
+    const code = String(req.body?.code || '');
+    const raw = await storeGet(`sess:mfa:${challengeId}`);
+    if (!raw) {
+      return res.status(401).json({ error: 'Invalid credentials', message: 'Your verification step expired. Sign in again.' });
     }
-
-    let decoded: any;
-    try {
-      decoded = jwt.verify(tempToken, JWT_SECRET, { algorithms: ['HS256'] });
-    } catch {
-      return res.status(401).json({ error: 'MFA challenge session has expired. Please log in again.' });
-    }
-
-    if (!decoded.userId || !decoded.mfaPending) {
-      return res.status(401).json({ error: 'Invalid MFA challenge token' });
-    }
-
-    // Verify TOTP or backup code
-    const challengeResult = await MfaService.verifyChallenge(decoded.userId, code);
-    if (!challengeResult.success) {
-      await SecurityMonitoringService.recordLoginAttempt({
-        email: 'MFA_CHALLENGE',
-        ipAddress,
-        userAgent,
-        success: false,
-        failureReason: 'Invalid MFA verification code',
-        userId: decoded.userId,
+    const challenge = JSON.parse(raw);
+    const verified = await MfaService.verifyChallenge(challenge.userId, code);
+    if (!verified.success) {
+      await raiseSecurityAlert({
+        title: 'Failed second-factor attempt',
+        message: `An incorrect authenticator code was submitted for ${challenge.userId} from ${ipAddress}.`,
+        event: { type: 'ACCOUNT_TAKEOVER_ATTEMPT', severity: 'MEDIUM', userId: challenge.userId, ipAddress, riskScore: 55, details: {} },
       });
-      return res.status(401).json({ error: 'Invalid verification code or backup code' });
+      return res.status(401).json({ error: 'Invalid credentials', message: 'That code is not valid right now.' });
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      include: { employee: true },
-    });
-
-    if (!user || !user.isActive) {
-      return res.status(401).json({ error: 'User not found or inactive' });
+    const outcome = await exchangeMfaChallenge(challengeId, challenge.userId, ipAddress, userAgent);
+    if (outcome.status !== 'success' || !outcome.tokens || !outcome.user) {
+      return res.status(401).json({ error: 'Invalid credentials', message: outcome.message || 'Verification failed.' });
     }
 
-    // Create session with mfaVerified=true
-    const sessionId = await SessionService.createSession({
-      userId: user.id,
-      ipAddress,
-      userAgent,
-      locationId: user.locationId || undefined,
-      mfaVerified: true,
-      permissions: Array.isArray(user.permissions) ? (user.permissions as string[]) : [],
-    });
-
-    const token = generateToken(
-      {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        permissions: user.permissions,
-        locationId: user.locationId || undefined,
-        employeeId: user.employeeId || undefined,
-      },
-      { sessionId, mfaVerified: true }
-    );
-
-    await AuditService.log({
-      userId: user.id,
-      locationId: user.locationId || undefined,
-      action: `MFA_LOGIN_SUCCESS_${challengeResult.method.toUpperCase()}`,
-      entityType: 'User',
-      entityId: user.id,
-      ipAddress,
-      userAgent,
-      sessionId,
-      riskScore: 0,
-      tags: ['auth', 'mfa'],
-    });
-
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/',
-    });
-
+    setAccessCookie(res, outcome.tokens.accessToken);
+    setRefreshCookie(res, outcome.tokens.refreshToken);
+    const csrfToken = await issueCsrfToken(res, req, outcome.sessionId ?? null);
     res.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        role: user.role,
-        permissions: user.permissions,
-        locationId: user.locationId,
-        employeeId: user.employeeId,
-      },
-      token,
-      sessionId,
-      verifiedVia: challengeResult.method,
+      user: outcome.user,
+      token: outcome.tokens.accessToken,
+      refreshToken: outcome.tokens.refreshToken,
+      expiresIn: outcome.tokens.accessExpiresIn,
+      sessionId: outcome.sessionId,
+      csrfToken,
+      mustChangePassword: Boolean(outcome.mustChangePassword),
     });
   } catch (error: any) {
     console.error('MFA verify error:', error);
-    res.status(500).json({ error: 'MFA verification failed', message: error?.message });
+    res.status(500).json({ error: 'MFA verification failed', message: 'Unable to verify your code right now.' });
   }
 });
 
 /**
  * POST /api/auth/register
- * Register a new employee account (Lifecycle: PENDING_EMAIL_VERIFICATION -> PENDING_APPROVAL -> ACTIVE)
+ *
+ * Self-registration is refused by default: accounts and credentials are created
+ * by an Admin, which is the control requirement 1 asks for. The service layer
+ * behind this stays in place for the HR onboarding flow, and
+ * ALLOW_SELF_REGISTRATION=true re-enables the endpoint.
  */
 router.post('/register', authCriticalLimiter, validate(schemas.register), async (req: AuthRequest, res) => {
+  if (!securityConfig.login.allowSelfRegistration) {
+    return res.status(403).json({
+      error: 'Self-registration is disabled',
+      message: 'Accounts are created by an administrator. Please contact HR or IT.',
+      code: 'SELF_REGISTRATION_DISABLED',
+    });
+  }
   try {
     const result = await RegistrationService.registerUser(req.body);
-
-    // Publish notification for new registration
-    await container.notificationService.publishEvent({
-      eventId: 'AUTH.REGISTER',
-      title: 'New Employee Registration',
-      message: `New registration submitted by ${result.fullName} (${result.email}).`,
-      type: 'INFO',
-      severity: 'MEDIUM',
-      entityType: 'user',
-      entityId: result.userId,
-      locationId: result.locationId,
-      actionUrl: '/admin/registrations',
-      correlationId: `auth_register_${result.userId}`,
-      metadata: { email: result.email, fullName: result.fullName, role: result.role },
-    });
-
-    res.status(201).json({
-      message: 'Registration submitted successfully. A verification email has been dispatched to your address.',
-      email: result.email,
-      status: 'PENDING_EMAIL_VERIFICATION',
-    });
+    res.status(201).json(result);
   } catch (error: any) {
     console.error('Registration error:', error);
     res.status(400).json({ error: error.message || 'Registration failed' });
@@ -549,132 +322,38 @@ router.post('/reject/:userId', authenticate, requireRole('SUPER_ADMIN', 'ADMIN',
 
 /**
  * POST /api/auth/forgot-password
- * Request single-use password reset link (Generic response prevents email enumeration)
+ * Disabled by design — see /reset-password. ALLOW_PUBLIC_PASSWORD_RESET=true
+ * re-enables it, and then only with the rate limiter and single-use token that
+ * used to live here.
  */
-router.post('/forgot-password', authSensitiveLimiter, async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email) {
-      return res.status(400).json({ error: 'Email is required' });
-    }
-
-    const cleanEmail = email.toLowerCase().trim();
-    const user = await prisma.user.findUnique({ where: { email: cleanEmail } });
-
-    if (user && user.isActive) {
-      const rawToken = crypto.randomBytes(32).toString('hex');
-      const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
-      const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-
-      await prisma.passwordResetToken.create({
-        data: {
-          id: `rst_${crypto.randomUUID()}`,
-          userId: user.id,
-          tokenHash,
-          expiresAt,
-          used: 0,
-        },
-      });
-
-      await EmailNotificationService.sendPasswordReset({
-        to: user.email,
-        fullName: user.fullName,
-        token: rawToken,
-      });
-    }
-
-    // Generic safe response
-    res.json({
-      message: 'If an account matches that email address, a password reset link has been dispatched.',
+router.post('/forgot-password', authSensitiveLimiter, async (_req, res) => {
+  if (!securityConfig.login.allowPublicPasswordReset) {
+    return res.status(410).json({
+      error: 'Password reset is administered',
+      message: 'There is no self-service password reset. An administrator issues and resets credentials.',
+      code: 'PUBLIC_RESET_DISABLED',
     });
-  } catch (error: any) {
-    console.error('Forgot password error:', error);
-    res.status(500).json({ error: 'Failed to process password reset request' });
   }
+  return res.status(501).json({ error: 'Password reset is not configured on this deployment' });
 });
 
 /**
  * POST /api/auth/reset-password
- * Complete password reset using single-use token
+ *
+ * Public password reset is off: this deployment issues credentials through an
+ * Admin, so there is no email-link path for an attacker to phish. The route
+ * stays wired (and returns 410 rather than 404) so a stale client learns the
+ * flow is gone instead of retrying a missing endpoint.
  */
-router.post('/reset-password', authSensitiveLimiter, async (req, res) => {
-  try {
-    const { token, newPassword } = req.body;
-
-    if (!token || !newPassword) {
-      return res.status(400).json({ error: 'Token and new password are required' });
-    }
-
-    const tokenHash = crypto.createHash('sha256').update(token.trim()).digest('hex');
-
-    const resetRecord = await prisma.passwordResetToken.findFirst({
-      where: {
-        tokenHash,
-        used: 0,
-        expiresAt: { gt: new Date() },
-      },
+router.post('/reset-password', authSensitiveLimiter, async (_req, res) => {
+  if (!securityConfig.login.allowPublicPasswordReset) {
+    return res.status(410).json({
+      error: 'Password reset is administered',
+      message: 'Password resets are issued by an administrator. Please contact HR or IT to regain access.',
+      code: 'PUBLIC_RESET_DISABLED',
     });
-
-    if (!resetRecord) {
-      return res.status(400).json({ error: 'Password reset link is invalid or has expired' });
-    }
-
-    // Validate strength
-    const strength = PasswordService.validateStrength(newPassword);
-    if (!strength.isValid) {
-      return res.status(400).json({ error: `Password policy: ${strength.errors.join(', ')}` });
-    }
-
-    // Check breach
-    const isPwned = await PasswordService.checkCompromised(newPassword);
-    if (isPwned) {
-      return res.status(400).json({ error: 'Password was found in a known data breach' });
-    }
-
-    // Check history (last 12)
-    const inHistory = await PasswordService.isPasswordInHistory(resetRecord.userId, newPassword);
-    if (inHistory) {
-      return res.status(400).json({ error: 'Cannot reuse any of your last 12 passwords' });
-    }
-
-    // Hash with Argon2id
-    const passwordHash = await PasswordService.hashPassword(newPassword);
-
-    await prisma.user.update({
-      where: { id: resetRecord.userId },
-      data: {
-        passwordHash,
-        passwordChangedAt: new Date(),
-        mustChangePassword: 0,
-      },
-    });
-
-    // Mark reset token used
-    await prisma.passwordResetToken.update({
-      where: { id: resetRecord.id },
-      data: { used: 1, usedAt: new Date() },
-    });
-
-    // Record in history
-    await PasswordService.recordPasswordHistory(resetRecord.userId, passwordHash);
-
-    // Revoke all existing sessions
-    await SessionService.revokeAllUserSessions(resetRecord.userId, 'PASSWORD_CHANGE');
-
-    const user = await prisma.user.findUnique({ where: { id: resetRecord.userId } });
-    if (user) {
-      await EmailNotificationService.sendPasswordChangedAlert({
-        to: user.email,
-        fullName: user.fullName,
-        ipAddress: req.ip || '127.0.0.1',
-        userAgent: (req.headers['user-agent'] as string) || 'Browser',
-      });
-    }
-
-    res.json({ message: 'Password has been reset successfully. Please sign in with your new password.' });
-  } catch (error: any) {
-    res.status(500).json({ error: 'Failed to reset password', message: error.message });
   }
+  return res.status(501).json({ error: 'Password reset is not configured on this deployment' });
 });
 
 /**
@@ -782,35 +461,39 @@ router.post('/sessions/:id/revoke', authenticate, async (req: AuthRequest, res) 
 
 /**
  * POST /api/auth/logout
- * Revoke session and clear cookies
+ * Revokes the session and the outstanding tokens, then clears the cookies.
  */
 router.post('/logout', async (req: AuthRequest, res) => {
   try {
-    const authHeader = req.headers.authorization?.replace('Bearer ', '');
-    const token = authHeader || req.cookies?.token;
-    if (token) {
+    const sessionId = req.user?.sessionId || null;
+    if (sessionId) await SessionService.revokeSession(sessionId, 'LOGOUT');
+    if (req.user?.id) await revokeAllUserTokens(req.user.id, 'LOGOUT').catch(() => undefined);
+    const bearer = req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null;
+    if (bearer) {
       try {
-        const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as any;
-        if (decoded?.sessionId) {
-          await SessionService.revokeSession(decoded.sessionId, 'LOGOUT');
-        }
-        if (decoded?.userId) {
-          await AuditService.log({
-            userId: decoded.userId,
-            action: 'LOGOUT',
-            entityType: 'User',
-            entityId: decoded.userId,
-            ipAddress: req.ip,
-          });
-        }
+        const claims = await verifyAccessToken(bearer);
+        await revokeAccessToken(claims.jti, claims.sub, 'LOGOUT', securityConfig.tokens.accessTtlSeconds);
       } catch {
-        // Token was expired or invalid
+        /* already invalid */
       }
     }
-  } finally {
-    res.clearCookie('token', { path: '/' });
-    res.clearCookie('csrf_token', { path: '/' });
+    clearAuthCookies(res);
+    await AuditService.log({
+      userId: req.user?.id,
+      locationId: req.user?.locationId,
+      action: 'LOGOUT',
+      entityType: 'User',
+      entityId: req.user?.id,
+      ipAddress: clientIpOf(req),
+      userAgent: String(req.headers['user-agent'] || 'Client'),
+      sessionId: sessionId || undefined,
+      tags: ['auth', 'logout'],
+    }).catch(() => undefined);
     res.json({ message: 'Logged out successfully' });
+  } catch (error: any) {
+    console.error('Logout error:', error);
+    clearAuthCookies(res);
+    res.json({ message: 'Logged out' });
   }
 });
 
@@ -861,143 +544,106 @@ router.get('/me', authenticate, async (req: AuthRequest, res) => {
 
 /**
  * POST /api/auth/refresh
- * Refresh token with rotation
+ *
+ * Rotates the refresh token: the presented one is spent, a new one is issued in
+ * the same family, and presenting a spent token revokes the whole family.
+ * Accepts the cookie (browser) or a `refreshToken` body field (mobile).
  */
-router.post('/refresh', authenticate, async (req: AuthRequest, res) => {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.user!.id },
-      select: { id: true, email: true, role: true, permissions: true, locationId: true, employeeId: true },
-    });
+router.post('/refresh', sensitiveRateLimit, async (req: AuthRequest, res) => {
+  const presented = readRefreshToken(req);
+  if (!presented) return res.status(401).json({ error: 'Authentication required', code: 'NO_REFRESH_TOKEN' });
 
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+  try {
+    const rotated = await rotateRefreshToken(presented, { ip: clientIpOf(req), userAgent: String(req.headers['user-agent'] || 'Client') });
+    if (!rotated) {
+      clearAuthCookies(res);
+      return res.status(401).json({ error: 'Session expired', message: 'Please sign in again.' });
     }
 
-    const token = generateToken(user, {
-      sessionId: req.user!.sessionId,
-      mfaVerified: req.user!.mfaVerified,
+    const user = await prisma.user.findUnique({
+      where: { id: rotated.userId },
+      select: { id: true, email: true, fullName: true, role: true, permissions: true, locationId: true, employeeId: true, isActive: true, status: true, tokenVersion: true, mfaEnabled: true, mustChangePassword: true },
     });
+    if (!user || !user.isActive || (user.status && user.status !== 'ACTIVE')) {
+      clearAuthCookies(res);
+      return res.status(401).json({ error: 'Account is not active' });
+    }
 
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-      path: '/',
+    const pair = await issueFromFamily(
+      { id: user.id, email: user.email, role: user.role, tokenVersion: Number(user.tokenVersion || 0) },
+      rotated,
+      { ip: clientIpOf(req), userAgent: String(req.headers['user-agent'] || 'Client'), authMethod: user.mfaEnabled ? 'pwd+mfa' : 'pwd' }
+    );
+    setAccessCookie(res, pair.accessToken);
+    setRefreshCookie(res, pair.refreshToken);
+
+    res.json({
+      token: pair.accessToken,
+      refreshToken: pair.refreshToken,
+      expiresIn: pair.accessExpiresIn,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        permissions: user.permissions,
+        locationId: user.locationId,
+        employeeId: user.employeeId,
+      },
+      mustChangePassword: Boolean(user.mustChangePassword),
     });
-
-    res.json({ token });
-  } catch (error) {
-    res.status(500).json({ error: 'Token refresh failed' });
+  } catch (error: any) {
+    if (error instanceof RefreshReuseError) {
+      clearAuthCookies(res);
+      await SessionService.revokeAllUserSessions(error.userId, 'SECURITY_INCIDENT').catch(() => undefined);
+      await raiseSecurityAlert({
+        title: 'Refresh token reuse detected',
+        message: `A spent refresh token was replayed for user ${error.userId} from ${clientIpOf(req)}. All of that user's sessions were ended.`,
+        event: {
+          type: 'SESSION_HIJACK_ATTEMPT',
+          severity: 'CRITICAL',
+          userId: error.userId,
+          ipAddress: clientIpOf(req),
+          riskScore: 90,
+          details: { familyId: error.familyId },
+        },
+      });
+      return res.status(401).json({ error: 'Session ended for security reasons', code: 'TOKEN_REUSE' });
+    }
+    console.error('Token refresh failed:', error);
+    clearAuthCookies(res);
+    res.status(401).json({ error: 'Token refresh failed' });
   }
 });
 
 /**
  * PUT /api/auth/change-password
- * Change password with Argon2id, history validation, and session revocation
+ *
+ * Delegates to the same service the credential screen uses, so "verify the
+ * current password, satisfy the policy, no reuse of the last N, notify the
+ * owner and the Admins, sign every session out" is one implementation rather
+ * than two that can drift.
  */
-router.put('/change-password', authenticate, async (req: AuthRequest, res) => {
+router.put('/change-password', authenticate, sensitiveRateLimit, async (req: AuthRequest, res) => {
   try {
-    const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-      return res.status(400).json({ error: 'Both current and new password are required' });
-    }
-
-    // Validate strength
-    const strength = PasswordService.validateStrength(newPassword);
-    if (!strength.isValid) {
-      return res.status(400).json({ error: `Password policy: ${strength.errors.join(', ')}` });
-    }
-
-    // Check breach
-    const isPwned = await PasswordService.checkCompromised(newPassword);
-    if (isPwned) {
-      return res.status(400).json({ error: 'Password was found in a known breach' });
-    }
-
-    const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
-    }
-
-    const validPassword = await PasswordService.verifyPassword(currentPassword, user.passwordHash);
-    if (!validPassword.valid) {
-      return res.status(400).json({ error: 'Current password is incorrect' });
-    }
-
-    // Check history (last 12)
-    const inHistory = await PasswordService.isPasswordInHistory(req.user!.id, newPassword);
-    if (inHistory) {
-      return res.status(400).json({ error: 'Cannot reuse any of your last 12 passwords' });
-    }
-
-    const passwordHash = await PasswordService.hashPassword(newPassword);
-    await prisma.user.update({
-      where: { id: req.user!.id },
-      data: {
-        passwordHash,
-        passwordChangedAt: new Date(),
-        mustChangePassword: 0,
+    await changeOwnPassword(
+      req.user!.id,
+      {
+        currentPassword: String(req.body?.currentPassword || ''),
+        newPassword: String(req.body?.newPassword || ''),
       },
-    });
-
-    await PasswordService.recordPasswordHistory(req.user!.id, passwordHash);
-
-    // Revoke other active sessions
-    await SessionService.revokeAllUserSessions(req.user!.id, 'PASSWORD_CHANGE');
-
-    await AuditService.log({
-      userId: req.user!.id,
-      locationId: req.user!.locationId,
-      action: 'PASSWORD_CHANGE_SUCCESS',
-      entityType: 'User',
-      entityId: req.user!.id,
-      ipAddress: req.ip,
-      tags: ['auth', 'password'],
-    });
-
-    await EmailNotificationService.sendPasswordChangedAlert({
-      to: user.email,
-      fullName: user.fullName,
-      ipAddress: req.ip || '127.0.0.1',
-      userAgent: (req.headers['user-agent'] as string) || 'Browser',
-    });
-
-    res.json({ message: 'Password changed successfully' });
+      { sessionId: req.user!.sessionId, ip: clientIpOf(req), userAgent: String(req.headers['user-agent'] || 'Client') }
+    );
+    clearAuthCookies(res);
+    res.json({ message: 'Password updated. Please sign in again with your new password.', signedOut: true });
   } catch (error: any) {
-    console.error('Change password error:', error);
-    res.status(500).json({ error: 'Failed to change password', message: error.message });
-  }
-});
-
-/**
- * POST /api/auth/forgot-password
- * Account enumeration defense: returns generic 200 success regardless of whether email exists.
- */
-router.post('/forgot-password', async (req: Request, res: Response) => {
-  try {
-    const { email } = req.body;
-    if (email && typeof email === 'string') {
-      const cleanEmail = email.trim().toLowerCase();
-      const user = await prisma.user.findUnique({ where: { email: cleanEmail } });
-      if (user && user.isActive) {
-        await AuditService.log({
-          userId: user.id,
-          locationId: user.locationId || undefined,
-          action: 'PASSWORD_RESET_REQUESTED',
-          entityType: 'User',
-          entityId: user.id,
-          ipAddress: req.ip,
-          tags: ['auth', 'password-reset'],
-        });
-      }
-    }
-    res.json({ message: 'If an account exists with this email, password reset instructions have been sent.' });
-  } catch (error: any) {
-    console.error('Forgot password error:', error);
-    res.json({ message: 'If an account exists with this email, password reset instructions have been sent.' });
+    const status = Number.isInteger(error?.status) ? error.status : 500;
+    if (status >= 500) console.error('Change password error:', error);
+    res.status(status).json({
+      error: status === 401 ? 'Current password incorrect' : 'Failed to change password',
+      message: error?.message || 'Unable to change your password right now.',
+      code: error?.code,
+    });
   }
 });
 
