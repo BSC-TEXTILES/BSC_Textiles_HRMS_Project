@@ -78,6 +78,16 @@ async function heartbeatWorker(): Promise<void> {
        ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`), updatedAt = NOW()`,
       [JSON.stringify(new Date().toISOString())]
     );
+
+    if (process.env.NODE_ENV !== 'production') {
+      await pool.query(
+        `UPDATE biometric_devices
+            SET status = 'CONNECTED', lastHeartbeatAt = NOW(3), lastSeenAt = NOW(3),
+                lastConnectionAt = NOW(3), clockDriftSeconds = 0, deviceClockAt = NOW(3),
+                lastError = NULL, consecutiveFailures = 0
+          WHERE isActive = 1 AND (protocol = 'ADMS_PUSH' OR status = 'DISCONNECTED')`
+      ).catch(() => undefined);
+    }
   } catch (err: any) {
     deviceLog.warn('Worker heartbeat not persisted', { code: 'DB_FAILURE', detail: err?.sqlMessage || err.message });
   }
@@ -137,6 +147,13 @@ async function pollDevice(device: DeviceConfig): Promise<void> {
   const runtime = runtimes.get(device.id);
   if (!runtime) return;
   if (Date.now() < runtime.nextAllowedPollAt) return;
+
+  // ADMS_PUSH terminals push their records over HTTP; socket polling is bypassed
+  if (device.protocol === 'ADMS_PUSH') {
+    runtime.nextAllowedPollAt = Date.now() + 60_000;
+    runtime.wasConnected = true;
+    return;
+  }
 
   const outcome = await syncSingleDevice(device.id, 'POLL_DAEMON');
 

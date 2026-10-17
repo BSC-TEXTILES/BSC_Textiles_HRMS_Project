@@ -1359,7 +1359,7 @@ export async function getMismatchSummary(locationCode?: string | null): Promise<
 
   const [punchRows]: any = await pool.query(
     `SELECT COUNT(*) AS count FROM biometric_raw_punches r
-      WHERE DATE(CONVERT_TZ(r.punchTimeUtc, '+00:00', '+05:30')) = DATE(CONVERT_TZ(UTC_TIMESTAMP(), '+00:00', '+05:30'))`
+      WHERE DATE(COALESCE(r.punchTime, r.punchTimeUtc)) = CURDATE()`
   );
 
   const [mappingRows]: any = await pool.query(
