@@ -45,6 +45,7 @@ let USER_ID = `usr-unset-${UNIQUE}`;
  * the suite would then be asserting on an empty trail.
  */
 let ACTOR_ID = '';
+let CREATED_FALLBACK_ADMIN = false;
 
 function actor(overrides: Partial<CredentialActor> = {}): CredentialActor {
   return {
@@ -238,10 +239,18 @@ test('cookies', 'names and flags: HttpOnly session cookies, readable CSRF only',
 // ─── E. Database-backed flows ───────────────────────────────────────────────
 
 test('db', 'setup: create a test subject through the credential service', async () => {
-  const [admins]: any = await pool.query(
+  let [admins]: any = await pool.query(
     "SELECT `id` FROM `user` WHERE `role` IN ('ADMIN','SUPER_ADMIN') AND `isActive` = 1 ORDER BY `createdAt` ASC LIMIT 1"
   );
-  assert.ok(admins?.length, 'need an existing Admin account to act as the credential issuer');
+  if (!admins?.length) {
+    const fallbackId = `admin-fallback-${UNIQUE}`;
+    await pool.query(
+      "INSERT INTO `user` (`id`, `email`, `role`, `fullName`, `isActive`, `createdAt`, `updatedAt`) VALUES (?, ?, 'ADMIN', 'CI Admin', 1, NOW(), NOW())",
+      [fallbackId, `admin-${UNIQUE}@bsctextiles.com`]
+    );
+    admins = [{ id: fallbackId }];
+    CREATED_FALLBACK_ADMIN = true;
+  }
   ACTOR_ID = admins[0].id;
 
   const created = await createCredential(
@@ -577,6 +586,9 @@ test('db', 'teardown removes only the rows this suite created', async () => {
   await pool.query("DELETE FROM `login_attempt` WHERE `id` = 'la-travel-1'");
   await pool.query('DELETE FROM `auditlog` WHERE `entityId` = ? OR `entityId` IN (SELECT `id` FROM `user` WHERE `loginId` = ?)', [USER_ID, LOGIN_ID]);
   await pool.query('DELETE FROM `user` WHERE `id` = ? OR `loginId` = ?', [USER_ID, LOGIN_ID]);
+  if (CREATED_FALLBACK_ADMIN && ACTOR_ID) {
+    await pool.query('DELETE FROM `user` WHERE `id` = ?', [ACTOR_ID]);
+  }
   const [left]: any = await pool.query('SELECT COUNT(*) AS n FROM `user` WHERE `loginId` = ?', [LOGIN_ID]);
   assert.equal(Number(left[0].n), 0);
 });
