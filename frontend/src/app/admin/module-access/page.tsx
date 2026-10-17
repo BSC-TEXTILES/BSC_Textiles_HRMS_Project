@@ -22,11 +22,11 @@ import { cn } from '@/lib/utils';
 
 function grantsFrom(modules: MatrixModule[]): DraftGrants {
   const draft: DraftGrants = {};
-  for (const module of modules) {
-    draft[module.key] = {
-      module: module.key,
-      enabled: Boolean(module.grant?.enabled),
-      actions: { ...(module.grant?.actions || ({} as Record<RbacAction, boolean>)) },
+  for (const mod of modules) {
+    draft[mod.key] = {
+      module: mod.key,
+      enabled: Boolean(mod.grant?.enabled),
+      actions: { ...(mod.grant?.actions || ({} as Record<RbacAction, boolean>)) },
     };
   }
   return draft;
@@ -106,9 +106,9 @@ export default function ModuleAccessPage() {
   const selectedRole = roles.find((role) => role.id === roleId) || null;
 
   const isDirty = useMemo(() => {
-    for (const module of modules) {
-      const now = draft[module.key];
-      const was = baseline[module.key];
+    for (const mod of modules) {
+      const now = draft[mod.key];
+      const was = baseline[mod.key];
       if (!now || !was) return true;
       if (now.enabled !== was.enabled) return true;
       if (RBAC_ACTIONS.some((action) => Boolean(now.actions[action]) !== Boolean(was.actions[action]))) return true;

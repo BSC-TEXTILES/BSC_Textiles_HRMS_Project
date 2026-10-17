@@ -360,7 +360,10 @@ export default function InactiveEmployeesPage() {
   const SortHeader = ({ label, column, className = '' }: { label: string; column: SortKey; className?: string }) => {
     const isActive = sortKey === column;
     return (
-      <th className={`py-2.5 px-3 font-bold whitespace-nowrap ${className}`}>
+      <th
+        className={`py-2.5 px-3 font-bold whitespace-nowrap ${className}`}
+        aria-sort={isActive ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+      >
         <button
           type="button"
           onClick={() => {
@@ -371,7 +374,6 @@ export default function InactiveEmployeesPage() {
             }
           }}
           className={`inline-flex items-center gap-1 hover:text-[#1346a1] ${isActive ? 'text-[#1346a1] dark:text-sky-300' : ''}`}
-          aria-sort={isActive ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
         >
           {label}
           {isActive ? (
