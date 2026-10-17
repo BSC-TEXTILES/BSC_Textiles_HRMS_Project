@@ -155,13 +155,10 @@ jobs:
           cache: npm
       - run: npm ci
 
-      - name: Schema, migrations and seeds
+      - name: Schema and migrations
         run: |
           npm run db:schema
           npm run db:migrate
-          npm run db:seed
-          npm run db:seed:rbac-demo
-          npm run db:seed:biometric-demo
 
       - name: Typecheck
         run: npm run typecheck
