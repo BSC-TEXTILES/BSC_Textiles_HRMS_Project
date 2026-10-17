@@ -161,7 +161,7 @@ async function detectAnomaly(user: any, ip: string, userAgent: string): Promise<
       const here = networkOf(ip);
       const nearby = history.find((r: any) => {
         const when = new Date(r.createdAt).getTime();
-        return Number.isFinite(when) && Date.now() - when <= windowMs && networkOf(r.ipAddress) !== here;
+        return Number.isFinite(when) && Math.abs(Date.now() - when) <= windowMs && networkOf(r.ipAddress) !== here;
       });
       if (nearby) {
         const minutes = Math.max(1, Math.round((Date.now() - new Date(nearby.createdAt).getTime()) / 60_000));

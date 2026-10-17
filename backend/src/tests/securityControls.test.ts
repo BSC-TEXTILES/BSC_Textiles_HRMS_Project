@@ -471,10 +471,11 @@ test('db', 'a second successful sign-in from a different network raises IMPOSSIB
   await pool.query('DELETE FROM `login_attempt` WHERE `userId` = ?', [USER_ID]);
 
   // Pretend the account signed in successfully from another /24 one minute ago.
+  const pastLoginTime = new Date(Date.now() - 60_000);
   await pool.query(
     `INSERT INTO \`login_attempt\` (\`id\`, \`email\`, \`userId\`, \`ipAddress\`, \`userAgent\`, \`success\`, \`failureReason\`, \`createdAt\`)
-     VALUES ('la-travel-1', ?, ?, '203.0.113.44', 'security-suite', 1, NULL, DATE_SUB(NOW(3), INTERVAL 1 MINUTE))`,
-    [`${LOGIN_ID}@bsctextiles.com`, USER_ID]
+     VALUES ('la-travel-1', ?, ?, '203.0.113.44', 'security-suite', 1, NULL, ?)`,
+    [`${LOGIN_ID}@bsctextiles.com`, USER_ID, pastLoginTime]
   );
 
   const restore = withLoginConfig({ travelWindowMinutes: 15, captchaAfter: 99, minResponseMs: 0 });

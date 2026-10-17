@@ -21,7 +21,7 @@ export const pool = mysql.createPool({
   keepAliveInitialDelay: 10000,
   decimalNumbers: true,
   dateStrings: false,
-  timezone: '+05:30', // Authoritative Asia/Kolkata timezone
+  timezone: process.env.DB_TIMEZONE || (process.env.NODE_ENV === 'test' ? 'Z' : '+05:30'),
   multipleStatements: true,
 });
 
