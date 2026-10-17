@@ -385,8 +385,57 @@ const unitOnly = process.env.BIOMETRIC_TEST_UNIT_ONLY === '1';
   };
 
   test('db', 'setup: test device and a clean employee', async () => {
-    const [locs]: any = await pool.query("SELECT id FROM location WHERE code = 'BEL' LIMIT 1");
-    locationId = locs[0]?.id ?? null;
+    let [locs]: any = await pool.query("SELECT id FROM location WHERE code = 'BEL' LIMIT 1");
+    if (!locs || locs.length === 0) {
+      await pool.query(
+        `INSERT INTO location (id, code, name, city, state, pin, status, createdAt, updatedAt)
+         VALUES ('loc-demo-bel', 'BEL', 'Belagavi Head Store', 'Belagavi', 'Karnataka', '590001', 'ACTIVE', NOW(), NOW())
+         ON DUPLICATE KEY UPDATE code = 'BEL', status = 'ACTIVE'`
+      );
+      [locs] = await pool.query("SELECT id FROM location WHERE code = 'BEL' LIMIT 1");
+    }
+    locationId = locs[0]?.id ?? 'loc-demo-bel';
+
+    await pool.query(
+      `INSERT INTO shift (id, name, code, locationId, startTime, endTime, status, createdAt, updatedAt)
+       VALUES ('shift-demo-bel', 'General Shift (BEL)', 'DEMO_GEN_BEL', ?, '2024-01-01 09:00:00.000', '2024-01-01 18:00:00.000', 'ACTIVE', NOW(), NOW())
+       ON DUPLICATE KEY UPDATE name = VALUES(name), status = 'ACTIVE'`,
+      [locationId]
+    );
+
+    const testEmployees = [
+      { id: 'emp-demo-100201', code: '100201', first: 'Rajesh', last: 'Kumar', role: 'SALES_EMPLOYEE', desig: 'Sales Associate' },
+      { id: 'emp-demo-100202', code: '100202', first: 'Priya', last: 'Sharma', role: 'SALES_EMPLOYEE', desig: 'Senior Sales Associate' },
+      { id: 'emp-demo-100203', code: '100203', first: 'Amit', last: 'Patel', role: 'FLOOR_MANAGER', desig: 'Floor Manager' },
+      { id: 'emp-demo-100206', code: '100206', first: 'Geeta', last: 'Kulkarni', role: 'SALES_EMPLOYEE', desig: 'Cashier' },
+    ];
+    for (const emp of testEmployees) {
+      await pool.query(
+        `INSERT INTO employee (id, employeeCode, firstName, lastName, fullName, email, phone, gender,
+                               locationId, shiftId, designation, role, status, joiningDate,
+                               biometricDeviceEmployeeId, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, '+91 9800000000', 'male', ?, 'shift-demo-bel', ?, ?, 'ACTIVE', '2024-04-01 00:00:00.000', ?, NOW(), NOW())
+         ON DUPLICATE KEY UPDATE
+           employeeCode = VALUES(employeeCode),
+           biometricDeviceEmployeeId = VALUES(biometricDeviceEmployeeId),
+           locationId = VALUES(locationId),
+           shiftId = VALUES(shiftId),
+           status = 'ACTIVE'`,
+        [
+          emp.id,
+          emp.code,
+          emp.first,
+          emp.last,
+          `${emp.first} ${emp.last}`,
+          `${emp.code}@example.test`,
+          locationId,
+          emp.desig,
+          emp.role,
+          emp.code,
+        ]
+      );
+    }
+
     await pool.query(
       `INSERT INTO biometric_devices (id, serialNumber, name, model, ipAddress, port, locationCode, locationId,
                                       status, protocol, isActive, timezone, heartbeatTimeoutSeconds, commKey)
@@ -638,14 +687,15 @@ const unitOnly = process.env.BIOMETRIC_TEST_UNIT_ONLY === '1';
   test('db', 'connectivity follows the heartbeat window, not a wish', async () => {
     // Age every proof of contact past the 15s budget: this is exactly what
     // happens when a terminal is unplugged, and the badge must follow.
+    const fortySecondsAgo = new Date(Date.now() - 40_000);
     await pool.query(
       `UPDATE biometric_devices
-          SET lastHeartbeatAt = DATE_SUB(NOW(), INTERVAL 40 SECOND),
-              lastSeenAt = DATE_SUB(NOW(), INTERVAL 40 SECOND),
-              lastSyncAt = DATE_SUB(NOW(), INTERVAL 40 SECOND),
-              lastConnectionAt = DATE_SUB(NOW(), INTERVAL 40 SECOND)
+          SET lastHeartbeatAt = ?,
+              lastSeenAt = ?,
+              lastSyncAt = ?,
+              lastConnectionAt = ?
         WHERE serialNumber = ?`,
-      [SIM_SERIAL]
+      [fortySecondsAgo, fortySecondsAgo, fortySecondsAgo, fortySecondsAgo, SIM_SERIAL]
     );
     const stale = await getDeviceStatusSnapshot(SIM_SERIAL);
     assert.equal(stale.length, 1);

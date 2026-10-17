@@ -72,11 +72,18 @@ const SIMULATED_DEVICE = {
 async function main() {
   const pool = mysql.createPool({ uri, multipleStatements: true, timezone: '+05:30' });
 
-  const [locations]: any = await pool.query('SELECT id, code FROM location');
+  let [locations]: any = await pool.query('SELECT id, code FROM location');
   if (locations.length === 0) {
-    console.error('❌ No locations found. Run `npm run db:seed` (01_locations_and_organization.sql) first.');
-    await pool.end();
-    process.exit(1);
+    console.log('— Baseline locations missing; provisioning BEL, DAV, SHI...');
+    await pool.query(
+      `INSERT INTO location (id, code, name, city, state, pin, status, createdAt, updatedAt)
+       VALUES
+         ('loc-demo-bel', 'BEL', 'Belagavi Head Store', 'Belagavi', 'Karnataka', '590001', 'ACTIVE', NOW(), NOW()),
+         ('loc-demo-dav', 'DAV', 'Davanagere Mega Store', 'Davanagere', 'Karnataka', '577001', 'ACTIVE', NOW(), NOW()),
+         ('loc-demo-shi', 'SHI', 'Shivamogga Flagship', 'Shivamogga', 'Karnataka', '577201', 'ACTIVE', NOW(), NOW())
+       ON DUPLICATE KEY UPDATE name = VALUES(name), status = 'ACTIVE'`
+    );
+    [locations] = await pool.query('SELECT id, code FROM location');
   }
   const locationIdByCode = new Map<string, string>(locations.map((l: any) => [l.code, l.id]));
 

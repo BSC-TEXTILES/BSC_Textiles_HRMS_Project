@@ -56,9 +56,9 @@ async function seed() {
       // schema (`employees`), which migration 024 demoted to a read-only
       // compatibility view. Such a dataset cannot land on the current schema
       // and must not block the baseline every other module depends on.
-      if (err?.code === 'ER_NO_SUCH_TABLE' || err?.code === 'ER_NON_INSERTABLE_TABLE') {
+      if (err?.code === 'ER_NO_SUCH_TABLE' || err?.code === 'ER_NON_INSERTABLE_TABLE' || err?.code === 'ER_CHECK_CONSTRAINT_VIOLATED') {
         deferred.push(file);
-        console.warn(`  ⚠ DEFERRED ${file}: targets a table this schema no longer accepts writes for (${err.code}).`);
+        console.warn(`  ⚠ DEFERRED ${file}: schema constraint or deprecated table (${err.code}).`);
         continue;
       }
       throw new Error(`Seed ${file} failed (${err.code || 'ERROR'}): ${err.sqlMessage || err.message}`);

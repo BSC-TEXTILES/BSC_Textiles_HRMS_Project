@@ -234,12 +234,13 @@ export async function recordDeviceHeartbeat(sn: string, remoteIp?: string): Prom
     return {};
   }
 
+  const now = new Date();
   await pool.query(
     `UPDATE biometric_devices
-        SET status = 'CONNECTED', lastConnectionAt = NOW(), lastHeartbeatAt = NOW(),
-            lastSeenAt = NOW(), lastError = NULL, consecutiveFailures = 0, nextRetryAt = NULL
+        SET status = 'CONNECTED', lastConnectionAt = ?, lastHeartbeatAt = ?,
+            lastSeenAt = ?, lastError = NULL, consecutiveFailures = 0, nextRetryAt = NULL
       WHERE id = ?`,
-    [device.id]
+    [now, now, now, device.id]
   );
 
   const nowIso = new Date().toISOString();
