@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense, useMemo } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { signIn, useSession, getSession } from 'next-auth/react';
+import { signIn, useSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -38,16 +38,6 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
-const AUTH_COOKIE_NAMES = ['token', 'bsc_token'];
-
-function clearAuthCookies() {
-  if (typeof document === 'undefined') return;
-  for (const name of AUTH_COOKIE_NAMES) {
-    document.cookie = `${name}=; path=/; max-age=0; SameSite=Lax`;
-    document.cookie = `${name}=; path=/; max-age=0`;
-  }
-}
-
 /** Seeded authorized roles for test validation */
 const QUICK_TEST_ACCOUNTS = [
   {
@@ -77,6 +67,11 @@ function LoginFormContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedAccountEmail, setSelectedAccountEmail] = useState<string | null>(null);
+  const [captcha, setCaptcha] = useState<{ captchaId: string; svg: string } | null>(null);
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const [lockSecondsLeft, setLockSecondsLeft] = useState(0);
+  const [mfaChallenge, setMfaChallenge] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
 
   // Safe same-origin redirect
   const callbackUrl = useMemo(
@@ -84,16 +79,24 @@ function LoginFormContent() {
     [searchParams, session?.user?.role]
   );
 
-  // Auto-redirect ONLY if visiting /login directly with an active, valid token (no callback redirect in progress)
+  // The old build kept a bearer token in localStorage. Clearing it here means a
+  // returning user cannot be mistaken for signed-in by any leftover code path.
   useEffect(() => {
-    const hasCallback = searchParams.get('callbackUrl');
-    if (hasCallback) return;
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem('bsc_token');
+    localStorage.removeItem('token');
+    localStorage.removeItem('bsc_user');
+    for (const name of ['token', 'bsc_token']) {
+      document.cookie = `${name}=; path=/; max-age=0`;
+    }
+  }, []);
 
+  // Auto-redirect only when NextAuth reports a live session and the backend
+  // agrees (the cookie is what actually authorises requests).
+  useEffect(() => {
+    if (searchParams.get('callbackUrl')) return;
     if (status === 'authenticated' && session?.user) {
-      const localToken = typeof window !== 'undefined' ? (localStorage.getItem('bsc_token') || localStorage.getItem('token')) : null;
-      if (localToken) {
-        window.location.href = getRoleHomePath(session.user.role);
-      }
+      window.location.href = getRoleHomePath(session.user.role);
     }
   }, [status, searchParams, session]);
 
@@ -109,102 +112,120 @@ function LoginFormContent() {
     mode: 'onTouched',
   });
 
-  const clearStoredCredentials = () => {
-    if (typeof window === 'undefined') return;
-    localStorage.removeItem('bsc_token');
-    localStorage.removeItem('token');
-    localStorage.removeItem('bsc_user');
-    clearAuthCookies();
-  };
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api';
 
+  /** Live countdown; the backend refuses attempts during the cooldown anyway. */
+  useEffect(() => {
+    if (lockSecondsLeft <= 0) return;
+    const timer = setInterval(() => setLockSecondsLeft((seconds) => Math.max(0, seconds - 1)), 1000);
+    return () => clearInterval(timer);
+  }, [lockSecondsLeft]);
+
+  async function loadCaptcha() {
+    try {
+      const response = await fetch(`${apiBase}/session/captcha`, { credentials: 'include', cache: 'no-store' });
+      const data = await response.json();
+      if (data?.captchaId) {
+        setCaptcha({ captchaId: data.captchaId, svg: data.svg });
+        setCaptchaAnswer('');
+      }
+    } catch {
+      /* the challenge is optional until the server asks for one */
+    }
+  }
+
+  const finishSignIn = async (ticket: string, fallbackRole?: string) => {
+    const result = await signIn('credentials', { ticket, redirect: false });
+    if (result?.error) {
+      const message =
+        result.error === 'CredentialsSignin' ? 'Your session could not be established. Please try again.' : result.error;
+      setErrorMessage(message);
+      toast.error(message);
+      return;
+    }
+    toast.success('Signed in successfully');
+    window.location.href = sanitizeCallbackUrl(searchParams.get('callbackUrl'), getRoleHomePath(fallbackRole));
+  };
 
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
-      // Direct authenticate with backend to ensure the token is immediately cached
-      let directToken: string | null = null;
-      let directUser: any = null;
-      try {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL || (typeof window !== 'undefined' ? '/api' : 'http://localhost:4000/api');
-        const loginRes = await fetch(`${apiUrl}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: data.email, password: data.password }),
-        });
-        const rawText = await loginRes.text().catch(() => '');
-        const loginData = safeJsonParse<any>(rawText, {});
-        if (loginRes.status === 429) {
-          const rateMsg = loginData?.message || 'Rate limit reached: Maximum 10 attempts in 1 minute allowed. Please wait before retrying.';
-          clearStoredCredentials();
-          setErrorMessage(rateMsg);
-          toast.error(rateMsg);
-          setIsLoading(false);
-          return;
-        }
-        if (loginRes.ok && loginData?.token) {
-          directToken = loginData.token;
-          directUser = loginData.user;
-          localStorage.setItem('bsc_token', loginData.token);
-          localStorage.setItem('token', loginData.token);
-          if (loginData.user) {
-            localStorage.setItem('bsc_user', JSON.stringify(loginData.user));
-          }
-          document.cookie = `token=${encodeURIComponent(loginData.token)}; path=/; max-age=604800; SameSite=Lax`;
-          document.cookie = `bsc_token=${encodeURIComponent(loginData.token)}; path=/; max-age=604800; SameSite=Lax`;
-        }
-      } catch (directErr) {
-        // Non-fatal, NextAuth will perform primary verification
-      }
-
-      // 1. NextAuth credentials sign-in for RBAC session cookies
-      const result = await signIn('credentials', {
-        email: data.email,
-        password: data.password,
-        redirect: false,
+      const response = await fetch(`${apiBase}/session/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          identifier: data.email.trim(),
+          password: data.password,
+          captchaId: captcha?.captchaId,
+          captchaAnswer: captchaAnswer || undefined,
+        }),
       });
+      const payload = safeJsonParse<any>(await response.text(), {});
 
-      if (result?.error) {
-        const errorMsg =
-          result.error === 'CredentialsSignin' || result.error.includes('Credentials')
-            ? 'Invalid email or password. Please verify your credentials and try again.'
-            : result.error;
-        clearStoredCredentials();
-        setErrorMessage(errorMsg);
-        toast.error(errorMsg);
+      if (response.status === 202 && payload?.challengeId) {
+        setMfaChallenge(payload.challengeId);
+        setErrorMessage(null);
+        toast('Enter the code from your authenticator app.', { icon: '🔐' });
         return;
       }
 
-      // 2. Success → sync fresh session tokens and cookies
-      toast.success('Signed in successfully');
-      let landing = '/dashboard';
-      try {
-        const freshSession = await getSession();
-        const effectiveToken = freshSession?.token || directToken;
-        if (effectiveToken) {
-          localStorage.setItem('bsc_token', effectiveToken);
-          localStorage.setItem('token', effectiveToken);
-          const effectiveUser = freshSession?.user || directUser;
-          if (effectiveUser) {
-            localStorage.setItem('bsc_user', JSON.stringify(effectiveUser));
-          }
-          document.cookie = `token=${encodeURIComponent(effectiveToken)}; path=/; max-age=604800; SameSite=Lax`;
-          document.cookie = `bsc_token=${encodeURIComponent(effectiveToken)}; path=/; max-age=604800; SameSite=Lax`;
+      if (response.ok && payload?.ticket) {
+        setLockSecondsLeft(0);
+        setCaptcha(null);
+        if (payload.mustChangePassword) {
+          await finishSignIn(payload.ticket, payload.user?.role);
+          window.location.href = '/change-password?forced=1';
+          return;
         }
-        landing = sanitizeCallbackUrl(
-          searchParams.get('callbackUrl'),
-          getRoleHomePath(freshSession?.user?.role || directUser?.role)
-        );
-      } catch {
-        landing = '/dashboard';
+        await finishSignIn(payload.ticket, payload.user?.role);
+        return;
       }
 
-      window.location.href = landing;
+      // Every failure path refreshes the challenge: it is single-use, so a
+      // retry without a fresh one would simply fail again.
+      if (payload?.locked || response.status === 429) {
+        setLockSecondsLeft(Number(payload?.retryAfterSeconds || 180));
+        setErrorMessage(
+          `Too many failed attempts. This sign-in is blocked for ${payload?.retryAfterSeconds || 180} seconds.`
+        );
+      } else {
+        setErrorMessage(payload?.message || 'Invalid credentials. Check your login ID and password.');
+      }
+
+      if (payload?.captchaRequired) await loadCaptcha();
+      else if (captcha) await loadCaptcha();
     } catch {
-      const message = 'Authentication service encountered an issue. Please try again.';
+      const message = 'The authentication service is unreachable. Start the API on port 4000 and try again.';
       setErrorMessage(message);
       toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const submitMfa = async () => {
+    if (!mfaChallenge || !mfaCode.trim()) return;
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${apiBase}/session/mfa/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ challengeId: mfaChallenge, code: mfaCode.trim() }),
+      });
+      const payload = safeJsonParse<any>(await response.text(), {});
+      if (response.ok && payload?.ticket) {
+        setMfaChallenge(null);
+        await finishSignIn(payload.ticket, payload.user?.role);
+        return;
+      }
+      setErrorMessage(payload?.message || 'That code was not accepted.');
+      if (payload?.error === 'Invalid credentials') setMfaChallenge(null);
+    } catch {
+      setErrorMessage('Verification failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -298,13 +319,9 @@ function LoginFormContent() {
                 <label htmlFor="password" className="block text-xs font-semibold text-gray-700 dark:text-white">
                   Password
                 </label>
-                <button
-                  type="button"
-                  onClick={() => toast('Please contact HR / IT Administrator to reset your password.', { icon: '🔐' })}
-                  className="text-[11px] font-medium text-[#0058be] dark:text-blue-400 hover:underline focus:outline-none"
-                >
-                  Forgot password?
-                </button>
+                <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  Forgot it? Ask your Admin
+                </span>
               </div>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
@@ -354,10 +371,97 @@ function LoginFormContent() {
               <span className="text-[11px] text-slate-400 font-medium">Secured Session</span>
             </div>
 
+            {/* Cooldown countdown — attempts are refused until it reaches zero */}
+            {lockSecondsLeft > 0 && (
+              <div
+                role="status"
+                aria-live="polite"
+                className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50/90 dark:bg-amber-950/40 dark:border-amber-900/60 px-3 py-2.5"
+              >
+                <span className="text-[11px] font-semibold text-amber-800 dark:text-amber-300">
+                  Too many attempts. Try again in
+                </span>
+                <span className="tabular-nums text-sm font-bold text-amber-900 dark:text-amber-200">
+                  {String(Math.floor(lockSecondsLeft / 60)).padStart(2, '0')}:
+                  {String(lockSecondsLeft % 60).padStart(2, '0')}
+                </span>
+              </div>
+            )}
+
+            {/* CAPTCHA challenge, demanded after repeated failures */}
+            {captcha && !mfaChallenge && (
+              <div className="space-y-2 rounded-lg border border-gray-200 dark:border-slate-700 p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-gray-700 dark:text-slate-200">
+                    Enter the characters shown
+                  </span>
+                  <button
+                    type="button"
+                    onClick={loadCaptcha}
+                    className="text-[11px] font-medium text-[#0058be] dark:text-blue-400 hover:underline"
+                  >
+                    New challenge
+                  </button>
+                </div>
+                <div
+                  className="rounded-md border border-gray-200 dark:border-slate-700 overflow-hidden bg-white"
+                  aria-hidden="true"
+                  dangerouslySetInnerHTML={{ __html: captcha.svg }}
+                />
+                <input
+                  value={captchaAnswer}
+                  onChange={(event) => setCaptchaAnswer(event.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                  maxLength={6}
+                  placeholder="Case-insensitive"
+                  className="w-full h-9 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-[#1A1D24] px-3 text-xs uppercase tracking-[0.2em] outline-none focus:ring-2 focus:ring-[#0058be]/20 focus:border-[#0058be]"
+                />
+              </div>
+            )}
+
+            {/* Second factor */}
+            {mfaChallenge && (
+              <div className="space-y-2 rounded-lg border border-blue-200 bg-blue-50/70 dark:bg-blue-950/30 dark:border-blue-900/60 p-3">
+                <label htmlFor="mfa-code" className="block text-[11px] font-semibold text-blue-900 dark:text-blue-200">
+                  Authenticator code or backup code
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="mfa-code"
+                    value={mfaCode}
+                    onChange={(event) => setMfaCode(event.target.value)}
+                    inputMode="text"
+                    autoComplete="one-time-code"
+                    placeholder="123456"
+                    className="flex-1 h-9 rounded-lg border border-gray-300 dark:border-slate-700 bg-white dark:bg-[#1A1D24] px-3 text-xs tracking-[0.2em] outline-none focus:ring-2 focus:ring-[#0058be]/20"
+                  />
+                  <button
+                    type="button"
+                    onClick={submitMfa}
+                    disabled={isLoading || !mfaCode.trim()}
+                    className="h-9 px-3 rounded-lg bg-[#0058be] text-white text-xs font-semibold disabled:opacity-60"
+                  >
+                    Verify
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMfaChallenge(null);
+                    setMfaCode('');
+                  }}
+                  className="text-[11px] font-medium text-slate-500 hover:underline"
+                >
+                  Cancel and sign in again
+                </button>
+              </div>
+            )}
+
             {/* Primary Login Button */}
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || lockSecondsLeft > 0 || Boolean(mfaChallenge)}
               className="w-full h-10 mt-2 rounded-lg bg-[#0058be] hover:bg-[#0047a0] text-white text-xs font-semibold shadow-xs flex items-center justify-center gap-2 transition-all active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
             >
               {isLoading ? (
@@ -411,11 +515,25 @@ function LoginFormContent() {
         </div>
 
         {/* System Integrity & Legal Footer */}
-        <div className="mt-5 text-center space-y-1">
+        <div className="mt-5 text-center space-y-2">
           <div className="flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-slate-400">
             <ShieldCheck className="w-3.5 h-3.5 text-[#0058be] dark:text-blue-400" aria-hidden="true" />
-            <span>Role-Based Access Control • TLS 1.3 Encryption</span>
+            <span>Role-Based Access Control • Argon2id • HttpOnly Sessions</span>
           </div>
+          <nav aria-label="Legal" className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10px]">
+            <Link href="/privacy-policy" className="text-slate-500 hover:text-[#0058be] dark:text-slate-400 underline-offset-2 hover:underline">
+              Privacy Policy
+            </Link>
+            <Link href="/terms-of-use" className="text-slate-500 hover:text-[#0058be] dark:text-slate-400 underline-offset-2 hover:underline">
+              Terms of Use
+            </Link>
+            <Link href="/cookie-policy" className="text-slate-500 hover:text-[#0058be] dark:text-slate-400 underline-offset-2 hover:underline">
+              Cookie Policy
+            </Link>
+            <Link href="/data-retention" className="text-slate-500 hover:text-[#0058be] dark:text-slate-400 underline-offset-2 hover:underline">
+              Data Retention
+            </Link>
+          </nav>
           <p className="text-[10px] text-slate-400">
             © {new Date().getFullYear()} BSC Textiles Pvt. Ltd. • Karnataka Retail Network
           </p>

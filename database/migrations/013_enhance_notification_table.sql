@@ -69,10 +69,15 @@ CREATE TABLE `notification_policy` (
   `deduplicationWindowMinutes` int NOT NULL DEFAULT '60',
   `aggregationRule` varchar(191) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `createdAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-  `updatedAt` datetime(3) NOT NULL,
+  `updatedAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   PRIMARY KEY (`id`),
   UNIQUE KEY `NotificationPolicy_eventId_key` (`eventId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- The baseline schema.sql created this table with `updatedAt` NOT NULL and no
+-- default, which made the policy seed below abort on every fresh install.
+ALTER TABLE `notification_policy`
+  MODIFY COLUMN `updatedAt` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3);
 
 -- Insert default notification policies
 INSERT INTO `notification_policy` (`id`, `eventId`, `name`, `description`, `defaultSeverity`, `defaultChannels`, `mandatoryChannels`, `recipientRoles`, `enabled`, `deduplicationWindowMinutes`) VALUES

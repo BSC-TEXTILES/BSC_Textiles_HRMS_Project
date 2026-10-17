@@ -10,7 +10,9 @@
     "db:seed": "tsx scripts/seed.ts",
     "db:setup": "tsx scripts/migrate.ts && tsx scripts/seed.ts",
     "db:schema": "tsx scripts/schema.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "db:seed:biometric-demo": "tsx scripts/seedBiometricDemo.ts",
+    "db:seed:rbac-demo": "tsx scripts/seedRbacDemo.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

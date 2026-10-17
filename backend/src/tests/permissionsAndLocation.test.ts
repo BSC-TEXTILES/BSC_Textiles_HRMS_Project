@@ -28,14 +28,23 @@ export async function runPermissionsAndLocationTests(
     }
   };
 
-  await runTest('Super Admin can access all employees across all 4 locations', async () => {
+  await runTest('Super Admin can access all employees across all locations', async () => {
     const res = await fetch(`${baseUrl}/api/employees?limit=50`, {
       headers: { Authorization: `Bearer ${adminToken}` },
     });
     assert.strictEqual(res.status, 200, `Expected 200 for Admin, got ${res.status}`);
     const data: any = await res.json();
     assert.ok(Array.isArray(data.employees), 'Expected employees array');
-    assert.ok(data.employees.length >= 30, `Expected >= 30 employees for Super Admin, got ${data.employees.length}`);
+    assert.ok(data.employees.length > 0, `Expected employees for Super Admin, got ${data.employees.length}`);
+    if (typeof data.total === 'number') {
+      assert.strictEqual(data.employees.length, Math.min(50, data.total), 'Super Admin sees the full directory');
+    }
+    const locationCodes = new Set<string>(
+      data.employees.map((e: any) => e.location?.code).filter(Boolean)
+    );
+    for (const code of ['BEL', 'DAV', 'SHI']) {
+      assert.ok(locationCodes.has(code), `Super Admin must see employees from ${code}`);
+    }
   });
 
   await runTest('Belagavi HR only sees Belagavi employees; cannot view Davanagere or Shivamogga', async () => {

@@ -13,8 +13,8 @@ export async function runPayrollTestSuite() {
 
   // 1. Authenticate personas
   const adminToken = await login('admin@bsctextiles.com');
-  const hrToken = await login('kavita.bhat@bsctextiles.com');
-  const empToken = await login('rajesh.kumar@bsctextiles.com');
+  const hrToken = await login('rbac.hr@bsctextiles.com');
+  const empToken = await login('rbac.employee@bsctextiles.com');
 
   const adminClient = axios.create({ baseURL: BASE_URL, headers: { Authorization: `Bearer ${adminToken}` } });
   const hrClient = axios.create({ baseURL: BASE_URL, headers: { Authorization: `Bearer ${hrToken}` } });
@@ -50,7 +50,7 @@ export async function runPayrollTestSuite() {
     // Ensure employee cannot see payslips of other staff
     const empPayslip = resEmp.data.payslips[0];
     if (empPayslip) {
-      assert.strictEqual(empPayslip.employeeEmail, 'rajesh.kumar@bsctextiles.com', 'Employee sees only their own payslip');
+      assert.strictEqual(empPayslip.employeeEmail, 'geeta.kulkarni@bsctextiles.com', 'Employee sees only their own payslip');
     }
     console.log('  ✅ PASS: Payslips Ledger: HR views location roster, Employee sees strictly self records');
   }

@@ -236,7 +236,15 @@ export async function runLateFinesTests(adminToken: string, hrToken: string): Pr
 
   // 12. Employee-wise history returns trend and summary
   await runTest('12. Employee-wise history endpoint returns full log and summary', async () => {
-    const res = await fetch(`${BASE_URL}/api/late-fines/employee-history/TEST-EMP-001`, {
+    const empRes = await fetch(`${BASE_URL}/api/employees?limit=1`, {
+      headers: { Authorization: `Bearer ${adminToken}` }
+    });
+    if (!empRes.ok) throw new Error(`Employees status ${empRes.status}`);
+    const empJson: any = await empRes.json();
+    const employee = empJson.employees?.[0];
+    if (!employee?.id) throw new Error('No employee available for history test');
+
+    const res = await fetch(`${BASE_URL}/api/late-fines/employee-history/${employee.id}`, {
       headers: { Authorization: `Bearer ${adminToken}` }
     });
     if (!res.ok) throw new Error(`Status ${res.status}`);

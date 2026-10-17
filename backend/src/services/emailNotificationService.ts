@@ -59,6 +59,21 @@ export class EmailNotificationService {
   }
 
   /**
+   * Public entry point for the security layer's own notifications (lockouts,
+   * credential changes, token reuse). Returns false rather than throwing so a
+   * dead SMTP relay cannot fail the request that triggered it.
+   */
+  public static async sendSecurityAlert(options: {
+    to: string;
+    subject: string;
+    text: string;
+    html: string;
+  }): Promise<boolean> {
+    if (!options.to) return false;
+    return await this.send(options);
+  }
+
+  /**
    * Send Email Verification Link
    */
   public static async sendEmailVerification(params: {

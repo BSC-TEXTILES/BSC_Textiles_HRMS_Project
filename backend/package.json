@@ -9,7 +9,17 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "test": "tsx src/tests/runAllTests.ts",
-    "benchmark": "tsx src/tests/benchmarkApis.ts"
+    "benchmark": "tsx src/tests/benchmarkApis.ts",
+    "worker": "tsx src/workers/biometricWorker.ts",
+    "worker:supervised": "tsx src/workers/superviseWorker.ts",
+    "device:simulator": "tsx src/tools/mb160Simulator.ts",
+    "test:biometric": "tsx src/tests/biometricCorrectness.test.ts",
+    "diagnose": "tsx src/tools/diagnose.ts",
+    "test:rbac": "tsx src/tests/rbacAccess.test.ts",
+    "test:security": "tsx src/tests/securityControls.test.ts",
+    "test:live": "tsx src/tests/liveActivities.test.ts",
+    "provision:hiring-shards": "tsx src/scripts/provisionHiringShards.ts",
+    "seed:hiring-demo": "tsx src/scripts/seedHiringDemo.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^1.7.0",
@@ -24,6 +34,7 @@
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.1.0",
+    "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "mysql2": "^3.24.5",

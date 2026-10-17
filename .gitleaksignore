@@ -1,0 +1,3 @@
+# Gitleaks ignore file
+# Format: [commit-sha]:[path]:[rule-id]:[line]
+6339d11a9f2d11aba0335c6fda5cbdc7a371d785:.github/workflows/ci.yml:generic-api-key:144

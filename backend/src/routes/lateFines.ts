@@ -3,6 +3,7 @@ import { pool } from '../db.js';
 import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 import { socketIO } from '../socket.js';
 import { safeJsonParse } from '../utils/safeJson.js';
+import { businessDateOf } from '../services/workforceEvents.js';
 
 const router = Router();
 
@@ -70,9 +71,11 @@ router.get('/dashboard', authorize('VIEW'), async (req: AuthRequest, res) => {
         params.push(String(endDate).split('T')[0]);
       }
     } else {
-      // Default to 2026-10-11 if none specified, but never override if specified
+      // Default to today in the business timezone. The literal '2026-10-11'
+      // that used to sit here meant the dashboard quietly showed a fixed
+      // historical day whenever the caller omitted ?date=.
       conditions.push('lar.recordDate = ?');
-      params.push('2026-10-11');
+      params.push(businessDateOf());
     }
 
     const whereClause = conditions.join(' AND ');

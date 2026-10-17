@@ -1,5 +1,5 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
-import { getSession, signOut } from 'next-auth/react';
+import { signOut } from 'next-auth/react';
 
 const api = axios.create({
   baseURL:
@@ -16,118 +16,112 @@ const api = axios.create({
   },
 });
 
-let sessionToken: string | null = null;
-let inFlightSessionPromise: Promise<any> | null = null;
-
-function getStoredToken(): string | null {
-  if (typeof window === 'undefined') return null;
-
-  const local = localStorage.getItem('bsc_token') || localStorage.getItem('token');
-  if (local) return local;
-
-  // Check document cookie as fallback
-  const match = document.cookie.match(/(?:^|;\s*)token=([^;]+)/);
-  if (match && match[1]) {
-    try {
-      const decoded = decodeURIComponent(match[1]);
-      localStorage.setItem('bsc_token', decoded);
-      return decoded;
-    } catch {
-      return match[1];
-    }
-  }
-
-  return null;
+/**
+ * Authentication is carried entirely by HttpOnly cookies set by
+ * `POST /api/session/login`. Nothing here reads a token from
+ * localStorage: a script-readable token turns any XSS on the dashboard into a
+ * session hijack, and it cannot be revoked before the page reloads.
+ *
+ * The only value mirrored into a readable cookie is the CSRF token, which the
+ * double-submit pattern requires the client to send back as a header.
+ */
+function csrfHeader(): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+  return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
-async function resolveSession(): Promise<any> {
-  if (typeof window === 'undefined') return null;
-  if (!inFlightSessionPromise) {
-    inFlightSessionPromise = getSession()
-      .catch(() => null)
-      .finally(() => {
-        inFlightSessionPromise = null;
-      });
-  }
-  return inFlightSessionPromise;
-}
+const ABSOLUTE_SESSION_SECONDS = 8 * 60 * 60;
 
 let isRedirecting = false;
+let refreshInFlight: Promise<boolean> | null = null;
 
-api.interceptors.request.use(async (config) => {
-  let token = getStoredToken() || sessionToken;
-
-  if (!token) {
-    const session = await resolveSession();
-    if (session?.token) {
-      token = session.token;
-      sessionToken = session.token;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('bsc_token', session.token);
-        localStorage.setItem('token', session.token);
-      }
-    }
-  } else if (!sessionToken) {
-    sessionToken = token;
+/**
+ * Exchanges the refresh cookie for a new token pair. Single-flight: fifty
+ * components that all observe the same 401 trigger one refresh, not fifty.
+ */
+function refreshSession(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = axios
+      .post(`${api.defaults.baseURL}/session/refresh`, {}, { withCredentials: true, timeout: 10000 })
+      .then((response) => {
+        if (response.data?.csrfToken && typeof document !== 'undefined') {
+          document.cookie = `csrf_token=${response.data.csrfToken}; path=/; max-age=${ABSOLUTE_SESSION_SECONDS}; SameSite=Strict`;
+        }
+        return true;
+      })
+      .catch(() => false)
+      .finally(() => {
+        refreshInFlight = null;
+      });
   }
+  return refreshInFlight;
+}
 
-  if (token) {
-    if (config.headers && typeof (config.headers as any).set === 'function') {
-      (config.headers as any).set('Authorization', `Bearer ${token}`);
-    }
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-
-  // Generate correlation ID for request tracing
+api.interceptors.request.use((config) => {
   if (!config.headers['x-correlation-id']) {
     config.headers['x-correlation-id'] = `req-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
   }
 
-  // Attach CSRF header for double-submit cookie validation if present
-  if (typeof document !== 'undefined') {
-    const csrfMatch = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
-    if (csrfMatch && csrfMatch[1]) {
-      config.headers['x-csrf-token'] = decodeURIComponent(csrfMatch[1]);
-    }
+  const csrf = csrfHeader();
+  if (csrf) {
+    config.headers['x-csrf-token'] = csrf;
   }
 
   return config;
 });
+
+function beginSignOut(): void {
+  if (typeof window === 'undefined' || isRedirecting) return;
+  const pathname = window.location.pathname;
+  if (pathname.startsWith('/login') || pathname.startsWith('/403')) return;
+  isRedirecting = true;
+  signOut({ redirect: false })
+    .catch(() => undefined)
+    .finally(() => {
+      window.location.href = `/login?callbackUrl=${encodeURIComponent(pathname + window.location.search)}`;
+    });
+}
 
 api.interceptors.response.use(
   (response) => {
     isRedirecting = false;
     return response;
   },
-  (error) => {
-    if (error.response?.status === 401 && typeof window !== 'undefined') {
-      const pathname = window.location.pathname;
+  async (error) => {
+    const status = error.response?.status;
+    const config = error.config;
 
-      // DO NOT clear tokens or loop redirect if we are already on the login or 403 page
+    if (status === 401 && config && !config._retriedAfterRefresh) {
+      const pathname = typeof window !== 'undefined' ? window.location.pathname : '';
       if (pathname.startsWith('/login') || pathname.startsWith('/403')) {
         error.isHandled401 = true;
         return Promise.reject(error);
       }
-
-      sessionToken = null;
-      localStorage.removeItem('bsc_token');
-      localStorage.removeItem('token');
-      localStorage.removeItem('bsc_user');
-      document.cookie = 'token=; path=/; max-age=0';
-      document.cookie = 'bsc_token=; path=/; max-age=0';
-
-      if (!pathname.startsWith('/login') && !isRedirecting) {
-        isRedirecting = true;
-        signOut({ redirect: false }).finally(() => {
-          const redirectTarget = `/login?callbackUrl=${encodeURIComponent(pathname + window.location.search)}`;
-          window.location.href = redirectTarget;
-        });
+      config._retriedAfterRefresh = true;
+      if (await refreshSession()) {
+        try {
+          return await api(config);
+        } catch (retryError) {
+          beginSignOut();
+          throw retryError;
+        }
       }
+      beginSignOut();
       error.isHandled401 = true;
+      return Promise.reject(error);
+    }
+
+    // An outstanding temporary password locks the API; the change-password
+    // screen is the only place that can clear it.
+    if (status === 403 && error.response?.data?.code === 'PASSWORD_CHANGE_REQUIRED' && typeof window !== 'undefined') {
+      if (!window.location.pathname.startsWith('/change-password')) {
+        window.location.href = '/change-password?forced=1';
+      }
+      error.isHandled403 = true;
     }
 
     // Transparent retry for transient network dropouts / server reload
-    const config = error.config;
     if (
       !error.response &&
       config &&

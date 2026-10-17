@@ -1,7 +1,20 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../index.js';
+import { pool } from '../nativeDb.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
+import { requireRoleLifecycle } from '../middleware/rbac.js';
+import {
+  entriesFromLegacyLevels,
+  writeRolePermissions,
+  deleteRole as deleteRoleViaService,
+  RbacConflictError,
+  RbacForbiddenError,
+  RbacNotFoundError,
+  RbacValidationError,
+  type Actor,
+} from '../services/rbacAdmin.js';
+import { invalidateAccessCaches } from '../services/accessControl.js';
 import {
   RBAC_MODULES,
   ACCESS_LEVELS,
@@ -97,6 +110,7 @@ router.put('/user/:userId', authorize('CONFIGURE'), async (req: AuthRequest, res
     });
 
     invalidateUserAccessCache(userId).catch(() => {});
+    invalidateAccessCaches(userId);
     res.json({ message: 'User role & permissions updated successfully', user });
   } catch (error) {
     console.error('Update user role error:', error);
@@ -127,16 +141,55 @@ function generateId(prefix: string): string {
   return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** Only Super Admins (legacy) or MANAGE holders may administer roles. */
-function requireRoleAdmin(req: AuthRequest, res: any, next: any) {
-  if (!req.user) return res.status(401).json({ error: 'Authentication required' });
-  if (!canManageRoles(req.user.role, req.user.permissions)) {
-    return res.status(403).json({
-      error: 'Forbidden: only Super Admin can manage roles',
-      message: 'Only Super Admin can create, edit or delete roles.',
-    });
+/**
+ * Role lifecycle is Super Admin work — the literal 'MANAGE' token used to open
+ * this door to any account holding it, which is exactly the escalation the
+ * Super Admin / Admin split is meant to prevent. Module-access writes live on
+ * /api/access/module-access and are Admin-gated instead.
+ */
+const requireRoleAdmin = requireRoleLifecycle;
+
+function actorOf(req: AuthRequest): Actor {
+  return {
+    id: req.user!.id,
+    role: req.user!.role,
+    locationId: req.user!.locationId,
+    ip: req.ip || req.socket.remoteAddress || '127.0.0.1',
+    userAgent: (req.headers['user-agent'] as string) || 'Client',
+    canManageRoles: Boolean(req.access?.canManageRoles ?? canManageRoles(req.user!.role, req.user!.permissions)),
+    canAssignModuleAccess: Boolean(req.access?.canAssignModuleAccess),
+  };
+}
+
+function rbacFail(res: any, error: any): boolean {
+  if (error instanceof RbacValidationError) {
+    res.status(400).json({ error: error.message });
+    return true;
   }
-  next();
+  if (error instanceof RbacConflictError) {
+    res.status(409).json({ error: error.message });
+    return true;
+  }
+  if (error instanceof RbacForbiddenError) {
+    res.status(403).json({ error: error.message });
+    return true;
+  }
+  return false;
+}
+
+/** Runs `fn` on a dedicated connection inside a transaction. */
+async function inTransaction(fn: (conn: any) => Promise<void>): Promise<void> {
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    await fn(conn);
+    await conn.commit();
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 }
 
 /**
@@ -227,13 +280,10 @@ router.post('/rbac/roles', requireRoleAdmin, async (req: AuthRequest, res) => {
       },
     });
 
-    await prisma.rolePermission.createMany({
-      data: MODULE_KEYS.map((m) => ({
-        id: generateId('rp_'),
-        roleId: role.id,
-        module: m,
-        accessLevel: normalized[m],
-      })),
+    // Written through the shared helper so `accessLevel` and the per-action
+    // booleans can never disagree.
+    await inTransaction(async (conn) => {
+      await writeRolePermissions(conn, role.id, entriesFromLegacyLevels(normalized));
     });
 
     await prisma.auditLog.create({
@@ -303,14 +353,8 @@ router.patch('/rbac/roles/:id', requireRoleAdmin, async (req: AuthRequest, res) 
     });
 
     if (normalized) {
-      await prisma.rolePermission.deleteMany({ where: { roleId: id } });
-      await prisma.rolePermission.createMany({
-        data: MODULE_KEYS.map((m) => ({
-          id: generateId('rp_'),
-          roleId: id,
-          module: m,
-          accessLevel: normalized![m],
-        })),
+      await inTransaction(async (conn) => {
+        await writeRolePermissions(conn, id, entriesFromLegacyLevels(normalized!));
       });
       // Every permission change must be visible to affected users quickly.
       const holders = await prisma.userRole.findMany({ where: { roleId: id }, select: { userId: true } });
@@ -318,6 +362,7 @@ router.patch('/rbac/roles/:id', requireRoleAdmin, async (req: AuthRequest, res) 
         await invalidateUserAccessCache(holder.userId);
       }
       await invalidateAllAccessCache();
+      invalidateAccessCaches();
     }
 
     await prisma.auditLog.create({
@@ -345,43 +390,15 @@ router.patch('/rbac/roles/:id', requireRoleAdmin, async (req: AuthRequest, res) 
   }
 });
 
-// Delete a role (Super Admin only, protected roles refused).
+// Delete a role (Super Admin only). Delegated to the service so the
+// "no users still assigned" rule and the system-role rule have one owner.
 router.delete('/rbac/roles/:id', requireRoleAdmin, async (req: AuthRequest, res) => {
   try {
-    const { id } = req.params;
-    await ensureRbacReady();
-
-    const role = await prisma.role.findUnique({ where: { id } });
-    if (!role) return res.status(404).json({ error: 'Role not found' });
-    if (role.isSystem) {
-      return res.status(400).json({ error: 'System roles cannot be deleted' });
-    }
-
-    const holders = await prisma.userRole.findMany({ where: { roleId: id }, select: { userId: true } });
-
-    await prisma.userRole.deleteMany({ where: { roleId: id } });
-    await prisma.rolePermission.deleteMany({ where: { roleId: id } });
-    await prisma.role.delete({ where: { id } });
-
-    for (const holder of holders || []) {
-      await invalidateUserAccessCache(holder.userId);
-    }
-
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user!.id,
-        locationId: req.user!.locationId,
-        action: 'DELETE',
-        entityType: 'RbacRole',
-        entityId: id,
-        oldValue: { name: role.name, description: role.description, removedFromUsers: (holders || []).length },
-        ipAddress: req.ip || req.socket.remoteAddress || '127.0.0.1',
-        userAgent: (req.headers['user-agent'] as string) || 'Client',
-      },
-    });
-
-    res.json({ message: 'Role deleted successfully' });
-  } catch (error) {
+    const removed = await deleteRoleViaService(req.params.id, actorOf(req));
+    res.json({ message: 'Role deleted successfully', role: removed });
+  } catch (error: any) {
+    if (rbacFail(res, error)) return;
+    if (error instanceof RbacNotFoundError) return res.status(404).json({ error: error.message });
     console.error('Delete RBAC role error:', error);
     res.status(500).json({ error: 'Failed to delete role' });
   }
@@ -483,6 +500,7 @@ router.put('/rbac/users/:userId/roles', requireRoleAdmin, async (req: AuthReques
     }
 
     await invalidateUserAccessCache(userId);
+    invalidateAccessCaches(userId);
 
     await prisma.auditLog.create({
       data: {

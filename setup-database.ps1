@@ -65,7 +65,17 @@ Write-Host "Database '$DatabaseName' is ready." -ForegroundColor Green
 # --- 3. Apply Native MySQL 8.0 schema + seed -------------------------------
 Push-Location $PSScriptRoot
 try {
-    Write-Host "Applying Native MySQL schema and migrations (npm run db:migrate) ..." -ForegroundColor Cyan
+    # schema.sql is the authoritative consolidated baseline; migrations 001-027
+    # assume it. Applying migrations alone yields tables missing columns that
+    # later migrations, the compat view and the app all expect.
+    Write-Host "Applying consolidated schema.sql baseline (npm run db:schema) ..." -ForegroundColor Cyan
+    npm run db:schema
+    if ($LASTEXITCODE -ne 0) {
+        Write-Error "Schema application failed."
+        exit 1
+    }
+
+    Write-Host "Applying versioned migrations (npm run db:migrate) ..." -ForegroundColor Cyan
     npm run db:migrate
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Database migration failed."
@@ -77,6 +87,15 @@ try {
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Database seed failed."
         exit 1
+    }
+
+    # db:seed cannot create logins on this repo's current schema (see
+    # docs/BIOMETRIC_MB160.md "Known pre-existing breakage"), so this supplies
+    # the employees, shifts and password123 accounts the app needs.
+    Write-Host "Seeding biometric demo dataset (npm run db:seed:biometric-demo) ..." -ForegroundColor Cyan
+    npm run db:seed:biometric-demo
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Biometric demo seed failed; the device console will have no employees or terminals."
     }
 }
 finally {

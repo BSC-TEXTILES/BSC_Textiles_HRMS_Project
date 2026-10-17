@@ -37,11 +37,6 @@ export function useOrganizationSocket({ onChange, locationId, enabled = true }: 
     onChangeRef.current = onChange;
   }, [onChange]);
 
-  const getToken = useCallback(() => {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem('bsc_token') || localStorage.getItem('token');
-  }, []);
-
   useEffect(() => {
     if (!enabled) {
       socketRef.current?.disconnect();
@@ -50,11 +45,10 @@ export function useOrganizationSocket({ onChange, locationId, enabled = true }: 
       return;
     }
 
-    const token = getToken();
-    if (!token) return;
-
+    // Cookie-authenticated handshake; the server verifies the session before it
+    // lets this socket join the organisation rooms.
     const socket = io(WS_URL, {
-      auth: { token },
+      withCredentials: true,
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 5,
@@ -86,7 +80,7 @@ export function useOrganizationSocket({ onChange, locationId, enabled = true }: 
       setConnected(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, getToken]); // intentionally not depending on locationId to avoid reconnect on filter change
+  }, [enabled]); // intentionally not depending on locationId to avoid reconnect on filter change
 
   // Join / leave location room when locationId changes without reconnecting
   useEffect(() => {

@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { prisma, pool } from '../db.js';
 import { cacheService } from './cacheService.js';
+import { securityConfig } from '../config/security.js';
 
 export interface CreateSessionOptions {
   userId: string;
@@ -18,9 +19,19 @@ export interface SessionValidationResult {
 }
 
 export class SessionService {
-  private static readonly MAX_CONCURRENT_SESSIONS = 3;
-  private static readonly IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
-  private static readonly ABSOLUTE_TIMEOUT_MS = 12 * 60 * 60 * 1000; // 12 hours
+  private static get MAX_CONCURRENT_SESSIONS(): number {
+    return securityConfig.session.maxConcurrentSessions;
+  }
+
+  /** IDLE_TIMEOUT, default 15 minutes. */
+  private static get IDLE_TIMEOUT_MS(): number {
+    return securityConfig.session.idleTimeoutSeconds * 1000;
+  }
+
+  /** ABSOLUTE_TIMEOUT, default 8 hours. */
+  private static get ABSOLUTE_TIMEOUT_MS(): number {
+    return securityConfig.session.absoluteTimeoutSeconds * 1000;
+  }
 
   /**
    * Generate deterministic or semi-random device fingerprint
@@ -76,8 +87,9 @@ export class SessionService {
     }
 
     // Check active sessions and evict oldest if limit exceeded
+    let activeSessions: any[] = [];
     try {
-      const activeSessions = await prisma.session.findMany({
+      activeSessions = await prisma.session.findMany({
         where: {
           userId: options.userId,
           revoked: 0,
@@ -112,12 +124,45 @@ export class SessionService {
         permissions: options.permissions || [],
         createdAt: now,
         lastActivityAt: now,
+        idleExpiresAt: new Date(now.getTime() + this.IDLE_TIMEOUT_MS),
         expiresAt,
         revoked: 0,
       },
     });
 
+    if (securityConfig.session.singleActiveSession) {
+      // Optional single-session mode: a new sign-in ends every older one.
+      for (const previous of activeSessions.filter((s: any) => s.id !== sessionId)) {
+        await this.revokeSession(previous.id, 'CONCURRENT_LIMIT_EXCEEDED').catch(() => undefined);
+      }
+    }
+
     return sessionId;
+  }
+
+  /** Session metadata for the idle-timeout UI, without touching activity. */
+  public static async peekSession(sessionId: string): Promise<{ expiresAt: Date; idleExpiresAt: Date } | null> {
+    if (!sessionId) return null;
+    const session = await prisma.session.findUnique({ where: { id: sessionId } });
+    if (!session) return null;
+    return { expiresAt: session.expiresAt, idleExpiresAt: session.idleExpiresAt || session.expiresAt };
+  }
+
+  /** Extends only the idle deadline; the absolute deadline never moves. */
+  public static async extendIdle(sessionId: string): Promise<{ expiresAt: Date; idleExpiresAt: Date }> {
+    const now = new Date();
+    const idle = new Date(now.getTime() + this.IDLE_TIMEOUT_MS);
+    await prisma.session.update({
+      where: { id: sessionId },
+      data: { lastActivityAt: now, idleExpiresAt: idle },
+    });
+    const session = await prisma.session.findUnique({ where: { id: sessionId } });
+    return { expiresAt: session!.expiresAt, idleExpiresAt: idle };
+  }
+
+  /** Alias kept for readability at call sites that only bump activity. */
+  public static async touchSession(sessionId: string): Promise<void> {
+    await this.extendIdle(sessionId);
   }
 
   /**
@@ -149,9 +194,11 @@ export class SessionService {
       return { valid: false, reason: 'Session expired (absolute timeout)' };
     }
 
-    // Check idle timeout
+    // Check idle timeout — both the rolling activity window and the absolute
+    // idle deadline stored on the row, whichever bites first.
     const lastActivity = new Date(session.lastActivityAt).getTime();
-    if (now - lastActivity > this.IDLE_TIMEOUT_MS) {
+    const idleDeadline = session.idleExpiresAt ? new Date(session.idleExpiresAt).getTime() : lastActivity + this.IDLE_TIMEOUT_MS;
+    if (now - lastActivity > this.IDLE_TIMEOUT_MS || now > idleDeadline) {
       await this.revokeSession(sessionId, 'IDLE_TIMEOUT');
       return { valid: false, reason: 'Session expired (idle timeout)' };
     }
@@ -160,7 +207,7 @@ export class SessionService {
     if (now - lastActivity > 60_000) {
       prisma.session.update({
         where: { id: sessionId },
-        data: { lastActivityAt: new Date() },
+        data: { lastActivityAt: new Date(), idleExpiresAt: new Date(now + this.IDLE_TIMEOUT_MS) },
       }).catch((err) => console.warn('[SessionService] Throttled lastActivity update warning:', err.message));
     }
 

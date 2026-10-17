@@ -54,7 +54,30 @@ interface NotificationContextType {
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000');
+/**
+ * Socket.IO is served by the Express API process, not by Next.js. Deriving the
+ * default from NEXT_PUBLIC_API_URL (rather than window.location.origin) is what
+ * makes live punches arrive at all: the browser page is on :3000, the socket
+ * server is on :4000, and Next.js only proxies /api/* — not /socket.io/.
+ */
+function resolveWebSocketUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_WS_URL?.trim();
+  if (explicit) return explicit.replace(/\/$/, '');
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (apiUrl) {
+    try {
+      const parsed = new URL(apiUrl, typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000');
+      return parsed.origin;
+    } catch {
+      // fall through to the origin default below
+    }
+  }
+
+  return typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000';
+}
+
+const WS_URL = resolveWebSocketUrl();
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession();
@@ -66,8 +89,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const fetchUnreadCount = useCallback(async () => {
     if (typeof window === 'undefined' || window.location.pathname.startsWith('/login')) return;
-    const token = localStorage.getItem('bsc_token') || localStorage.getItem('token') || (session as any)?.token;
-    if (!token) return;
 
     try {
       const res = await api.get('/notifications/unread-count');
@@ -81,8 +102,6 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const fetchNotifications = useCallback(async (params: any = {}) => {
     if (typeof window === 'undefined' || window.location.pathname.startsWith('/login')) return;
-    const token = localStorage.getItem('bsc_token') || localStorage.getItem('token') || (session as any)?.token;
-    if (!token) return;
 
     setIsLoading(true);
     setError(null);
@@ -159,22 +178,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const token = (session as any)?.token || (typeof window !== 'undefined' ? localStorage.getItem('bsc_token') || localStorage.getItem('token') : null);
-    if (!token) return;
-
-    let currentUserId = (session?.user as any)?.id || 'current';
-    if (currentUserId === 'current' && typeof window !== 'undefined') {
-      try {
-        const userStr = localStorage.getItem('bsc_user');
-        if (userStr) {
-          const u = JSON.parse(userStr);
-          if (u?.id) currentUserId = u.id;
-        }
-      } catch {}
-    }
+    // The socket authenticates with the same HttpOnly session cookie as the
+    // REST API (`withCredentials`), and the server derives the user room from
+    // the verified token — never from anything this client claims.
+    const currentUserId = (session?.user as any)?.id;
 
     const newSocket = io(WS_URL, {
-      auth: { userId: currentUserId, token },
+      auth: { userId: currentUserId },
+      withCredentials: true,
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 10,

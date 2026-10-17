@@ -1,23 +1,27 @@
 import { Client } from 'pg';
+import fs from 'node:fs';
+import path from 'node:path';
 import dotenv from 'dotenv';
-import path from 'path';
 
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 dotenv.config();
 
 const connectionString =
-  process.env.SUPABASE_POOLER_URL ||
-  process.env.SUPABASE_DB_URL ||
-  process.env.DATABASE_URL;
-
+  process.env.SUPABASE_POOLER_URL || process.env.SUPABASE_DB_URL || '';
 if (!connectionString) {
-  console.error('[Error] Missing SUPABASE_POOLER_URL, SUPABASE_DB_URL, or DATABASE_URL in environment.');
+  console.error(
+    '[verify_supabase] SUPABASE_POOLER_URL or SUPABASE_DB_URL must be set. ' +
+      'A live connection string used to be hardcoded in this file — it must not come back.'
+  );
   process.exit(1);
 }
 
 const client = new Client({
   connectionString,
-  ssl: { rejectUnauthorized: false }
+  ssl:
+    (process.env.PGSSL_REJECT_UNAUTHORIZED || '').trim().toLowerCase() === 'false'
+      ? { rejectUnauthorized: false }
+      : { rejectUnauthorized: true },
 });
 
 async function verify() {

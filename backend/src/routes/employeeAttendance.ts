@@ -10,9 +10,88 @@ import { Router, Response } from 'express';
 import { pool } from '../nativeDb.js';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth.js';
 import { ingestRawPunches, probeDeviceSocket } from '../services/biometricService.js';
-import { decodeVerificationMode } from '../services/zkProtocolAdapter.js';
+import { loadGlobalSettings } from '../services/biometric/settings.js';
+import {
+  deviceCalendarDate,
+  formatWallString,
+  fromUtcMysqlString,
+  toUtcMysqlString,
+  wallTimeToInstant,
+} from '../services/biometric/timeCodec.js';
 import { socketIO } from '../socket.js';
 import crypto from 'node:crypto';
+
+/**
+ * The store timezone for an employee: the terminal that recorded their punches
+ * decides it, falling back to the deployment default. Display must not depend on
+ * whichever zone the API process happens to run in.
+ */
+async function resolveEmployeeTimezone(employeeId: string): Promise<string> {
+  const settings = await loadGlobalSettings();
+  try {
+    const [rows]: any = await pool.query(
+      `SELECT d.timezone
+         FROM biometric_raw_punches r
+         JOIN biometric_devices d ON d.id = r.deviceId
+        WHERE r.employeeId = ? AND d.timezone IS NOT NULL AND d.timezone <> ''
+        ORDER BY r.punchTimeUtc DESC
+        LIMIT 1`,
+      [employeeId]
+    );
+    if (rows[0]?.timezone) return String(rows[0].timezone);
+  } catch {
+    // No punches yet — the deployment default is the right answer.
+  }
+  return settings.defaultTimezone;
+}
+
+/** A 12-hour clock string in the store's timezone, e.g. "09:12 AM". */
+function wallHhmm(instant: Date | null, timeZone: string): string | null {
+  if (!instant) return null;
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(instant);
+}
+
+/** Absolute instant of a stored punch, preferring the authoritative UTC column. */
+function punchInstantOf(p: any, fallbackZone: string): Date | null {
+  if (p.punchTimeUtc) {
+    const asUtc = fromUtcMysqlString(p.punchTimeUtc);
+    if (asUtc) return asUtc;
+  }
+  if (p.punchTime instanceof Date) return p.punchTime;
+  if (!p.punchTime) return null;
+  // Legacy rows written before punchTimeUtc existed: the pool hands back the
+  // instant already, and the raw text is in the device zone if present.
+  return p.rawDeviceTimeString
+    ? toSafeInstantForLegacyRow(String(p.rawDeviceTimeString), p.rawTimezone || fallbackZone)
+    : new Date(String(p.punchTime));
+}
+
+function toSafeInstantForLegacyRow(wall: string, timeZone: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(wall);
+  if (!match) return null;
+  return wallTimeToInstant(
+    {
+      year: Number(match[1]),
+      month: Number(match[2]),
+      day: Number(match[3]),
+      hour: Number(match[4]),
+      minute: Number(match[5]),
+      second: Number(match[6]),
+      ms: 0,
+    },
+    timeZone
+  );
+}
+
+function wallMonthBoundary(year: number, month: number, day: number, hhmmss: string, timeZone: string): Date {
+  const [h, mi, s] = hhmmss.split(':').map(Number);
+  return wallTimeToInstant({ year, month, day, hour: h, minute: mi, second: s, ms: 0 }, timeZone);
+}
 
 const router = Router();
 router.use(authenticate);
@@ -118,31 +197,49 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res: Response) =>
     // Days in selected month
     const totalDays = new Date(year, month, 0).getDate();
     const today = new Date();
-    // System simulated date or real calendar
-    const todayYmd = today.toISOString().slice(0, 10);
+    // "Today" in the store's own timezone, not in UTC: before 05:30 IST the UTC
+    // date is still yesterday, which made the board mark today as future/past
+    // incorrectly.
+    const storeTimezone = await resolveEmployeeTimezone(empId);
+    const todayYmd = deviceCalendarDate(today, storeTimezone);
 
-    // 1. Fetch raw biometric punches for this employee across all Davanagere devices
+    // 1. Fetch raw biometric punches for this employee across its devices.
+    //    The window is built in the employee's store timezone and compared
+    //    against punchTimeUtc, so a month boundary means the same thing here as
+    //    it does on the terminal — not whatever zone the API server happens to
+    //    run in.
+    const monthStartUtc = wallMonthBoundary(year, month, 1, '00:00:00', storeTimezone);
+    const monthEndUtc = wallMonthBoundary(year, month, totalDays, '23:59:59', storeTimezone);
+
     const [rawPunches]: any = await pool.query(
-      `SELECT r.id, r.deviceId, r.serialNumber, r.enrollmentNumber, r.punchTime,
-              r.punchType, r.verifyMode, r.receivedAt, r.syncStatus, d.name as deviceName
-       FROM biometric_raw_punches r
-       LEFT JOIN biometric_devices d ON r.deviceId = d.id
-       WHERE (r.enrollmentNumber = ? OR r.enrollmentNumber = ? OR r.attendanceId LIKE ?)
-         AND r.punchTime >= ? AND r.punchTime <= ?
-       ORDER BY r.punchTime ASC`,
+      `SELECT r.id, r.deviceId, r.serialNumber, r.enrollmentNumber, r.normalizedId,
+              r.punchTime, r.punchTimeUtc, r.punchType, r.verifyMode, r.rawVerifyType,
+              r.rawPunchState, r.verifyModeLabel, r.matchValue, r.photoPath,
+              r.rawTimezone, r.mappingStatus, r.receivedAt, r.syncStatus,
+              d.name as deviceName, d.timezone as deviceTimezone
+         FROM biometric_raw_punches r
+         LEFT JOIN biometric_devices d ON r.deviceId = d.id
+        WHERE (r.employeeId = ? OR r.normalizedId = ? OR r.enrollmentNumber = ?)
+          AND r.punchTimeUtc >= ? AND r.punchTimeUtc <= ?
+        ORDER BY r.punchTimeUtc ASC`,
       [
+        empId,
+        employeeCode.replace(/^0+/, '') || employeeCode,
         employeeCode,
-        '1604',
-        `%${empId.slice(0, 8)}%`,
-        `${year}-${String(month).padStart(2, '0')}-01 00:00:00`,
-        `${year}-${String(month).padStart(2, '0')}-${String(totalDays).padStart(2, '0')} 23:59:59`,
+        toUtcMysqlString(monthStartUtc),
+        toUtcMysqlString(monthEndUtc),
       ]
     );
 
-    // 2. Fetch computed daily attendance records
+    // 2. Fetch computed daily attendance records.
+    //    `attendanceDate` is a DATE; mysql2 hands it back as a Date at local
+    //    midnight, so `toISOString()` reports the previous day on an IST server.
+    //    Asking MySQL for the string removes the whole class of bug.
     const [attendanceRows]: any = await pool.query(
-      `SELECT * FROM attendance 
-       WHERE employeeId = ? AND attendanceDate >= ? AND attendanceDate <= ?`,
+      `SELECT a.*, DATE_FORMAT(a.attendanceDate, '%Y-%m-%d') AS attendanceDateYmd
+         FROM attendance a
+        WHERE a.employeeId = ?
+          AND a.attendanceDate >= ? AND a.attendanceDate <= ?`,
       [
         empId,
         `${year}-${String(month).padStart(2, '0')}-01`,
@@ -151,10 +248,7 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res: Response) =>
     );
     const attendanceMap = new Map<string, any>();
     for (const att of attendanceRows) {
-      const dStr = att.attendanceDate instanceof Date
-        ? att.attendanceDate.toISOString().slice(0, 10)
-        : String(att.attendanceDate).slice(0, 10);
-      attendanceMap.set(dStr, att);
+      attendanceMap.set(att.attendanceDateYmd, att);
     }
 
     // 3. Fetch HR attendance corrections
@@ -228,10 +322,10 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res: Response) =>
 
       const isFutureDate = dateYmd > todayYmd;
 
-      // Filter punches for this specific date
+      // Filter punches for this specific date, by the day the terminal was in.
       const dayPunches = rawPunches.filter((p: any) => {
-        const pDate = p.punchTime instanceof Date ? p.punchTime.toISOString().slice(0, 10) : String(p.punchTime).slice(0, 10);
-        return pDate === dateYmd;
+        const instant = punchInstantOf(p, storeTimezone);
+        return instant ? deviceCalendarDate(instant, p.rawTimezone || storeTimezone) === dateYmd : false;
       });
 
       const dayAttendance = attendanceMap.get(dateYmd);
@@ -277,14 +371,20 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res: Response) =>
         statusLabel = 'Present';
 
         if (dayPunches.length > 0) {
-          const sorted = [...dayPunches].sort((a, b) => new Date(a.punchTime).getTime() - new Date(b.punchTime).getTime());
-          inPunch = new Date(sorted[0].punchTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-          
+          const sorted = dayPunches
+            .map((p: any) => ({ p, instant: punchInstantOf(p, storeTimezone) }))
+            .filter((x: any): x is { p: any; instant: Date } => Boolean(x.instant))
+            .sort((a, b) => a.instant.getTime() - b.instant.getTime());
+          const zoneOf = (row: any) => row.p.rawTimezone || storeTimezone;
+
+          if (sorted.length > 0) {
+            inPunch = wallHhmm(sorted[0].instant, zoneOf(sorted[0]));
+          }
+
           if (sorted.length > 1) {
-            outPunch = new Date(sorted[sorted.length - 1].punchTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-            const inMs = new Date(sorted[0].punchTime).getTime();
-            const outMs = new Date(sorted[sorted.length - 1].punchTime).getTime();
-            netDurationSec = Math.max(0, Math.floor((outMs - inMs) / 1000));
+            const last = sorted[sorted.length - 1];
+            outPunch = wallHhmm(last.instant, zoneOf(last));
+            netDurationSec = Math.max(0, Math.floor((last.instant.getTime() - sorted[0].instant.getTime()) / 1000));
             // Standard break deduction if worked over 6 hours
             if (netDurationSec > 21600) {
               breakDurationSec = 3600; // 60 min lunch
@@ -298,9 +398,9 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res: Response) =>
             statusLabel = 'Incomplete (Missing OUT)';
           }
         } else if (dayAttendance?.actualLogin) {
-          inPunch = new Date(dayAttendance.actualLogin).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+          inPunch = wallHhmm(new Date(dayAttendance.actualLogin), storeTimezone);
           if (dayAttendance.actualLogout) {
-            outPunch = new Date(dayAttendance.actualLogout).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            outPunch = wallHhmm(new Date(dayAttendance.actualLogout), storeTimezone);
             netDurationSec = dayAttendance.effectiveWorkingSeconds || dayAttendance.totalWorkingSeconds || 32400;
           } else {
             flags.push('Missing OUT punch');
@@ -342,17 +442,31 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res: Response) =>
         isFutureDate,
         inPunch,
         outPunch,
-        allPunches: dayPunches.map((p: any) => ({
-          id: p.id,
-          punchTime: p.punchTime,
-          timeFormatted: new Date(p.punchTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }),
-          punchType: p.punchType,
-          verifyMode: decodeVerificationMode(p.verifyMode).label,
-          rawVerifyMode: p.verifyMode,
-          deviceSerialNumber: p.serialNumber,
-          deviceName: p.deviceName || 'eSSL MB160 Terminal',
-          syncStatus: p.syncStatus,
-        })),
+        allPunches: dayPunches.map((p: any) => {
+          const zone = p.rawTimezone || storeTimezone;
+          const instant = punchInstantOf(p, storeTimezone);
+          return {
+            id: p.id,
+            punchTime: instant ? instant.toISOString() : null,
+            timeFormatted: wallHhmm(instant, zone),
+            dateTimeFormatted: instant ? formatWallString(instant, zone, false) : null,
+            timezone: zone,
+            punchType: p.punchType,
+            // Resolved once at ingest from the editable mapping table; an
+            // unrecognised code says Unknown instead of borrowing "Card".
+            verifyMode: p.verifyModeLabel || 'Unknown',
+            rawVerifyMode: p.verifyMode,
+            rawVerifyType: p.rawVerifyType,
+            rawPunchState: p.rawPunchState,
+            matchValue: p.matchValue ?? null,
+            photoUrl: p.photoPath ? `/${String(p.photoPath).replace(/^\/+/, '')}` : null,
+            photoMissingReason: p.photoPath ? null : 'No photo available from device',
+            mappingStatus: p.mappingStatus,
+            deviceSerialNumber: p.serialNumber,
+            deviceName: p.deviceName || 'Unregistered terminal',
+            syncStatus: p.syncStatus,
+          };
+        }),
         workingSeconds: netDurationSec,
         workingHoursFormatted: netDurationSec > 0 ? `${Math.floor(netDurationSec / 3600)}h ${Math.floor((netDurationSec % 3600) / 60)}m` : '—',
         breakSeconds: breakDurationSec,

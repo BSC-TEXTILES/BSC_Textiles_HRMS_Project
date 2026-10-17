@@ -87,71 +87,101 @@ export class AuditService {
     const id = `aud_${crypto.randomUUID()}`;
     const now = new Date();
 
-    // 1. Fetch previous hash from the latest auditlog entry
-    let previousHash = '0000000000000000000000000000000000000000000000000000000000000000';
+    // Serialize the read-chain -> hash -> insert window across processes. The
+    // in-process queue alone cannot stop two Node processes (API server and a
+    // script/test runner) from interleaving writes and forking the chain.
+    let chainConn: any = null;
     try {
-      const [latestRows]: any = await pool.query(
-        'SELECT hash FROM auditlog WHERE hash IS NOT NULL ORDER BY createdAt DESC LIMIT 1'
-      );
-      if (latestRows && latestRows.length > 0 && latestRows[0].hash) {
-        previousHash = latestRows[0].hash;
-      }
+      chainConn = await pool.getConnection();
+      await chainConn.query("SELECT GET_LOCK('bsc_audit_hash_chain', 5)");
     } catch (err) {
-      console.warn('[AuditService] Failed to read previous audit hash:', err);
+      console.warn('[AuditService] Failed to acquire audit chain lock:', err);
+      if (chainConn) {
+        try {
+          chainConn.release();
+        } catch {
+          /* ignore */
+        }
+        chainConn = null;
+      }
     }
 
-    // 2. Normalize and redact sensitive values
-    const userId = entry.userId || '';
-    const entityId = entry.entityId || 'SYS_RESOURCE';
-    const ipAddress = entry.ipAddress || '127.0.0.1';
-    const correlationId = entry.correlationId || '';
-    const redactedBefore = entry.before ? this.redactSensitive(entry.before) : null;
-    const redactedAfter = entry.after ? this.redactSensitive(entry.after) : null;
-
-    // 3. Compute deterministic SHA-256 hash of this record chained to previousHash
-    const payloadToHash = JSON.stringify({
-      previousHash,
-      id,
-      userId,
-      action: entry.action,
-      entityType: entry.entityType,
-      entityId,
-      ipAddress,
-      correlationId,
-    });
-
-    const hash = crypto.createHash('sha256').update(payloadToHash).digest('hex');
-
-    // 4. Insert into database
     try {
-      await prisma.auditLog.create({
-        data: {
-          id,
-          createdAt: now,
-          userId: entry.userId || null,
-          locationId: entry.locationId || null,
-          action: entry.action,
-          entityType: entry.entityType,
-          entityId,
-          oldValue: redactedBefore,
-          newValue: redactedAfter,
-          ipAddress,
-          userAgent: entry.userAgent || 'Internal System',
-          correlationId: correlationId || null,
-          sessionId: entry.sessionId || null,
-          deviceId: entry.deviceId || null,
-          riskScore: entry.riskScore || 0,
-          tags: entry.tags || [],
-          hash,
-          previousHash,
-          integrityVerified: 1,
-        },
-      });
-    } catch (auditErr) {
-      console.error('[AuditService] Failed to write audit log entry:', auditErr);
-    }
+      // 1. Fetch previous hash from the latest auditlog entry
+      let previousHash = '0000000000000000000000000000000000000000000000000000000000000000';
+      try {
+        const [latestRows]: any = await pool.query(
+          'SELECT hash FROM auditlog WHERE hash IS NOT NULL ORDER BY createdAt DESC LIMIT 1'
+        );
+        if (latestRows && latestRows.length > 0 && latestRows[0].hash) {
+          previousHash = latestRows[0].hash;
+        }
+      } catch (err) {
+        console.warn('[AuditService] Failed to read previous audit hash:', err);
+      }
 
-    return id;
+      // 2. Normalize and redact sensitive values
+      const userId = entry.userId || '';
+      const entityId = entry.entityId || 'SYS_RESOURCE';
+      const ipAddress = entry.ipAddress || '127.0.0.1';
+      const correlationId = entry.correlationId || '';
+      const redactedBefore = entry.before ? this.redactSensitive(entry.before) : null;
+      const redactedAfter = entry.after ? this.redactSensitive(entry.after) : null;
+
+      // 3. Compute deterministic SHA-256 hash of this record chained to previousHash
+      const payloadToHash = JSON.stringify({
+        previousHash,
+        id,
+        userId,
+        action: entry.action,
+        entityType: entry.entityType,
+        entityId,
+        ipAddress,
+        correlationId,
+      });
+
+      const hash = crypto.createHash('sha256').update(payloadToHash).digest('hex');
+
+      // 4. Insert into database
+      try {
+        await prisma.auditLog.create({
+          data: {
+            id,
+            createdAt: now,
+            userId: entry.userId || null,
+            locationId: entry.locationId || null,
+            action: entry.action,
+            entityType: entry.entityType,
+            entityId,
+            oldValue: redactedBefore,
+            newValue: redactedAfter,
+            ipAddress,
+            userAgent: entry.userAgent || 'Internal System',
+            correlationId: correlationId || null,
+            sessionId: entry.sessionId || null,
+            deviceId: entry.deviceId || null,
+            riskScore: entry.riskScore || 0,
+            tags: entry.tags || [],
+            hash,
+            previousHash,
+            integrityVerified: 1,
+          },
+        });
+      } catch (auditErr) {
+        console.error('[AuditService] Failed to write audit log entry:', auditErr);
+      }
+
+      return id;
+    } finally {
+      if (chainConn) {
+        try {
+          await chainConn.query("SELECT RELEASE_LOCK('bsc_audit_hash_chain')");
+        } catch {
+          /* ignore */
+        }
+        chainConn.release();
+      }
+    }
   }
 
   /**

@@ -10,6 +10,7 @@ import {
   allocateEmployeeId,
 } from '../services/employeeIdService.js';
 import { TestResult } from './attendance.test.js';
+import { prisma } from '../db.js';
 
 export async function runEmployeeImportTests(baseUrl?: string, token?: string): Promise<TestResult[]> {
   const results: TestResult[] = [];
@@ -104,19 +105,22 @@ Vinay,Patil,9844001122,vinay.patil@bsctextiles.com,BEL,Sales,Fashion Consultant,
 
   // 6. Validation Preview - Update Mode & Non-Destructive Matching
   await runTest('validateAndPreview matches existing employee by Employee ID in update mode', async () => {
-    // Match Sadashiva Hadimani (ID 1372 or code)
+    // Match against a real seeded employee by their Employee ID (employeeCode).
+    const existing = await prisma.employee.findFirst({ orderBy: { employeeCode: 'asc' } });
+    assert.ok(existing, 'Seed data must contain at least one employee');
+
     const testCsv = `employee_id,first_name,last_name,mobile_number,location_code,designation,employment_status
-1372,SADASHIVA,HADIMANI,9876543210,BEL,Senior Operations Specialist,ACTIVE`;
+${existing.employeeCode},${existing.firstName},${existing.lastName},9876543210,BEL,Senior Operations Specialist,ACTIVE`;
 
     const preview = await validateAndPreview(testCsv, {
-      fileName: 'update_hadimani.csv',
+      fileName: 'update_existing.csv',
       mode: 'update',
       actor: adminActor,
     });
 
     assert.strictEqual(preview.summary.totalRows, 1);
     assert.strictEqual(preview.rows[0].action, 'UPDATE');
-    assert.strictEqual(preview.rows[0].employeeId, '1372');
+    assert.strictEqual(preview.rows[0].employeeId, existing.employeeCode);
   });
 
   // 7. Validation Preview - Rejects Missing Required Fields

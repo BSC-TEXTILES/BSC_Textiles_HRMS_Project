@@ -15,7 +15,8 @@ export interface SecurityEventOptions {
     | 'AUDIT_LOG_GAP'
     | 'CONFIG_CHANGE'
     | 'ACCOUNT_TAKEOVER_ATTEMPT'
-    | 'SESSION_HIJACK_ATTEMPT';
+    | 'SESSION_HIJACK_ATTEMPT'
+    | 'PRIVILEGED_LOGIN_BLOCKED';
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   userId?: string;
   ipAddress?: string;

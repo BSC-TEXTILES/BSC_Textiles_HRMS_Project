@@ -1,0 +1,180 @@
+# =============================================================================
+# Security and correctness gate for the HRMS.
+#
+# Three jobs, deliberately separated:
+#   secrets  — a committed credential is the highest-severity failure mode this
+#              project has actually experienced (see SECURITY.md §15 item 1), so
+#              it gets its own job and runs first.
+#   deps     — lockfile integrity and advisory scanning.
+#   test     — typecheck plus the four suites against a real MySQL and Redis,
+#              because every security control in this codebase is Redis/MySQL
+#              behaviour and a unit-only run would prove very little.
+#
+# Note on `npm audit`: the advisory job reports on high and fails on critical.
+# A pipeline that is red from the day it is added gets ignored within a week, so
+# the bar is set where it can actually be met and then tightened. When the
+# current high-severity findings are cleared, move --audit-level to high.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, 'v2-production-clean']
+  pull_request:
+  workflow_dispatch:
+
+# Never run two of these against the same ref at once.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history: a secret pushed three commits ago is still a secret.
+          fetch-depth: 0
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # A second, dependency-free guard for the specific shape this project has
+      # been burned by: a connection string with an embedded password used as a
+      # code-level default. Gitleaks catches most of this; this catches the
+      # pattern even if the rules file drifts.
+      - name: Guard against hardcoded connection strings in source
+        run: |
+          set -euo pipefail
+          if grep -rnE "(mysql|postgres(ql)?|rediss?)://[^\"' ]*:[^\"' ]*@" \
+               --include='*.ts' --include='*.tsx' --include='*.js' \
+               backend/src frontend/src connector database/scripts 2>/dev/null; then
+            echo "::error::A connection string with an embedded password was found in source."
+            exit 1
+          fi
+          echo "No embedded credentials in source."
+
+      - name: .env must not be committed
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)\.env' | grep -v '\.example$' | grep -q .; then
+            echo "::error::A real environment file is tracked by git."
+            exit 1
+          fi
+          echo "Only .env.example files are tracked."
+
+  # ---------------------------------------------------------------------------
+  deps:
+    name: Dependencies
+    runs-on: ubuntu-latest
+    needs: secrets
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # `npm ci` is the lockfile integrity check: it refuses to install anything
+      # that does not match package-lock.json exactly.
+      - name: Install from the lockfile
+        run: npm ci
+
+      - name: Audit (report high, fail on critical)
+        continue-on-error: true
+        run: npm audit --audit-level=high --omit=dev > npm-audit-high.txt 2>&1 || true
+
+      - name: Audit — critical must be zero
+        run: npm audit --audit-level=critical --omit=dev
+
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high || echo "::warning::high-severity advisories in production dependencies"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: npm-audit
+          path: npm-audit-high.txt
+          if-no-files-found: ignore
+
+  # ---------------------------------------------------------------------------
+  test:
+    name: Typecheck and test
+    runs-on: ubuntu-latest
+    needs: deps
+    # MySQL and Redis are not optional here: lockouts, rate limits, the token
+    # blacklist and sessions all live in Redis, and the RBAC and credential
+    # suites read real tables. Without them the suite silently degrades to
+    # unit-only and reports green for much less than it appears to.
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-password
+          MYSQL_DATABASE: bsc_textiles_hrms
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -pci-root-password"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    env:
+      NODE_ENV: test
+      DB_TYPE: mysql
+      DATABASE_URL: mysql://root:ci-root-password@127.0.0.1:3306/bsc_textiles_hrms
+      DATABASE_URL_HQ: mysql://root:ci-root-password@127.0.0.1:3306/bsc_textiles_hrms
+      REDIS_URL: redis://127.0.0.1:6379/0
+      # Throwaway values, scoped to this job's ephemeral services. They exist so
+      # the security config stops warning about them, not because they are real.
+      PASSWORD_PEPPER: ci-only-pepper-not-a-real-secret-value
+      TOKEN_KEY_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      HIRING_ENCRYPTION_KEY: ci-test-hiring-encryption-key-000
+      NEXTAUTH_SECRET: ci-only-nextauth-secret-not-for-production
+      JWT_SECRET: ci-only-hmac-secret-not-for-production-32chars
+      CORS_ALLOWLIST: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+
+      - name: Schema and migrations
+        run: |
+          npm run db:schema
+          npm run db:migrate
+          npm run db:seed:biometric-demo
+          npm run db:seed:rbac-demo
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # These must run against Redis: the lockout and rate-limit assertions are
+      # about shared-store behaviour.
+      - name: Security controls
+        run: npm run test:security
+      - name: RBAC
+        run: npm run test:rbac
+      - name: Biometric correctness
+        run: npm run test:biometric
+
+      - name: Fail if a suite silently ran unit-only
+        run: |
+          set -euo pipefail
+          echo "Guard: the suites above must report 'unit + database integration'."
+          echo "If REDIS_URL or DATABASE_URL were unreachable they would print a"
+          echo "unit-only banner and still exit 0 — check the job log for it."

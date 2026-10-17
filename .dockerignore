@@ -1,0 +1,62 @@
+# Build context is the repository root so the backend image can reach
+# database/*.sql (shard provisioning and the SQLite schema are read at
+# runtime) and so both images install from the single root lockfile — the
+# root package.json carries the security `overrides`, and an image built
+# from a workspace subdirectory would silently ignore them.
+
+# Never bake a real environment into an image layer.
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.local
+secrets/
+*.pem
+*.key
+
+# Installed locally / rebuilt inside the image.
+node_modules
+**/node_modules
+.next
+**/.next
+out
+dist
+**/dist
+*.tsbuildinfo
+.cache
+coverage
+.nyc_output
+
+# Runtime state and personal data must never leave the host.
+uploads
+**/uploads
+quarantine
+logs
+**/logs
+backups
+backend/backups
+database/sqlite/*.db
+database/sqlite/backups
+certbot
+nginx/ssl
+
+# Repo noise.
+.git
+.gitignore
+.tmp
+.memory
+.postman
+.agents
+.idea
+.vscode
+Thumbs.db
+.DS_Store
+stitch_bsc_textiles_hrms
+*.log
+npm-debug.log*
+
+# Documentation is not needed to run the app.
+*.md
+**/*.md
+docs/
+postman_collection.json

@@ -1,0 +1,26 @@
+title = "BSC Textiles HRMS Gitleaks Configuration"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Global allowlist for CI workflows, test suites, and mock test keys"
+paths = [
+  '''^\.github/workflows/.*''',
+  '''^backend/src/tests/.*''',
+  '''^database/seeds/.*''',
+  '''^scripts/scan-secrets\.mjs$'''
+]
+regexes = [
+  '''ci-only-.*''',
+  '''ci-test-.*''',
+  '''bsc-dev-.*''',
+  '''Y2ktb25seS1oaXJpbmcta2V5LW5vdC1hLXJlYWwtc2VjcmV0'''
+]
+stopwords = [
+  "ci-only-pepper-not-a-real-secret-value",
+  "Y2ktb25seS1oaXJpbmcta2V5LW5vdC1hLXJlYWwtc2VjcmV0",
+  "bsc-textiles-hrms-dev-nextauth-secret-change-me-32-chars",
+  "ci-only-nextauth-secret-not-for-production",
+  "ci-only-hmac-secret-not-for-production-32chars"
+]

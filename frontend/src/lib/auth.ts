@@ -8,173 +8,85 @@ const CredentialsProvider: typeof _CredentialsProvider =
     ? (_CredentialsProvider as any).default
     : (_CredentialsProvider as any)?.default?.default || _CredentialsProvider;
 
-const API_URL = process.env.BACKEND_URL
-  ? `${process.env.BACKEND_URL.replace(/\/+$/, '')}/api`
-  : process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:4000/api';
+const API_BASES = [
+  process.env.BACKEND_URL ? `${process.env.BACKEND_URL.replace(/\/+$/, '')}/api` : null,
+  process.env.API_URL?.trim() || null,
+  process.env.NEXT_PUBLIC_API_URL?.trim() || null,
+  'http://127.0.0.1:4000/api',
+].filter(Boolean) as string[];
+
+/**
+ * NextAuth holds only the UI's view of who is signed in.
+ *
+ * The real authentication decision is made by the Express API, which sets the
+ * HttpOnly session cookies. What arrives here is a single-use ticket that the
+ * login page received *after* that decision, exchanged for a profile. So:
+ *   - no password ever passes through NextAuth, and none is logged;
+ *   - there is no offline/demo account that could mint a session the database
+ *     knows nothing about (the previous version had one, and it was a
+ *     SUPER_ADMIN backdoor);
+ *   - the backend JWT is not copied into the NextAuth session, because a
+ *     session readable by client code is a token readable by client code.
+ */
+async function exchangeTicket(ticket: string): Promise<Record<string, unknown>> {
+  let lastError = 'no backend reachable';
+
+  for (const base of API_BASES) {
+    let response: Response;
+    try {
+      response = await fetch(`${base}/session/exchange`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket }),
+        cache: 'no-store',
+      });
+    } catch (err: any) {
+      lastError = err?.message || lastError;
+      continue;
+    }
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.user) {
+      // An invalid or spent ticket is an answer, not a transport failure.
+      throw new Error(data?.error === 'Invalid exchange' ? 'Your sign-in step expired. Please try again.' : 'Sign-in failed');
+    }
+
+    const user = data.user;
+    return {
+      id: user.id,
+      email: user.email,
+      name: user.fullName || user.email,
+      role: user.role || 'EMPLOYEE',
+      permissions: Array.isArray(user.permissions) ? user.permissions : [],
+      locationId: user.locationId || undefined,
+      employeeId: user.employeeId || undefined,
+      loginId: user.loginId || undefined,
+      mustChangePassword: Boolean(user.mustChangePassword),
+      sessionId: user.sessionId,
+    };
+  }
+
+  throw new Error(`Could not reach the authentication server (${lastError}).`);
+}
+
+const IS_PROD = process.env.NODE_ENV === 'production';
+
+if (IS_PROD && !process.env.NEXTAUTH_SECRET) {
+  throw new Error('NEXTAUTH_SECRET is required in production.');
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      name: 'Credentials',
+      name: 'BSC Textiles SSO',
       credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' },
+        ticket: { label: 'Session ticket', type: 'text' },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          throw new Error('Email and password are required');
-        }
-
-        const cleanEmail = credentials.email.trim().toLowerCase();
-        const cleanPassword = credentials.password.trim();
-
-        // 1. Direct authentication for enterprise test roles (Executive Governance, Staff & Payroll, My Desk)
-        const ENTERPRISE_SEED_USERS: Record<string, any> = {
-          'admin@bsctextiles.com': {
-            id: 'cmuwszr8b00001vdt6ldrzqdn',
-            email: 'admin@bsctextiles.com',
-            name: 'Super Admin',
-            role: 'SUPER_ADMIN',
-            permissions: [
-              'VIEW', 'ADD', 'EDIT', 'DELETE', 'APPROVE', 'REJECT',
-              'ASSIGN', 'EXPORT', 'IMPORT', 'CONFIGURE', 'MANAGE',
-              'RECORD', 'UPLOAD', 'PUBLISH', 'SCAN', 'VIEW_SENSITIVE_DATA'
-            ],
-            locationId: 'loc_davangere_01',
-            employeeId: 'emp_admin',
-          },
-          'hr@bsctextiles.com': {
-            id: 'cmuwszr8b00002vdt6ldrzqdo',
-            email: 'hr@bsctextiles.com',
-            name: 'HR Manager',
-            role: 'HR_MANAGER',
-            permissions: [
-              'VIEW', 'ADD', 'EDIT', 'APPROVE', 'REJECT', 'ASSIGN',
-              'EXPORT', 'IMPORT', 'MANAGE', 'RECORD'
-            ],
-            locationId: 'loc_davangere_01',
-            employeeId: 'emp_hr',
-          },
-          'vikram.singh@bsctextiles.com': {
-            id: 'cmuwszr8b00002vdt6ldrzqdo',
-            email: 'vikram.singh@bsctextiles.com',
-            name: 'HR Manager',
-            role: 'HR_MANAGER',
-            permissions: [
-              'VIEW', 'ADD', 'EDIT', 'APPROVE', 'REJECT', 'ASSIGN',
-              'EXPORT', 'IMPORT', 'MANAGE', 'RECORD'
-            ],
-            locationId: 'loc_davangere_01',
-            employeeId: 'emp_hr',
-          },
-          'staff@bsctextiles.com': {
-            id: 'cmuwszr8b00003vdt6ldrzqdp',
-            email: 'staff@bsctextiles.com',
-            name: 'Staff Member',
-            role: 'STAFF',
-            permissions: ['VIEW', 'RECORD'],
-            locationId: 'loc_davangere_01',
-            employeeId: 'emp_staff',
-          },
-          'rajesh.kumar@bsctextiles.com': {
-            id: 'cmuwszr8b00003vdt6ldrzqdp',
-            email: 'rajesh.kumar@bsctextiles.com',
-            name: 'Staff Member',
-            role: 'STAFF',
-            permissions: ['VIEW', 'RECORD'],
-            locationId: 'loc_davangere_01',
-            employeeId: 'emp_staff',
-          },
-          'manager@bsctextiles.com': {
-            id: 'cmuwszr8b00004vdt6ldrzqdq',
-            email: 'manager@bsctextiles.com',
-            name: 'Store Manager',
-            role: 'STORE_MANAGER',
-            permissions: ['VIEW', 'ADD', 'EDIT', 'APPROVE', 'RECORD', 'MANAGE'],
-            locationId: 'loc_davangere_01',
-            employeeId: 'emp_manager',
-          },
-          'sales@bsctextiles.com': {
-            id: 'cmuwszr8b00005vdt6ldrzqdr',
-            email: 'sales@bsctextiles.com',
-            name: 'Sales Associate',
-            role: 'SALES_EMPLOYEE',
-            permissions: ['VIEW', 'RECORD'],
-            locationId: 'loc_davangere_01',
-            employeeId: 'emp_sales',
-          },
-        };
-
-        // 1. Authoritative Backend Authentication via Express/Supabase service
-        // All logins are verified with Argon2/bcrypt hashes in database with rate-limiting and audit logging.
-
-        // 2. Query backend services for other dynamic accounts
-        let response: Response | null = null;
-        const boundBackendApi = process.env.BACKEND_URL
-          ? `${process.env.BACKEND_URL.replace(/\/+$/, '')}/api`
-          : null;
-        const vercelHostApi = process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}/api`
-          : null;
-        const nextAuthUrlApi = process.env.NEXTAUTH_URL
-          ? `${process.env.NEXTAUTH_URL.replace(/\/+$/, '')}/api`
-          : null;
-        const candidateUrls = [
-          boundBackendApi,
-          vercelHostApi,
-          nextAuthUrlApi,
-          'https://bsctextileshrmsproject.vercel.app/api',
-          API_URL,
-          API_URL.includes('127.0.0.1') ? API_URL.replace('127.0.0.1', 'localhost') : API_URL.replace('localhost', '127.0.0.1'),
-          'http://127.0.0.1:4000/api',
-          'http://localhost:4000/api',
-        ].filter(Boolean) as string[];
-        const uniqueUrls = Array.from(new Set(candidateUrls));
-
-        let lastErrorMsg = '';
-        for (const url of uniqueUrls) {
-          try {
-            response = await fetch(`${url}/auth/login`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: credentials.email,
-                password: credentials.password,
-              }),
-            });
-            if (response) break;
-          } catch (err: any) {
-            lastErrorMsg = err?.message || 'Network request failed';
-          }
-        }
-
-        if (!response) {
-          console.error('[NextAuth] Could not connect to backend across candidate URLs:', uniqueUrls, lastErrorMsg);
-          throw new Error('Could not connect to authentication server. Please ensure backend is running on port 4000.');
-        }
-
-        const text = await response.text().catch(() => '');
-        let data: any = {};
-        try {
-          data = text ? JSON.parse(text) : {};
-        } catch {
-          data = {};
-        }
-
-        if (!response.ok || !data?.user) {
-          throw new Error(data?.error || data?.message || 'Invalid email or password');
-        }
-
-        return {
-          id: data.user.id,
-          email: data.user.email,
-          name: data.user.fullName || data.user.email,
-          role: data.user.role || 'EMPLOYEE',
-          permissions: Array.isArray(data.user.permissions) ? data.user.permissions : [],
-          locationId: data.user.locationId || undefined,
-          employeeId: data.user.employeeId || undefined,
-          token: data.token,
-        };
+        const ticket = String(credentials?.ticket || '').trim();
+        if (!ticket) throw new Error('Your sign-in step is missing. Please try again.');
+        const user = await exchangeTicket(ticket);
+        return user as any;
       },
     }),
   ],
@@ -183,38 +95,49 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: 'jwt',
-    maxAge: 7 * 24 * 60 * 60,
+    // Matches ABSOLUTE_TIMEOUT on the API: when the backend session ends, the
+    // UI session ends with it rather than lingering for a week.
+    maxAge: 8 * 60 * 60,
+    updateAge: 5 * 60,
   },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.role = user.role;
-        token.permissions = user.permissions;
-        token.locationId = user.locationId;
-        token.employeeId = user.employeeId;
-        token.token = user.token;
+        token.role = (user as any).role;
+        token.permissions = (user as any).permissions;
+        token.locationId = (user as any).locationId;
+        token.employeeId = (user as any).employeeId;
+        token.loginId = (user as any).loginId;
+        token.mustChangePassword = (user as any).mustChangePassword;
       }
       return token;
     },
     async session({ session, token }) {
-      if (token) {
-        if (token.id) {
-          session.user = {
-            ...session.user,
-            id: token.id,
-            role: token.role,
-            permissions: token.permissions,
-            locationId: token.locationId,
-            employeeId: token.employeeId,
-          };
-        }
-        if (token.token) {
-          session.token = token.token;
-        }
+      if (token?.id) {
+        session.user = {
+          ...session.user,
+          id: token.id,
+          role: token.role,
+          permissions: token.permissions,
+          locationId: token.locationId,
+          employeeId: token.employeeId,
+          loginId: token.loginId,
+          mustChangePassword: token.mustChangePassword,
+        } as any;
       }
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('NEXTAUTH_SECRET must be configured in production'); })() : 'bsc-dev-local-secret-not-for-prod-32c'),
+  // A committed fallback secret means anyone who can read this repository can
+  // mint a valid NextAuth session token, so production refuses to start
+  // without a real one. The dev value is deliberately non-secret-looking and
+  // length-stable so local JWTs stay valid across restarts.
+  secret:
+    process.env.NEXTAUTH_SECRET ||
+    (process.env.NODE_ENV === 'production'
+      ? (() => {
+          throw new Error('NEXTAUTH_SECRET is required in production');
+        })()
+      : 'bsc-textiles-hrms-dev-nextauth-secret-change-me-32-chars'),
 };

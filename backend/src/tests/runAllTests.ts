@@ -17,6 +17,9 @@ import { runMyDeskTests } from './myDesk.test.js';
 import { runAnalysisTests } from './analysis.test.js';
 import { runEmployeeImportTests } from './employeeImport.test.js';
 import { runBiometricIntegrationTests } from './biometricIntegration.test.js';
+import { runHiringValidatorTests } from './hiringValidators.test.js';
+import { runHiringApiTests } from './hiringApi.test.js';
+import { runBiometricOpsTests } from './biometricOps.test.js';
 
 const BASE_URL = (process.env.API_URL || 'http://localhost:4000').replace(/\/api\/?$/, '');
 
@@ -74,7 +77,7 @@ async function main() {
     console.log('  ✔ Super Admin Authenticated');
 
     // Belagavi HR
-    belagaviHrToken = await loginUser('kavita.bhat@bsctextiles.com');
+    belagaviHrToken = await loginUser('rbac.hr@bsctextiles.com');
     console.log('  ✔ Belagavi HR Authenticated');
 
     // Shivamogga HR
@@ -86,7 +89,7 @@ async function main() {
     console.log('  ✔ T-Shop Scanner Authenticated');
 
     // Sales Employee
-    salesToken = await loginUser('rajesh.kumar@bsctextiles.com');
+    salesToken = await loginUser('rbac.employee@bsctextiles.com');
     console.log('  ✔ Sales Employee Authenticated');
   } catch (err: any) {
     console.error('❌ Failed to authenticate test personas:', err.message);
@@ -200,6 +203,21 @@ async function main() {
   console.log('▶ Executing Suite 18: Biometric Attendance, eSSL IoT & Cloud MySQL Sync...');
   const bioResults = await runBiometricIntegrationTests(BASE_URL, adminToken);
   allResults.push(...bioResults.map((r) => ({ ...r, suite: 'biometric-iot' })));
+
+  // 19. Candidate Hiring Validators (pure unit suite — no HTTP)
+  console.log('▶ Executing Suite 19: Candidate Hiring Validators & Sanitization...');
+  const hiringValidatorResults = await runHiringValidatorTests();
+  allResults.push(...hiringValidatorResults);
+
+  // 20. Candidate Hiring End-to-End API Suite
+  console.log('▶ Executing Suite 20: Candidate Hiring End-to-End (forms, links, public apply, pipeline)...');
+  const hiringApiResults = await runHiringApiTests(adminToken, belagaviHrToken, shivamoggaHrToken);
+  allResults.push(...hiringApiResults);
+
+  // 21. Biometric Device Ops Suite (mismatch engine, resolution workflow, log, exports)
+  console.log('▶ Executing Suite 21: Biometric Device Ops (registry, mismatch queue, resolution, exports)...');
+  const bioOpsResults = await runBiometricOpsTests(BASE_URL, adminToken, belagaviHrToken, salesToken);
+  allResults.push(...bioOpsResults.map((r) => ({ ...r, suite: 'biometric-device-ops' })));
 
   // Print Summary Table
   console.log('\n================================================================');

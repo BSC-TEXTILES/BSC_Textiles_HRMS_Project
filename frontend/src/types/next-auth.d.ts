@@ -1,5 +1,12 @@
 import type { DefaultSession } from 'next-auth';
 
+/**
+ * The NextAuth session carries identity only.
+ *
+ * There is deliberately no `token` field: the API's access token lives in an
+ * HttpOnly cookie, so a cross-site script on any dashboard page cannot read a
+ * credential it could then replay elsewhere.
+ */
 declare module 'next-auth' {
   interface Session {
     user: {
@@ -8,8 +15,9 @@ declare module 'next-auth' {
       permissions: string[];
       locationId?: string;
       employeeId?: string;
+      loginId?: string;
+      mustChangePassword?: boolean;
     } & DefaultSession['user'];
-    token?: string;
   }
 
   interface User {
@@ -18,7 +26,8 @@ declare module 'next-auth' {
     permissions: string[];
     locationId?: string;
     employeeId?: string;
-    token?: string;
+    loginId?: string;
+    mustChangePassword?: boolean;
   }
 }
 
@@ -29,6 +38,7 @@ declare module 'next-auth/jwt' {
     permissions: string[];
     locationId?: string;
     employeeId?: string;
-    token?: string;
+    loginId?: string;
+    mustChangePassword?: boolean;
   }
 }

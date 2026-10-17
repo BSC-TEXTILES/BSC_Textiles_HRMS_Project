@@ -1,477 +1,367 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSession } from 'next-auth/react';
-import {
-  ShieldQuestion, Plus, Pencil, Trash2, UserPlus, RefreshCw,
-  Loader2, Lock, Users, Search, Sparkles, ShieldCheck
-} from 'lucide-react';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import api from '@/lib/api';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { useMyAccess, canViewModule, invalidateMyAccessCache, type AccessLevel, type RbacModule } from '@/lib/rbac';
-import { PermissionSummary } from './components/PermissionMatrix';
-import { CreateEditRoleModal, type RbacRole } from './components/CreateEditRoleModal';
+import { KeyRound, Network, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, UserCog, Users } from 'lucide-react';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { AccessNav } from '@/components/access/AccessNav';
+import { RequireModule } from '@/components/access/RequireModule';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { RoleFormModal } from '@/components/access/RoleFormModal';
 import { AssignUserRoleModal } from './components/AssignUserRoleModal';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card, CardContent } from '@/components/ui/Card';
+import { apiError, deleteRole, fetchRoles, setRoleStatus } from '@/lib/access';
+import type { AdminRole } from '@/lib/access';
+import { invalidateMyAccessCache, useMyAccess } from '@/lib/rbac';
+import { cn } from '@/lib/utils';
 
-const CELL_STYLES: Record<AccessLevel, string> = {
-  none: 'bg-gray-100 text-gray-400 border border-gray-200 hover:bg-gray-200 hover:text-gray-700',
-  view: 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 shadow-xs',
-  edit: 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300 shadow-xs',
-};
+type PendingAction =
+  | { kind: 'delete'; role: AdminRole }
+  | { kind: 'status'; role: AdminRole; next: boolean }
+  | null;
 
-const NEXT_LEVEL: Record<AccessLevel, AccessLevel> = {
-  none: 'view',
-  view: 'edit',
-  edit: 'none',
-};
-
-const CELL_LABELS: Record<AccessLevel, string> = { none: '—', view: 'VIEW', edit: 'EDIT' };
-
-export default function RolesAdminPage() {
-  const { data: session } = useSession();
-  const myAccess = useMyAccess();
-
-  const [roles, setRoles] = useState<RbacRole[]>([]);
-  const [modules, setModules] = useState<RbacModule[]>([]);
+export default function RoleManagementPage() {
+  const access = useMyAccess();
+  const [roles, setRoles] = useState<AdminRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<AdminRole | null>(null);
+  const [assignFor, setAssignFor] = useState<AdminRole | null>(null);
+  const [pending, setPending] = useState<PendingAction>(null);
+  const [busy, setBusy] = useState(false);
 
-  const [roleModalOpen, setRoleModalOpen] = useState(false);
-  const [editingRole, setEditingRole] = useState<RbacRole | null>(null);
-  const [assignModalOpen, setAssignModalOpen] = useState(false);
-  const [deletingRole, setDeletingRole] = useState<RbacRole | null>(null);
-  const [deleteBusy, setDeleteBusy] = useState(false);
+  const mayManage = access.canManageRoles || access.source !== 'rbac';
 
-  const actorIsSuperAdmin = (session?.user as any)?.role === 'SUPER_ADMIN';
-  const canManage = actorIsSuperAdmin || myAccess.canManageRoles || myAccess.source !== 'rbac';
-  const canViewRoles = canViewModule(myAccess, 'ROLES_PERMISSIONS');
-
-  const fetchRoles = useCallback(async () => {
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      setLoading(true);
-      const res = await api.get('/roles/rbac/roles');
-      setRoles(res.data?.roles || []);
-      if (Array.isArray(res.data?.modules) && res.data.modules.length > 0) {
-        setModules(res.data.modules);
-      }
-    } catch (e) {
-      console.error(e);
-      toast.error('Failed to load roles');
+      const { roles: list } = await fetchRoles();
+      setRoles(list);
+    } catch (err: any) {
+      const message = apiError(err, 'Could not load roles');
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (canViewRoles) {
-      fetchRoles();
-    } else {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canViewRoles]);
+    if (access.loading) return;
+    load();
+  }, [access.loading, load]);
 
-  const [savingCellKey, setSavingCellKey] = useState<string | null>(null);
-  const [matrixSearch, setMatrixSearch] = useState('');
-
-  const effectiveModules = useMemo(() => (modules.length > 0 ? modules : []), [modules]);
-
-  const filteredModules = useMemo(() => {
-    if (!matrixSearch.trim()) return effectiveModules;
-    const q = matrixSearch.toLowerCase();
-    return effectiveModules.filter(
-      (m) => m.label.toLowerCase().includes(q) || m.key.toLowerCase().includes(q)
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return roles;
+    return roles.filter(
+      (role) =>
+        role.name.toLowerCase().includes(needle) ||
+        (role.description || '').toLowerCase().includes(needle)
     );
-  }, [effectiveModules, matrixSearch]);
+  }, [roles, query]);
 
-  const handleCellClick = async (role: RbacRole, moduleKey: string, currentLevel: AccessLevel) => {
-    if (!canManage) {
-      toast.error('Only administrators can modify role permissions');
-      return;
-    }
-
-    if (role.name === 'SUPER_ADMIN') {
-      toast('The SUPER_ADMIN role must keep full EDIT access on all operational modules', {
-        icon: '🔒',
-      });
-      return;
-    }
-
-    const nextLevel = NEXT_LEVEL[currentLevel] || 'none';
-    const cellKey = `${role.id}:${moduleKey}`;
-    const previousPermissions = { ...(role.permissions || {}) };
-    const nextPermissions = { ...previousPermissions, [moduleKey]: nextLevel };
-
-    // Optimistic UI update
-    setRoles((prev) =>
-      prev.map((r) => (r.id === role.id ? { ...r, permissions: nextPermissions } : r))
-    );
-    setSavingCellKey(cellKey);
-
+  const applyPending = async () => {
+    if (!pending) return;
+    setBusy(true);
     try {
-      await api.patch(`/roles/rbac/roles/${role.id}`, {
-        permissions: nextPermissions,
-      });
+      if (pending.kind === 'delete') {
+        await deleteRole(pending.role.id);
+        toast.success(`Role "${pending.role.name}" deleted`);
+      } else {
+        await setRoleStatus(pending.role.id, pending.next);
+        toast.success(`Role "${pending.role.name}" ${pending.next ? 'activated' : 'deactivated'}`);
+      }
       invalidateMyAccessCache();
-      toast.success(
-        `${role.name}: ${moduleKey.replace(/_/g, ' ')} → ${nextLevel.toUpperCase()}`,
-        { id: `cell-${cellKey}`, duration: 1800 }
-      );
+      setPending(null);
+      await load();
     } catch (err: any) {
-      // Rollback optimistic update
-      setRoles((prev) =>
-        prev.map((r) => (r.id === role.id ? { ...r, permissions: previousPermissions } : r))
-      );
-      toast.error(err.response?.data?.error || 'Failed to update access level');
+      // The server refuses these when the result would strand a user, so the
+      // refusal is shown rather than guessed at on the client.
+      toast.error(apiError(err, 'Action refused'));
     } finally {
-      setSavingCellKey(null);
+      setBusy(false);
     }
   };
-
-  const handleDelete = async (role: RbacRole) => {
-    try {
-      setDeleteBusy(true);
-      await api.delete(`/roles/rbac/roles/${role.id}`);
-      toast.success(`Role "${role.name}" deleted`);
-      setDeletingRole(null);
-      fetchRoles();
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to delete role');
-    } finally {
-      setDeleteBusy(false);
-    }
-  };
-
-  if (!loading && !canViewRoles) {
-    return (
-      <DashboardLayout>
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10 text-center">
-          <Lock className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <h2 className="font-bold text-gray-900 mb-1">Restricted Section 🔒</h2>
-          <p className="text-sm text-gray-500">
-            Your role does not have access to Roles &amp; Permissions. Contact an administrator if you believe this is an error.
-          </p>
-        </div>
-      </DashboardLayout>
-    );
-  }
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <RequireModule module="ROLES_PERMISSIONS">
+      <div className="space-y-5">
+        <AccessNav access={access} />
+
+        <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <ShieldQuestion className="w-6 h-6 text-primary-600" />
-              Roles &amp; Permissions
-            </h1>
-            <p className="text-sm text-gray-500 mt-1">
-              Create roles, control module-level access (View / Edit / No Access), and assign roles to users
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-slate-100">Role Management</h1>
+            <p className="mt-1 text-sm text-gray-500 dark:text-slate-400">
+              {mayManage
+                ? 'Create, rename, deactivate and delete roles here. What each role may do is assigned on the Module Access page.'
+                : 'You can see the roles and assign their module access, but only a Super Admin can create, rename, deactivate or delete them.'}
             </p>
           </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              onClick={fetchRoles}
-              className="p-2.5 rounded-lg border border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
-              title="Refresh"
-            >
-              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-            {canManage && (
-              <button
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+              <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} aria-hidden="true" />
+              Refresh
+            </Button>
+            {mayManage && (
+              <Button
+                size="sm"
                 onClick={() => {
-                  setEditingRole(null);
-                  setRoleModalOpen(true);
+                  setEditing(null);
+                  setFormOpen(true);
                 }}
-                className="bg-primary-600 hover:bg-primary-700 text-white font-medium py-2.5 px-5 rounded-lg shadow-sm text-sm flex items-center gap-2 transition-colors"
               >
-                <Plus className="w-4 h-4" />
-                Create New Role
-              </button>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Create Role
+              </Button>
             )}
           </div>
         </div>
 
-        {/* Roles list */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          {loading ? (
-            <div className="flex items-center justify-center py-16 text-gray-400">
-              <Loader2 className="w-6 h-6 animate-spin" />
-            </div>
-          ) : (
+        {!access.loading && !mayManage && (
+          <Card>
+            <CardContent className="flex items-start gap-3 text-sm">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#1346a1]" aria-hidden="true" />
+              <div>
+                <p className="font-medium text-gray-900 dark:text-slate-100">Role governance is read-only for your account</p>
+                <p className="mt-1 text-gray-600 dark:text-slate-300">
+                  Super Admin owns the role list; Admin owns module access. That separation is enforced by the API, so
+                  these buttons are absent rather than disabled.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search roles by name or description…"
+            className="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 focus:ring-[#1346a1]/30 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          />
+        </div>
+
+        {error && !loading && (
+          <Card>
+            <CardContent className="flex items-center justify-between gap-3">
+              <p className="text-sm text-red-600">{error}</p>
+              <Button size="sm" variant="outline" onClick={load}>
+                Retry
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        <Card padding={false}>
+          <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-gray-50 text-[11px] uppercase font-semibold text-gray-700 border-b border-gray-200">
+              <table className="w-full min-w-[880px] text-sm">
+                <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500 dark:bg-slate-800/70 dark:text-slate-400">
                   <tr>
-                    <th className="py-3 px-4 min-w-[200px]">Role</th>
-                    <th className="py-3 px-4 min-w-[240px]">Access Summary</th>
-                    <th className="py-3 px-3 text-center">Users</th>
-                    <th className="py-3 px-4 text-right min-w-[150px]">Actions</th>
+                    <th className="px-4 py-3 font-medium">Role name</th>
+                    <th className="px-4 py-3 font-medium">Description</th>
+                    <th className="px-4 py-3 font-medium">Users</th>
+                    <th className="px-4 py-3 font-medium">Modules</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="sticky right-0 z-10 bg-gray-50 px-4 py-3 text-right font-medium dark:bg-slate-800">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {roles.map((r) => (
-                    <tr key={r.id} className="hover:bg-gray-50/70 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-gray-900 flex items-center gap-1.5">
-                          {r.name}
-                          {r.isSystem && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 font-bold">SYSTEM</span>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-gray-500 mt-0.5">{r.description}</div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <PermissionSummary modules={effectiveModules} value={r.permissions} />
-                      </td>
-                      <td className="py-3 px-3 text-center">
-                        <span className="inline-flex items-center gap-1 text-gray-700 font-semibold">
-                          <Users className="w-3.5 h-3.5 text-gray-400" />
-                          {r.userCount ?? 0}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {canManage && (
-                            <>
-                              <button
-                                onClick={() => {
-                                  setAssignModalOpen(true);
-                                }}
-                                className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-primary-700 bg-primary-50 hover:bg-primary-100 flex items-center gap-1"
-                                title="Assign users to roles"
-                              >
-                                <UserPlus className="w-3.5 h-3.5" />
-                                Assign
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setEditingRole(r);
-                                  setRoleModalOpen(true);
-                                }}
-                                className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-gray-700 bg-gray-100 hover:bg-gray-200 flex items-center gap-1"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                                Edit
-                              </button>
-                              {!r.isSystem && (
-                                <button
-                                  onClick={() => setDeletingRole(r)}
-                                  className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-red-600 bg-red-50 hover:bg-red-100 flex items-center gap-1"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5" />
-                                  Delete
-                                </button>
-                              )}
-                            </>
-                          )}
-                          {!canManage && (
-                            <span className="text-[11px] text-gray-400 flex items-center gap-1">
-                              <Lock className="w-3 h-3" /> Read-only
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {roles.length === 0 && (
+                <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
+                  {loading &&
+                    [0, 1, 2, 3].map((i) => (
+                      <tr key={i}>
+                        <td colSpan={6} className="px-4 py-3">
+                          <div className="h-8 animate-pulse rounded bg-gray-100 dark:bg-slate-800" />
+                        </td>
+                      </tr>
+                    ))}
+
+                  {!loading && filtered.length === 0 && (
                     <tr>
-                      <td colSpan={4} className="py-10 text-center text-sm text-gray-400">
-                        No roles found. The default roles will appear after the database migrates.
+                      <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500 dark:text-slate-400">
+                        No roles match “{query}”.
                       </td>
                     </tr>
                   )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
 
-        {/* Interactive permission overview matrix */}
-        {effectiveModules.length > 0 && roles.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-purple-50 text-purple-700 border border-purple-200">
-                  <ShieldCheck className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-gray-900 text-base">Permission Matrix Overview</h3>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      <Sparkles className="w-3 h-3 text-emerald-500" /> Click to Edit Access
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    Click any cell to cycle access (<span className="font-semibold text-gray-400">—</span> &rarr; <span className="font-semibold text-blue-600">VIEW</span> &rarr; <span className="font-semibold text-emerald-600">EDIT</span>), or click a role to configure details
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 flex-wrap">
-                {/* Legend badges */}
-                <div className="flex items-center gap-1.5 text-[11px]">
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-emerald-200 bg-emerald-50 font-bold text-emerald-700">
-                    EDIT
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-blue-200 bg-blue-50 font-bold text-blue-700">
-                    VIEW
-                  </span>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded border border-gray-200 bg-gray-100 font-bold text-gray-400">
-                    — None
-                  </span>
-                </div>
-
-                {/* Filter modules input */}
-                <div className="relative">
-                  <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
-                  <input
-                    type="text"
-                    placeholder="Filter modules..."
-                    value={matrixSearch}
-                    onChange={(e) => setMatrixSearch(e.target.value)}
-                    className="pl-8 pr-3 py-1.5 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 w-40"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-gray-50 text-[11px] uppercase font-semibold text-gray-700 border-b border-gray-200">
-                  <tr>
-                    <th className="py-3 px-4 min-w-[200px] sticky left-0 bg-gray-50 z-20">Role</th>
-                    {filteredModules.map((m) => (
-                      <th key={m.key} className="py-3 px-2 text-center min-w-[90px]">
-                        <span className="truncate block" title={m.label}>{m.label}</span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {roles.map((r) => {
-                    const isSuperAdmin = r.name === 'SUPER_ADMIN';
-                    return (
-                      <tr key={r.id} className="hover:bg-gray-50/70 transition-colors">
-                        <td className="py-2.5 px-4 font-bold text-gray-900 sticky left-0 bg-white z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)]">
-                          <div className="flex items-center justify-between gap-2">
-                            <button
-                              type="button"
-                              disabled={!canManage}
-                              onClick={() => {
-                                setEditingRole(r);
-                                setRoleModalOpen(true);
-                              }}
-                              className="text-left font-bold text-gray-900 hover:text-primary-600 transition-colors flex items-center gap-1.5 group cursor-pointer"
-                              title="Click to edit role settings"
-                            >
-                              <span>{r.name}</span>
-                              {canManage && (
-                                <Pencil className="w-3 h-3 text-gray-400 opacity-60 group-hover:opacity-100 group-hover:text-primary-600 transition-all" />
-                              )}
-                            </button>
-                            {r.isSystem && (
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 font-mono font-semibold">
-                                SYSTEM
+                  {!loading &&
+                    filtered.map((role) => {
+                      const isSuperAdminRole = role.name === 'SUPER_ADMIN';
+                      const canDelete = mayManage && !role.isSystem && role.userCount === 0;
+                      return (
+                        <tr key={role.id} className="align-top">
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <KeyRound className="h-4 w-4 text-gray-400" aria-hidden="true" />
+                              <span className="font-medium text-gray-900 dark:text-slate-100">
+                                {role.name.replace(/_/g, ' ')}
                               </span>
+                              {role.isSystem && <Badge variant="info">system</Badge>}
+                            </div>
+                          </td>
+                          <td className="max-w-sm px-4 py-3 text-gray-600 dark:text-slate-300">
+                            {role.description || <span className="text-gray-400">No description</span>}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-1 text-gray-700 dark:text-slate-300">
+                              <Users className="h-3.5 w-3.5 text-gray-400" aria-hidden="true" />
+                              {role.userCount}
+                            </span>
+                            {role.userCount > 0 && !role.isSystem && (
+                              <p className="mt-0.5 text-xs text-gray-400">reassign its users to delete</p>
                             )}
-                          </div>
-                        </td>
-                        {filteredModules.map((m) => {
-                          const level = (r.permissions?.[m.key] || 'none') as AccessLevel;
-                          const cellKey = `${r.id}:${m.key}`;
-                          const isSavingThis = savingCellKey === cellKey;
-                          const nextLevel = NEXT_LEVEL[level];
-
-                          return (
-                            <td key={m.key} className="py-2 px-1.5 text-center">
-                              <button
-                                type="button"
-                                disabled={!canManage || isSuperAdmin || isSavingThis}
-                                onClick={() => handleCellClick(r, m.key, level)}
-                                className={`w-full max-w-[85px] mx-auto py-1.5 px-2 rounded-md font-bold text-[10px] tracking-wider border transition-all transform active:scale-95 flex items-center justify-center gap-1 ${
-                                  CELL_STYLES[level]
-                                } ${
-                                  isSuperAdmin
-                                    ? 'cursor-not-allowed opacity-90'
-                                    : canManage
-                                    ? 'cursor-pointer hover:shadow-xs hover:scale-105 ring-offset-1 focus:outline-none focus:ring-2 focus:ring-primary-400'
-                                    : 'cursor-default'
-                                } ${isSavingThis ? 'ring-2 ring-primary-500 animate-pulse' : ''}`}
-                                title={
-                                  isSuperAdmin
-                                    ? 'SUPER_ADMIN has permanently locked EDIT access'
-                                    : canManage
-                                    ? `Current: ${CELL_LABELS[level]} — Click to toggle to ${CELL_LABELS[nextLevel]}`
-                                    : `Access level: ${CELL_LABELS[level]}`
-                                }
-                              >
-                                {isSavingThis ? (
-                                  <Loader2 className="w-3 h-3 animate-spin text-primary-600" />
-                                ) : (
-                                  CELL_LABELS[level]
-                                )}
-                              </button>
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
+                          </td>
+                          <td className="px-4 py-3 text-gray-700 dark:text-slate-300">{role.moduleCount}</td>
+                          <td className="px-4 py-3">
+                            <Badge variant={role.isActive ? 'success' : 'gray'} dot>
+                              {role.isActive ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </td>
+                          <td className="sticky right-0 bg-white px-2 py-3 dark:bg-[#0e172a]">
+                            <div className="flex flex-wrap justify-end gap-1">
+                              <Link href={`/admin/module-access?role=${encodeURIComponent(role.id)}`}>
+                                <Button variant="ghost" size="xs" title="Assign module access">
+                                  <Network className="h-3.5 w-3.5" aria-hidden="true" />
+                                  Access
+                                </Button>
+                              </Link>
+                              {mayManage && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="xs"
+                                    onClick={() => {
+                                      setEditing(role);
+                                      setFormOpen(true);
+                                    }}
+                                    title="Edit role"
+                                  >
+                                    <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                                    Edit
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="xs"
+                                    onClick={() => setAssignFor(role)}
+                                    title="Assign users to this role"
+                                  >
+                                    <UserCog className="h-3.5 w-3.5" aria-hidden="true" />
+                                    Users
+                                  </Button>
+                                  {!isSuperAdminRole && (
+                                    <Button
+                                      variant="ghost"
+                                      size="xs"
+                                      onClick={() => setPending({ kind: 'status', role, next: !role.isActive })}
+                                    >
+                                      {role.isActive ? 'Deactivate' : 'Activate'}
+                                    </Button>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="xs"
+                                    className="text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-red-950/40"
+                                    disabled={!canDelete}
+                                    title={
+                                      role.isSystem
+                                        ? 'System roles cannot be deleted'
+                                        : role.userCount > 0
+                                          ? `${role.userCount} user(s) are still assigned — reassign them first`
+                                          : 'Delete role'
+                                    }
+                                    onClick={() => setPending({ kind: 'delete', role })}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                    Delete
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
+          </CardContent>
+        </Card>
+
+        <p className="text-xs text-gray-500 dark:text-slate-400">
+          Defaults shipped with the system: Admin, HR, Floor Manager, Employee — plus SUPER_ADMIN, which cannot be
+          removed so there is always a way back in.
+        </p>
+
+        <RoleFormModal
+          open={formOpen}
+          role={editing}
+          onClose={() => {
+            setFormOpen(false);
+            setEditing(null);
+          }}
+          onSaved={load}
+        />
+
+        <AssignUserRoleModal
+          open={Boolean(assignFor)}
+          roles={roles.map((role) => ({
+            id: role.id,
+            name: role.name,
+            description: role.description || '',
+            isSystem: role.isSystem,
+          }))}
+          actorIsSuperAdmin={access.unrestricted || access.roles.includes('SUPER_ADMIN')}
+          onClose={() => setAssignFor(null)}
+          onSaved={() => {
+            invalidateMyAccessCache();
+            load();
+          }}
+        />
+
+        <ConfirmDialog
+          open={Boolean(pending)}
+          title={pending?.kind === 'delete' ? `Delete ${pending.role.name}?` : `${pending?.role.name} — ${pending?.next === false ? 'deactivate' : 'reactivate'}?`}
+          tone={pending?.kind === 'delete' ? 'danger' : 'primary'}
+          confirmLabel={pending?.kind === 'delete' ? 'Delete role' : 'Confirm'}
+          loading={busy}
+          message={
+            pending?.kind === 'delete' ? (
+              <>
+                This removes the role and its {pending.role.moduleCount} module grant(s) permanently. Users assigned to
+                it lose those permissions the moment their next request is checked.
+              </>
+            ) : (
+              <>
+                {pending?.next === false ? (
+                  <>
+                    Deactivating hides every module grant on this role for its {pending?.role.userCount || 0} assigned
+                    user(s) until it is reactivated. Their accounts stay intact.
+                  </>
+                ) : (
+                  <>Reactiving restores this role’s grants to its {pending?.role.userCount || 0} assigned user(s).</>
+                )}
+              </>
+            )
+          }
+          details={
+            pending?.kind === 'delete' && pending.role.userCount > 0 ? (
+              <span>{pending.role.userCount} user(s) are still assigned — delete will be refused.</span>
+            ) : undefined
+          }
+          onConfirm={applyPending}
+          onCancel={() => setPending(null)}
+        />
       </div>
-
-      <CreateEditRoleModal
-        open={roleModalOpen}
-        role={editingRole}
-        modules={effectiveModules}
-        onClose={() => setRoleModalOpen(false)}
-        onSaved={fetchRoles}
-      />
-
-      <AssignUserRoleModal
-        open={assignModalOpen}
-        roles={roles}
-        actorIsSuperAdmin={actorIsSuperAdmin}
-        onClose={() => setAssignModalOpen(false)}
-        onSaved={fetchRoles}
-      />
-
-      {/* Delete confirmation */}
-      {deletingRole && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
-            <h3 className="font-bold text-gray-900 mb-2">Delete role "{deletingRole.name}"?</h3>
-            <p className="text-sm text-gray-500 mb-5">
-              This removes the role and its permissions, and unassigns it from {deletingRole.userCount ?? 0} user(s).
-              This action is recorded in the audit log.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setDeletingRole(null)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={deleteBusy}
-                onClick={() => handleDelete(deletingRole)}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg flex items-center gap-2 disabled:opacity-50"
-              >
-                {deleteBusy && <Loader2 className="w-4 h-4 animate-spin" />}
-                Delete Role
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </RequireModule>
     </DashboardLayout>
   );
 }

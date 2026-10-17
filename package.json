@@ -8,7 +8,7 @@
     "database"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "concurrently -k -n api,web,device -c blue,green,magenta \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run worker:supervised\"",
     "dev:backend": "npm run dev --workspace=backend",
     "dev:frontend": "npm run dev --workspace=frontend",
     "build": "npm run build --workspaces",
@@ -23,6 +23,18 @@
     "benchmark": "npm run benchmark --workspace=backend",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
+    "db:seed:biometric-demo": "npm run db:seed:biometric-demo --workspace=database",
+    "test:biometric": "npm run test:biometric --workspace=backend",
+    "worker": "npm run worker --workspace=backend",
+    "worker:supervised": "npm run worker:supervised --workspace=backend",
+    "device:simulator": "npm run device:simulator --workspace=backend",
+    "diagnose": "npm run diagnose --workspace=backend",
+    "setup:local": "npm run db:schema --workspace=database && npm run db:migrate --workspace=database && npm run db:seed --workspace=database && npm run db:seed:biometric-demo --workspace=database",
+    "connector": "tsx connector/bscBiometricConnector.ts",
+    "db:seed:rbac-demo": "npm run db:seed:rbac-demo --workspace=database",
+    "test:rbac": "npm run test:rbac --workspace=backend",
+    "test:security": "npm run test:security --workspace=backend",
+    "test:live": "npm run test:live --workspace=backend",
     "secret-scan": "node scripts/scan-secrets.mjs"
   },
   "devDependencies": {

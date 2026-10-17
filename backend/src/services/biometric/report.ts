@@ -1,0 +1,266 @@
+/**
+ * Attendance report read model with the filters HR actually asks for — date
+ * range, employee, verification mode, device — plus CSV and Excel export.
+ *
+ * Rows are punch-level: one line per event the terminal recorded, joined to the
+ * employee and device, carrying both the UTC instant and the display time in the
+ * device's own timezone. Exporting only the UTC column is how a report ends up
+ * claiming someone arrived at 03:42.
+ */
+
+import { Response } from 'express';
+import ExcelJS from 'exceljs';
+import { pool } from '../../nativeDb.js';
+import { loadGlobalSettings } from './settings.js';
+import { fromUtcMysqlString, formatWallString, wallTimeToInstant, deviceCalendarDate } from './timeCodec.js';
+
+export interface ReportFilters {
+  from?: string;            // YYYY-MM-DD, inclusive, in `timeZone`
+  to?: string;              // YYYY-MM-DD, inclusive, in `timeZone`
+  employeeId?: string;
+  employeeQuery?: string;   // matches code, name, or device id
+  verifyMethod?: string[];  // labels from verify_mode_mapping
+  serialNumber?: string;
+  deviceId?: string;
+  locationCode?: string;
+  mappingStatus?: string[];
+  limit?: number;
+  offset?: number;
+  timeZone?: string;
+}
+
+export interface ReportRow {
+  id: string;
+  employeeCode: string | null;
+  employeeName: string | null;
+  enrollmentNumber: string;
+  deviceName: string;
+  serialNumber: string;
+  locationCode: string | null;
+  punchTimeUtc: string;
+  punchTimeLocal: string;
+  attendanceDate: string;
+  timezone: string;
+  punchType: string;
+  verifyMethod: string;
+  rawVerifyType: number | null;
+  rawPunchState: number | null;
+  matchValue: number | null;
+  workCode: string | null;
+  photoUrl: string | null;
+  photoMissingReason: string | null;
+  mappingStatus: string;
+  source: string;
+  syncStatus: string;
+}
+
+const COLUMNS: Array<{ key: keyof ReportRow; header: string }> = [
+  { key: 'employeeCode', header: 'Employee Code' },
+  { key: 'employeeName', header: 'Employee Name' },
+  { key: 'enrollmentNumber', header: 'Device User ID' },
+  { key: 'attendanceDate', header: 'Date' },
+  { key: 'punchTimeLocal', header: 'Time (device zone)' },
+  { key: 'timezone', header: 'Timezone' },
+  { key: 'punchTimeUtc', header: 'Time (UTC)' },
+  { key: 'punchType', header: 'Punch Type' },
+  { key: 'verifyMethod', header: 'Mode' },
+  { key: 'rawVerifyType', header: 'Raw Verify Code' },
+  { key: 'rawPunchState', header: 'Raw Punch State' },
+  { key: 'matchValue', header: 'Match %' },
+  { key: 'deviceName', header: 'Device' },
+  { key: 'serialNumber', header: 'Device Serial' },
+  { key: 'locationCode', header: 'Location' },
+  { key: 'workCode', header: 'Work Code' },
+  { key: 'photoUrl', header: 'Photo' },
+  { key: 'mappingStatus', header: 'Mapping' },
+  { key: 'source', header: 'Source' },
+  { key: 'syncStatus', header: 'Status' },
+];
+
+/** A calendar day edge in `timeZone`, rendered as the UTC wall string that
+ *  punchTimeUtc stores, so the comparison never depends on the DB session zone. */
+function dayBoundary(dateYmd: string, endOfDay: boolean, timeZone: string): string {
+  const [y, m, d] = dateYmd.split('-').map(Number);
+  const [h, mi, s] = (endOfDay ? '23:59:59' : '00:00:00').split(':').map(Number);
+  const instant = wallTimeToInstant({ year: y, month: m, day: d, hour: h, minute: mi, second: s, ms: endOfDay ? 999 : 0 }, timeZone);
+  return formatWallString(instant, 'UTC', true);
+}
+
+export async function buildAttendanceReport(filters: ReportFilters): Promise<{
+  rows: ReportRow[];
+  total: number;
+  timeZone: string;
+  appliedFilters: ReportFilters;
+}> {
+  const settings = await loadGlobalSettings();
+  const timeZone = filters.timeZone || settings.defaultTimezone;
+
+  const where: string[] = ['1=1'];
+  const params: any[] = [];
+
+  if (filters.from) {
+    where.push('r.punchTimeUtc >= ?');
+    params.push(dayBoundary(filters.from, false, timeZone));
+  }
+  if (filters.to) {
+    where.push('r.punchTimeUtc <= ?');
+    params.push(dayBoundary(filters.to, true, timeZone));
+  }
+  if (filters.employeeId) {
+    where.push('r.employeeId = ?');
+    params.push(filters.employeeId);
+  }
+  if (filters.employeeQuery) {
+    where.push('(e.employeeCode LIKE ? OR e.fullName LIKE ? OR r.enrollmentNumber LIKE ? OR r.normalizedId LIKE ?)');
+    const like = `%${filters.employeeQuery.trim()}%`;
+    params.push(like, like, like, like);
+  }
+  if (filters.verifyMethod && filters.verifyMethod.length > 0) {
+    where.push(`r.verifyModeLabel IN (${filters.verifyMethod.map(() => '?').join(',')})`);
+    params.push(...filters.verifyMethod);
+  }
+  if (filters.serialNumber) {
+    where.push('r.serialNumber = ?');
+    params.push(filters.serialNumber);
+  }
+  if (filters.deviceId) {
+    where.push('r.deviceId = ?');
+    params.push(filters.deviceId);
+  }
+  if (filters.locationCode && filters.locationCode !== 'ALL') {
+    where.push('d.locationCode = ?');
+    params.push(filters.locationCode);
+  }
+  if (filters.mappingStatus && filters.mappingStatus.length > 0) {
+    where.push(`r.mappingStatus IN (${filters.mappingStatus.map(() => '?').join(',')})`);
+    params.push(...filters.mappingStatus);
+  }
+
+  const limit = Math.min(Math.max(Number(filters.limit) || 1000, 1), 10_000);
+  const offset = Math.max(Number(filters.offset) || 0, 0);
+
+  const [countRows]: any = await pool.query(
+    `SELECT COUNT(*) AS total
+       FROM biometric_raw_punches r
+       LEFT JOIN biometric_devices d ON r.deviceId = d.id
+       LEFT JOIN employee e ON e.id = r.employeeId
+      WHERE ${where.join(' AND ')}`,
+    params
+  );
+
+  const [rows]: any = await pool.query(
+    `SELECT r.id, r.serialNumber, r.enrollmentNumber, r.normalizedId, r.punchTime, r.punchTimeUtc,
+            r.rawTimezone, r.punchType, r.verifyMode, r.rawVerifyType, r.rawPunchState,
+            r.verifyModeLabel, r.workCode, r.matchValue, r.photoPath, r.mappingStatus,
+            r.syncStatus, r.source, r.employeeId,
+            e.employeeCode, e.fullName AS employeeName,
+            COALESCE(d.name, 'Unregistered terminal') AS deviceName,
+            d.locationCode
+       FROM biometric_raw_punches r
+       LEFT JOIN biometric_devices d ON r.deviceId = d.id
+       LEFT JOIN employee e ON e.id = r.employeeId
+      WHERE ${where.join(' AND ')}
+      ORDER BY r.punchTimeUtc DESC
+      LIMIT ${limit} OFFSET ${offset}`,
+    params
+  );
+
+  const mapped: ReportRow[] = rows.map((row: any) => {
+    const zone = row.rawTimezone || timeZone;
+    const instant = fromUtcMysqlString(row.punchTimeUtc)
+      ?? (row.punchTime instanceof Date ? row.punchTime : null);
+
+    return {
+      id: row.id,
+      employeeCode: row.employeeCode ?? null,
+      employeeName: row.employeeName ?? null,
+      enrollmentNumber: row.enrollmentNumber,
+      deviceName: row.deviceName,
+      serialNumber: row.serialNumber,
+      locationCode: row.locationCode ?? null,
+      punchTimeUtc: instant ? instant.toISOString() : '',
+      punchTimeLocal: instant ? formatWallString(instant, zone, false) : '',
+      attendanceDate: instant ? deviceCalendarDate(instant, zone) : '',
+      timezone: zone,
+      punchType: row.punchType,
+      verifyMethod: row.verifyModeLabel || 'Unknown',
+      rawVerifyType: row.rawVerifyType === null ? null : Number(row.rawVerifyType),
+      rawPunchState: row.rawPunchState === null ? null : Number(row.rawPunchState),
+      matchValue: row.matchValue === null ? null : Number(row.matchValue),
+      workCode: row.workCode ?? null,
+      photoUrl: row.photoPath ? `/${String(row.photoPath).replace(/^\/+/, '')}` : null,
+      photoMissingReason: row.photoPath ? null : 'No photo available from device',
+      mappingStatus: row.mappingStatus,
+      source: row.source,
+      syncStatus: row.syncStatus,
+    };
+  });
+
+  return { rows: mapped, total: Number(countRows[0]?.total ?? mapped.length), timeZone, appliedFilters: filters };
+}
+
+/** RFC 4180 escaping: quote when needed, double embedded quotes. */
+export function toCsv(rows: ReportRow[], columns = COLUMNS): string {
+  const escape = (value: unknown): string => {
+    if (value === null || value === undefined) return '';
+    const text = String(value);
+    return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+
+  const header = columns.map((c) => escape(c.header)).join(',');
+  const body = rows.map((row) => columns.map((c) => escape(row[c.key])).join(','));
+  return [header, ...body].join('\r\n');
+}
+
+export function sendCsv(res: Response, csv: string, filename: string): void {
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename.replace(/[^A-Za-z0-9._-]/g, '_')}"`);
+  // BOM so Excel opens Indian names and the ₹ sign without mangling them.
+  res.send(`\uFEFF${csv}`);
+}
+
+export async function sendXlsx(res: Response, rows: ReportRow[], filename: string, meta: { filterSummary: string }): Promise<void> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.created = new Date();
+  const sheet = workbook.addWorksheet('Attendance');
+
+  sheet.columns = COLUMNS.map((c) => ({ header: c.header, key: c.key, width: Math.max(12, c.header.length + 4) }));
+
+  sheet.getRow(1).font = { bold: true };
+  sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
+  sheet.autoFilter = {
+    from: { row: 1, column: 1 },
+    to: { row: 1, column: COLUMNS.length },
+  };
+
+  for (const row of rows) {
+    sheet.addRow(COLUMNS.map((c) => (row[c.key] === null ? '' : row[c.key])));
+  }
+
+  const notes = workbook.addWorksheet('About');
+  notes.getCell('A1').value = 'BSC Textiles HRMS — biometric attendance report';
+  notes.getCell('A2').value = `Generated: ${new Date().toISOString()}`;
+  notes.getCell('A3').value = `Filters: ${meta.filterSummary}`;
+  notes.getCell('A4').value = 'Times are shown in the timezone the recording device is configured for; the UTC column is also included.';
+  notes.getCell('A5').value = 'An empty Photo column means this firmware did not push a snapshot for that punch.';
+
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename.replace(/[^A-Za-z0-9._-]/g, '_')}"`);
+  await workbook.xlsx.write(res);
+  res.end();
+}
+
+export function describeFilters(filters: ReportFilters, timeZone: string): string {
+  const parts: string[] = [`timezone=${timeZone}`];
+  if (filters.from) parts.push(`from=${filters.from}`);
+  if (filters.to) parts.push(`to=${filters.to}`);
+  if (filters.employeeId) parts.push(`employee=${filters.employeeId}`);
+  if (filters.employeeQuery) parts.push(`search="${filters.employeeQuery}"`);
+  if (filters.verifyMethod?.length) parts.push(`mode=${filters.verifyMethod.join('|')}`);
+  if (filters.serialNumber) parts.push(`serial=${filters.serialNumber}`);
+  if (filters.deviceId) parts.push(`device=${filters.deviceId}`);
+  if (filters.locationCode) parts.push(`location=${filters.locationCode}`);
+  return parts.join(' ');
+}
+
+export { COLUMNS as REPORT_COLUMNS };

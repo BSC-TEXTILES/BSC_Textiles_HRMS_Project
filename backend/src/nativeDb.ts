@@ -30,7 +30,7 @@ const isSqlite =
 const isMysql = !isPostgres && !isSqlite;
 
 const connectionUri = isPostgres
-  ? process.env.SUPABASE_POOLER_URL || process.env.SUPABASE_DB_URL || rawUri || 'postgresql://postgres:postgres@localhost:5432/postgres'
+  ? process.env.SUPABASE_POOLER_URL || process.env.SUPABASE_DB_URL || rawUri
   : rawUri || 'mysql://root@localhost:3306/bsc_textiles_hrms';
 
 console.log(
