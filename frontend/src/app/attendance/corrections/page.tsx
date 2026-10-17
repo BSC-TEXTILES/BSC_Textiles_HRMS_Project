@@ -402,7 +402,7 @@ export default function AttendanceCorrectionsPage() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#1346a1] opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1346a1]"></span>
                 </span>
-                Active Pay Cycle: 21 Oct - 27 Oct 2024
+                Active Pay Cycle: 11 Oct - 17 Oct 2026
               </div>
               <div className="inline-flex items-center gap-1.5 text-slate-600 text-xs bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/60 font-medium">
                 <span className="material-symbols-outlined text-[15px] text-[#1346a1]">verified_user</span>

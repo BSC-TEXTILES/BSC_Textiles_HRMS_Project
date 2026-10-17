@@ -24,19 +24,19 @@ export async function setupCustodyAssets() {
 
   const [countRows]: any = await pool.query('SELECT count(*) as c FROM employee_custody_assets');
   if (countRows[0].c === 0) {
-    const [emps]: any = await pool.query('SELECT id, employeeCode, fullName, locationId FROM employee LIMIT 50');
+    const [emps]: any = await pool.query('SELECT id, employeeCode, fullName, locationId FROM employee WHERE status = "ACTIVE"');
     for (const emp of emps) {
-      const codeSuffix = (emp.employeeCode || '4029').replace(/[^0-9]/g, '').slice(-4) || '4029';
+      const codeSuffix = (emp.employeeCode || '1001').replace(/[^0-9]/g, '').slice(-4) || '1001';
       await pool.query(
         `INSERT INTO employee_custody_assets (id, employeeId, assetName, assetType, serialNumber, locationId, status, notes)
          VALUES 
          (CONCAT('asset_', UUID()), ?, 'Zebra TC52 Touch Computer', 'HANDHELD_SCANNER', ?, ?, 'ASSIGNED', 'Handheld 2D Barcode RFID Scanner'),
-         (CONCAT('asset_', UUID()), ?, 'Staff Locker Key #B-14', 'STAFF_LOCKER', 'KEY-B14-LKR', ?, 'ASSIGNED', 'Basement Locker Wing B'),
-         (CONCAT('asset_', UUID()), ?, 'Security RFID Keycard', 'RFID_SECURITY_CARD', '#BEL-VLT-12', ?, 'ASSIGNED', 'Vault Level 1 Active Security Credential')`,
+         (CONCAT('asset_', UUID()), ?, 'Staff Locker Key', 'STAFF_LOCKER', ?, ?, 'ASSIGNED', 'Staff Locker Wing A'),
+         (CONCAT('asset_', UUID()), ?, 'Security RFID Keycard', 'RFID_SECURITY_CARD', ?, ?, 'ASSIGNED', 'Floor Active Security Credential')`,
         [
-          emp.id, `SN: #TC52-BEL-${codeSuffix}`, emp.locationId,
-          emp.id, emp.locationId,
-          emp.id, emp.locationId,
+          emp.id, `SN: #TC52-DAV-${codeSuffix}`, emp.locationId,
+          emp.id, `KEY-DAV-${codeSuffix}-LKR`, emp.locationId,
+          emp.id, `#DAV-RFID-${codeSuffix}`, emp.locationId,
         ]
       );
     }

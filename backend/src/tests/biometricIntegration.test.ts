@@ -19,7 +19,7 @@ export interface TestResult {
 
 export async function runBiometricIntegrationTests(baseUrl: string, adminToken: string): Promise<TestResult[]> {
   const results: TestResult[] = [];
-  const CONNECTOR_KEY = process.env.BIOMETRIC_CONNECTOR_KEY || 'bsc-biometric-connector-secret-key-2024';
+  const CONNECTOR_KEY = process.env.BIOMETRIC_CONNECTOR_KEY || 'bsc-dev-connector-key-not-for-production';
 
   async function recordTest(name: string, fn: () => Promise<any>) {
     const start = Date.now();

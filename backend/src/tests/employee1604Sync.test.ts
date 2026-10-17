@@ -64,14 +64,15 @@ async function runTests() {
     assert(ingest2.duplicates >= 1 && ingest2.inserted === 0, 'Deduplication works: identical punch is rejected with zero duplicate insertion');
 
     // 5. Test Dedicated Employee Attendance API
-    const secret = process.env.JWT_SECRET || 'test-mock-jwt-secret-for-offline-unit-tests-only';
-    const token = jwt.sign(
-      { userId: 'cmuwszr8b00001vdt6ldrzqdn', email: 'admin@bsctextiles.com', role: 'SUPER_ADMIN' },
-      secret,
-      { expiresIn: '1h' }
-    );
+    const loginRes = await fetch('http://127.0.0.1:4000/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@bsctextiles.com', password: 'password123' }),
+    });
+    const loginData: any = await loginRes.json();
+    const token = loginData.token;
 
-    const res = await fetch('http://localhost:4000/api/attendance/employee/1604?year=2026&month=10', {
+    const res = await fetch('http://127.0.0.1:4000/api/attendance/employee/1604?year=2026&month=10', {
       headers: { Authorization: `Bearer ${token}` },
     });
     const apiData: any = await res.json();
@@ -80,7 +81,7 @@ async function runTests() {
     assert(apiData.data?.dailyRecords?.length === 31, `API returns exactly 31 daily calendar rows for October 2026 (got: ${apiData.data?.dailyRecords?.length})`);
     assert(apiData.data?.dailyRecords[1]?.status === 'HOLIDAY', 'Oct 2 is classified as Holiday (Gandhi Jayanti)');
     assert(apiData.data?.dailyRecords[3]?.status === 'WEEKLY_OFF', 'Oct 4 is classified as Weekly Off (Sunday)');
-    assert(apiData.data?.dailyRecords[16]?.isFutureDate === true, 'Oct 17 is classified as Future Date');
+    assert(apiData.data?.dailyRecords[30]?.isFutureDate === true, 'Oct 31 is classified as Future Date');
 
     // 6. Verify No Raw IP Addresses Leaked in Output
     const jsonStr = JSON.stringify(apiData);

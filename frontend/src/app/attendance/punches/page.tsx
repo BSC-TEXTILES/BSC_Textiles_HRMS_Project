@@ -510,7 +510,7 @@ export default function BiometricPunchesPage() {
                 <tr>
                   <th className="py-2.5 px-4">Employee</th>
                   <th className="py-2.5 px-4">Location / Hub</th>
-                  <th className="py-2.5 px-4">Punch Time</th>
+                  <th className="py-2.5 px-4">Punch Date & Time</th>
                   <th className="py-2.5 px-4">Terminal Status</th>
                   <th className="py-2.5 px-4">AI Liveness</th>
                   <th className="py-2.5 px-4">Early Incentive</th>
@@ -536,6 +536,12 @@ export default function BiometricPunchesPage() {
                     const emp = punch.employee || {};
                     const isEarly = Number(punch.earlyLoginIncentive) > 0;
                     const isLate = Number(punch.lateLoginPenalty) > 0;
+                    const loginDate = punch.actualLogin
+                      ? new Date(punch.actualLogin)
+                      : punch.attendanceDate
+                      ? new Date(punch.attendanceDate)
+                      : new Date();
+                    const dateFormatted = loginDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
                     const timeFormatted = punch.actualLogin
                       ? new Date(punch.actualLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
                       : '09:12 AM';
@@ -565,8 +571,9 @@ export default function BiometricPunchesPage() {
                             {punch.location?.name || 'Belagavi Head Store'}
                           </span>
                         </td>
-                        <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-300 font-medium">
-                          {timeFormatted}
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-slate-800 dark:text-slate-200 text-xs">{dateFormatted}</div>
+                          <div className="font-mono text-slate-500 dark:text-slate-400 text-[11px] font-medium">{timeFormatted}</div>
                         </td>
                         <td className="py-3 px-4">
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 border border-[#dce9ff] dark:border-blue-900">

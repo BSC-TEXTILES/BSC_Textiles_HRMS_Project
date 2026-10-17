@@ -56,8 +56,8 @@ export default function AttendanceRegisterPage() {
   const [locations, setLocations] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedYear, setSelectedYear] = useState<number>(2024);
-  const [selectedMonth, setSelectedMonth] = useState<number>(10); // October default
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
   const [loading, setLoading] = useState(true);
 
   // Matrix stored as: { [employeeId]: { [dayNum]: DayAttendanceRecord } }
@@ -362,6 +362,7 @@ export default function AttendanceRegisterPage() {
                   <option value={2024}>2024</option>
                   <option value={2025}>2025</option>
                   <option value={2026}>2026</option>
+                  <option value={2027}>2027</option>
                 </select>
               </div>
 

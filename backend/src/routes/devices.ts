@@ -652,9 +652,22 @@ router.post('/', authorize('EDIT'), async (req: AuthRequest, res) => {
       });
     }
     const { serialNumber, name, model, firmwareVersion, ipAddress, port, commKey, timezone, locationCode, protocol, floorId, sectionId } = req.body;
-    if (!serialNumber || !name || !ipAddress || !locationCode) {
-      return res.status(400).json({ error: 'serialNumber, name, ipAddress and locationCode are required' });
+    const DAVANGERE_EXCLUSIVE_SERIALS = new Set([
+      'JNP2252300795',
+      'JNP2252300802',
+      'JNPJNP2252300802',
+      'JNP2252300797',
+      (process.env.BIOMETRIC_DEV1_SERIAL || '').trim(),
+      (process.env.BIOMETRIC_DEV2_SERIAL || '').trim(),
+      (process.env.BIOMETRIC_DEV3_SERIAL || '').trim(),
+    ].filter(Boolean));
+
+    if (DAVANGERE_EXCLUSIVE_SERIALS.has(String(serialNumber).trim()) && locationCode.toUpperCase() !== 'DAV') {
+      return res.status(400).json({
+        error: `Hardware terminal ${serialNumber} belongs exclusively to Davangere and cannot be registered under ${locationCode}.`,
+      });
     }
+
     // registerBiometricDevice upserts by serial, so without this a "new" device
     // whose serial already exists silently rewrites the existing terminal's
     // name, floor and section instead of failing. Two devices on one serial is
@@ -746,6 +759,22 @@ router.put('/:id', authorize('EDIT'), async (req: AuthRequest, res) => {
     if (!existing) return res.status(404).json({ error: 'Device not found' });
     if (!checkDeviceLocationAccess(req.user, existing.locationId, existing.locationCode)) {
       return res.status(403).json({ error: 'Forbidden: device belongs to another showroom' });
+    }
+
+    const DAVANGERE_EXCLUSIVE_SERIALS = new Set([
+      'JNP2252300795',
+      'JNP2252300802',
+      'JNPJNP2252300802',
+      'JNP2252300797',
+      (process.env.BIOMETRIC_DEV1_SERIAL || '').trim(),
+      (process.env.BIOMETRIC_DEV2_SERIAL || '').trim(),
+      (process.env.BIOMETRIC_DEV3_SERIAL || '').trim(),
+    ].filter(Boolean));
+
+    if (locationCode && locationCode.toUpperCase() !== 'DAV' && DAVANGERE_EXCLUSIVE_SERIALS.has(String(existing.serialNumber).trim())) {
+      return res.status(400).json({
+        error: `Terminal ${existing.serialNumber} is permanently bound to Davangere showroom and cannot be moved to ${locationCode}.`,
+      });
     }
 
     if (port !== undefined && (Number(port) < 1 || Number(port) > 65535)) {
