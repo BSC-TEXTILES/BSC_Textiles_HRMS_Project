@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { HrSuperAdminDashboard } from '@/components/dashboard/HrSuperAdminDashboard';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
 import Link from 'next/link';
@@ -44,6 +45,9 @@ import {
 
 export default function MyDeskPage() {
   const { data: session } = useSession();
+
+  // Dual mode: Default to HR / Super Admin Command Center, allow toggle to personal employee desk
+  const [deskMode, setDeskMode] = useState<'hr-admin' | 'personal'>('hr-admin');
 
   // Selected period for Monthly Velocity
   const [selectedYear, setSelectedYear] = useState<number>(2024);
@@ -403,11 +407,51 @@ export default function MyDeskPage() {
 
   return (
     <DashboardLayout>
-      <div className="w-full space-y-6 text-slate-800 dark:text-slate-100">
-        {/* ========================================================= */}
-        {/* 1. TOP FULL-WIDTH CARD: EMPLOYEE PROFILE SUMMARY + ACTIONS */}
-        {/* ========================================================= */}
-        <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-5 sm:p-6 lg:p-7 relative overflow-hidden transition-colors">
+      <div className="w-full space-y-6 text-slate-800 dark:text-slate-100 max-w-[1920px] mx-auto">
+        {/* VIEW SELECTOR: HR COMMAND CENTER vs MY PERSONAL DESK */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white dark:bg-[#131d36] p-2.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs">
+          <div className="flex items-center gap-2">
+            <div className="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700/80">
+              <button
+                type="button"
+                onClick={() => setDeskMode('hr-admin')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  deskMode === 'hr-admin'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>HR Command Center (Super Admin)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeskMode('personal')}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  deskMode === 'personal'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Fingerprint className="w-4 h-4" />
+                <span>Personal Employee Desk (Clock-In & Payslips)</span>
+              </button>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-500 dark:text-slate-400 pr-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Karnataka Multi-Hub Operations Live</span>
+          </div>
+        </div>
+
+        {deskMode === 'hr-admin' ? (
+          <HrSuperAdminDashboard />
+        ) : (
+          <div className="space-y-6">
+            {/* ========================================================= */}
+            {/* 1. TOP FULL-WIDTH CARD: EMPLOYEE PROFILE SUMMARY + ACTIONS */}
+            {/* ========================================================= */}
+            <section className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-5 sm:p-6 lg:p-7 relative overflow-hidden transition-colors">
           <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-blue-50/80 via-indigo-50/40 to-transparent dark:from-blue-900/20 dark:via-indigo-900/10 rounded-full -mr-20 -mt-20 pointer-events-none" />
 
           <div className="relative flex flex-col xl:flex-row xl:items-center justify-between gap-6">
@@ -1787,6 +1831,8 @@ export default function MyDeskPage() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
           </div>
         )}
       </div>
