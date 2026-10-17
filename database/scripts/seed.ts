@@ -24,7 +24,7 @@ async function seed() {
     await pool.end();
     process.exit(1);
   }
-  const [userRows]: any = await pool.query('SELECT COUNT(*) AS n FROM `User`');
+  const [userRows]: any = await pool.query('SELECT COUNT(*) AS n FROM `user`');
   if (Number(userRows[0].n) > 0) {
     console.log(`⏩ Baseline data already present (${userRows[0].n} users). Skipping seed.`);
     console.log('   (Seeds only run against empty databases; existing business data is preserved.)');

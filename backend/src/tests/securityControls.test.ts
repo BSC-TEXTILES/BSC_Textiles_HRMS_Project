@@ -245,7 +245,7 @@ test('db', 'setup: create a test subject through the credential service', async 
   if (!admins?.length) {
     const fallbackId = `admin-fallback-${UNIQUE}`;
     await pool.query(
-      "INSERT INTO `user` (`id`, `email`, `role`, `fullName`, `isActive`, `createdAt`, `updatedAt`) VALUES (?, ?, 'ADMIN', 'CI Admin', 1, NOW(), NOW())",
+      "INSERT INTO `user` (`id`, `email`, `role`, `fullName`, `passwordHash`, `isActive`, `createdAt`, `updatedAt`) VALUES (?, ?, 'ADMIN', 'CI Admin', '$argon2id$v=19$m=65536,t=3,p=4$dummyhash', 1, NOW(), NOW())",
       [fallbackId, `admin-${UNIQUE}@bsctextiles.com`]
     );
     admins = [{ id: fallbackId }];
