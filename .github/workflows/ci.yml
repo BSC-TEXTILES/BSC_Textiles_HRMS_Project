@@ -45,6 +45,8 @@ jobs:
 
       - name: Gitleaks
         uses: gitleaks/gitleaks-action@v2
+        with:
+          config-path: .gitleaks.toml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -141,7 +143,7 @@ jobs:
       # the security config stops warning about them, not because they are real.
       PASSWORD_PEPPER: ci-only-pepper-not-a-real-secret-value
       TOKEN_KEY_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
-      HIRING_ENCRYPTION_KEY: Y2ktb25seS1oaXJpbmcta2V5LW5vdC1hLXJlYWwtc2VjcmV0
+      HIRING_ENCRYPTION_KEY: ci-test-hiring-encryption-key-000
       NEXTAUTH_SECRET: ci-only-nextauth-secret-not-for-production
       JWT_SECRET: ci-only-hmac-secret-not-for-production-32chars
       CORS_ALLOWLIST: http://localhost:3000
