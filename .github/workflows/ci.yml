@@ -68,11 +68,11 @@ jobs:
       - name: .env must not be committed
         run: |
           set -euo pipefail
-          if git ls-files | grep -E '^\.env$|^\.env\.[^l]'; then
+          if git ls-files | grep -E '(^|/)\.env' | grep -v '\.example$' | grep -q .; then
             echo "::error::A real environment file is tracked by git."
             exit 1
           fi
-          echo "Only .env.example is tracked."
+          echo "Only .env.example files are tracked."
 
   # ---------------------------------------------------------------------------
   deps:
