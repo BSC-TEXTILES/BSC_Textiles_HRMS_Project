@@ -13,7 +13,11 @@ import { BscHolidaysCalendar } from '@/components/dashboard/BscHolidaysCalendar'
 import { KarnatakaHubsCardSection } from '@/components/dashboard/KarnatakaHubsCardSection';
 import { LiveActivitiesSection } from '@/components/dashboard/LiveActivitiesSection';
 import { ExecutiveShiftFilter, type ShiftOptionItem } from '@/components/dashboard/ExecutiveShiftFilter';
-import { ExecutiveDeptFilter, type DeptOptionItem } from '@/components/dashboard/ExecutiveDeptFilter';
+import {
+  ExecutiveDeptFilter,
+  type DeptOptionItem,
+  dashboardDepartmentOptions,
+} from '@/components/dashboard/ExecutiveDeptFilter';
 import { SHIFT_I_LABEL } from '@/config/shiftPolicyConfig';
 import type { CreatedCustomShift } from '@/components/dashboard/ExecutiveCustomShiftDialog';
 import { ExecutiveHeaderSearch } from '@/components/dashboard/ExecutiveHeaderSearch';
@@ -102,14 +106,7 @@ const DEFAULT_HUBS = [
   { id: 'SHI', code: 'SHI', name: 'Shivamogga Hub (SHI-03)' },
 ];
 
-const DEFAULT_DEPTS = [
-  { id: 'SALES', name: 'Sales & Retail' },
-  { id: 'OPS', name: 'Store Operations' },
-  { id: 'HR', name: 'Human Resources' },
-  { id: 'FIN', name: 'Finance & Accounts' },
-  { id: 'INV', name: 'Inventory & Logistics' },
-  { id: 'CS', name: 'Customer Service & Billing' },
-];
+const DEFAULT_DEPTS = dashboardDepartmentOptions;
 
 const DEFAULT_SHIFTS: ShiftOptionItem[] = [
   {
@@ -581,22 +578,13 @@ export default function DashboardPage() {
     loadShiftOptions(selectedHub);
   }, [selectedHub, loadShiftOptions]);
 
-  // Load department and location options dynamically from backend
+  // Load hub location options dynamically from backend
   useEffect(() => {
     let ignore = false;
-    const loadDeptsAndLocs = async () => {
+    const loadHubLocations = async () => {
       try {
-        const loc = selectedHub !== 'all' ? `&locationId=${selectedHub}` : '';
-        const [deptRes, locRes] = await Promise.all([
-          api.get(`/departments?limit=100${loc}`).catch(() => ({ data: null })),
-          api.get('/locations/all').catch(() => ({ data: null })),
-        ]);
+        const locRes = await api.get('/locations/all').catch(() => ({ data: null }));
         if (!ignore) {
-          const dList = deptRes.data?.departments || deptRes.data || [];
-          if (Array.isArray(dList) && dList.length > 0) {
-            setDeptOptions(dList.map((d: any) => ({ id: d.id, name: d.name })));
-          }
-
           const lList = locRes.data;
           if (Array.isArray(lList) && lList.length > 0) {
             setHubOptions([
@@ -610,16 +598,14 @@ export default function DashboardPage() {
           }
         }
       } catch {
-        if (!ignore) {
-          setDeptOptions(DEFAULT_DEPTS);
-        }
+        // Safe fallback already in hubOptions initial state
       }
     };
-    loadDeptsAndLocs();
+    loadHubLocations();
     return () => {
       ignore = true;
     };
-  }, [selectedHub]);
+  }, []);
 
   const handleCustomShiftCreated = (newShift: CreatedCustomShift) => {
     shiftCacheRef.current = {};
@@ -826,22 +812,11 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Department Filter */}
-                <div className="flex items-center gap-1.5 bg-white dark:bg-[#0c1424] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs text-xs group hover:border-[#0058be] dark:hover:border-blue-500 transition-colors">
-                  <span className="material-symbols-outlined text-slate-400 text-[16px] group-hover:scale-110 transition-transform">category</span>
-                  <span className="text-[10px] uppercase text-slate-400 font-bold">Dept:</span>
-                  <select
-                    value={selectedDept}
-                    onChange={(e) => setSelectedDept(e.target.value)}
-                    className="bg-transparent font-semibold text-xs text-[#0b1c30] dark:text-slate-100 focus:outline-none cursor-pointer pr-1"
-                  >
-                    <option value="all" className="dark:bg-[#0c1424]">All Departments</option>
-                    {deptOptions.map((d) => (
-                      <option key={d.id} value={d.id} className="dark:bg-[#0c1424]">
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <ExecutiveDeptFilter
+                  selectedDeptId={selectedDept}
+                  onSelectDept={(id) => setSelectedDept(id)}
+                  deptOptions={deptOptions}
+                />
 
                 {/* Date Filter with Quick Today/Yesterday toggles */}
                 <div className="flex items-center gap-1.5 bg-white dark:bg-[#0c1424] px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 shadow-xs text-xs group hover:border-[#0058be] dark:hover:border-blue-500 transition-colors">
