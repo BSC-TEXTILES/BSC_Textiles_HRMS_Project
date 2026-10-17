@@ -363,9 +363,12 @@ async function run(): Promise<void> {
       passed++;
       console.log(`  ✔ ${testCase.name} (${Date.now() - started}ms)`);
     } catch (err: any) {
-      failures.push({ group: testCase.group, name: testCase.name, error: err?.message || String(err) });
+      const errDetail = err?.stack || err?.message || String(err);
+      failures.push({ group: testCase.group, name: testCase.name, error: errDetail });
       console.log(`  ✖ ${testCase.name}`);
-      console.log(`      ${err?.message || err}`);
+      console.log(`      ${errDetail}`);
+      const encodedMsg = errDetail.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+      console.log(`::error title=RBAC Failed [${testCase.group}: ${testCase.name}]::${encodedMsg}`);
     }
   }
 
@@ -385,6 +388,9 @@ async function run(): Promise<void> {
 }
 
 run().catch((err) => {
+  const errDetail = err?.stack || err?.message || String(err);
+  const encodedMsg = errDetail.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  console.log(`::error title=RBAC Runner Crash::${encodedMsg}`);
   console.error('Test runner failed:', err);
   process.exit(1);
 });

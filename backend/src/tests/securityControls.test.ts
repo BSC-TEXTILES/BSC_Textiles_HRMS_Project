@@ -245,8 +245,8 @@ test('db', 'setup: create a test subject through the credential service', async 
   if (!admins?.length) {
     const fallbackId = `admin-fallback-${UNIQUE}`;
     await pool.query(
-      "INSERT INTO `user` (`id`, `email`, `role`, `fullName`, `passwordHash`, `isActive`, `createdAt`, `updatedAt`) VALUES (?, ?, 'ADMIN', 'CI Admin', '$argon2id$v=19$m=65536,t=3,p=4$dummyhash', 1, NOW(), NOW())",
-      [fallbackId, `admin-${UNIQUE}@bsctextiles.com`]
+      "INSERT INTO `user` (`id`, `email`, `loginId`, `role`, `fullName`, `passwordHash`, `isActive`, `status`, `accessStatus`, `createdAt`, `updatedAt`) VALUES (?, ?, ?, 'ADMIN', 'CI Admin', '$argon2id$v=19$m=65536,t=3,p=4$dummyhash', 1, 'ACTIVE', 'ACTIVE', NOW(), NOW())",
+      [fallbackId, `admin-${UNIQUE}@bsctextiles.com`, `admin_${UNIQUE}`]
     );
     admins = [{ id: fallbackId }];
     CREATED_FALLBACK_ADMIN = true;
@@ -637,9 +637,12 @@ async function run(): Promise<void> {
       passed++;
       console.log(`  ✔ ${testCase.name} (${Date.now() - started}ms)`);
     } catch (err: any) {
-      failures.push({ group: testCase.group, name: testCase.name, error: err?.message || String(err) });
+      const errDetail = err?.stack || err?.message || String(err);
+      failures.push({ group: testCase.group, name: testCase.name, error: errDetail });
       console.log(`  ✖ ${testCase.name}`);
-      console.log(`      ${err?.message || err}`);
+      console.log(`      ${errDetail}`);
+      const encodedMsg = errDetail.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+      console.log(`::error title=SecurityControls Failed [${testCase.group}: ${testCase.name}]::${encodedMsg}`);
     }
   }
 
@@ -660,6 +663,9 @@ async function run(): Promise<void> {
 
 
 run().catch((err) => {
+  const errDetail = err?.stack || err?.message || String(err);
+  const encodedMsg = errDetail.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  console.log(`::error title=SecurityControls Runner Crash::${encodedMsg}`);
   console.error('Test runner failed:', err);
   process.exit(1);
 });
