@@ -18,7 +18,19 @@ import {
 import { pool } from '../nativeDb.js';
 
 const router = Router();
-const CONNECTOR_KEY = process.env.BIOMETRIC_CONNECTOR_KEY || 'bsc-biometric-connector-secret-key-2024';
+
+function getBiometricConnectorKey(): string {
+  const key = process.env.BIOMETRIC_CONNECTOR_KEY;
+  if (!key || key.trim().length === 0) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('Security Error: BIOMETRIC_CONNECTOR_KEY must be configured in production.');
+    }
+    return 'bsc-dev-connector-key-not-for-production';
+  }
+  return key.trim();
+}
+
+const CONNECTOR_KEY = getBiometricConnectorKey();
 
 // The three Davangere devices are permanently and exclusively bound to DAV
 const DAVANGERE_PERMANENT_SERIALS = ['JNP2252300795', 'JNPJNP2252300802', 'JNP2252300802', 'JNP2252300797'];

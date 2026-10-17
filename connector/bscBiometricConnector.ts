@@ -19,7 +19,7 @@ import { ZkProtocolClient, ZkAttendanceRecord } from '../backend/src/services/zk
 
 // Configuration (Loaded from environment or fallback defaults)
 const CLOUD_API_URL = process.env.CLOUD_API_URL || 'http://localhost:4000/api';
-const CONNECTOR_KEY = process.env.BIOMETRIC_CONNECTOR_KEY || 'bsc-biometric-connector-secret-key-2024';
+const CONNECTOR_KEY = process.env.BIOMETRIC_CONNECTOR_KEY || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('BIOMETRIC_CONNECTOR_KEY must be provided in production'); })() : 'bsc-dev-connector-key-not-for-production');
 const POLL_INTERVAL_SECONDS = Number(process.env.CONNECTOR_POLL_INTERVAL) || 30;
 const HEALTH_PORT = Number(process.env.CONNECTOR_HEALTH_PORT) || 4371;
 

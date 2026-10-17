@@ -123,7 +123,7 @@ export default withAuth(
     pages: {
       signIn: '/login',
     },
-    secret: process.env.NEXTAUTH_SECRET || 'bsc-textiles-hrms-super-secret-jwt-key-2024-production-ready-32chars',
+    secret: process.env.NEXTAUTH_SECRET || (process.env.NODE_ENV === 'production' ? undefined : 'bsc-dev-local-secret-not-for-prod-32c'),
     callbacks: {
       authorized: ({ token, req }: { token: any; req: any }) => {
         const pathname = req.nextUrl.pathname;

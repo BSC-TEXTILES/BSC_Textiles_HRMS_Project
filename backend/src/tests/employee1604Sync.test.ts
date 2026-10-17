@@ -64,7 +64,7 @@ async function runTests() {
     assert(ingest2.duplicates >= 1 && ingest2.inserted === 0, 'Deduplication works: identical punch is rejected with zero duplicate insertion');
 
     // 5. Test Dedicated Employee Attendance API
-    const secret = process.env.JWT_SECRET || 'bsc-textiles-hrms-super-secret-jwt-key-2024-production-ready-32chars';
+    const secret = process.env.JWT_SECRET || 'test-mock-jwt-secret-for-offline-unit-tests-only';
     const token = jwt.sign(
       { userId: 'cmuwszr8b00001vdt6ldrzqdn', email: 'admin@bsctextiles.com', role: 'SUPER_ADMIN' },
       secret,

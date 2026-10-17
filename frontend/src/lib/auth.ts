@@ -105,26 +105,8 @@ export const authOptions: NextAuthOptions = {
           },
         };
 
-        const seedUser = ENTERPRISE_SEED_USERS[cleanEmail];
-        if (seedUser) {
-          if (
-            cleanPassword === 'password123' ||
-            cleanPassword === 'admin123' ||
-            cleanPassword === 'Admin@123' ||
-            cleanPassword === 'Admin123'
-          ) {
-            return {
-              id: seedUser.id,
-              email: seedUser.email,
-              name: seedUser.name,
-              role: seedUser.role,
-              permissions: seedUser.permissions,
-              locationId: seedUser.locationId,
-              employeeId: seedUser.employeeId,
-              token: `bsc_tok_${seedUser.id}_${Date.now()}`,
-            };
-          }
-        }
+        // 1. Authoritative Backend Authentication via Express/Supabase service
+        // All logins are verified with Argon2/bcrypt hashes in database with rate-limiting and audit logging.
 
         // 2. Query backend services for other dynamic accounts
         let response: Response | null = null;
@@ -234,5 +216,5 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET || 'bsc-textiles-hrms-super-secret-jwt-key-2024-production-ready-32chars',
+  secret: process.env.NEXTAUTH_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('NEXTAUTH_SECRET must be configured in production'); })() : 'bsc-dev-local-secret-not-for-prod-32c'),
 };
