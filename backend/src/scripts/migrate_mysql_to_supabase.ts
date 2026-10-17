@@ -228,7 +228,16 @@ export async function runMigration(supabaseConnString: string) {
   await pgClient.end();
 }
 
-const targetConn = process.argv[2] || process.env.SUPABASE_DB_URL || 'postgresql://postgres:postgres@localhost:5432/postgres';
+const targetConn =
+  process.argv[2] ||
+  process.env.SUPABASE_DB_URL ||
+  process.env.SUPABASE_POOLER_URL ||
+  process.env.DATABASE_URL;
+
+if (!targetConn) {
+  console.error('[Error] SUPABASE_DB_URL or target connection string argument is required.');
+  process.exit(1);
+}
 
 runMigration(targetConn).catch(err => {
   console.error('Migration aborted:', err);
