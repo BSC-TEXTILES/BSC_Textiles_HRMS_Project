@@ -149,11 +149,13 @@ export function fromUtcMysqlString(value: unknown): Date | null {
   if (value === null || value === undefined) return null;
 
   if (value instanceof Date) {
-    // The pool decodes DATETIME with its pinned session timezone, so a stored
-    // UTC wall time arrives shifted. Reconstruct it from the displayed digits.
+    // The pool decodes DATETIME with its pinned session timezone (+05:30), so a stored
+    // UTC wall time arrives anchored to Asia/Kolkata. Reconstruct it from the Asia/Kolkata
+    // wall digits rather than host-local getHours() which varies by runner OS.
+    const w = instantToWallParts(value, 'Asia/Kolkata');
     const wall =
-      `${pad(value.getFullYear(), 4)}-${pad(value.getMonth() + 1)}-${pad(value.getDate())} ` +
-      `${pad(value.getHours())}:${pad(value.getMinutes())}:${pad(value.getSeconds())}.${pad(value.getMilliseconds(), 3)}`;
+      `${pad(w.year, 4)}-${pad(w.month)}-${pad(w.day)} ` +
+      `${pad(w.hour)}:${pad(w.minute)}:${pad(w.second)}.${pad(w.ms, 3)}`;
     return new Date(`${wall.replace(' ', 'T')}Z`);
   }
 

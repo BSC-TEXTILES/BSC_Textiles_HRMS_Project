@@ -49,7 +49,7 @@ export const mysqlPool: Pool = isMysql
       keepAliveInitialDelay: 10000,
       decimalNumbers: true,
       dateStrings: false,
-      timezone: process.env.DB_TIMEZONE || (process.env.NODE_ENV === 'test' ? 'Z' : '+05:30'),
+      timezone: '+05:30',
       multipleStatements: true,
     })
   : (null as unknown as Pool);
