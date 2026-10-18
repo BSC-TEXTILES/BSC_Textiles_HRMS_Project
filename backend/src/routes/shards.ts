@@ -28,10 +28,13 @@ shardsRouter.get('/', async (req: AuthRequest, res: Response) => {
     const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
     const shards = await shardRegistry.getAllShards();
 
-    // If not super admin, filter only the user's assigned shard
+    // If not super admin, filter only the user's assigned shard. The shard id
+    // was being rebuilt from the raw location CUID, which never matches a
+    // registry row; `authenticate` already resolved the shard for this user.
+    const ownShardId = req.user?.databaseId || req.user?.database_id || 'BSC-SHARD-HQ-001';
     const visibleShards = isSuperAdmin
       ? shards
-      : shards.filter((s) => s.database_id === (req.user?.locationId ? `BSC-SHARD-${req.user.locationId}-001` : 'BSC-SHARD-HQ-001'));
+      : shards.filter((s) => s.database_id === ownShardId);
 
     return res.json({
       success: true,

@@ -1,3 +1,4 @@
+import { bootFixturesAllowed } from '../config/bootFixtures.js';
 import { pool } from '../db.js';
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -9,8 +10,12 @@ function genId(prefix: string) {
 
 const STORAGE_DIR = path.resolve(process.cwd(), 'storage/secure');
 
-export async function setupEmployeeDocuments() {
-  console.log('--- Initializing Employee Document Management Schema & Seed Data ---');
+/**
+ * Reference data only: the table plus the document-type catalogue.
+ * Idempotent and required at boot — the upload screens cannot work without it.
+ */
+export async function seedDocumentReferenceConfig() {
+  console.log('--- Employee document configuration (reference data) ---');
 
   await fs.mkdir(STORAGE_DIR, { recursive: true });
 
@@ -130,6 +135,28 @@ export async function setupEmployeeDocuments() {
 
   console.log(`Document types seeded (${defaultDocTypes.length} types).`);
 
+  return defaultDocTypes.length;
+}
+
+/**
+ * Development fixtures: sample files and invented document dossiers.
+ *
+ * This used to run from the API process on every boot and opened with
+ * `DELETE FROM employee_documents` — which destroyed every document a real HR
+ * user had uploaded and replaced it with fabricated rows attributed to invented
+ * staff. It is now opt-in (see config/bootFixtures.ts), never wipes the table,
+ * and its own rows carry a `docfix_` id so they can be recognised and re-seeded
+ * without touching anything else.
+ */
+export async function seedDocumentDossierFixtures() {
+  const [alreadySeeded]: any = await pool.query(
+    "SELECT COUNT(*) AS n FROM employee_documents WHERE id LIKE 'docfix_%'"
+  );
+  if (Number(alreadySeeded[0]?.n || 0) > 0) {
+    console.log(`Document fixtures already present (${alreadySeeded[0].n}); leaving them as they are.`);
+    return 0;
+  }
+
   // 4. Create sample sample_doc.pdf in storage/secure
   const samplePdfPath = path.join(STORAGE_DIR, 'sample_document.pdf');
   const samplePdfContent = Buffer.from(
@@ -153,9 +180,8 @@ export async function setupEmployeeDocuments() {
 
   console.log(`Found ${employees.length} employees to populate with document dossiers.`);
 
-  // Clear existing employee_documents to prevent stale artifacts
-  await pool.query('DELETE FROM employee_documents');
-
+  // No blanket DELETE: real uploads must survive a re-seed. Fixture rows are
+  // identified by their `docfix_` id prefix instead.
   let insertedDocsCount = 0;
 
   for (let i = 0; i < employees.length; i++) {
@@ -210,7 +236,7 @@ export async function setupEmployeeDocuments() {
         'STRICTLY_CONFIDENTIAL', 'Official identity proof', '[]', ?, NOW(3)
       )
     `, [
-      genId('doc'), emp.id, aadhaarNumber, samplePdfPath,
+      genId('docfix'), emp.id, aadhaarNumber, samplePdfPath,
       aadhaarStatus, aadhaarStatus === 'VERIFIED' ? 'usr_hr_01' : null,
       aadhaarStatus === 'VERIFIED' ? 'Kavita Bhat' : null,
       aadhaarStatus === 'VERIFIED' ? new Date('2026-10-02T14:30:00Z') : null,
@@ -235,7 +261,7 @@ export async function setupEmployeeDocuments() {
         'CONFIDENTIAL', 'Income Tax identity verification', '[]', ?, NOW(3)
       )
     `, [
-      genId('doc'), emp.id, panNumber, samplePdfPath,
+      genId('docfix'), emp.id, panNumber, samplePdfPath,
       JSON.stringify([{ action: 'VERIFIED', by: 'Kavita Bhat', role: 'HR_MANAGER', timestamp: new Date().toISOString() }])
     ]);
     insertedDocsCount++;
@@ -256,7 +282,7 @@ export async function setupEmployeeDocuments() {
         'INTERNAL', 'Staff ID card photo', '[]', ?, NOW(3)
       )
     `, [
-      genId('doc'), emp.id, sampleJpgPath,
+      genId('docfix'), emp.id, sampleJpgPath,
       JSON.stringify([{ action: 'VERIFIED', by: 'S. B. Angadi', role: 'SUPER_ADMIN', timestamp: new Date().toISOString() }])
     ]);
     insertedDocsCount++;
@@ -277,7 +303,7 @@ export async function setupEmployeeDocuments() {
         'CONFIDENTIAL', 'Countersigned employment offer', '[]', ?, NOW(3)
       )
     `, [
-      genId('doc'), emp.id, samplePdfPath,
+      genId('docfix'), emp.id, samplePdfPath,
       JSON.stringify([{ action: 'VERIFIED', by: 'Kavita Bhat', role: 'HR_MANAGER', timestamp: new Date().toISOString() }])
     ]);
     insertedDocsCount++;
@@ -299,7 +325,7 @@ export async function setupEmployeeDocuments() {
           'STRICTLY_CONFIDENTIAL', 'Direct salary crediting bank account proof', '[]', ?, NOW(3)
         )
       `, [
-        genId('doc'), emp.id, samplePdfPath,
+        genId('docfix'), emp.id, samplePdfPath,
         JSON.stringify([{ action: 'VERIFIED', by: 'Kavita Bhat', role: 'HR_MANAGER', timestamp: new Date().toISOString() }])
       ]);
       insertedDocsCount++;
@@ -322,7 +348,7 @@ export async function setupEmployeeDocuments() {
           'INTERNAL', 'Karnataka secondary education board certificate', '[]', ?, NOW(3)
         )
       `, [
-        genId('doc'), emp.id, samplePdfPath,
+        genId('docfix'), emp.id, samplePdfPath,
         JSON.stringify([{ action: 'VERIFIED', by: 'Kavita Bhat', role: 'HR_MANAGER', timestamp: new Date().toISOString() }])
       ]);
       insertedDocsCount++;
@@ -343,7 +369,7 @@ export async function setupEmployeeDocuments() {
           'PENDING_VERIFICATION', 'INTERNAL', 'Submitted by Floor Manager during retail floor deployment', '[]', ?, NOW(3)
         )
       `, [
-        genId('doc'), emp.id, samplePdfPath,
+        genId('docfix'), emp.id, samplePdfPath,
         JSON.stringify([{ action: 'UPLOADED', by: 'Ramesh Gowda', role: 'FLOOR_MANAGER', timestamp: new Date().toISOString(), note: 'Submitted for HR verification' }])
       ]);
       insertedDocsCount++;
@@ -377,7 +403,7 @@ export async function setupEmployeeDocuments() {
           'INTERNAL', 'Replacement document verified successfully', ?, ?, NOW(3)
         )
       `, [
-        genId('doc'), emp.id, samplePdfPath, JSON.stringify(prevVersionObj),
+        genId('docfix'), emp.id, samplePdfPath, JSON.stringify(prevVersionObj),
         JSON.stringify([
           { action: 'REPLACED', by: 'Kavita Bhat', role: 'HR_MANAGER', timestamp: '2026-10-05T11:00:00Z', note: 'Replaced blurry v1 with clean v2' },
           { action: 'VERIFIED', by: 'Kavita Bhat', role: 'HR_MANAGER', timestamp: '2026-10-05T12:00:00Z', note: 'Verified updated electricity bill' }
@@ -387,8 +413,18 @@ export async function setupEmployeeDocuments() {
     }
   }
 
-  console.log(`Successfully seeded ${insertedDocsCount} employee document records across all 35 employees!`);
-  console.log('Setup finished successfully!');
+  console.log(`Seeded ${insertedDocsCount} document dossier fixtures (development data only).`);
+  return insertedDocsCount;
+}
+
+/** Full setup: reference config, plus fixtures only when explicitly allowed. */
+export async function setupEmployeeDocuments() {
+  await seedDocumentReferenceConfig();
+  if (bootFixturesAllowed()) {
+    await seedDocumentDossierFixtures();
+  } else {
+    console.log('Document dossier fixtures skipped (boot fixtures disabled).');
+  }
 }
 
 if (process.argv[1]?.includes('setupEmployeeDocuments')) {

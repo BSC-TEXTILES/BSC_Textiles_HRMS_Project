@@ -149,6 +149,13 @@ export class SettlementRepository extends BaseRepository<SettlementEntity> {
     );
   }
 
+  public async updateStatus(settlementId: string, status: SettlementEntity['status']): Promise<void> {
+    await this.execute(
+      `UPDATE fnf_settlements SET status = ?, updated_at = NOW() WHERE id = ?`,
+      [status, settlementId]
+    );
+  }
+
   public async recordPayment(settlementId: string, paymentRef: string, paymentMode: string, paymentDate: string): Promise<void> {
     await this.execute(
       `UPDATE fnf_settlements 

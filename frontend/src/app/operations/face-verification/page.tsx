@@ -56,6 +56,17 @@ interface FaceDashboardStats {
   deviceBreakdown: Array<{ device: string; total: number; passed: number; failed: number; avgScore: number }>;
 }
 
+/** Placeholder for any biometric figure the backend or the terminal did not report. */
+const NO_DATA = '—';
+
+function formatPercent(value: number | null | undefined, digits = 1): string {
+  return typeof value === 'number' && Number.isFinite(value) ? `${value.toFixed(digits)}%` : NO_DATA;
+}
+
+function formatCount(value: number | null | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value) ? String(value) : NO_DATA;
+}
+
 export default function FaceVerificationDashboardPage() {
   const [stats, setStats] = useState<FaceDashboardStats | null>(null);
   const [records, setRecords] = useState<FaceVerificationRecord[]>([]);
@@ -142,8 +153,8 @@ export default function FaceVerificationDashboardPage() {
       `"${r.employeeName}"`,
       `"${r.locationName} (${r.locationCode})"`,
       `"${r.deviceName || 'Scanner'}"`,
-      r.score !== null ? `${r.score.toFixed(1)}%` : 'N/A',
-      `${r.threshold || 85}%`,
+      r.score !== null && r.score !== undefined ? `${r.score.toFixed(1)}%` : 'Not reported',
+      r.threshold !== null && r.threshold !== undefined ? `${r.threshold}%` : 'Not reported',
       r.result,
       `"${new Date(r.attemptedAt).toLocaleString()}"`,
     ]);
@@ -317,7 +328,7 @@ export default function FaceVerificationDashboardPage() {
             </div>
             <div className="mt-4 flex items-baseline gap-2">
               <span className="text-3xl font-black text-slate-900 tracking-tight">
-                {stats?.summary?.verifiedToday ?? stats?.verified ?? 35}
+                {formatCount(stats?.summary?.verifiedToday ?? stats?.verified)}
               </span>
               <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                 Active Today
@@ -325,7 +336,9 @@ export default function FaceVerificationDashboardPage() {
             </div>
             <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
               <span>Lifetime Scans:</span>
-              <span className="font-bold text-slate-800">{stats?.total ?? 44} total verified</span>
+              <span className="font-bold text-slate-800">
+                {stats?.total !== undefined ? `${stats.total} total verified` : `${NO_DATA} total verified`}
+              </span>
             </div>
           </div>
 
@@ -340,7 +353,7 @@ export default function FaceVerificationDashboardPage() {
             </div>
             <div className="mt-4 flex items-baseline gap-2">
               <span className="text-3xl font-black text-slate-900 tracking-tight">
-                {stats?.summary?.failedToday ?? stats?.failed ?? 0}
+                {formatCount(stats?.summary?.failedToday ?? stats?.failed)}
               </span>
               <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
                 Below Threshold
@@ -348,7 +361,7 @@ export default function FaceVerificationDashboardPage() {
             </div>
             <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
               <span>Security Breaches:</span>
-              <span className="font-bold text-emerald-600">0 critical incidents</span>
+              <span className="font-bold text-slate-600">Not reported</span>
             </div>
           </div>
 
@@ -363,7 +376,7 @@ export default function FaceVerificationDashboardPage() {
             </div>
             <div className="mt-4 flex items-baseline gap-2">
               <span className="text-3xl font-black text-slate-900 tracking-tight">
-                {stats?.summary?.averageMatchPercent ? `${stats.summary.averageMatchPercent.toFixed(1)}%` : '97.6%'}
+                {stats?.summary?.averageMatchPercent ? `${stats.summary.averageMatchPercent.toFixed(1)}%` : `${NO_DATA} avg`}
               </span>
               <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
                 Target: &gt;85%
@@ -371,7 +384,9 @@ export default function FaceVerificationDashboardPage() {
             </div>
             <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
               <span>Confidence Index:</span>
-              <span className="font-bold text-blue-600">Optimal (High-Fidelity)</span>
+              <span className="font-bold text-slate-600">
+                {stats?.summary?.averageMatchPercent ? 'Reported by terminal' : 'No scores reported'}
+              </span>
             </div>
           </div>
 
@@ -386,10 +401,10 @@ export default function FaceVerificationDashboardPage() {
             </div>
             <div className="mt-4 flex items-baseline gap-2">
               <span className="text-3xl font-black text-slate-900 tracking-tight">
-                {stats?.successRate?.rate ?? 78}%
+                {formatPercent(stats?.successRate?.rate)}
               </span>
               <span className="text-xs font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                1st Attempt Match
+                Recorded Attempts
               </span>
             </div>
             <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
@@ -408,7 +423,7 @@ export default function FaceVerificationDashboardPage() {
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Highest Match</p>
               <p className="text-base font-extrabold text-white">
-                {stats?.summary?.highestMatchPercent ? `${stats.summary.highestMatchPercent.toFixed(1)}%` : '98.8%'}
+                {formatPercent(stats?.summary?.highestMatchPercent)}
               </p>
             </div>
           </div>
@@ -420,7 +435,7 @@ export default function FaceVerificationDashboardPage() {
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Lowest Match</p>
               <p className="text-base font-extrabold text-white">
-                {stats?.summary?.lowestMatchPercent ? `${stats.summary.lowestMatchPercent.toFixed(1)}%` : '96.4%'}
+                {formatPercent(stats?.summary?.lowestMatchPercent)}
               </p>
             </div>
           </div>
@@ -432,7 +447,7 @@ export default function FaceVerificationDashboardPage() {
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Below Cutoff</p>
               <p className="text-base font-extrabold text-white">
-                {stats?.summary?.belowThreshold ?? 0}
+                {formatCount(stats?.summary?.belowThreshold)}
               </p>
             </div>
           </div>
@@ -443,7 +458,7 @@ export default function FaceVerificationDashboardPage() {
             </div>
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Engine Latency</p>
-              <p className="text-base font-extrabold text-white">&lt; 120ms</p>
+              <p className="text-base font-extrabold text-white">Not reported</p>
             </div>
           </div>
         </div>
@@ -470,7 +485,7 @@ export default function FaceVerificationDashboardPage() {
               </span>
               <span className="flex items-center gap-1.5 text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
                 <Sparkles className="w-3.5 h-3.5 text-[#1346a1]" />
-                Avg Score: {stats?.summary?.averageMatchPercent ? `${stats.summary.averageMatchPercent.toFixed(1)}%` : '97.6%'}
+                Avg Score: {formatPercent(stats?.summary?.averageMatchPercent)}
               </span>
             </div>
           </div>
@@ -488,15 +503,12 @@ export default function FaceVerificationDashboardPage() {
 
             {/* Bars Flex Track */}
             <div className="h-56 flex items-end justify-between gap-3 sm:gap-6 px-2 sm:px-4 relative z-10">
-              {(stats?.trend || [
-                { date: '2026-10-02', total: 0, passed: 0, failed: 0, avgScore: 0 },
-                { date: '2026-10-03', total: 0, passed: 0, failed: 0, avgScore: 0 },
-                { date: '2026-10-04', total: 0, passed: 0, failed: 0, avgScore: 0 },
-                { date: '2026-10-05', total: 0, passed: 0, failed: 0, avgScore: 0 },
-                { date: '2026-10-06', total: 0, passed: 0, failed: 0, avgScore: 0 },
-                { date: '2026-10-07', total: 44, passed: 44, failed: 0, avgScore: 97.6 },
-                { date: '2026-10-08', total: 0, passed: 0, failed: 0, avgScore: 0 },
-              ]).map((day) => {
+              {(stats?.trend || []).length === 0 ? (
+                <div className="w-full flex items-center justify-center text-xs text-slate-400 pb-10">
+                  No verification attempts recorded in the selected date range.
+                </div>
+              ) : (
+                (stats?.trend || []).map((day) => {
                 const totalScans = day.total || (day.passed + day.failed);
                 const passRatio = totalScans > 0 ? (day.passed / totalScans) : 0;
                 const failRatio = totalScans > 0 ? (day.failed / totalScans) : 0;
@@ -544,12 +556,13 @@ export default function FaceVerificationDashboardPage() {
                       <span className={`text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded ${
                         day.avgScore > 0 ? 'bg-blue-50 text-[#1346a1] border border-blue-200' : 'text-slate-400'
                       }`}>
-                        {day.avgScore > 0 ? `${day.avgScore.toFixed(1)}%` : '—'}
+                        {day.avgScore > 0 ? `${day.avgScore.toFixed(1)}%` : NO_DATA}
                       </span>
                     </div>
                   </div>
                 );
-              })}
+                })
+              )}
             </div>
           </div>
 
@@ -581,28 +594,33 @@ export default function FaceVerificationDashboardPage() {
                 <Building2 className="w-5 h-5 text-[#1346a1]" />
                 <h3 className="font-bold text-slate-900 text-sm">Karnataka Hub Verification Adherence</h3>
               </div>
-              <span className="text-xs text-slate-500 font-medium">3 Active Locations</span>
+              <span className="text-xs text-slate-500 font-medium">
+                {stats?.locationBreakdown?.length ? `${stats.locationBreakdown.length} Reporting Locations` : 'No Locations Reported'}
+              </span>
             </div>
 
             <div className="space-y-3">
-              {(stats?.locationBreakdown?.length ? stats.locationBreakdown : [
-                { code: 'BEL', name: 'Belagavi Head Store', total: 24, passed: 24, failed: 0, avgScore: 97.4 },
-                { code: 'DAV', name: 'Davanagere Mega Store', total: 10, passed: 10, failed: 0, avgScore: 98.1 },
-                { code: 'SHI', name: 'Shivamogga Flagship', total: 10, passed: 10, failed: 0, avgScore: 97.0 },
-              ]).map((loc) => {
-                const passRate = loc.total > 0 ? Math.round((loc.passed / loc.total) * 100) : 100;
+              {(stats?.locationBreakdown || []).length === 0 ? (
+                <p className="text-xs text-slate-400 py-4 text-center">
+                  No location reported a verification in the selected range.
+                </p>
+              ) : (
+                (stats?.locationBreakdown || []).map((loc) => {
+                const passRate = loc.total > 0 ? Math.round((loc.passed / loc.total) * 100) : 0;
                 return (
                   <div key={loc.code} className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/60 hover:bg-slate-50 transition-colors">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-bold text-xs text-slate-900">{loc.name}</p>
-                        <p className="text-[11px] text-slate-500 font-mono">Code: {loc.code} • Total: {loc.total} scans</p>
+                        <p className="font-bold text-xs text-slate-900">{loc.name || loc.code || NO_DATA}</p>
+                        <p className="text-[11px] text-slate-500 font-mono">Code: {loc.code || NO_DATA} • Total: {loc.total} scans</p>
                       </div>
                       <div className="text-right">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
                           {passRate}% Passed
                         </span>
-                        <p className="text-[11px] text-[#1346a1] font-bold mt-1">Match: {loc.avgScore.toFixed(1)}%</p>
+                        <p className="text-[11px] text-[#1346a1] font-bold mt-1">
+                          Match: {typeof loc.avgScore === 'number' ? `${loc.avgScore.toFixed(1)}%` : NO_DATA}
+                        </p>
                       </div>
                     </div>
                     {/* Progress Bar */}
@@ -611,7 +629,8 @@ export default function FaceVerificationDashboardPage() {
                     </div>
                   </div>
                 );
-              })}
+              })
+              )}
             </div>
           </div>
 
@@ -622,34 +641,38 @@ export default function FaceVerificationDashboardPage() {
                 <Monitor className="w-5 h-5 text-[#1346a1]" />
                 <h3 className="font-bold text-slate-900 text-sm">Biometric Terminals & Camera Devices</h3>
               </div>
-              <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                All Online
+              <span className="text-xs font-semibold text-slate-500 flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-slate-300" />
+                {stats?.deviceBreakdown?.length ? `${stats.deviceBreakdown.length} Reporting Terminals` : 'No Terminal Data'}
               </span>
             </div>
 
             <div className="space-y-3">
-              {(stats?.deviceBreakdown?.length ? stats.deviceBreakdown : [
-                { device: 'BEL-TABLET-A1 (Main Entry)', total: 24, passed: 24, failed: 0, avgScore: 97.4 },
-                { device: 'DAV-TERMINAL-01 (Store Front)', total: 10, passed: 10, failed: 0, avgScore: 98.1 },
-                { device: 'SHI-SCANNER-S1 (Staff Portal)', total: 10, passed: 10, failed: 0, avgScore: 97.0 },
-              ]).map((dev, idx) => (
+              {(stats?.deviceBreakdown || []).length === 0 ? (
+                <p className="text-xs text-slate-400 py-4 text-center">
+                  No terminal reported a verification in the selected range.
+                </p>
+              ) : (
+                (stats?.deviceBreakdown || []).map((dev, idx) => (
                 <div key={idx} className="p-3.5 rounded-xl bg-slate-50/80 border border-slate-200/60 hover:bg-slate-50 transition-colors flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-[#1346a1]">
                       <Cpu className="w-4 h-4" />
                     </div>
                     <div>
-                      <p className="font-bold text-xs text-slate-900">{dev.device}</p>
-                      <p className="text-[11px] text-slate-500">Latency: 92ms • Reliability: 100%</p>
+                      <p className="font-bold text-xs text-slate-900">{dev.device || NO_DATA}</p>
+                      <p className="text-[11px] text-slate-500">Latency: {NO_DATA} • Reliability: {NO_DATA}</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <span className="text-xs font-bold text-slate-800">{dev.total} Scans</span>
-                    <p className="text-[11px] font-mono text-emerald-600 font-semibold mt-0.5">{dev.avgScore.toFixed(1)}% Match</p>
+                    <p className="text-[11px] font-mono text-emerald-600 font-semibold mt-0.5">
+                      {typeof dev.avgScore === 'number' ? `${dev.avgScore.toFixed(1)}% Match` : `${NO_DATA} Match`}
+                    </p>
                   </div>
                 </div>
-              ))}
+              ))
+              )}
             </div>
           </div>
         </div>
@@ -700,8 +723,11 @@ export default function FaceVerificationDashboardPage() {
                   </tr>
                 ) : (
                   displayRecords.map((r) => {
-                    const score = r.score ?? r.matchPercentage ?? 95.0;
-                    const threshold = r.threshold ?? 85.0;
+                    // A score the terminal never sent is not a 95% match.
+                    const rawScore = r.score ?? r.matchPercentage;
+                    const score = typeof rawScore === 'number' && Number.isFinite(rawScore) ? rawScore : null;
+                    const rawThreshold = r.threshold;
+                    const threshold = typeof rawThreshold === 'number' && Number.isFinite(rawThreshold) ? rawThreshold : null;
                     const isPassed = r.result?.toLowerCase() === 'passed' || r.result === 'VERIFIED';
 
                     return (
@@ -713,45 +739,51 @@ export default function FaceVerificationDashboardPage() {
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#0b1c30] to-[#1346a1] text-white flex items-center justify-center font-bold text-xs shadow-xs">
-                              {r.employeeName ? r.employeeName.charAt(0) : 'E'}
+                              {r.employeeName ? r.employeeName.charAt(0) : '—'}
                             </div>
                             <div>
                               <p className="font-bold text-slate-900 group-hover:text-[#1346a1] transition-colors">
-                                {r.employeeName || 'Unknown Employee'}
+                                {r.employeeName || 'Unmatched device ID'}
                               </p>
-                              <p className="font-mono text-[11px] text-slate-400">{r.employeeCode || 'N/A'}</p>
+                              <p className="font-mono text-[11px] text-slate-400">{r.employeeCode || NO_DATA}</p>
                             </div>
                           </div>
                         </td>
 
                         <td className="py-3.5 px-4">
-                          <p className="font-medium text-slate-800">{r.locationName || 'Belagavi Head Store'}</p>
+                          <p className="font-medium text-slate-800">{r.locationName || NO_DATA}</p>
                           <p className="text-[11px] text-slate-400 flex items-center gap-1">
                             <Monitor className="w-3 h-3 text-slate-400" />
-                            {r.deviceName || 'Terminal 1'}
+                            {r.deviceName || 'Terminal not identified'}
                           </p>
                         </td>
 
                         <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-2">
-                            <span className={`font-mono font-bold text-xs ${
-                              score >= 90 ? 'text-emerald-600' : score >= threshold ? 'text-blue-600' : 'text-rose-600'
-                            }`}>
-                              {score.toFixed(1)}%
+                          {score === null ? (
+                            <span className="text-[11px] font-medium text-slate-400 italic">
+                              Not reported by device
                             </span>
-                            <div className="w-16 bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full ${
-                                  score >= 90 ? 'bg-emerald-500' : score >= threshold ? 'bg-blue-500' : 'bg-rose-500'
-                                }`}
-                                style={{ width: `${Math.min(100, score)}%` }}
-                              />
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className={`font-mono font-bold text-xs ${
+                                score >= 90 ? 'text-emerald-600' : threshold !== null && score >= threshold ? 'text-blue-600' : 'text-rose-600'
+                              }`}>
+                                {score.toFixed(1)}%
+                              </span>
+                              <div className="w-16 bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full rounded-full ${
+                                    score >= 90 ? 'bg-emerald-500' : threshold !== null && score >= threshold ? 'bg-blue-500' : 'bg-rose-500'
+                                  }`}
+                                  style={{ width: `${Math.min(100, score)}%` }}
+                                />
+                              </div>
                             </div>
-                          </div>
+                          )}
                         </td>
 
                         <td className="py-3.5 px-4 font-mono text-slate-600">
-                          {threshold.toFixed(0)}% Min
+                          {threshold === null ? NO_DATA : `${threshold.toFixed(0)}% Min`}
                         </td>
 
                         <td className="py-3.5 px-4">
@@ -852,14 +884,22 @@ export default function FaceVerificationDashboardPage() {
                   <div className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/50">
                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Neural Match Score</span>
                     <p className="text-2xl font-black text-[#1346a1] mt-1 font-mono">
-                      {selectedRecord.score !== null ? `${selectedRecord.score.toFixed(2)}%` : '96.40%'}
+                      {typeof selectedRecord.score === 'number' && Number.isFinite(selectedRecord.score)
+                        ? `${selectedRecord.score.toFixed(2)}%`
+                        : 'Not reported by device'}
                     </p>
-                    <p className="text-[11px] text-emerald-600 font-semibold mt-1">Exceeds Required Baseline</p>
+                    <p className="text-[11px] text-slate-500 font-semibold mt-1">
+                      {typeof selectedRecord.score === 'number' && typeof selectedRecord.threshold === 'number'
+                        ? (selectedRecord.score >= selectedRecord.threshold ? 'At or above required baseline' : 'Below required baseline')
+                        : 'No terminal score to compare'}
+                    </p>
                   </div>
                   <div className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/50">
                     <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Required Threshold</span>
                     <p className="text-2xl font-black text-slate-900 mt-1 font-mono">
-                      {selectedRecord.threshold || 85}%
+                      {typeof selectedRecord.threshold === 'number' && Number.isFinite(selectedRecord.threshold)
+                        ? `${selectedRecord.threshold}%`
+                        : NO_DATA}
                     </p>
                     <p className="text-[11px] text-slate-500 font-semibold mt-1">BSC Security Policy Compliant</p>
                   </div>
@@ -875,16 +915,16 @@ export default function FaceVerificationDashboardPage() {
                     </div>
                     <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
                       <span className="text-slate-400 block text-[10px] uppercase font-bold">Scanning Terminal</span>
-                      <span className="font-medium text-slate-800">{selectedRecord.deviceName || 'Primary Tablet Scanner'}</span>
+                      <span className="font-medium text-slate-800">{selectedRecord.deviceName || 'Terminal not identified'}</span>
                     </div>
                     <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
                       <span className="text-slate-400 block text-[10px] uppercase font-bold">Operation Purpose</span>
-                      <span className="font-semibold text-[#1346a1]">{selectedRecord.purpose || 'SHIFT_LOGIN'}</span>
+                      <span className="font-semibold text-[#1346a1]">{selectedRecord.purpose || NO_DATA}</span>
                     </div>
                     <div className="p-3 rounded-lg bg-slate-50 border border-slate-100">
                       <span className="text-slate-400 block text-[10px] uppercase font-bold">Security Hash Ref</span>
                       <span className="font-mono text-slate-700 truncate block text-[11px]">
-                        {selectedRecord.captureRef || `fv-sec-${selectedRecord.id}-verified`}
+                        {selectedRecord.captureRef || 'No capture reference stored'}
                       </span>
                     </div>
                   </div>

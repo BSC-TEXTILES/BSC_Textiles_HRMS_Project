@@ -1,11 +1,18 @@
 import { pool } from '../nativeDb.js';
 
-export async function setupFormerEmployees() {
+export async function setupFormerEmployees(options?: { schemaOnly?: boolean }) {
   console.log('--- Checking Former Employees & F&F Seed Data ---');
 
+  if (options?.schemaOnly) {
+    console.log('setupFormerEmployees: schema/reference shaping complete; the fabricated resigned employees, exits and F&F settlements were not seeded (boot fixtures disabled).');
+    return;
+  }
   const [existingExits]: any = await pool.query('SELECT COUNT(*) as count FROM employee_exits');
-  if (existingExits[0]?.count > 0) {
-    console.log(`✓ Exits already seeded: ${existingExits[0].count} records.`);
+  const [existingFixtures]: any = await pool.query(
+    "SELECT COUNT(*) as count FROM employee WHERE id IN ('emp_ex_001', 'emp_ex_002')"
+  );
+  if (existingExits[0]?.count > 0 || existingFixtures[0]?.count > 0) {
+    console.log(`✓ Former-employee fixtures already present (${existingExits[0]?.count || 0} exits).`);
     return;
   }
 
@@ -38,11 +45,13 @@ export async function setupFormerEmployees() {
       locationId, departmentId, shiftId, designation, role, status, joiningDate, exitDate, createdAt, updatedAt
     ) VALUES 
     (
-      'emp_ex_001', 'EMP-BEL-EX01', 'Anand', 'Kulkarni', 'Anand Kulkarni (Former Lead Cashier)', 'MALE', '+91 9880000091', 'anand.k@bsctextiles.com',
+  // Digits-only (the enforced employeeCode check) and deliberately outside the
+  // ranges the biometric identity tests use for suffix collisions.
+      '+'emp_ex_001'+', '+'991001'+', 'Anand', 'Kulkarni', 'Anand Kulkarni (Former Lead Cashier)', 'MALE', '+91 9880000091', 'anand.k@bsctextiles.com',
       ?, ?, ?, 'Former Lead Cashier', 'SALES_EMPLOYEE', 'RESIGNED', '2022-04-15', '2026-08-31', NOW(3), NOW(3)
     ),
     (
-      'emp_ex_002', 'EMP-SHI-EX02', 'Sunita', 'Rao', 'Sunita Rao (Former Sales Associate)', 'FEMALE', '+91 9880000092', 'sunita.r@bsctextiles.com',
+      'emp_ex_002', '991002', 'Sunita', 'Rao', 'Sunita Rao (Former Sales Associate)', 'FEMALE', '+91 9880000092', 'sunita.r@bsctextiles.com',
       ?, ?, ?, 'Former Sales Associate', 'SALES_EMPLOYEE', 'RESIGNED', '2023-01-10', '2026-10-15', NOW(3), NOW(3)
     )
     ON DUPLICATE KEY UPDATE status = VALUES(status), exitDate = VALUES(exitDate)

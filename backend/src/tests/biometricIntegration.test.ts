@@ -9,6 +9,9 @@
  * - 10: Dual-Key Connector Security & RBAC
  */
 
+import { pool } from '../nativeDb.js';
+import { registerDeviceConfig } from '../services/biometric/settings.js';
+
 export interface TestResult {
   name: string;
   passed: boolean;
@@ -20,6 +23,41 @@ export interface TestResult {
 export async function runBiometricIntegrationTests(baseUrl: string, adminToken: string): Promise<TestResult[]> {
   const results: TestResult[] = [];
   const CONNECTOR_KEY = process.env.BIOMETRIC_CONNECTOR_KEY || 'bsc-biometric-connector-secret-key-2024';
+
+  // Ingestion stamps `status`, `lastConnectionAt`, `lastHeartbeatAt`, `lastSeenAt`
+  // and `lastSyncAt` on the device row the serial resolves to. This suite used to
+  // submit punches under `JNP2252300795` and `JNP2252300797` — two real,
+  // registered shop-floor terminals — so every test run rewrote their history to
+  // say they had just synchronized, which they had not. It now uses its own
+  // loopback fixture terminal and deletes it again at the end.
+  const fixtureSerial = `SIMINT-${Date.now().toString(36).toUpperCase()}`;
+  let fixtureDeviceId: string | null = null;
+  try {
+    const created = await registerDeviceConfig({
+      serialNumber: fixtureSerial,
+      name: 'Integration test fixture terminal (not a shop-floor device)',
+      ipAddress: '127.0.0.1',
+      locationCode: 'DAV',
+      protocol: 'TCP_SDK',
+      isFixture: true,
+    });
+    fixtureDeviceId = created.id;
+  } catch (err: any) {
+    console.error('  ⚠ fixture terminal could not be created:', err.message);
+  }
+
+  async function cleanupFixture() {
+    try {
+      await pool.query('DELETE FROM biometric_raw_punches WHERE serialNumber = ?', [fixtureSerial]);
+      if (fixtureDeviceId) {
+        await pool.query('DELETE FROM biometric_device_sync_state WHERE deviceId = ?', [fixtureDeviceId]);
+        await pool.query('DELETE FROM biometric_device_users WHERE deviceId = ?', [fixtureDeviceId]);
+      }
+      await pool.query('DELETE FROM biometric_devices WHERE serialNumber = ?', [fixtureSerial]);
+    } catch (err: any) {
+      console.error('  ⚠ fixture cleanup failed:', err.message);
+    }
+  }
 
   async function recordTest(name: string, fn: () => Promise<any>) {
     const start = Date.now();
@@ -95,7 +133,7 @@ export async function runBiometricIntegrationTests(baseUrl: string, adminToken: 
     const testPunchTime = new Date('2026-10-15T09:15:00+05:30').toISOString();
     const testBatch = [
       {
-        serialNumber: 'JNP2252300795',
+        serialNumber: fixtureSerial,
         enrollmentNumber: '9901', // Enrolled test persona
         punchTime: testPunchTime,
         punchType: 'CHECK_IN',
@@ -140,7 +178,7 @@ export async function runBiometricIntegrationTests(baseUrl: string, adminToken: 
     const punchTime = new Date().toISOString();
     const batch = [
       {
-        serialNumber: 'JNP2252300795',
+        serialNumber: fixtureSerial,
         enrollmentNumber: '9902',
         punchTime,
         punchType: 'CHECK_IN',
@@ -183,7 +221,7 @@ export async function runBiometricIntegrationTests(baseUrl: string, adminToken: 
     const punchTime = new Date().toISOString();
     const batch = [
       {
-        serialNumber: 'JNP2252300797',
+        serialNumber: fixtureSerial,
         enrollmentNumber: ghostEnrollment,
         punchTime,
         punchType: 'CHECK_IN',
@@ -226,6 +264,8 @@ export async function runBiometricIntegrationTests(baseUrl: string, adminToken: 
 
     return { totalLogs: data.logs.length, sample: data.logs[0] || null };
   });
+
+  await cleanupFixture();
 
   return results;
 }

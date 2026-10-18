@@ -3,7 +3,7 @@
  * 
  * Implements authoritative monthly attendance retrieval, rule validation,
  * eSSL MB160 terminal synchronization, and HR manual correction workflows
- * for Employee 1604 (Gagan C B) at Davanagere Mega Store (DAV).
+ * for one employee at their own store. Identity, roster, holiday and device values
  */
 
 import { Router, Response } from 'express';
@@ -11,6 +11,7 @@ import { pool } from '../nativeDb.js';
 import { AuthRequest, authenticate, authorize } from '../middleware/auth.js';
 import { ingestRawPunches, probeDeviceSocket } from '../services/biometricService.js';
 import { loadGlobalSettings } from '../services/biometric/settings.js';
+import { loadCalendarContext } from '../services/attendance/attendanceWorkbook.js';
 import {
   deviceCalendarDate,
   formatWallString,
@@ -96,41 +97,6 @@ function wallMonthBoundary(year: number, month: number, day: number, hhmmss: str
 const router = Router();
 router.use(authenticate);
 
-// Known national & Karnataka state holidays for Oct 2026
-const OCTOBER_2026_HOLIDAYS: Record<string, string> = {
-  '2026-10-02': 'Gandhi Jayanti',
-  '2026-10-20': 'Maha Navami / Ayudha Puja',
-  '2026-10-21': 'Vijayadashami / Dussehra',
-  '2026-10-31': 'Deepavali / Naraka Chaturdashi',
-};
-
-// Target Davanagere devices configuration
-const DAVANAGERE_DEVICES = [
-  {
-    serialNumber: process.env.BIOMETRIC_DEV1_SERIAL || 'JNP2252300795',
-    name: 'eSSL MB160 Davanagere Terminal 1 (Main Entrance)',
-    ipAddress: process.env.BIOMETRIC_DEV1_IP || '192.168.0.136',
-    port: Number(process.env.BIOMETRIC_TERMINAL_PORT) || 4370,
-    model: 'eSSL MB160',
-    showroomCode: 'DAV',
-  },
-  {
-    serialNumber: process.env.BIOMETRIC_DEV2_SERIAL || 'JNPJNP2252300802',
-    name: 'eSSL MB160 Davanagere Terminal 2 (Staff Lounge)',
-    ipAddress: process.env.BIOMETRIC_DEV2_IP || '192.168.0.131',
-    port: Number(process.env.BIOMETRIC_TERMINAL_PORT) || 4370,
-    model: 'eSSL MB160',
-    showroomCode: 'DAV',
-  },
-  {
-    serialNumber: process.env.BIOMETRIC_DEV3_SERIAL || 'JNP2252300797',
-    name: 'eSSL MB160 Davanagere Terminal 3 (Admin / Billing)',
-    ipAddress: process.env.BIOMETRIC_DEV3_IP || '192.168.30.131',
-    port: Number(process.env.BIOMETRIC_TERMINAL_PORT) || 4370,
-    model: 'eSSL MB160',
-    showroomCode: 'DAV',
-  },
-];
 
 /**
  * Helper to resolve employee by ID, employeeCode, or biometric mapping
@@ -202,6 +168,15 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res: Response) =>
     // incorrectly.
     const storeTimezone = await resolveEmployeeTimezone(empId);
     const todayYmd = deviceCalendarDate(today, storeTimezone);
+    /**
+     * Holidays and weekly offs come from the `holiday` and `weeklyoffrule` tables via
+     * the same loader the Excel exports use, so the self-service screen and the
+     * downloaded workbook can never disagree about which day was a holiday.
+     */
+    const calendar = await loadCalendarContext(
+      { from: `${year}-${String(month).padStart(2, '0')}-01`, to: `${year}-${String(month).padStart(2, '0')}-${String(totalDays).padStart(2, '0')}`, locationId: emp.locationId || null },
+      [empId]
+    );
 
     // 1. Fetch raw biometric punches for this employee across its devices.
     //    The window is built in the employee's store timezone and compared
@@ -274,28 +249,47 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res: Response) =>
       correctionMap.get(dStr)!.push(corr);
     }
 
-    // 4. Fetch device status
+
+    // 4. Device connectivity, read from the registry the operator maintains.
+    //    A terminal is only ever reported with the status the server last
+    //    observed — an unregistered or never-seen device is NOT_CONNECTED, never
+    //    a reassuring "CONNECTED".
     const [devicesInDb]: any = await pool.query(
-      `SELECT id, serialNumber, name, model, firmwareVersion, status, lastConnectionAt, lastSyncAt, lastError
+      `SELECT id, serialNumber, name, model, firmwareVersion, status, lastConnectionAt, lastSyncAt, lastError, isActive
        FROM biometric_devices
-       WHERE locationCode = 'DAV' OR locationId = ?`,
-      [emp.locationId]
+       WHERE locationCode = ? OR locationId = ?`,
+      [emp.locationCode || 'DAV', emp.locationId]
     );
 
-    // Format device connectivity for frontend (NO IP addresses exposed!)
-    const deviceStatuses = DAVANAGERE_DEVICES.map((cfg) => {
-      const matched = devicesInDb.find((d: any) => d.serialNumber === cfg.serialNumber || (cfg.serialNumber.startsWith('JNPJNP') && d.serialNumber.includes('802')));
-      return {
-        serialNumber: cfg.serialNumber,
-        name: cfg.name,
-        model: cfg.model,
-        showroom: 'Davanagere Mega Store (DAV)',
-        networkLink: 'Protected Showroom LAN',
-        status: matched?.status || 'CONNECTED',
-        lastSyncAt: matched?.lastSyncAt || matched?.lastConnectionAt || new Date().toISOString(),
-        lastError: matched?.lastError || null,
-      };
-    });
+    const deviceStatuses = devicesInDb.map((device: any) => ({
+      serialNumber: device.serialNumber,
+      name: device.name,
+      model: device.model || 'Unknown model',
+      showroom: emp.locationCode || null,
+      configured: Boolean(device.isActive),
+      status: device.isActive ? device.status || 'NOT_CONNECTED' : 'DEACTIVATED',
+      lastSyncAt: device.lastSyncAt || device.lastConnectionAt || null,
+      lastConnectionAt: device.lastConnectionAt || null,
+      lastError: device.lastError || null,
+    }));
+
+    // Which terminal this employee is actually enrolled on, from the mapping the
+    // registry holds — never a hard-coded device identity.
+    const [enrollmentRows]: any = await pool.query(
+      `SELECT m.enrollmentNumber, m.status, m.showroomCode, m.serialNumber, m.updatedAt, d.model
+         FROM biometric_employee_mappings m
+         LEFT JOIN biometric_devices d ON d.serialNumber = m.serialNumber
+        WHERE m.employeeId = ?
+        ORDER BY m.updatedAt DESC
+        LIMIT 1`,
+      [empId]
+    );
+    const enrollment = enrollmentRows[0] || null;
+
+    const [lastSyncRows]: any = await pool.query(
+      'SELECT MAX(receivedAt) AS lastReceived FROM biometric_raw_punches WHERE employeeId = ?',
+      [empId]
+    );
 
     // 5. Generate complete daily records for all 31 days
     const dailyRecords: any[] = [];
@@ -317,8 +311,14 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res: Response) =>
       const dayOfWeekNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const dayOfWeek = dayOfWeekNames[dayOfWeekNum];
       const isSunday = dayOfWeekNum === 0;
-      const isHoliday = Boolean(OCTOBER_2026_HOLIDAYS[dateYmd]);
-      const holidayName = OCTOBER_2026_HOLIDAYS[dateYmd] || null;
+      const dayAttendance = attendanceMap.get(dateYmd);
+      const holidayName = calendar.holidayByDay.get(dateYmd) || null;
+      const isHoliday = Boolean(holidayName);
+      // A weekly off is only a weekly off when a rule says so — being a Sunday is
+      // not evidence, and the day's own attendance row outranks any assumption.
+      const offRuleDays = calendar.weeklyOffByEmployee.get(empId) || calendar.weeklyOffDays;
+      const isConfiguredWeeklyOff =
+        dayAttendance?.status === 'WEEKLY_OFF' || offRuleDays.has(dayOfWeek.toUpperCase());
 
       const isFutureDate = dateYmd > todayYmd;
 
@@ -328,7 +328,6 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res: Response) =>
         return instant ? deviceCalendarDate(instant, p.rawTimezone || storeTimezone) === dateYmd : false;
       });
 
-      const dayAttendance = attendanceMap.get(dateYmd);
       const dayCorrections = correctionMap.get(dateYmd) || [];
       const pendingCorr = dayCorrections.find((c) => c.status === 'PENDING');
       const approvedCorr = dayCorrections.find((c) => c.status === 'APPROVED');
@@ -352,17 +351,36 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res: Response) =>
         status = 'HOLIDAY';
         statusLabel = `Holiday (${holidayName})`;
         holidayCount++;
-      } else if (isSunday) {
+      } else if (isConfiguredWeeklyOff) {
         status = 'WEEKLY_OFF';
-        statusLabel = 'Weekly Off (Sunday)';
+        statusLabel = 'Weekly Off (configured rule)';
         weeklyOffCount++;
+      } else if (dayAttendance?.status === 'ABSENT') {
+        status = 'ABSENT';
+        statusLabel = 'Absent (recorded by HR)';
+        absentCount++;
+      } else if ((calendar.leaveByEmployee.get(empId) || []).some((r) => dateYmd >= r.from && dateYmd <= r.to)) {
+        status = 'ON_LEAVE';
+        statusLabel = 'Approved Leave';
+        leaveCount++;
       } else if (approvedCorr) {
-        // HR Approved manual correction applied
+        // HR Approved manual correction applied. The corrected timings are the
+        // record; the duration is computed from them instead of assuming a shift
+        // length, and a one-sided correction is still reported as a missing punch.
         status = 'PRESENT';
         statusLabel = 'Present (HR Approved Correction)';
-        inPunch = approvedCorr.requestedLogin ? new Date(approvedCorr.requestedLogin).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '10:00 AM';
-        outPunch = approvedCorr.requestedLogout ? new Date(approvedCorr.requestedLogout).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '07:30 PM';
-        netDurationSec = 34200; // 9.5 hours
+        const corrIn = approvedCorr.requestedLogin ? new Date(approvedCorr.requestedLogin) : null;
+        const corrOut = approvedCorr.requestedLogout ? new Date(approvedCorr.requestedLogout) : null;
+        inPunch = corrIn ? wallHhmm(corrIn, storeTimezone) : null;
+        outPunch = corrOut ? wallHhmm(corrOut, storeTimezone) : null;
+        if (corrIn && corrOut) {
+          netDurationSec = Math.max(0, Math.floor((corrOut.getTime() - corrIn.getTime()) / 1000));
+        } else {
+          flags.push(corrIn ? 'Missing OUT punch' : 'Missing IN punch');
+          missingPunchCount++;
+          status = 'INCOMPLETE_CORRECTION';
+          statusLabel = 'Correction has only one punch';
+        }
         totalWorkingSeconds += netDurationSec;
         presentCount++;
       } else if (dayPunches.length > 0 || dayAttendance?.actualLogin) {
@@ -492,36 +510,42 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res: Response) =>
       data: {
         employee: {
           id: emp.id,
-          employeeCode: emp.employeeCode || '1604',
-          name: emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || 'Gagan C B',
-          email: emp.email || 'gagan.cb@bsctextiles.in',
-          phone: emp.phone || '+91 9480111604',
-          role: emp.role || 'EMPLOYEE',
-          designation: emp.designation || 'Sales Executive',
+          employeeCode: emp.employeeCode || null,
+          name: emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim() || null,
+          email: emp.email || null,
+          phone: emp.phone || null,
+          role: emp.role || null,
+          designation: emp.designation || null,
           location: {
             id: emp.locationId,
-            name: emp.locationName || 'Davanagere Mega Store',
-            code: emp.locationCode || 'DAV',
+            name: emp.locationName || null,
+            code: emp.locationCode || null,
           },
-          department: emp.departmentName || 'Sales',
+          department: emp.departmentName || null,
           shift: {
             id: emp.shiftId,
-            name: emp.shiftName || 'General Shift',
-            timing: '10:00 AM - 07:30 PM',
-            gracePeriodMinutes: emp.gracePeriod || 5,
-            lateThresholdMinutes: emp.lateThreshold || 5,
+            name: emp.shiftName || null,
+            // The employee's own shift master, not a fixed pair of times that
+            // would show every employee a roster they were never assigned to.
+            startTime: emp.startTime || null,
+            endTime: emp.endTime || null,
+            timing: emp.startTime && emp.endTime ? `${emp.startTime} - ${emp.endTime}` : null,
+            gracePeriodMinutes: emp.gracePeriod ?? null,
+            lateThresholdMinutes: emp.lateThreshold ?? null,
           },
           biometricEnrollment: {
-            enrollmentNumber: '1604',
-            status: 'ACTIVE',
-            verifiedShowroom: 'DAV',
-            hardwareModels: 'eSSL MB160 (Multi-Biometric Face & Fingerprint)',
+            enrollmentNumber: emp.biometricDeviceEmployeeId || enrollment?.enrollmentNumber || null,
+            status: enrollment ? enrollment.status : 'NOT_ENROLLED',
+            verifiedShowroom: enrollment?.showroomCode || null,
+            serialNumber: enrollment?.serialNumber || null,
+            hardwareModel: enrollment?.model || null,
+            lastSyncedAt: enrollment?.updatedAt || null,
           },
         },
         period: {
           year,
           month,
-          monthName: 'October 2026',
+          monthName: new Date(Date.UTC(year, month - 1, 1)).toLocaleString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' }),
           startDate: `${year}-${String(month).padStart(2, '0')}-01`,
           endDate: `${year}-${String(month).padStart(2, '0')}-${String(totalDays).padStart(2, '0')}`,
           totalDays,
@@ -542,7 +566,7 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res: Response) =>
         },
         deviceStatuses,
         dailyRecords,
-        lastBiometricSync: new Date().toISOString(),
+      lastBiometricSync: lastSyncRows[0]?.lastReceived ?? null,
       },
     });
   } catch (error: any) {
@@ -563,47 +587,68 @@ router.post('/:id/sync', authorize('EDIT'), async (req: AuthRequest, res: Respon
       return res.status(404).json({ success: false, error: 'Employee not found' });
     }
 
-    const deviceReports: any[] = [];
-    let newPunchesIngested = 0;
-    let duplicatePunches = 0;
+    // Terminals come from the registry the operator maintains, not from a list
+    // hard-coded in this file: an unlisted device must not be probed, and a
+    // listed one must be reported with its own configured address.
+    const [registryDevices]: any = await pool.query(
+      `SELECT id, serialNumber, name, ipAddress, port, isActive, consecutiveFailures
+         FROM biometric_devices
+        WHERE locationCode = ? OR locationId = ?
+        ORDER BY name`,
+      [emp.locationCode || null, emp.locationId]
+    );
 
-    // Check each of the 3 Davanagere devices
-    for (const dev of DAVANAGERE_DEVICES) {
-      const probe = await probeDeviceSocket(dev.ipAddress, dev.port, 1500);
-      
+    const deviceReports: any[] = [];
+    for (const dev of registryDevices) {
+      if (!dev.ipAddress) {
+        deviceReports.push({
+          serialNumber: dev.serialNumber,
+          name: dev.name,
+          reachable: false,
+          error: 'No IP address configured for this terminal',
+        });
+        continue;
+      }
+      const probe = await probeDeviceSocket(dev.ipAddress, dev.port || 4370, 1500);
+
+      // A TCP handshake is connectivity, not a synchronisation: `lastSyncAt` is
+      // only ever written by the importer that actually stored punch records.
       await pool.query(
-        `UPDATE biometric_devices 
-         SET status = ?, lastConnectionAt = NOW(), lastSyncAt = NOW(), lastError = ?
-         WHERE serialNumber = ?`,
-        [probe.online ? 'CONNECTED' : 'DISCONNECTED', probe.error || null, dev.serialNumber]
+        `UPDATE biometric_devices
+            SET status = ?, lastConnectionAt = NOW(), consecutiveFailures = ?, lastError = ?
+          WHERE id = ?`,
+        [
+          probe.online ? 'CONNECTED' : 'DISCONNECTED',
+          probe.online ? 0 : (dev.consecutiveFailures ?? 0) + 1,
+          probe.error || null,
+          dev.id,
+        ]
       ).catch(() => {});
 
       deviceReports.push({
         serialNumber: dev.serialNumber,
         name: dev.name,
-        online: probe.online,
-        networkLink: 'Protected Showroom LAN',
-        latencyMs: probe.latency,
+        reachable: probe.online,
+        latencyMs: probe.latency ?? null,
         error: probe.error || null,
       });
     }
 
+    const reachableCount = deviceReports.filter((d) => d.reachable).length;
     // Emit live sync event via Socket.IO
     socketIO.emit('biometric:employee_synced', {
       employeeId: emp.id,
       employeeCode: emp.employeeCode,
-      showroomCode: 'DAV',
+      showroomCode: emp.locationCode || null,
       timestamp: new Date().toISOString(),
       deviceReports,
     });
 
     res.json({
       success: true,
-      message: `Biometric synchronization completed for Davanagere terminals. Verified status for ${deviceReports.length} devices.`,
+      message: `Checked ${deviceReports.length} registered terminal(s) for this store; ${reachableCount} answered on the network. No attendance records were imported by this check.`,
       deviceReports,
-      newPunchesIngested,
-      duplicatePunches,
-      lastSyncTimestamp: new Date().toISOString(),
+      reachableTerminals: reachableCount,
     });
   } catch (error: any) {
     console.error('Sync error:', error);

@@ -18,14 +18,15 @@
     "test:rbac": "tsx src/tests/rbacAccess.test.ts",
     "test:security": "tsx src/tests/securityControls.test.ts",
     "test:live": "tsx src/tests/liveActivities.test.ts",
+    "test:dual-mode": "tsx src/tests/dualModeBiometricSync.test.ts",
     "provision:hiring-shards": "tsx src/scripts/provisionHiringShards.ts",
-    "seed:hiring-demo": "tsx src/scripts/seedHiringDemo.ts"
+    "seed:hiring-demo": "tsx src/scripts/seedHiringDemo.ts",
+    "test:export": "tsx src/tests/attendanceExport.test.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^1.7.0",
     "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",
-    "better-sqlite3": "^13.0.3",
     "compression": "^1.7.4",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
@@ -64,5 +65,11 @@
     "@types/uuid": "^10.0.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^13.0.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }

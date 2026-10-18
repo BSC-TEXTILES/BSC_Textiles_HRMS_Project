@@ -213,6 +213,11 @@ router.post('/events/:id/action', async (req: AuthRequest, res: Response) => {
 router.get('/filters', requireAction('ATTENDANCE', 'view'), async (req: AuthRequest, res: Response) => {
   try {
     const scope = scopeOf(req);
+    // A scoped user with no location has an empty allowlist — `IN ()` is a
+    // syntax error, so answer with the empty filter list instead of a 500.
+    if (scope.ids && scope.ids.length === 0) {
+      return res.json({ departments: [] });
+    }
     const where = scope.ids ? `AND w.locationId IN (${scope.ids.map(() => '?').join(',')})` : '';
     const [rows]: any = await pool.query(
       `SELECT DISTINCT d.\`id\`, d.\`name\`

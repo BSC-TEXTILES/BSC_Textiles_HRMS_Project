@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '../index.js';
+import { pool } from '../nativeDb.js';
 import { dbDate } from '../utils/dates.js';
 import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 import { cacheService } from '../services/cacheService.js';
@@ -61,19 +62,30 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
       sellingPointWhere.locationId = locationId;
     }
 
-    if (departmentId && departmentId !== 'all' && departmentId !== 'ALL') {
-      if (departmentId.includes(',')) {
-        const idList = departmentId.split(',').map((s: string) => s.trim()).filter(Boolean);
-        employeeWhere.departmentId = { in: idList };
-        attendanceWhere.employee = { ...(attendanceWhere.employee || {}), departmentId: { in: idList } };
-        incentiveWhere.employee = { ...(incentiveWhere.employee || {}), departmentId: { in: idList } };
-        penaltyWhere.employee = { ...(penaltyWhere.employee || {}), departmentId: { in: idList } };
-      } else {
-        employeeWhere.departmentId = departmentId;
-        attendanceWhere.employee = { ...(attendanceWhere.employee || {}), departmentId };
-        incentiveWhere.employee = { ...(incentiveWhere.employee || {}), departmentId };
-        penaltyWhere.employee = { ...(penaltyWhere.employee || {}), departmentId };
-      }
+    // Executive dashboards filter by the company's standard department list, whose
+    // entries are names/codes rather than department row ids, so resolve here.
+    // An unmatched name resolves to no ids at all — which is the honest answer:
+    // no employee in the master belongs to that department yet.
+    const deptTokens =
+      !departmentId || departmentId === 'all' || departmentId === 'ALL'
+        ? []
+        : String(departmentId).split(',').map((s) => s.trim()).filter(Boolean);
+    if (deptTokens.length) {
+      const wanted = deptTokens.map((t) => t.toLowerCase());
+      const allDepartments = await prisma.department.findMany({
+        select: { id: true, name: true, code: true },
+      });
+      const deptIds = allDepartments
+        .filter((d: any) =>
+          wanted.includes(String(d.id).toLowerCase()) ||
+          wanted.includes(String(d.name || '').toLowerCase()) ||
+          wanted.includes(String(d.code || '').toLowerCase())
+        )
+        .map((d: any) => d.id);
+      employeeWhere.departmentId = { in: deptIds };
+      attendanceWhere.employee = { ...(attendanceWhere.employee || {}), departmentId: { in: deptIds } };
+      incentiveWhere.employee = { ...(incentiveWhere.employee || {}), departmentId: { in: deptIds } };
+      penaltyWhere.employee = { ...(penaltyWhere.employee || {}), departmentId: { in: deptIds } };
     }
 
     if (shiftId) {
@@ -191,6 +203,513 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
   } catch (error) {
     console.error('Dashboard summary error:', error);
     res.status(500).json({ error: 'Failed to get dashboard summary' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// HR Command Center — real aggregates only. Every figure is computed from the
+// database; where the schema has no source for a metric the field is null (or
+// an empty list) and the UI must render “—”. Nothing here is simulated.
+// ---------------------------------------------------------------------------
+
+const ATTENDANCE_PRESENT_STATUSES = [
+  'PRESENT', 'EARLY', 'LATE', 'OVERTIME', 'LEFT_STORE', 'FACE_VERIFIED',
+  'FACE_VERIFICATION_FAILED', 'ON_LUNCH', 'ON_TEA_BREAK', 'ON_OTHER_BREAK',
+];
+
+function ymdUtc(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function addUtcDays(d: Date, days: number): Date {
+  const out = new Date(d.getTime());
+  out.setUTCDate(out.getUTCDate() + days);
+  return out;
+}
+
+/** Resolve department query tokens (ids/names/codes, comma separated) to row ids. */
+async function resolveDepartmentIds(token?: string): Promise<{ given: boolean; ids: string[] }> {
+  if (!token || token === 'all' || token === 'ALL') return { given: false, ids: [] };
+  const wanted = String(token).split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const allDepartments = await prisma.department.findMany({ select: { id: true, name: true, code: true } });
+  const ids = allDepartments
+    .filter((d: any) =>
+      wanted.includes(String(d.id).toLowerCase()) ||
+      wanted.includes(String(d.name || '').toLowerCase()) ||
+      wanted.includes(String(d.code || '').toLowerCase())
+    )
+    .map((d: any) => d.id);
+  return { given: true, ids };
+}
+
+router.get('/hr-command-center', authorize('VIEW'), async (req: AuthRequest, res) => {
+  try {
+    let locationId = getScopedLocationId(req.user, req.query.locationId);
+    if (locationId === 'all') locationId = undefined;
+    const dept = await resolveDepartmentIds(req.query.departmentId ? String(req.query.departmentId) : undefined);
+
+    const q = async (sql: string, params: any[] = []): Promise<any[]> => {
+      const [rows]: any = await pool.query(sql, params);
+      return rows || [];
+    };
+
+    const empScope = (alias: string) => {
+      const parts: string[] = [];
+      const params: any[] = [];
+      if (locationId) { parts.push(`\`${alias}\`.locationId = ?`); params.push(locationId); }
+      if (dept.given) {
+        parts.push(dept.ids.length ? `\`${alias}\`.departmentId IN (${dept.ids.map(() => '?').join(',')})` : '1 = 0');
+        if (dept.ids.length) params.push(...dept.ids);
+      }
+      return { sql: parts.length ? ` AND ${parts.join(' AND ')}` : '', params };
+    };
+    const es = empScope('e');
+
+    const latestAttendance = await prisma.attendance.findFirst({
+      orderBy: { attendanceDate: 'desc' },
+      select: { attendanceDate: true },
+    });
+    const targetDate = req.query.date ? new Date(String(req.query.date)) : latestAttendance?.attendanceDate || dbDate();
+    const targetYmd = ymdUtc(dbDate(targetDate));
+    const todayYmd = ymdUtc(dbDate());
+    const targetMonth = Number(targetYmd.slice(5, 7));
+    const targetDay = Number(targetYmd.slice(8, 10));
+    const monthStart = new Date(Date.UTC(Number(targetYmd.slice(0, 4)), targetMonth - 1, 1));
+    const monthEndExclusive = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1));
+    const nowUtc = dbDate();
+    const dayOfWeek = nowUtc.getUTCDay();
+    const weekStart = addUtcDays(nowUtc, dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
+    const weekEndExclusive = addUtcDays(weekStart, 7);
+
+    const leaveOverlap = `DATE(la.start_date) <= ? AND DATE(la.end_date) >= ?`;
+    const pendingStatuses = ATTENDANCE_PRESENT_STATUSES.map(() => '?').join(',');
+
+    const [
+      headcountRows, presentRows, weeklyOffRows, lateRows, onLeaveRows, returnTomorrowRows,
+      newJoinerRows, faceVerifiedRows,
+      locRows, headcountByLoc, presentByLoc,
+      deptDistRows,
+      leaveMonthRows, leaveTodayByTypeRows, pendingLeaveRows, upcomingLeaveRows,
+      correctionRows, docsPendingRows, syncFailureRows, probationRows, resignationsRows, fnfRows,
+      missingKycRows, bankPendingRows, pfEsiRows,
+      joiningWeekRows, assetsPendingRows, lastRunRows, candidateRows, interviewTodayRows,
+      birthdayRows, birthdayNameRows, upcomingHolidayRows,
+    ] = await Promise.all([
+      q(`SELECT COUNT(*) c FROM employee e WHERE e.status = 'ACTIVE'${es.sql}`, es.params),
+      q(
+        `SELECT COUNT(*) c FROM attendance a JOIN employee e ON e.id = a.employeeId
+         WHERE DATE(a.attendanceDate) = ? AND a.status IN (${pendingStatuses})${es.sql}`,
+        [targetYmd, ...es.params]
+      ),
+      q(
+        `SELECT COUNT(*) c FROM attendance a JOIN employee e ON e.id = a.employeeId
+         WHERE DATE(a.attendanceDate) = ? AND a.status = 'WEEKLY_OFF'${es.sql}`,
+        [targetYmd, ...es.params]
+      ),
+      q(
+        `SELECT COUNT(*) c FROM attendance a JOIN employee e ON e.id = a.employeeId
+         WHERE DATE(a.attendanceDate) = ? AND a.status = 'LATE'${es.sql}`,
+        [targetYmd, ...es.params]
+      ),
+      q(
+        `SELECT COUNT(DISTINCT la.employee_id) c FROM leave_applications la JOIN employee e ON e.id = la.employee_id
+         WHERE la.status = 'APPROVED' AND ${leaveOverlap}${es.sql}`,
+        [targetYmd, targetYmd, ...es.params]
+      ),
+      q(
+        `SELECT COUNT(DISTINCT la.employee_id) c FROM leave_applications la JOIN employee e ON e.id = la.employee_id
+         WHERE la.status = 'APPROVED' AND ${leaveOverlap} AND DATE(la.end_date) = ?${es.sql}`,
+        [targetYmd, targetYmd, targetYmd, ...es.params]
+      ),
+      q(
+        `SELECT COUNT(*) c FROM employee e WHERE e.status = 'ACTIVE'
+         AND e.joiningDate >= ? AND e.joiningDate < ?${es.sql}`,
+        [monthStart, monthEndExclusive, ...es.params]
+      ),
+      q(
+        `SELECT COUNT(*) c FROM faceverification f JOIN employee e ON e.id = f.employeeId
+         WHERE DATE(f.verifiedAt) = ? AND f.result = 'VERIFIED'${es.sql}`,
+        [targetYmd, ...es.params]
+      ),
+      q(`SELECT id, name, code FROM location ORDER BY name ASC`),
+      q(
+        `SELECT e.locationId, COUNT(*) c FROM employee e WHERE e.status = 'ACTIVE'${es.sql} GROUP BY e.locationId`,
+        es.params
+      ),
+      q(
+        `SELECT a.locationId, COUNT(*) c FROM attendance a JOIN employee e ON e.id = a.employeeId
+         WHERE DATE(a.attendanceDate) = ? AND a.status IN (${pendingStatuses})${es.sql}
+         GROUP BY a.locationId`,
+        [targetYmd, ...es.params]
+      ),
+      q(
+        `SELECT d.name AS name, COUNT(*) c FROM employee e LEFT JOIN department d ON d.id = e.departmentId
+         WHERE e.status = 'ACTIVE'${es.sql} GROUP BY d.name ORDER BY c DESC`,
+        es.params
+      ),
+      q(
+        `SELECT la.start_date, la.end_date FROM leave_applications la JOIN employee e ON e.id = la.employee_id
+         WHERE la.status = 'APPROVED' AND la.start_date < ? AND la.end_date >= ?${es.sql}`,
+        [monthEndExclusive, monthStart, ...es.params]
+      ),
+      q(
+        `SELECT lt.name AS name, COUNT(DISTINCT la.employee_id) c
+         FROM leave_applications la
+         JOIN leave_types lt ON lt.id = la.leave_type_id
+         JOIN employee e ON e.id = la.employee_id
+         WHERE la.status = 'APPROVED' AND ${leaveOverlap}${es.sql}
+         GROUP BY lt.name`,
+        [targetYmd, targetYmd, ...es.params]
+      ),
+      q(
+        `SELECT COUNT(*) c FROM leave_applications la JOIN employee e ON e.id = la.employee_id
+         WHERE la.status = 'PENDING'${es.sql}`,
+        es.params
+      ),
+      q(
+        `SELECT COUNT(*) c FROM leave_applications la JOIN employee e ON e.id = la.employee_id
+         WHERE la.status = 'PENDING' AND la.start_date > ? AND la.start_date <= ?${es.sql}`,
+        [nowUtc, weekEndExclusive, ...es.params]
+      ),
+      q(
+        `SELECT COUNT(*) c FROM attendancecorrection c WHERE c.status = 'PENDING'${locationId ? ' AND c.locationId = ?' : ''}`,
+        locationId ? [locationId] : []
+      ),
+      q(
+        `SELECT COUNT(*) c FROM employee e WHERE e.status = 'ACTIVE'
+         AND (e.documentStatus IS NULL OR e.documentStatus NOT IN ('VERIFIED','COMPLETE','APPROVED'))${es.sql}`,
+        es.params
+      ),
+      q(`SELECT COUNT(*) c FROM biometric_devices WHERE isActive = 1 AND consecutiveFailures > 0`),
+      q(
+        `SELECT COUNT(*) c FROM employee e WHERE e.status = 'ACTIVE' AND e.employmentType = 'PROBATION'
+         AND e.confirmationDate IS NOT NULL AND e.confirmationDate <= DATE_ADD(?, INTERVAL 30 DAY)${es.sql}`,
+        [nowUtc, ...es.params]
+      ),
+      q(
+        `SELECT COUNT(*) c FROM employee_exits x JOIN employee e ON e.id = x.employee_id
+         WHERE x.status NOT IN ('PAID','COMPLETED','REJECTED','CANCELLED','WITHDRAWN')${es.sql}`,
+        es.params
+      ),
+      q(
+        `SELECT COUNT(*) c FROM fnf_settlements f JOIN employee e ON e.id = f.employee_id
+         WHERE f.status NOT IN ('PAID','COMPLETED','REJECTED','CANCELLED')${es.sql}`,
+        es.params
+      ),
+      q(
+        `SELECT COUNT(*) c FROM employee e WHERE e.status = 'ACTIVE'
+         AND (e.panNumber IS NULL OR e.aadhaarVerificationStatus IS NULL OR e.aadhaarVerificationStatus <> 'VERIFIED')${es.sql}`,
+        es.params
+      ),
+      q(
+        `SELECT COUNT(*) c FROM employee e WHERE e.status = 'ACTIVE' AND e.bankAccount IS NULL${es.sql}`,
+        es.params
+      ),
+      q(
+        `SELECT COUNT(*) c FROM employee e WHERE e.status = 'ACTIVE'
+         AND (e.pfNo IS NULL OR e.esiNo IS NULL)${es.sql}`,
+        es.params
+      ),
+      q(
+        `SELECT COUNT(*) c FROM employee e WHERE e.status = 'ACTIVE'
+         AND e.joiningDate >= ? AND e.joiningDate < ?${es.sql}`,
+        [weekStart, weekEndExclusive, ...es.params]
+      ),
+      q(
+        `SELECT COUNT(*) c FROM employee_custody_assets ca JOIN employee e ON e.id = ca.employeeId
+         WHERE ca.acknowledgedAt IS NULL AND ca.returnedAt IS NULL${es.sql}`,
+        es.params
+      ),
+      q(`SELECT id, status, periodStart, periodEnd FROM payrollrun ORDER BY createdAt DESC LIMIT 1`),
+      q(`SELECT COUNT(*) c FROM candidate`),
+      q(`SELECT COUNT(*) c FROM interview WHERE DATE(scheduledAt) = ?`, [todayYmd]),
+      q(
+        `SELECT COUNT(*) c FROM employee e WHERE e.status = 'ACTIVE'
+         AND MONTH(e.dateOfBirth) = ? AND DAY(e.dateOfBirth) = ?${es.sql}`,
+        [targetMonth, targetDay, ...es.params]
+      ),
+      q(
+        `SELECT e.fullName FROM employee e WHERE e.status = 'ACTIVE'
+         AND MONTH(e.dateOfBirth) = ? AND DAY(e.dateOfBirth) = ?${es.sql} LIMIT 5`,
+        [targetMonth, targetDay, ...es.params]
+      ),
+      q(
+        `SELECT name, date FROM holiday WHERE date >= ?${locationId ? ' AND (locationId IS NULL OR locationId = ?)' : ''} ORDER BY date ASC LIMIT 5`,
+        locationId ? [nowUtc, locationId] : [nowUtc]
+      ),
+    ]);
+
+    const num = (rows: any[]) => Number(rows?.[0]?.c || 0);
+    const headcount = num(headcountRows);
+    const present = num(presentRows);
+    const weeklyOff = num(weeklyOffRows);
+    const absent = Math.max(headcount - present - weeklyOff, 0);
+    const onLeave = num(onLeaveRows);
+
+    const hcByLoc = new Map<string, number>();
+    for (const r of headcountByLoc) hcByLoc.set(String(r.locationId), Number(r.c));
+    const presByLoc = new Map<string, number>();
+    for (const r of presentByLoc) presByLoc.set(String(r.locationId), Number(r.c));
+    const hubCoverage = locRows
+      .map((l: any) => {
+        const hc = hcByLoc.get(String(l.id)) || 0;
+        const pres = presByLoc.get(String(l.id)) || 0;
+        return {
+          locationId: String(l.id),
+          name: String(l.name),
+          code: l.code ? String(l.code) : null,
+          headcount: hc,
+          present: pres,
+          coveragePct: hc > 0 ? Math.round((pres / hc) * 1000) / 10 : null,
+        };
+      })
+      .filter((h: any) => h.headcount > 0 || h.present > 0);
+
+    const trendMonths: { label: string; start: Date; end: Date }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const start = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() - i, 1));
+      const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
+      trendMonths.push({ label: start.toLocaleDateString('en-IN', { month: 'short', timeZone: 'UTC' }), start, end });
+    }
+    const trend = await Promise.all(
+      trendMonths.map(async (m) => {
+        const [joinRows, exitRows, hcRows] = await Promise.all([
+          q(`SELECT COUNT(*) c FROM employee e WHERE e.joiningDate >= ? AND e.joiningDate < ?${es.sql}`, [m.start, m.end, ...es.params]),
+          q(
+            `SELECT COUNT(*) c FROM employee_exits x JOIN employee e ON e.id = x.employee_id
+             WHERE COALESCE(x.last_working_day, x.resignation_date) >= ? AND COALESCE(x.last_working_day, x.resignation_date) < ?${es.sql}`,
+            [m.start, m.end, ...es.params]
+          ),
+          q(
+            `SELECT COUNT(*) c FROM employee e
+             WHERE e.joiningDate < ? AND (e.exitDate IS NULL OR e.exitDate >= ?)${es.sql}`,
+            [m.end, m.end, ...es.params]
+          ),
+        ]);
+        return { month: m.label, joinings: num(joinRows), exits: num(exitRows), headcount: num(hcRows) };
+      })
+    );
+
+    const daysWithLeave: Record<string, number> = {};
+    for (const row of leaveMonthRows) {
+      let d = dbDate(new Date(row.start_date));
+      const end = dbDate(new Date(row.end_date));
+      if (d.getTime() < monthStart.getTime()) d = monthStart;
+      while (d.getTime() < monthEndExclusive.getTime() && d.getTime() <= end.getTime()) {
+        const key = ymdUtc(d);
+        daysWithLeave[key] = (daysWithLeave[key] || 0) + 1;
+        d = addUtcDays(d, 1);
+      }
+    }
+
+    const lastRun = lastRunRows[0] || null;
+    let payslipCount = 0;
+    if (lastRun?.id) {
+      const pr = await q(`SELECT COUNT(*) c FROM payrollitem WHERE payrollRunId = ?`, [lastRun.id]);
+      payslipCount = num(pr);
+    }
+
+    const result = {
+      date: targetYmd,
+      kpis: {
+        headcount,
+        present,
+        absent,
+        unplannedAbsent: Math.max(absent - onLeave, 0),
+        onLeave,
+        returnTomorrow: num(returnTomorrowRows),
+        newJoiners: num(newJoinerRows),
+        late: num(lateRows),
+        lateRate: present > 0 ? Math.round((num(lateRows) / present) * 1000) / 10 : null,
+        attendanceRate: headcount > 0 ? Math.round((present / headcount) * 1000) / 10 : null,
+        faceVerified: num(faceVerifiedRows),
+      },
+      hubs: hubCoverage,
+      trend,
+      departments: deptDistRows.map((r: any) => ({
+        name: r.name || 'Unassigned',
+        count: Number(r.c),
+        pct: headcount > 0 ? Math.round((Number(r.c) / headcount) * 1000) / 10 : null,
+      })),
+      leave: {
+        onLeaveTodayByType: leaveTodayByTypeRows.map((r: any) => ({ name: String(r.name), count: Number(r.c) })),
+        calendarMonth: targetYmd.slice(0, 7),
+        daysWithLeave: Object.entries(daysWithLeave).map(([date, count]) => ({ date, count })),
+        pendingRequests: num(pendingLeaveRows),
+        upcomingRequests: num(upcomingLeaveRows),
+      },
+      actionCenter: {
+        leaveRequestsPending: num(pendingLeaveRows),
+        correctionsPending: num(correctionRows),
+        documentsPending: num(docsPendingRows),
+        biometricSyncFailures: num(syncFailureRows),
+        probationReviewsDue: num(probationRows),
+        resignationsPending: num(resignationsRows),
+        fnfPending: num(fnfRows),
+      },
+      compliance: {
+        missingKyc: num(missingKycRows),
+        bankPending: num(bankPendingRows),
+        pfEsiPending: num(pfEsiRows),
+      },
+      onboarding: {
+        joiningThisWeek: num(joiningWeekRows),
+        documentsPending: num(docsPendingRows),
+        assetsPending: num(assetsPendingRows),
+      },
+      payrollReadiness: {
+        runStatus: lastRun?.status || null,
+        periodStart: lastRun?.periodStart || null,
+        periodEnd: lastRun?.periodEnd || null,
+        payslipCount,
+        coveragePct: headcount > 0 ? Math.round((payslipCount / headcount) * 1000) / 10 : null,
+      },
+      recruitment: {
+        activeCandidates: num(candidateRows),
+        interviewsToday: num(interviewTodayRows),
+      },
+      engagements: {
+        birthdaysToday: { count: num(birthdayRows), names: birthdayNameRows.map((r: any) => String(r.fullName)) },
+        upcomingHolidays: upcomingHolidayRows.map((r: any) => ({ name: String(r.name), date: ymdUtc(new Date(r.date)) })),
+      },
+    };
+
+    res.json(result);
+  } catch (error: any) {
+    console.error('HR command center error:', error);
+    res.status(500).json({ error: 'Failed to build the HR command center', message: error?.message });
+  }
+});
+
+router.get('/kpi-details', authorize('VIEW'), async (req: AuthRequest, res) => {
+  try {
+    const type = String(req.query.type || '');
+    let locationId = getScopedLocationId(req.user, req.query.locationId);
+    if (locationId === 'all') locationId = undefined;
+    const dept = await resolveDepartmentIds(req.query.departmentId ? String(req.query.departmentId) : undefined);
+
+    const q = async (sql: string, params: any[] = []): Promise<any[]> => {
+      const [rows]: any = await pool.query(sql, params);
+      return rows || [];
+    };
+    const empScope = (alias: string) => {
+      const parts: string[] = [];
+      const params: any[] = [];
+      if (locationId) { parts.push(`\`${alias}\`.locationId = ?`); params.push(locationId); }
+      if (dept.given) {
+        parts.push(dept.ids.length ? `\`${alias}\`.departmentId IN (${dept.ids.map(() => '?').join(',')})` : '1 = 0');
+        if (dept.ids.length) params.push(...dept.ids);
+      }
+      return { sql: parts.length ? ` AND ${parts.join(' AND ')}` : '', params };
+    };
+
+    const latestAttendance = await prisma.attendance.findFirst({
+      orderBy: { attendanceDate: 'desc' },
+      select: { attendanceDate: true },
+    });
+    const targetDate = req.query.date ? new Date(String(req.query.date)) : latestAttendance?.attendanceDate || dbDate();
+    const targetYmd = ymdUtc(dbDate(targetDate));
+
+    const clock = (v: unknown): string | null =>
+      v ? new Date(v as string).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' }) : null;
+
+    const es = empScope('e');
+    let rows: any[] = [];
+
+    if (type === 'headcount') {
+      rows = await q(
+        `SELECT e.employeeCode, e.fullName, e.designation, d.name AS department, l.name AS locationName, e.joiningDate
+         FROM employee e
+         LEFT JOIN department d ON d.id = e.departmentId
+         LEFT JOIN location l ON l.id = e.locationId
+         WHERE e.status = 'ACTIVE'${es.sql}
+         ORDER BY e.fullName ASC LIMIT 500`,
+        es.params
+      );
+      rows = rows.map((r) => ({ ...r, joiningDate: r.joiningDate ? ymdUtc(new Date(r.joiningDate)) : null }));
+    } else if (type === 'present' || type === 'late') {
+      const statusFilter = type === 'late' ? `a.status = 'LATE'` : `a.status IN (${ATTENDANCE_PRESENT_STATUSES.map(() => '?').join(',')})`;
+      const params = type === 'late' ? [] : [...ATTENDANCE_PRESENT_STATUSES];
+      rows = await q(
+        `SELECT e.employeeCode, e.fullName, d.name AS department, a.status, a.actualLogin, a.actualLogout,
+                a.totalWorkingSeconds, a.lateLoginSeconds, a.overtimeSeconds
+         FROM attendance a
+         JOIN employee e ON e.id = a.employeeId
+         LEFT JOIN department d ON d.id = e.departmentId
+         WHERE DATE(a.attendanceDate) = ? AND ${statusFilter}${es.sql}
+         ORDER BY a.actualLogin ASC LIMIT 500`,
+        [targetYmd, ...params, ...es.params]
+      );
+      rows = rows.map((r) => ({
+        employeeCode: r.employeeCode,
+        fullName: r.fullName,
+        department: r.department,
+        status: r.status,
+        login: clock(r.actualLogin),
+        logout: clock(r.actualLogout),
+        workedMinutes: r.totalWorkingSeconds != null ? Math.round(Number(r.totalWorkingSeconds) / 60) : null,
+        lateMinutes: r.lateLoginSeconds != null ? Math.round(Number(r.lateLoginSeconds) / 60) : null,
+      }));
+    } else if (type === 'absent') {
+      rows = await q(
+        `SELECT e.employeeCode, e.fullName, d.name AS department, l.name AS locationName
+         FROM employee e
+         LEFT JOIN department d ON d.id = e.departmentId
+         LEFT JOIN location l ON l.id = e.locationId
+         WHERE e.status = 'ACTIVE'${es.sql}
+           AND NOT EXISTS (SELECT 1 FROM attendance a WHERE a.employeeId = e.id AND DATE(a.attendanceDate) = ?)
+           AND NOT EXISTS (
+             SELECT 1 FROM leave_applications la
+             WHERE la.employee_id = e.id AND la.status = 'APPROVED'
+               AND DATE(la.start_date) <= ? AND DATE(la.end_date) >= ?
+           )
+         ORDER BY e.fullName ASC LIMIT 500`,
+        [...es.params, targetYmd, targetYmd, targetYmd]
+      );
+    } else if (type === 'leave') {
+      rows = await q(
+        `SELECT e.employeeCode, e.fullName, d.name AS department, lt.name AS leaveType,
+                la.start_date, la.end_date, la.status, la.days_count, la.reason
+         FROM leave_applications la
+         JOIN employee e ON e.id = la.employee_id
+         JOIN leave_types lt ON lt.id = la.leave_type_id
+         LEFT JOIN department d ON d.id = e.departmentId
+         WHERE la.status = 'APPROVED' AND DATE(la.start_date) <= ? AND DATE(la.end_date) >= ?${es.sql}
+         ORDER BY la.start_date ASC LIMIT 500`,
+        [targetYmd, targetYmd, ...es.params]
+      );
+      rows = rows.map((r) => ({
+        ...r,
+        startDate: r.start_date ? ymdUtc(new Date(r.start_date)) : null,
+        endDate: r.end_date ? ymdUtc(new Date(r.end_date)) : null,
+        start_date: undefined,
+        end_date: undefined,
+      }));
+    } else if (type === 'face_verified') {
+      rows = await q(
+        `SELECT e.employeeCode, e.fullName, d.name AS department, f.matchPercentage, f.verifiedAt, f.result
+         FROM faceverification f
+         JOIN employee e ON e.id = f.employeeId
+         LEFT JOIN department d ON d.id = e.departmentId
+         WHERE DATE(f.verifiedAt) = ? AND f.result = 'VERIFIED'${es.sql}
+         ORDER BY f.verifiedAt DESC LIMIT 500`,
+        [targetYmd, ...es.params]
+      );
+      rows = rows.map((r) => ({
+        employeeCode: r.employeeCode,
+        fullName: r.fullName,
+        department: r.department,
+        matchPercentage: r.matchPercentage != null ? Number(r.matchPercentage) : null,
+        verifiedAt: clock(r.verifiedAt),
+      }));
+    } else {
+      return res.status(400).json({ error: 'Unknown KPI detail type' });
+    }
+
+    res.json({ type, date: targetYmd, total: rows.length, rows });
+  } catch (error: any) {
+    console.error('KPI details error:', error);
+    res.status(500).json({ error: 'Failed to load KPI details', message: error?.message });
   }
 });
 

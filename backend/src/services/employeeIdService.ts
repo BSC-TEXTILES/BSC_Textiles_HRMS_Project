@@ -11,7 +11,11 @@
  *    never mint the same ID. The unique index on `employee.employeeCode`
  *    remains the final hard constraint.
  *  - The format is CONFIGURABLE (stored in `system_settings`), never hard-coded
- *    throughout the application. Default: `BSC-EMP-0001`.
+ *    throughout the application. Default: strictly numeric (`000001`), because
+ *    migration 025 installs an ENFORCED check
+ *    `employeeCode REGEXP '^[0-9]+$'` and every valid record in the database is
+ *    numeric — a prefix would mint codes the database rejects, breaking employee
+ *    creation. `setEmployeeIdPolicy` refuses a prefix that violates it.
  *  - IDs are never derived from the current row count or a frontend counter.
  *  - Existing official IDs (e.g. `1372`) and legacy/test identifiers
  *    (e.g. `TEST-EMP-001`) are classified, preserved, and never silently
@@ -28,17 +32,30 @@ export interface EmployeeIdPolicy {
   sampleFormat: string;
 }
 
+/**
+ * Digits-only, six wide: `100201`-style payroll numbers already in use, and the
+ * device enrollment PINs are the same shape, so an ID can be matched to a terminal
+ * user without a format translation step.
+ */
 export const DEFAULT_ID_POLICY: EmployeeIdPolicy = {
-  formatKey: 'BSC-EMP',
-  prefix: 'BSC-EMP-',
-  padding: 4,
-  sampleFormat: 'BSC-EMP-0001',
+  formatKey: 'NUMERIC',
+  prefix: '',
+  padding: 6,
+  sampleFormat: '000001',
 };
 
 export const EMPLOYEE_ID_SETTINGS_KEY = 'employee_id_format';
+export const EMPLOYEE_ID_PREVIOUS_KEY = 'employee_id_format_previous';
+
+/** Mirrors the ENFORCED constraint installed by migration 025. */
+const EMPLOYEE_CODE_PATTERN = /^[0-9]{1,30}$/;
+
+export function isEmployeeCodeAcceptedByDatabase(code: string): boolean {
+  return EMPLOYEE_CODE_PATTERN.test(String(code ?? '').trim());
+}
 
 export type EmployeeCodeKind =
-  | 'standard' // matches the configured production format (BSC-EMP-0001)
+  | 'standard' // matches the configured production format (numeric by default)
   | 'numeric-legacy' // bare numeric legacy payroll IDs such as 1372
   | 'test' // seeded test identifiers such as TEST-EMP-001
   | 'other-assigned' // any other pre-existing assigned ID
@@ -99,6 +116,32 @@ export async function getEmployeeIdPolicy(): Promise<EmployeeIdPolicy> {
 /** SUPER_ADMIN-only reconfiguration of the Employee ID format. */
 export async function setEmployeeIdPolicy(policy: Partial<EmployeeIdPolicy>): Promise<EmployeeIdPolicy> {
   const merged = normalisePolicy({ ...DEFAULT_ID_POLICY, ...policy });
+  // The employee table carries an ENFORCED digits-only check (migration 025).
+  // Accepting a prefixed format here would store a policy that cannot be used —
+  // every allocation under it would fail at INSERT — so it is refused with the
+  // reason instead of being silently adopted.
+  if (!isEmployeeCodeAcceptedByDatabase(merged.sampleFormat)) {
+    const err: any = new Error(
+      `Employee ID format "${merged.sampleFormat}" is rejected by the database: employeeCode must be digits only (1-30 characters).`
+    );
+    err.code = 'INVALID_EMPLOYEE_ID_FORMAT';
+    throw err;
+  }
+  // Keep the previous policy so a change is reversible and auditable.
+  const previous = await getEmployeeIdPolicy().catch(() => null);
+  if (previous && previous.formatKey !== merged.formatKey) {
+    await prisma.$executeRaw(
+      `INSERT INTO system_settings (id, setting_key, setting_value, description, updated_at)
+       VALUES (?, ?, ?, ?, NOW(3))
+       ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW(3)`,
+      [
+        crypto.randomUUID(),
+        EMPLOYEE_ID_PREVIOUS_KEY,
+        JSON.stringify(previous),
+        'Previous employee ID format policy (kept for rollback)',
+      ]
+    ).catch(() => undefined);
+  }
   const payload = JSON.stringify(merged);
   const id = crypto.randomUUID();
   await prisma.$executeRaw(
@@ -129,6 +172,15 @@ export async function setEmployeeIdPolicy(policy: Partial<EmployeeIdPolicy>): Pr
  */
 export async function allocateEmployeeId(tx?: any): Promise<string> {
   const policy = await getEmployeeIdPolicy();
+  // Fail before touching the sequence, not after: an INSERT that the ENFORCED
+  // employee CHECK rejects would otherwise advance next_value and burn an ID.
+  if (!isEmployeeCodeAcceptedByDatabase(formatEmployeeId(policy, 1))) {
+    const err: any = new Error(
+      `Employee ID policy "${policy.sampleFormat}" cannot be used: employeeCode must be digits only (1-30 characters).`
+    );
+    err.code = 'INVALID_EMPLOYEE_ID_FORMAT';
+    throw err;
+  }
   const client = tx || prisma;
 
   const run = async (exec: any): Promise<string> => {
@@ -157,7 +209,7 @@ export async function allocateEmployeeId(tx?: any): Promise<string> {
 
     const seq = rows[0];
     const value = Number(seq.next_value);
-    const code = formatEmployeeId({ ...policy, prefix: seq.prefix || policy.prefix, padding: Number(seq.padding) || policy.padding }, value);
+    const code = formatEmployeeId({ ...policy, prefix: seq.prefix ?? policy.prefix, padding: Number(seq.padding) || policy.padding }, value);
     await exec(`UPDATE employee_id_sequence SET next_value = ?, updated_at = NOW(3) WHERE id = ?`, [value + 1, seq.id]);
     return code;
   };
@@ -192,7 +244,7 @@ export async function allocateEmployeeId(tx?: any): Promise<string> {
     } else {
       const seq = rows[0];
       const value = Number(seq.next_value);
-      code = formatEmployeeId({ ...policy, prefix: seq.prefix || policy.prefix, padding: Number(seq.padding) || policy.padding }, value);
+      code = formatEmployeeId({ ...policy, prefix: seq.prefix ?? policy.prefix, padding: Number(seq.padding) || policy.padding }, value);
       await conn.query(`UPDATE employee_id_sequence SET next_value = ?, updated_at = NOW(3) WHERE id = ?`, [value + 1, seq.id]);
     }
     await conn.commit();
@@ -210,7 +262,12 @@ export function classifyEmployeeCode(code: string | null | undefined, policy?: E
   const value = String(code ?? '').trim();
   if (!value) return 'missing';
   if (/^TEST-EMP-/i.test(value)) return 'test';
-  if (/^\d+$/.test(value)) return 'numeric-legacy';
+  if (/^\d+$/.test(value)) {
+    // Under the digits-only policy a numeric code IS the production format, so it
+    // must not be reported as a legacy shape awaiting conversion. Without a policy
+    // argument the historical reading is kept.
+    return policy && policy.prefix === '' ? 'standard' : 'numeric-legacy';
+  }
   if (policy) {
     const escaped = policy.prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     if (new RegExp(`^${escaped}\\d+$`, 'i').test(value)) return 'standard';

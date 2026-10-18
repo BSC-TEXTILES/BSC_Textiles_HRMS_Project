@@ -17,8 +17,17 @@ import crypto from 'node:crypto';
 import { pool } from '../nativeDb.js';
 import { socketIO } from '../socket.js';
 import { shardRouter } from '../core/sharding/ShardRouter.js';
-import { ZkProtocolClient, probeZkTerminal } from './zkProtocolAdapter.js';
-import { deviceLog, classifyDeviceError } from './biometric/logger.js';
+import { ZkProtocolClient, probeZkTerminal, ZkParseError } from './zkProtocolAdapter.js';
+import {
+  deviceLog,
+  classifyDeviceError,
+  classifyDeviceFailure,
+  failureCodeForDeviceCode,
+  formatStoredFailure,
+  parseStoredFailureCode,
+  type DeviceErrorCode,
+  type DeviceFailureCode,
+} from './biometric/logger.js';
 import {
   loadGlobalSettings,
   readJsonSetting,
@@ -98,6 +107,101 @@ export interface DeviceProbeResult {
   latencyMs: number;
   protocol?: 'TCP' | 'UDP';
   error?: string;
+  /** Public failure class (repair brief §2); absent when the port answered. */
+  errorCode?: DeviceFailureCode;
+  /** The raw Node code behind the class: ETIMEDOUT, ECONNREFUSED, ENETUNREACH… */
+  transportCode?: string;
+}
+
+/**
+ * Node socket error → the public failure class the diagnostics report. Kept
+ * separate from the message so a refused port, a silent port and an unroutable
+ * address can never collapse into one "UNREACHABLE / timed out" again.
+ */
+function failureCodeForSocketError(err: any): { code: DeviceFailureCode; transportCode: string } {
+  const transportCode = String(err?.code || 'SOCKET_ERROR');
+  switch (transportCode) {
+    case 'ECONNREFUSED':
+    case 'EPERM':
+    case 'EACCES':
+      return { code: 'CONNECT_REFUSED', transportCode };
+    case 'ETIMEDOUT':
+    case 'ERR_STREAM_PREMATURE_CLOSE':
+      return { code: 'CONNECT_TIMEOUT', transportCode };
+    case 'ENETUNREACH':
+    case 'EHOSTUNREACH':
+    case 'ENETDOWN':
+    case 'ENOTFOUND':
+    case 'EAI_AGAIN':
+      return { code: 'NETWORK_UNREACHABLE', transportCode };
+    default:
+      return { code: failureCodeForDeviceCode(classifyDeviceError(err).code) ?? 'UNREACHABLE', transportCode };
+  }
+}
+
+/** A terminal failure in both vocabularies, plus the sentence for the operator. */
+export interface DeviceFailure {
+  /** Public class the API and UI promise (brief §2). */
+  code: DeviceFailureCode;
+  /** Log vocabulary stored in `lastError` / sync state, so grep stays stable. */
+  logCode: DeviceErrorCode;
+  message: string;
+  transportCode: string;
+}
+
+/**
+ * A failed ZK handshake becomes (class, log code, message). The tag the client
+ * set wins over the message text, so "the port answered and refused our
+ * credentials" is reported as AUTH_ERROR and never as a network timeout.
+ */
+export function failureFromHandshake(
+  connection: { error?: string; code?: string },
+  fallbackMessage = 'Terminal did not answer the handshake'
+): DeviceFailure {
+  const transportCode = String(connection.code || '');
+  const tagged = { code: transportCode, message: connection.error || fallbackMessage };
+  const classified = classifyDeviceError(tagged);
+  return {
+    code: classifyDeviceFailure(tagged).code,
+    logCode: classified.code,
+    message: connection.error || classified.message,
+    transportCode,
+  };
+}
+
+export type DeviceEnvironment = 'PRODUCTION' | 'DEVELOPMENT_FIXTURE';
+
+/** Loopback is this machine, not a showroom. */
+export function isLoopbackAddress(ip?: string | null): boolean {
+  const value = String(ip || '').trim().toLowerCase();
+  return value === 'localhost' || value === '::1' || value.startsWith('127.');
+}
+
+/**
+ * Whether a registry row may be counted as evidence about the shop floor.
+ *
+ * `biometric_devices` has no fixture column and adding one is a schema migration
+ * another engineer owns, so the transport address is the tell: a terminal on
+ * loopback is served by `npm run device:simulator` on this machine (the
+ * `SIMMB160DEMO01` row), and its results describe the simulator, never a factory.
+ */
+export function deviceEnvironmentOf(device: Pick<DeviceConfig, 'ipAddress' | 'serialNumber'>): {
+  environment: DeviceEnvironment;
+  environmentLabel: string;
+  usableAsProductionEvidence: boolean;
+} {
+  if (isLoopbackAddress(device.ipAddress)) {
+    return {
+      environment: 'DEVELOPMENT_FIXTURE',
+      environmentLabel: 'development fixture on loopback served by npm run device:simulator, not a shop-floor terminal',
+      usableAsProductionEvidence: false,
+    };
+  }
+  return {
+    environment: 'PRODUCTION',
+    environmentLabel: 'Registered terminal address',
+    usableAsProductionEvidence: true,
+  };
 }
 
 /** Raw TCP reachability only. Not proof a ZK terminal is answering. */
@@ -105,7 +209,14 @@ export async function probeDeviceSocket(ip: string, port = 4370, timeoutMs = 120
   const started = Date.now();
   return new Promise((resolve) => {
     if (!ip) {
-      resolve({ online: false, latency: 999, latencyMs: 0, error: 'No IP address configured for this device' });
+      resolve({
+        online: false,
+        latency: 999,
+        latencyMs: 0,
+        errorCode: 'UNREACHABLE',
+        transportCode: 'NO_ADDRESS',
+        error: 'No IP address configured for this device',
+      });
       return;
     }
     const socket = new net.Socket();
@@ -120,20 +231,28 @@ export async function probeDeviceSocket(ip: string, port = 4370, timeoutMs = 120
       const latencyMs = Math.max(1, Date.now() - started);
       finish({ online: true, latency: latencyMs, latencyMs });
     });
+    // The connect timer is a timeout by definition, whatever the text says.
     socket.on('timeout', () => finish({
       online: false,
       latency: 999,
       latencyMs: Date.now() - started,
+      errorCode: 'CONNECT_TIMEOUT',
+      transportCode: 'ETIMEDOUT',
       error: `No TCP answer from ${ip}:${port} within ${timeoutMs}ms`,
     }));
-    socket.on('error', (err: any) => finish({
-      online: false,
-      latency: 999,
-      latencyMs: Date.now() - started,
-      error: err?.code === 'ECONNREFUSED'
-        ? `Connection refused by ${ip}:${port}`
-        : `${err?.code || 'SOCKET_ERROR'}: ${err?.message}`,
-    }));
+    socket.on('error', (err: any) => {
+      const failure = failureCodeForSocketError(err);
+      finish({
+        online: false,
+        latency: 999,
+        latencyMs: Date.now() - started,
+        errorCode: failure.code,
+        transportCode: failure.transportCode,
+        error: err?.code === 'ECONNREFUSED'
+          ? `Connection refused by ${ip}:${port}`
+          : `${err?.code || 'SOCKET_ERROR'}: ${err?.message}`,
+      });
+    });
 
     socket.connect(port, ip);
   });
@@ -157,7 +276,18 @@ export interface DeviceStatusSnapshot {
   clockDriftWarning: boolean;
   deviceTimeLocal: string | null;
   lastError: string | null;
+  /** The log code stored at the front of `lastError`, when one is there. */
+  lastErrorCode: string | null;
+  /** Public failure class for this device (brief §2): timeout / refused / auth… */
+  failureCode: DeviceFailureCode | null;
+  /** Last time records were actually stored — never written by a failed pull. */
+  lastSyncAt: string | null;
+  environment: DeviceEnvironment;
+  environmentLabel: string;
+  usableAsProductionEvidence: boolean;
   consecutiveFailures: number;
+  nextRetryAt: string | null;
+  isActive: boolean;
   photoPushEnabled: boolean;
   userCount: number;
   attLogCount: number;
@@ -193,6 +323,15 @@ export async function getDeviceStatusSnapshot(deviceIdOrSerial?: string): Promis
     const connected = since !== null && since <= timeoutSeconds;
 
     const drift = device.clockDriftSeconds;
+    // The stored `lastError` already begins with the code the failure path wrote
+    // (`CONNECT_TIMEOUT: …`); read it back rather than guessing from the English,
+    // and a deactivated row is DEVICE_DISABLED whatever the last error said.
+    const stored = parseStoredFailureCode(device.lastError);
+    const failureCode: DeviceFailureCode | null = device.isActive
+      ? stored.code
+      : 'DEVICE_DISABLED';
+    const environment = deviceEnvironmentOf(device);
+
     return {
       deviceId: device.id,
       serialNumber: device.serialNumber,
@@ -209,8 +348,16 @@ export async function getDeviceStatusSnapshot(deviceIdOrSerial?: string): Promis
       clockDriftSeconds: drift,
       clockDriftWarning: drift !== null && Math.abs(drift) > settings.clockDriftWarnSeconds,
       deviceTimeLocal: device.deviceClockAt ? formatWallString(new Date(device.deviceClockAt), device.timezone, false) : null,
-      lastError: device.lastError,
+      lastError: stored.message || device.lastError,
+      lastErrorCode: device.isActive ? stored.rawCode : 'DEVICE_DEACTIVATED',
+      failureCode,
+      environment: environment.environment,
+      environmentLabel: environment.environmentLabel,
+      usableAsProductionEvidence: environment.usableAsProductionEvidence,
+      isActive: device.isActive,
+      lastSyncAt: device.lastSyncAt ? new Date(device.lastSyncAt).toISOString() : null,
       consecutiveFailures: device.consecutiveFailures,
+      nextRetryAt: device.nextRetryAt ? new Date(device.nextRetryAt).toISOString() : null,
       photoPushEnabled: device.photoPushEnabled,
       userCount: device.userCount,
       attLogCount: device.attLogCount,
@@ -222,7 +369,7 @@ export async function getDeviceStatusSnapshot(deviceIdOrSerial?: string): Promis
  * Called by the ADMS endpoints and by the poll worker. Also flips the registry to
  * CONNECTED and emits the heartbeat event so the badge updates immediately.
  */
-export async function recordDeviceHeartbeat(sn: string, remoteIp?: string): Promise<{ deviceId?: string; locationCode?: string }> {
+export async function recordDeviceHeartbeat(sn: string, remoteIp?: string, syncMode = 'ADMS_PUSH'): Promise<{ deviceId?: string; locationCode?: string }> {
   if (!sn) return {};
   const device = await getDeviceConfig(sn);
   if (!device) {
@@ -238,9 +385,9 @@ export async function recordDeviceHeartbeat(sn: string, remoteIp?: string): Prom
   await pool.query(
     `UPDATE biometric_devices
         SET status = 'CONNECTED', lastConnectionAt = ?, lastHeartbeatAt = ?,
-            lastSeenAt = ?, lastError = NULL, consecutiveFailures = 0, nextRetryAt = NULL
+            lastSeenAt = ?, lastSyncMode = ?, lastError = NULL, consecutiveFailures = 0, nextRetryAt = NULL
       WHERE id = ?`,
-    [now, now, now, device.id]
+    [now, now, now, syncMode, device.id]
   );
 
   const nowIso = new Date().toISOString();
@@ -264,14 +411,19 @@ export async function recordDeviceHeartbeat(sn: string, remoteIp?: string): Prom
 export async function recordDeviceDisconnect(
   deviceIdOrSerial: string,
   reason: string,
-  errorCode = 'CONNECT_TIMEOUT'
+  errorCode: string = 'CONNECT_TIMEOUT'
 ): Promise<void> {
   const device = await getDeviceConfig(deviceIdOrSerial);
   if (!device) return;
 
+  // `errorCode` is accepted in either vocabulary (the log code the caller
+  // classified, or the public failure class) and stored in the `CODE: message`
+  // form the registry has always used, so it stays parseable.
+  const stored = formatStoredFailure(errorCode, reason);
+
   await pool.query(
     `UPDATE biometric_devices SET status = 'DISCONNECTED', lastError = ? WHERE id = ?`,
-    [`${errorCode}: ${reason}`.slice(0, 1000), device.id]
+    [stored, device.id]
   );
 
   socketIO.emit('device:status', {
@@ -282,6 +434,7 @@ export async function recordDeviceDisconnect(
     status: 'DISCONNECTED',
     reason,
     code: errorCode,
+    failureCode: failureCodeForDeviceCode(errorCode) ?? 'UNREACHABLE',
     changedAt: new Date().toISOString(),
   });
 }
@@ -354,6 +507,13 @@ export interface LiveDeviceInfo {
   driftWarning: boolean;
   error: string | null;
   errorCode: string | null;
+  /** Public failure class (brief §2), or null when the terminal answered. */
+  failureCode: DeviceFailureCode | null;
+  /** Wall-clock cost of this read, measured rather than implied. */
+  durationMs: number;
+  environment: DeviceEnvironment;
+  environmentLabel: string;
+  usableAsProductionEvidence: boolean;
 }
 
 /**
@@ -365,6 +525,8 @@ export async function readLiveDeviceInfo(deviceIdOrSerial: string): Promise<Live
   const device = await getDeviceConfig(deviceIdOrSerial);
   if (!device) throw new Error('Device not found in registry');
 
+  const started = Date.now();
+  const environment = deviceEnvironmentOf(device);
   const base: LiveDeviceInfo = {
     device,
     reachable: false,
@@ -377,14 +539,38 @@ export async function readLiveDeviceInfo(deviceIdOrSerial: string): Promise<Live
     driftWarning: device.clockDriftSeconds !== null && Math.abs(device.clockDriftSeconds) > settings.clockDriftWarnSeconds,
     error: null as string | null,
     errorCode: null as string | null,
+    failureCode: null as DeviceFailureCode | null,
+    durationMs: 0,
+    environment: environment.environment,
+    environmentLabel: environment.environmentLabel,
+    usableAsProductionEvidence: environment.usableAsProductionEvidence,
   };
+
+  // A deactivated row is not a broken terminal: the registry says do not talk to
+  // it, so no socket is opened and the honest answer is DEVICE_DISABLED.
+  if (!device.isActive) {
+    const message = `${device.name} is registered but deactivated (isActive = 0); no connection was attempted and nothing was read.`;
+    base.error = message;
+    base.errorCode = 'DEVICE_DEACTIVATED';
+    base.failureCode = 'DEVICE_DISABLED';
+    base.durationMs = Date.now() - started;
+    deviceLog.warn('Live device info refused: terminal deactivated', {
+      deviceId: device.id, serialNumber: device.serialNumber, code: 'DEVICE_DEACTIVATED', detail: message,
+    });
+    return base;
+  }
 
   const client = new ZkProtocolClient(device.ipAddress, device.port, 3000, device.commKey);
   try {
     const connection = await client.connect();
     if (!connection.connected) {
       const probe = await probeZkTerminal(device.ipAddress, device.port, 1500, device.commKey);
-      if (!probe.online) throw new Error(connection.error || probe.error || 'Terminal did not answer');
+      if (!probe.online) {
+        const failure = failureFromHandshake(connection, probe.error || 'Terminal did not answer');
+        // Tagged rather than a bare Error, so the catch below still knows whether
+        // the port refused us, stayed silent, or answered and rejected our key.
+        throw Object.assign(new Error(failure.message), { code: failure.transportCode || failure.logCode });
+      }
       base.latencyMs = probe.latencyMs;
     }
 
@@ -415,15 +601,18 @@ export async function readLiveDeviceInfo(deviceIdOrSerial: string): Promise<Live
         device.id,
       ]
     );
-    await recordDeviceHeartbeat(device.serialNumber);
+    await recordDeviceHeartbeat(device.serialNumber, undefined, 'LOCAL_LAN');
+    base.durationMs = Date.now() - started;
     return base;
   } catch (err: any) {
     const classified = classifyDeviceError(err);
     base.error = classified.message;
     base.errorCode = classified.code;
+    base.failureCode = classifyDeviceFailure(err).code;
+    base.durationMs = Date.now() - started;
     await pool.query(
       `UPDATE biometric_devices SET status = 'DISCONNECTED', lastError = ?, consecutiveFailures = consecutiveFailures + 1 WHERE id = ?`,
-      [`${classified.code}: ${classified.message}`.slice(0, 1000), device.id]
+      [formatStoredFailure(classified.code, classified.message), device.id]
     ).catch(() => undefined);
     await recordDeviceDisconnect(device.id, classified.message, classified.code).catch(() => undefined);
     return base;
@@ -432,58 +621,209 @@ export async function readLiveDeviceInfo(deviceIdOrSerial: string): Promise<Live
   }
 }
 
-/** Push the server's time to the terminal, then re-measure drift. */
-export async function syncDeviceClock(deviceIdOrSerial: string): Promise<{ ok: boolean; driftSecondsBefore: number | null; driftSecondsAfter: number | null; message: string }> {
+/**
+ * The outcome of a clock-synchronisation attempt, with everything the caller
+ * needs to report the truth: which device was targeted, how long it took, which
+ * failure class occurred, and — for a success — the protocol response that
+ * confirmed the write together with the drift measured before and after.
+ */
+export interface DeviceClockSyncResult {
+  ok: boolean;
+  /** Public failure class (brief §2). Null exactly when `ok` is true. */
+  failureCode: DeviceFailureCode | null;
+  /** The log vocabulary stored alongside, e.g. CONNECT_TIMEOUT. */
+  errorCode: DeviceErrorCode | null;
+  deviceId: string;
+  serialNumber: string;
+  deviceName: string;
+  ipAddress: string;
+  port: number;
+  environment: DeviceEnvironment;
+  environmentLabel: string;
+  usableAsProductionEvidence: boolean;
+  driftSecondsBefore: number | null;
+  driftSecondsAfter: number | null;
+  durationMs: number;
+  /** What proved the write on the wire. Null on every non-success. */
+  confirmedBy: string | null;
+  message: string;
+}
+
+/**
+ * Attempts currently in flight, keyed by device. A second click while the first
+ * connection is still open joins that attempt instead of dialling the terminal
+ * again — so retrying cannot double-count a failure or leave two records behind.
+ */
+const inFlightClockSyncs = new Map<string, Promise<DeviceClockSyncResult>>();
+
+/**
+ * Push the server's clock to the terminal and prove it.
+ *
+ * `ok` is true only when the terminal was actually contacted, `SET_TIME` came
+ * back acknowledged by the protocol (`setDeviceTime` throws on any reply other
+ * than `ACK_OK`), and `GET_TIME` afterwards returned a readable clock — the two
+ * confirmations the device itself can give. Anything else is a failure, and it is
+ * reported as one: no `timeSyncedAt`, no status upgrade, no `lastSyncAt`, no
+ * clearing of `consecutiveFailures`, and a failure record instead.
+ */
+export function syncDeviceClock(
+  deviceIdOrSerial: string,
+  context: { requestId?: string } = {}
+): Promise<DeviceClockSyncResult> {
+  const key = String(deviceIdOrSerial || '');
+  const alreadyRunning = inFlightClockSyncs.get(key);
+  if (alreadyRunning) {
+    deviceLog.debug('Clock sync joined the attempt already in flight', {
+      serialNumber: key, requestId: context.requestId, detail: 'coalesced duplicate request',
+    });
+    return alreadyRunning;
+  }
+
+  const attempt = runDeviceClockSync(key, context.requestId).finally(() => inFlightClockSyncs.delete(key));
+  inFlightClockSyncs.set(key, attempt);
+  return attempt;
+}
+
+async function runDeviceClockSync(deviceIdOrSerial: string, requestId?: string): Promise<DeviceClockSyncResult> {
+  const started = Date.now();
   const device = await getDeviceConfig(deviceIdOrSerial);
   if (!device) throw new Error('Device not found in registry');
 
   const before = device.clockDriftSeconds;
+  const environment = deviceEnvironmentOf(device);
+  const outcome = (over: Partial<DeviceClockSyncResult>): DeviceClockSyncResult => ({
+    ok: false,
+    failureCode: null,
+    errorCode: null,
+    deviceId: device.id,
+    serialNumber: device.serialNumber,
+    deviceName: device.name,
+    ipAddress: device.ipAddress,
+    port: device.port,
+    environment: environment.environment,
+    environmentLabel: environment.environmentLabel,
+    usableAsProductionEvidence: environment.usableAsProductionEvidence,
+    driftSecondsBefore: before,
+    driftSecondsAfter: null,
+    durationMs: Date.now() - started,
+    confirmedBy: null,
+    message: '',
+    ...over,
+  });
+
+  // A deactivated terminal is not a broken one: nothing is dialled, and the
+  // answer is DEVICE_DISABLED rather than a timeout that would blame the network.
+  if (!device.isActive) {
+    const message = `${device.name} is registered but deactivated (isActive = 0), so no connection was attempted and its clock was not changed.`;
+    deviceLog.error('Device clock sync refused: terminal deactivated', {
+      deviceId: device.id, serialNumber: device.serialNumber, code: 'DEVICE_DEACTIVATED',
+      requestId, latencyMs: Date.now() - started, detail: message,
+    });
+    await recordDeviceDisconnect(device.id, message, 'DEVICE_DEACTIVATED').catch(() => undefined);
+    return outcome({ failureCode: 'DEVICE_DISABLED', errorCode: 'DEVICE_DEACTIVATED', message });
+  }
+
   const client = new ZkProtocolClient(device.ipAddress, device.port, 3000, device.commKey);
+
+  /** Every non-success ends up here: one place that must not write success. */
+  const fail = async (logCode: DeviceErrorCode, failureCode: DeviceFailureCode, message: string): Promise<DeviceClockSyncResult> => {
+    const durationMs = Date.now() - started;
+    // Failure record for the device row (status + lastError, parseable prefix),
+    // then the retry bookkeeping: consecutiveFailures is raised, never cleared,
+    // and the next attempt is pushed out by the same backoff the worker uses.
+    await recordDeviceDisconnect(device.id, message, logCode).catch(() => undefined);
+    await pool.query(
+      `UPDATE biometric_devices
+          SET consecutiveFailures = consecutiveFailures + 1, nextRetryAt = ?
+        WHERE id = ?`,
+      [new Date(Date.now() + backoffMs(device, logCode)), device.id]
+    ).catch(() => undefined);
+
+    deviceLog.error('Device clock sync failed', {
+      deviceId: device.id,
+      serialNumber: device.serialNumber,
+      ip: device.ipAddress,
+      port: device.port,
+      code: logCode,
+      latencyMs: durationMs,
+      requestId,
+      detail: `${message}${environment.usableAsProductionEvidence ? '' : ` [${environment.environmentLabel}]`}`,
+    });
+
+    return outcome({
+      failureCode,
+      errorCode: logCode,
+      durationMs,
+      message: environment.usableAsProductionEvidence
+        ? message
+        : `${message} — note: this is a ${environment.environmentLabel}, so the result says nothing about a shop-floor terminal.`,
+    });
+  };
+
   try {
     const connection = await client.connect();
-    if (!connection.connected) throw new Error(connection.error || 'Terminal did not answer the handshake');
+    if (!connection.connected) {
+      const failure = failureFromHandshake(connection, 'Terminal did not answer the handshake');
+      return await fail(failure.logCode, failure.code, failure.message);
+    }
+
+    // Proof 1: the write itself. ZkProtocolClient.setDeviceTime() throws unless
+    // the terminal answered CMD_SET_TIME with ACK_OK, so reaching the next line
+    // means the device acknowledged the new clock.
     await client.setDeviceTime(new Date(), device.timezone);
+
+    // Proof 2: read it back from the terminal rather than assuming it took.
     const wall = await client.getDeviceTime();
+    if (!wall || !Number.isFinite(Date.UTC(wall.year, wall.month - 1, wall.day, wall.hour, wall.minute, wall.second))) {
+      throw new ZkParseError('GET_TIME read-back after SET_TIME produced no readable clock');
+    }
     const after = clockDriftSeconds(wall, device.timezone, new Date());
+    const durationMs = Date.now() - started;
 
     await pool.query(
       `UPDATE biometric_devices
           SET clockDriftSeconds = ?, deviceClockAt = ?, timeSyncedAt = NOW(), clockDriftCheckedAt = NOW(),
-              lastSeenAt = NOW(), status = 'CONNECTED', lastError = NULL
+              lastSeenAt = NOW(), status = 'CONNECTED', lastError = NULL, consecutiveFailures = 0
         WHERE id = ?`,
       [after, wallTimeToInstant(wall, device.timezone), device.id]
     );
 
+    const confirmedBy = 'ZK ACK_OK for CMD_SET_TIME(202), verified by a CMD_GET_TIME(201) read-back';
     deviceLog.info('Device clock synchronised', {
+      deviceId: device.id,
       serialNumber: device.serialNumber,
-      detail: `drift ${before ?? 'unknown'}s -> ${after}s`,
+      ip: device.ipAddress,
+      port: device.port,
+      latencyMs: durationMs,
+      requestId,
+      detail: `drift ${before ?? 'unknown'}s -> ${after}s; ${confirmedBy}`,
     });
-    return {
+
+    return outcome({
       ok: true,
-      driftSecondsBefore: before,
       driftSecondsAfter: after,
+      durationMs,
+      confirmedBy,
       message: after === 0
         ? 'Device clock now matches the server.'
         : `Device clock set; residual drift ${after}s (device clock granularity is 1 second).`,
-    };
+    });
   } catch (err: any) {
     const classified = classifyDeviceError(err);
-    deviceLog.error('Device clock sync failed', { serialNumber: device.serialNumber, code: classified.code, detail: err?.message });
-    return { ok: false, driftSecondsBefore: before, driftSecondsAfter: null, message: classified.message };
+    const failureCode = classifyDeviceFailure(err).code;
+    return await fail(classified.code, failureCode, err?.message || classified.message);
   } finally {
     try { await client.disconnect(); } catch { /* ignore */ }
   }
 }
 
 /**
- * Pull path for one device: connect, read logs newer than the watermark, and
- * hand them to the ingestion engine. On reconnect after an outage the watermark
- * window is widened so nothing missed while down is left behind.
+ * One poll/pull attempt against one terminal. `status` stays inside the
+ * `biometric_sync_logs` enum; `errorCode` is the log vocabulary and `failureCode`
+ * the public class the API promises, so a caller never has to infer the reason
+ * from an English sentence.
  */
-export async function syncSingleDevice(
-  deviceId: string,
-  triggerType: 'MANUAL_USER' | 'POLL_DAEMON' | 'CONNECTOR_SERVICE' | 'SCHEDULED_CRON' = 'MANUAL_USER'
-): Promise<{
+export interface DeviceSyncOutcome {
   deviceId: string;
   serialNumber: string;
   deviceName: string;
@@ -495,17 +835,134 @@ export async function syncSingleDevice(
   status: 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'UNREACHABLE';
   errorMessage?: string;
   errorCode?: string;
+  failureCode?: DeviceFailureCode | null;
   latencyMs: number;
   durationMs: number;
   backfilled: boolean;
-}> {
+  environment?: DeviceEnvironment;
+  usableAsProductionEvidence?: boolean;
+}
+
+/**
+ * Pull path for one device: connect, read logs newer than the watermark, and
+ * hand them to the ingestion engine. On reconnect after an outage the watermark
+ * window is widened so nothing missed while down is left behind.
+ *
+ * Nothing here may imply a synchronisation that did not happen: `lastSyncAt` and
+ * `SYNCED` are only ever written by the ingestion engine when records were
+ * actually stored, and every failure path records its own class instead.
+ */
+export async function syncSingleDevice(
+  deviceId: string,
+  triggerType: 'MANUAL_USER' | 'POLL_DAEMON' | 'CONNECTOR_SERVICE' | 'SCHEDULED_CRON' = 'MANUAL_USER'
+): Promise<DeviceSyncOutcome> {
   const started = Date.now();
   const device = await getDeviceConfig(deviceId);
   if (!device) throw new Error('Device not found in registry');
 
+  const environment = deviceEnvironmentOf(device);
+  const identity = {
+    deviceId: device.id,
+    serialNumber: device.serialNumber,
+    deviceName: device.name,
+    locationCode: device.locationCode,
+    environment: environment.environment,
+    usableAsProductionEvidence: environment.usableAsProductionEvidence,
+  };
+
+  // A deactivated terminal is not an unreachable one. Report DEVICE_DISABLED and
+  // do not open a socket, so the diagnostics never blame the shop-floor network
+  // for a row the registry already switched off.
+  if (!device.isActive) {
+    const message = `${device.name} is deactivated in the registry (isActive = 0); no connection was attempted and no attendance was pulled.`;
+    const durationMs = Date.now() - started;
+    await finishSync(device, triggerType, {
+      status: 'FAILED', pulled: 0, inserted: 0, skipped: 0, rejected: 0,
+      durationMs, latencyMs: 0, errorMessage: message, errorCode: 'DEVICE_DEACTIVATED',
+    });
+    await ensureSyncState(device.id, device.serialNumber);
+    await markPollAttempt(device.id, new Date(), {
+      success: false,
+      errorCode: 'DEVICE_DEACTIVATED',
+      errorMessage: message,
+      nextRetryAt: new Date(Date.now() + backoffMs(device, 'DEVICE_DEACTIVATED')),
+    });
+    await recordDeviceDisconnect(device.id, message, 'DEVICE_DEACTIVATED');
+    deviceLog.error('Device sync refused: terminal deactivated', {
+      deviceId: device.id, serialNumber: device.serialNumber, code: 'DEVICE_DEACTIVATED', detail: message,
+    });
+
+    return {
+      ...identity,
+      recordsPulled: 0, recordsInserted: 0, recordsSkipped: 0, recordsRejected: 0,
+      status: 'FAILED', errorMessage: message, errorCode: 'DEVICE_DEACTIVATED', failureCode: 'DEVICE_DISABLED',
+      latencyMs: 0, durationMs, backfilled: false,
+    };
+  }
+
   await ensureSyncState(device.id, device.serialNumber);
   const state = await loadSyncState(device.id);
   const backfillWindowMs = state?.backfillPending ? 6 * 60 * 60 * 1000 : 0;
+
+  /**
+   * The single tail every non-success goes through: sync log, retry bookkeeping
+   * (exponential backoff, and `consecutiveFailures` fed by both a refused port and
+   * a timeout), disconnect record on the device row, and one structured log line.
+   */
+  const failWith = async (
+    status: 'FAILED' | 'UNREACHABLE',
+    failure: { logCode: DeviceErrorCode; code: DeviceFailureCode; message: string },
+    latencyMs: number,
+    pulledCount: number
+  ): Promise<DeviceSyncOutcome> => {
+    const durationMs = Date.now() - started;
+    const nextRetryAt = new Date(Date.now() + backoffMs(device, failure.logCode));
+    await finishSync(device, triggerType, {
+      status, pulled: pulledCount, inserted: 0, skipped: 0, rejected: 0,
+      durationMs, latencyMs, errorMessage: failure.message, errorCode: failure.logCode,
+    });
+    await markPollAttempt(device.id, new Date(), {
+      success: false,
+      errorCode: failure.logCode,
+      errorMessage: failure.message,
+      nextRetryAt,
+    });
+    // The worker's ladder reads the registry row's own counter, so both
+    // CONNECT_REFUSED and CONNECT_TIMEOUT must raise it. Before this, only
+    // `biometric_device_sync_state` counted the failures and
+    // `backoffMs(device, …)` kept seeing 0 — the "exponential" backoff never
+    // actually grew for a terminal that was simply offline.
+    await pool.query(
+      `UPDATE biometric_devices
+          SET consecutiveFailures = consecutiveFailures + 1, nextRetryAt = ?
+        WHERE id = ?`,
+      [nextRetryAt, device.id]
+    ).catch(() => undefined);
+    await recordDeviceDisconnect(device.id, failure.message, failure.logCode);
+    deviceLog.error(status === 'UNREACHABLE' ? 'Device unreachable during sync' : 'Device sync failed', {
+      deviceId: device.id,
+      serialNumber: device.serialNumber,
+      ip: device.ipAddress,
+      port: device.port,
+      code: failure.logCode,
+      latencyMs,
+      detail: `${failure.message}${environment.usableAsProductionEvidence ? '' : ` [${environment.environmentLabel}]`}`,
+    });
+
+    return {
+      ...identity,
+      recordsPulled: pulledCount, recordsInserted: 0, recordsSkipped: 0, recordsRejected: 0,
+      status,
+      errorMessage: environment.usableAsProductionEvidence
+        ? failure.message
+        : `${failure.message} — note: this is a ${environment.environmentLabel}, so the result says nothing about a shop-floor terminal.`,
+      errorCode: failure.logCode,
+      failureCode: failure.code,
+      latencyMs,
+      durationMs,
+      backfilled: backfillWindowMs > 0,
+    };
+  };
 
   const client = new ZkProtocolClient(device.ipAddress, device.port, 3500, device.commKey);
   let records: IngestPunchInput[] = [];
@@ -514,22 +971,8 @@ export async function syncSingleDevice(
   try {
     const connection = await client.connect();
     if (!connection.connected) {
-      const classified = classifyDeviceError(new Error(connection.error || 'Handshake failed'));
-      const durationMs = Date.now() - started;
-      await finishSync(device, triggerType, { status: 'UNREACHABLE', pulled: 0, inserted: 0, skipped: 0, rejected: 0, durationMs, latencyMs: connection.latencyMs, errorMessage: classified.message, errorCode: classified.code });
-      await markPollAttempt(device.id, new Date(), {
-        success: false,
-        errorCode: classified.code,
-        errorMessage: classified.message,
-        nextRetryAt: new Date(Date.now() + backoffMs(device, classified.code)),
-      });
-      await recordDeviceDisconnect(device.id, classified.message, classified.code);
-      return {
-        deviceId: device.id, serialNumber: device.serialNumber, deviceName: device.name, locationCode: device.locationCode,
-        recordsPulled: 0, recordsInserted: 0, recordsSkipped: 0, recordsRejected: 0,
-        status: 'UNREACHABLE', errorMessage: classified.message, errorCode: classified.code,
-        latencyMs: connection.latencyMs, durationMs, backfilled: backfillWindowMs > 0,
-      };
+      const failure = failureFromHandshake(connection, 'Handshake failed');
+      return await failWith('UNREACHABLE', failure, connection.latencyMs, 0);
     }
 
     const latencyMs = connection.latencyMs;
@@ -594,9 +1037,9 @@ export async function syncSingleDevice(
       await markPollAttempt(device.id, new Date(), { success: true, pulled, ingested: 0 });
       if (state?.backfillPending) await markBackfillPending(device.id, null);
       return {
-        deviceId: device.id, serialNumber: device.serialNumber, deviceName: device.name, locationCode: device.locationCode,
+        ...identity,
         recordsPulled: pulled, recordsInserted: 0, recordsSkipped: pulled, recordsRejected: 0,
-        status: 'SUCCESS', latencyMs, durationMs, backfilled: backfillWindowMs > 0,
+        status: 'SUCCESS', failureCode: null, latencyMs, durationMs, backfilled: backfillWindowMs > 0,
       };
     }
 
@@ -621,47 +1064,45 @@ export async function syncSingleDevice(
     });
 
     return {
-      deviceId: device.id,
-      serialNumber: device.serialNumber,
-      deviceName: device.name,
-      locationCode: device.locationCode,
+      ...identity,
       recordsPulled: pulled,
       recordsInserted: ingest.inserted,
       recordsSkipped: ingest.duplicates,
       recordsRejected: ingest.rejected,
       status,
+      failureCode: null,
       latencyMs,
       durationMs,
       backfilled: backfillWindowMs > 0,
     };
   } catch (err: any) {
     try { await client.disconnect(); } catch { /* ignore */ }
+    // Reached when the session was live and a command failed (a terminal that
+    // answers but never delivers ATTLOG is a PROTOCOL_ERROR, not a timeout).
     const classified = classifyDeviceError(err);
-    const durationMs = Date.now() - started;
-    await finishSync(device, triggerType, {
-      status: 'FAILED', pulled, inserted: 0, skipped: 0, rejected: 0,
-      durationMs, latencyMs: 0, errorMessage: classified.message, errorCode: classified.code,
-    });
-    await markPollAttempt(device.id, new Date(), {
-      success: false,
-      errorCode: classified.code,
-      errorMessage: classified.message,
-      nextRetryAt: new Date(Date.now() + backoffMs(device, classified.code)),
-    });
-    deviceLog.error('Device sync failed', { serialNumber: device.serialNumber, code: classified.code, detail: err?.message });
-
-    return {
-      deviceId: device.id, serialNumber: device.serialNumber, deviceName: device.name, locationCode: device.locationCode,
-      recordsPulled: pulled, recordsInserted: 0, recordsSkipped: 0, recordsRejected: 0,
-      status: 'FAILED', errorMessage: classified.message, errorCode: classified.code,
-      latencyMs: 0, durationMs, backfilled: backfillWindowMs > 0,
-    };
+    return await failWith('FAILED', {
+      logCode: classified.code,
+      code: classifyDeviceFailure(err).code,
+      message: err?.message || classified.message,
+    }, 0, pulled);
   }
 }
 
 /** Retry budget: transport faults back off exponentially; auth faults do not hammer. */
 export function backoffMs(device: Pick<DeviceConfig, 'consecutiveFailures'>, errorCode?: string): number {
-  if (errorCode === 'COMM_KEY_REJECTED' || errorCode === 'CONFIG_MISSING') return 60_000;
+  // A terminal that refused our credentials, or one the registry switched off,
+  // will still refuse on the next attempt — retrying it every two seconds is
+  // noise, so both wait a minute instead. Transport faults (CONNECT_REFUSED,
+  // CONNECT_TIMEOUT, NETWORK_UNREACHABLE) keep the exponential ladder, which is
+  // what makes an unplugged terminal recover on its own when it comes back.
+  const flatRetryCodes = new Set<string>([
+    'COMM_KEY_REJECTED',
+    'CONFIG_MISSING',
+    'AUTH_ERROR',
+    'DEVICE_DISABLED',
+    'DEVICE_DEACTIVATED',
+  ]);
+  if (errorCode && flatRetryCodes.has(errorCode)) return 60_000;
   const attempt = Math.max(0, Number(device.consecutiveFailures) || 0);
   const base = 2_000;
   const ceiling = 60_000;
@@ -673,6 +1114,13 @@ async function finishSync(
   triggerType: string,
   outcome: { status: string; pulled: number; inserted: number; skipped: number; rejected: number; durationMs: number; latencyMs: number; errorMessage?: string; errorCode?: string }
 ): Promise<void> {
+  // The class goes in front of the human sentence so the row is machine-parseable
+  // without a schema change (`biometric_sync_logs` has no code column); readers
+  // that only show the text still show the same sentence.
+  const storedError = outcome.errorMessage
+    ? (outcome.errorCode ? `[${outcome.errorCode}] ${outcome.errorMessage}` : outcome.errorMessage)
+    : null;
+
   await pool.query(
     `INSERT INTO biometric_sync_logs
        (id, deviceId, serialNumber, triggerType, recordsPulled, recordsInserted, recordsSkipped, status, errorMessage, latencyMs, durationMs, syncedAt)
@@ -686,7 +1134,7 @@ async function finishSync(
       outcome.inserted,
       outcome.skipped,
       outcome.status,
-      outcome.errorMessage ?? null,
+      storedError,
       outcome.latencyMs,
       outcome.durationMs,
     ]
@@ -700,7 +1148,9 @@ async function finishSync(
     recordsInserted: outcome.inserted,
     recordsSkipped: outcome.skipped,
     recordsRejected: outcome.rejected,
-    error: outcome.errorMessage ?? null,
+    error: storedError,
+    errorCode: outcome.errorCode ?? null,
+    failureCode: outcome.errorCode ? (failureCodeForDeviceCode(outcome.errorCode) ?? 'UNREACHABLE') : null,
     syncedAt: new Date().toISOString(),
   });
 }
@@ -769,6 +1219,14 @@ export async function listBiometricDevices(locationFilter?: string): Promise<any
       clockDriftSeconds: snapshot?.clockDriftSeconds ?? null,
       clockDriftWarning: snapshot?.clockDriftWarning ?? false,
       deviceTimeLocal: snapshot?.deviceTimeLocal ?? null,
+      // Why this terminal is not syncing, as a class rather than a sentence.
+      lastErrorCode: snapshot?.lastErrorCode ?? null,
+      failureCode: snapshot?.failureCode ?? null,
+      environment: snapshot?.environment ?? 'PRODUCTION',
+      environmentLabel: snapshot?.environmentLabel ?? 'Registered terminal address',
+      usableAsProductionEvidence: snapshot?.usableAsProductionEvidence ?? true,
+      nextRetryAt: snapshot?.nextRetryAt ?? null,
+      lastSyncAt: snapshot?.lastSyncAt ?? row.lastSyncAt ?? null,
       floorName: row.floorName ?? null,
       sectionName: row.sectionName ?? null,
       enrolledUsers: Number(row.enrolledUsers ?? 0),
@@ -930,7 +1388,12 @@ export async function listDeviceAttendanceLog(filters: AttendanceLogFilters): Pr
   if (filters.serialNumber) { where.push('r.serialNumber = ?'); params.push(filters.serialNumber); }
   if (filters.floorId) { where.push('d.floorId = ?'); params.push(filters.floorId); }
   if (filters.sectionId) { where.push('d.sectionId = ?'); params.push(filters.sectionId); }
-  if (filters.departmentId) { where.push('e.departmentId = ?'); params.push(filters.departmentId); }
+  if (filters.departmentId) {
+    // The executive dashboard filters by the company's standard department list,
+    // whose entries are names rather than department row ids.
+    where.push('e.departmentId IN (SELECT id FROM department WHERE id = ? OR LOWER(name) = LOWER(?))');
+    params.push(filters.departmentId, filters.departmentId);
+  }
   if (filters.punchType) { where.push('r.punchType = ?'); params.push(filters.punchType); }
   if (filters.verifyMethod) { where.push('r.verifyModeLabel = ?'); params.push(filters.verifyMethod); }
   if (filters.employeeQuery) {
@@ -961,7 +1424,7 @@ export async function listDeviceAttendanceLog(filters: AttendanceLogFilters): Pr
   const [rows]: any = await pool.query(
     `SELECT r.id, r.deviceId, r.serialNumber, r.enrollmentNumber, r.normalizedId,
             r.punchTimeUtc, r.rawTimezone, r.punchType, r.verifyModeLabel,
-            r.mappingStatus, r.syncStatus, r.source, r.photoPath,
+            r.mappingStatus, r.syncStatus, r.source, r.photoPath, r.matchValue,
             e.employeeCode, e.fullName AS employeeName,
             dep.name AS departmentName,
             COALESCE(d.name, 'Unregistered terminal') AS deviceName,

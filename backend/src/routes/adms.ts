@@ -210,24 +210,49 @@ export function parseAttPhotoBody(bodyText: string): Array<{ pin: string; punchT
 admsRouter.get('/cdata', async (req: Request, res: Response) => {
   const sn = String(req.query.SN || '').trim();
   const pushver = String(req.query.pushver || '').trim();
-  const settings = await loadGlobalSettings();
-  const device = sn ? await getDeviceConfig(sn) : null;
-  const timeZoneOffsetMinutes = offsetMinutesFor(device?.timezone || settings.defaultTimezone, new Date());
 
-  if (sn) {
-    await recordDeviceHeartbeat(sn, req.ip);
-    if (pushver) await updateDeviceSpecs(sn, { pushVersion: pushver });
+  if (!sn) {
+    deviceLog.warn('ADMS handshake missing serial number', { detail: `IP: ${req.ip}` });
+    res.status(400).setHeader('Content-Type', 'text/plain');
+    return res.send('ERROR: MISSING_SN');
   }
 
+  const device = await getDeviceConfig(sn);
+  if (!device) {
+    deviceLog.warn('ADMS handshake rejected: unknown or unregistered device', {
+      serialNumber: sn,
+      detail: `IP: ${req.ip}`,
+      code: 'CONFIG_MISSING',
+    });
+    res.status(401).setHeader('Content-Type', 'text/plain');
+    return res.send('UNAUTHORIZED: UNKNOWN_DEVICE');
+  }
+
+  if (device.isActive === false) {
+    deviceLog.warn('ADMS handshake rejected: device deactivated', {
+      serialNumber: sn,
+      code: 'DEVICE_DEACTIVATED',
+    });
+    res.status(403).setHeader('Content-Type', 'text/plain');
+    return res.send('FORBIDDEN: DEVICE_DEACTIVATED');
+  }
+
+  const settings = await loadGlobalSettings();
+  const timeZoneOffsetMinutes = offsetMinutesFor(device.timezone || settings.defaultTimezone, new Date());
+
+  await recordDeviceHeartbeat(sn, req.ip);
+  if (pushver) await updateDeviceSpecs(sn, { pushVersion: pushver });
+
   deviceLog.info('ADMS handshake', {
-    serialNumber: sn || 'UNKNOWN',
+    serialNumber: sn,
+    locationCode: device.locationCode,
     detail: `pushver=${pushver || 'unset'} tzOffset=${timeZoneOffsetMinutes / 60}`,
   });
 
   res.setHeader('Content-Type', 'text/plain');
   res.send(
     [
-      `GET OPTION FROM: ${sn || 'unknown'}`,
+      `GET OPTION FROM: ${sn}`,
       `Stamp=${Math.floor(Date.now() / 1000)}`,
       `OpStamp=${Math.floor(Date.now() / 1000)}`,
       `ErrorDelay=30`,
@@ -267,8 +292,34 @@ admsRouter.post('/cdata', async (req: Request, res: Response) => {
   const table = String(req.query.table || 'ATTLOG').toUpperCase();
   const body = rawBody(req);
 
+  if (!sn) {
+    deviceLog.warn('ADMS push missing serial number', { detail: `table=${table} IP=${req.ip}` });
+    res.status(400).setHeader('Content-Type', 'text/plain');
+    return res.send('ERROR: MISSING_SN');
+  }
+
+  const device = await getDeviceConfig(sn);
+  if (!device) {
+    deviceLog.warn('ADMS push rejected: unknown or unregistered device', {
+      serialNumber: sn,
+      detail: `table=${table} IP=${req.ip}`,
+      code: 'CONFIG_MISSING',
+    });
+    res.status(401).setHeader('Content-Type', 'text/plain');
+    return res.send('UNAUTHORIZED: UNKNOWN_DEVICE');
+  }
+
+  if (device.isActive === false) {
+    deviceLog.warn('ADMS push rejected: device deactivated', {
+      serialNumber: sn,
+      code: 'DEVICE_DEACTIVATED',
+    });
+    res.status(403).setHeader('Content-Type', 'text/plain');
+    return res.send('FORBIDDEN: DEVICE_DEACTIVATED');
+  }
+
   try {
-    if (sn) await recordDeviceHeartbeat(sn, req.ip);
+    await recordDeviceHeartbeat(sn, req.ip);
 
     if ((table === 'ATTLOG' || table === 'RTLOG') && body) {
       const { punches, malformed } = parseAttLogBody(body, sn);
@@ -377,15 +428,23 @@ function parseOptionsBody(bodyText: string): Record<string, string> {
  */
 admsRouter.get('/getrequest', async (req: Request, res: Response) => {
   const sn = String(req.query.SN || '').trim();
-  const commands: string[] = [];
+  if (!sn) {
+    res.status(400).setHeader('Content-Type', 'text/plain');
+    return res.send('ERROR: MISSING_SN');
+  }
 
-  if (sn) {
-    await recordDeviceHeartbeat(sn, req.ip);
-    let command = popDeviceCommand(sn);
-    while (command && commands.length < 5) {
-      commands.push(`C:${command.id}:${command.command}`);
-      command = popDeviceCommand(sn);
-    }
+  const device = await getDeviceConfig(sn);
+  if (!device || device.isActive === false) {
+    res.status(401).setHeader('Content-Type', 'text/plain');
+    return res.send('UNAUTHORIZED: UNKNOWN_DEVICE');
+  }
+
+  const commands: string[] = [];
+  await recordDeviceHeartbeat(sn, req.ip);
+  let command = popDeviceCommand(sn);
+  while (command && commands.length < 5) {
+    commands.push(`C:${command.id}:${command.command}`);
+    command = popDeviceCommand(sn);
   }
 
   res.setHeader('Content-Type', 'text/plain');
@@ -394,7 +453,18 @@ admsRouter.get('/getrequest', async (req: Request, res: Response) => {
 
 admsRouter.post('/devicecmd', async (req: Request, res: Response) => {
   const sn = String(req.query.SN || '').trim();
-  if (sn) await recordDeviceHeartbeat(sn, req.ip);
+  if (!sn) {
+    res.status(400).setHeader('Content-Type', 'text/plain');
+    return res.send('ERROR: MISSING_SN');
+  }
+
+  const device = await getDeviceConfig(sn);
+  if (!device || device.isActive === false) {
+    res.status(401).setHeader('Content-Type', 'text/plain');
+    return res.send('UNAUTHORIZED: UNKNOWN_DEVICE');
+  }
+
+  await recordDeviceHeartbeat(sn, req.ip);
   deviceLog.info('ADMS command result', {
     serialNumber: sn,
     detail: `id=${req.query.ID || '-'} return=${req.query.Return || '-'}`,
@@ -413,6 +483,17 @@ admsRouter.post('/registry', async (req: Request, res: Response) => {
 /** Convenience alias some deployments configure instead of /cdata. */
 admsRouter.post('/push', async (req: Request, res: Response) => {
   const sn = String(req.query.SN || '').trim();
+  if (!sn) {
+    res.status(400).setHeader('Content-Type', 'text/plain');
+    return res.send('ERROR: MISSING_SN');
+  }
+
+  const device = await getDeviceConfig(sn);
+  if (!device || device.isActive === false) {
+    res.status(401).setHeader('Content-Type', 'text/plain');
+    return res.send('UNAUTHORIZED: UNKNOWN_DEVICE');
+  }
+
   const body = rawBody(req);
   const { punches } = parseAttLogBody(body, sn);
   if (punches.length > 0) {

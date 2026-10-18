@@ -1,6 +1,19 @@
+import path from 'node:path';
 import type { NextConfig } from 'next';
 
 const API_URL = process.env.BACKEND_URL || 'http://localhost:4000';
+
+/**
+ * This repository is the workspace root — not the drive root.
+ *
+ * Next walks up from `frontend/` looking for a lockfile to decide the workspace
+ * root, and on this machine it finds an unrelated `D:\bun.lock` four levels up.
+ * Left alone, that becomes the Turbopack root and the Docker output-tracing root,
+ * which silently changes module resolution and can exclude the hoisted
+ * `node_modules` from the image. Pinning it here is the fix; deleting someone
+ * else's lockfile would not be.
+ */
+const WORKSPACE_ROOT = path.resolve(process.cwd(), '..');
 
 /**
  * Content-Security-Policy for the browser-facing app.
@@ -111,6 +124,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ['recharts'],
+  outputFileTracingRoot: WORKSPACE_ROOT,
+  turbopack: { root: WORKSPACE_ROOT },
   images: {
     remotePatterns: [{ protocol: 'http', hostname: 'localhost' }],
     formats: ['image/avif', 'image/webp'],

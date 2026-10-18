@@ -19,7 +19,13 @@ import { execFile } from 'node:child_process';
 import { pool } from '../nativeDb.js';
 import { getDeviceConfig, listDeviceConfigs, loadGlobalSettings, readJsonSetting } from '../services/biometric/settings.js';
 import { ZkProtocolClient } from '../services/zkProtocolAdapter.js';
-import { classifyDeviceError, DeviceErrorCode } from '../services/biometric/logger.js';
+import {
+  classifyDeviceError,
+  failureCodeForDeviceCode,
+  type DeviceErrorCode,
+  type DeviceFailureCode,
+} from '../services/biometric/logger.js';
+import { deviceEnvironmentOf } from '../services/biometricService.js';
 import { clockDriftSeconds, wallTimeToInstant, formatWallString, fromUtcMysqlString } from '../services/biometric/timeCodec.js';
 
 const args = process.argv.slice(2);
@@ -34,10 +40,20 @@ interface Step {
   detail: string;
   fatal: boolean;
   code?: DeviceErrorCode;
+  /** Public class (brief §2) — what the API and the device console report. */
+  failureCode?: DeviceFailureCode;
 }
 
 function line(text: string): void {
   console.log(text);
+}
+
+/** Both vocabularies on one step, so the printed tag is the public class. */
+function tagFailure(step: Step, err: unknown): Step {
+  const classified = classifyDeviceError(err);
+  step.code = classified.code;
+  step.failureCode = failureCodeForDeviceCode(classified.code) ?? 'UNREACHABLE';
+  return step;
 }
 
 /**
@@ -97,13 +113,39 @@ async function diagnoseDevice(serialOrId: string, pushUrl: string | null): Promi
 
   steps.push({
     name: 'config',
-    ok: true,
-    fatal: false,
-    detail: `${device.name} @ ${device.ipAddress}:${device.port}, timezone ${device.timezone}, commKey ${device.commKey ? 'set' : '0'}, protocol ${device.protocol}`,
+    ok: device.isActive,
+    fatal: !device.isActive,
+    code: device.isActive ? undefined : 'DEVICE_DEACTIVATED',
+    failureCode: device.isActive ? undefined : 'DEVICE_DISABLED',
+    detail: device.isActive
+      ? `${device.name} @ ${device.ipAddress}:${device.port}, timezone ${device.timezone}, commKey ${device.commKey ? 'set' : '0'}, protocol ${device.protocol}`
+      : `${device.name} is registered but deactivated (isActive = 0) — no connection is attempted and nothing here can be counted as a live terminal.`,
   });
 
+  // A loopback row is this machine's simulator (`npm run device:simulator`), not a
+  // showroom terminal. Name it that way before any of its results can be read as
+  // production evidence.
+  const environment = deviceEnvironmentOf(device);
+  if (!environment.usableAsProductionEvidence) {
+    steps.push({
+      name: 'fixture',
+      ok: true,
+      fatal: false,
+      detail: `DEVELOPMENT FIXTURE — ${environment.environmentLabel}. Its answers describe the simulator, never a shop floor.`,
+    });
+  }
+
+  if (!device.isActive) return steps;
+
   const resolved = await resolveHost(device.ipAddress);
-  steps.push({ name: 'dns', ok: resolved.ok, fatal: !resolved.ok, detail: resolved.detail });
+  steps.push({
+    name: 'dns',
+    ok: resolved.ok,
+    fatal: !resolved.ok,
+    code: resolved.ok ? undefined : 'DNS_FAILURE',
+    failureCode: resolved.ok ? undefined : 'NETWORK_UNREACHABLE',
+    detail: resolved.detail,
+  });
   if (!resolved.ok) return steps;
 
   const ping = await icmpPing(device.ipAddress);
@@ -112,30 +154,37 @@ async function diagnoseDevice(serialOrId: string, pushUrl: string | null): Promi
   steps.push({ name: 'ping', ok: ping.ok, fatal: false, detail: ping.ok ? ping.detail : `no ICMP reply (${ping.detail}) — continuing, the device may just block ping` });
 
   const tcp = await tcpProbe(device.ipAddress, device.port);
-  steps.push({
+  steps.push(tagFailure({
     name: `tcp-${device.port}`,
     ok: tcp.ok,
     fatal: !tcp.ok,
-    code: tcp.ok ? undefined : classifyDeviceError({ code: tcp.code, message: tcp.error || '' }).code,
     detail: tcp.ok
       ? `port open in ${tcp.ms}ms`
       : `${tcp.error} (${tcp.code || 'unknown'}) — check the terminal is powered, on this VLAN, and that no firewall blocks ${device.port}`,
-  });
+  }, { code: tcp.code, message: tcp.error || '' }));
   if (!tcp.ok) return steps;
 
   const client = new ZkProtocolClient(device.ipAddress, device.port, 3000, device.commKey);
   try {
     const connection = await client.connect();
-    steps.push({
-      name: 'zk-handshake',
-      ok: connection.connected,
-      fatal: !connection.connected,
-      code: connection.connected ? undefined : classifyDeviceError({ message: connection.error || '' }).code,
-      detail: connection.connected
-        ? `session ${connection.sessionId} established in ${connection.latencyMs}ms`
-        : connection.error || 'handshake failed',
-    });
-    if (!connection.connected) return steps;
+    if (connection.connected) {
+      steps.push({
+        name: 'zk-handshake',
+        ok: true,
+        fatal: false,
+        detail: `session ${connection.sessionId} established in ${connection.latencyMs}ms`,
+      });
+    } else {
+      // The tag the client set is what separates a silent port from a terminal
+      // that answered and refused our credentials.
+      steps.push(tagFailure({
+        name: 'zk-handshake',
+        ok: false,
+        fatal: true,
+        detail: connection.error || 'handshake failed',
+      }, { code: (connection as any).code, message: connection.error || '' }));
+      return steps;
+    }
 
     const info = await client.getDeviceInfo();
     steps.push({
@@ -165,11 +214,12 @@ async function diagnoseDevice(serialOrId: string, pushUrl: string | null): Promi
         ok: Math.abs(drift) <= settings.clockDriftWarnSeconds,
         fatal: false,
         code: Math.abs(drift) <= settings.clockDriftWarnSeconds ? undefined : 'DEVICE_TIME_DRIFT',
+        failureCode: Math.abs(drift) <= settings.clockDriftWarnSeconds ? undefined : 'PROTOCOL_ERROR',
         detail: `device ${formatWallString(deviceInstant, device.timezone, false)} (${device.timezone}) vs server ${formatWallString(new Date(), device.timezone, false)} → drift ${drift}s (warn above ${settings.clockDriftWarnSeconds}s). Use "Sync device time" to correct it.`,
       });
     } catch (err: any) {
       const classified = classifyDeviceError(err);
-      steps.push({ name: 'device-time', ok: false, fatal: false, code: classified.code, detail: classified.message });
+      steps.push({ name: 'device-time', ok: false, fatal: false, code: classified.code, failureCode: failureCodeForDeviceCode(classified.code) ?? 'UNREACHABLE', detail: classified.message });
     }
 
     try {
@@ -183,13 +233,14 @@ async function diagnoseDevice(serialOrId: string, pushUrl: string | null): Promi
         ok: records.length > 0,
         fatal: false,
         code: records.length === 0 ? 'ATTLOG_EMPTY' : undefined,
+        failureCode: records.length === 0 ? 'PROTOCOL_ERROR' : undefined,
         detail: records.length === 0
           ? 'terminal returned 0 parseable attendance records — either the log is genuinely empty or this firmware packs records differently'
           : `${records.length} record(s); last 5: ${sample.join(', ')}`,
       });
     } catch (err: any) {
       const classified = classifyDeviceError(err);
-      steps.push({ name: 'read-last-logs', ok: false, fatal: false, code: classified.code, detail: classified.message });
+      steps.push({ name: 'read-last-logs', ok: false, fatal: false, code: classified.code, failureCode: failureCodeForDeviceCode(classified.code) ?? 'UNREACHABLE', detail: classified.message });
     }
 
     if (pushUrl) {
@@ -220,7 +271,7 @@ async function diagnoseDevice(serialOrId: string, pushUrl: string | null): Promi
     }
   } catch (err: any) {
     const classified = classifyDeviceError(err);
-    steps.push({ name: 'protocol-error', ok: false, fatal: true, code: classified.code, detail: classified.message });
+    steps.push({ name: 'protocol-error', ok: false, fatal: true, code: classified.code, failureCode: failureCodeForDeviceCode(classified.code) ?? 'UNREACHABLE', detail: classified.message });
   } finally {
     try { await client.disconnect(); } catch { /* already closed */ }
   }
@@ -295,14 +346,21 @@ async function main(): Promise<void> {
   line('');
 
   let failing = 0;
+  let failingProduction = 0;
+  let fixtures = 0;
   for (const target of targets) {
     line(`─ ${target} ─`);
     const steps = await diagnoseDevice(target, pushUrl);
+    const isFixture = steps.some((s) => s.name === 'fixture');
+    if (isFixture) fixtures++;
     let stopped = false;
     for (const step of steps) {
       if (stopped) break;
       const mark = step.ok ? '✓' : step.fatal ? '✗' : '!';
-      line(`  ${mark} ${step.name.padEnd(20)} ${step.detail}${step.code ? ` [${step.code}]` : ''}`);
+      // The public class is what the API returns, so the console prints the same
+      // tag; the internal log code stays in the JSON log file for grep.
+      const tag = step.failureCode ?? step.code;
+      line(`  ${mark} ${step.name.padEnd(20)} ${step.detail}${tag ? ` [${tag}]` : ''}`);
       if (step.fatal) {
         line(`  → stopping at "${step.name}": later steps cannot be evaluated until this one passes.`);
         stopped = true;
@@ -311,7 +369,10 @@ async function main(): Promise<void> {
     // `ping` is informational: managed switches routinely drop ICMP, and a
     // terminal that answers ZK but not ping is healthy.
     const realFailures = steps.filter((s) => !s.ok && s.name !== 'ping');
-    if (realFailures.length > 0) failing++;
+    if (realFailures.length > 0) {
+      failing++;
+      if (!isFixture) failingProduction++;
+    }
     line('');
   }
 
@@ -323,6 +384,11 @@ async function main(): Promise<void> {
   } else {
     line(`⚠ ${failing} of ${targets.length} terminal(s) reported a problem — see the first ✗ or ! per device above.`);
   }
+  if (fixtures > 0 || failingProduction !== failing) {
+    line(`  ${failingProduction} real shop-floor terminal(s) failed; ${fixtures} development fixture(s) on loopback are excluded from that count.`);
+  }
+  line('  A terminal is only "synchronised" when it answered the SDK and records were');
+  line('  actually stored — never because a row exists in the registry.');
   line('================================================================');
   process.exit(failing);
 }

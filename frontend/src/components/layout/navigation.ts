@@ -53,9 +53,10 @@ import {
   AlarmClock,
   PartyPopper,
   Briefcase,
+  FileSpreadsheet,
 } from 'lucide-react';
 import type { MyAccess } from '@/lib/rbac';
-import { canEditModule, canViewModule } from '@/lib/rbac';
+import { canAction, canEditModule, canViewModule } from '@/lib/rbac';
 import {
   ADMIN_ROLES,
   HIRING_ROUTE_ROLES,
@@ -82,6 +83,8 @@ export interface NavItem {
   roles?: readonly string[];
   /** When true the entry needs `edit` access on the module, not just view. */
   requiresEdit?: boolean;
+  /** When true the entry needs the module's `export` action. */
+  requiresExport?: boolean;
 }
 
 export interface NavSectionTheme {
@@ -134,7 +137,14 @@ export const enterpriseNavigation: NavSectionConfig[] = [
     ),
     items: [
       { title: 'Employee Details', href: '/employees', icon: Users, moduleKey: 'USERS', roles: WORKFORCE },
-      { title: 'Active Employees', href: '/employees/active', icon: ListChecks, roles: WORKFORCE },
+      {
+        title: 'Active Employees',
+        href: '/employees/active',
+        icon: ListChecks,
+        moduleKey: 'USERS',
+        roles: WORKFORCE,
+        badge: 'On roster',
+      },
       {
         title: 'Inactive Employees',
         href: '/employees/inactive',
@@ -142,7 +152,14 @@ export const enterpriseNavigation: NavSectionConfig[] = [
         roles: WORKFORCE,
         badge: 'Exit / Block',
       },
-      { title: 'Employee History', href: '/employees/history', icon: History, roles: WORKFORCE },
+      {
+        title: 'Employee History',
+        href: '/employees/history',
+        icon: History,
+        moduleKey: 'USERS',
+        roles: WORKFORCE,
+        badge: 'Exits',
+      },
       { title: 'Profile 360 & Dossier', href: '/employees/profile', icon: Contact, moduleKey: 'MY_PROFILE' },
       {
         title: 'Analysis & Reports',
@@ -186,6 +203,14 @@ export const enterpriseNavigation: NavSectionConfig[] = [
         roles: WORKFORCE,
       },
       { title: 'Biometric Punches Ledger', href: '/attendance/punches', icon: Fingerprint, moduleKey: 'ATTENDANCE' },
+      {
+        title: 'Attendance Excel Download',
+        href: '/attendance/export',
+        icon: FileSpreadsheet,
+        moduleKey: 'ATTENDANCE',
+        requiresExport: true,
+        roles: WORKFORCE,
+      },
       { title: 'Floor Shifts & Rosters', href: '/attendance/shifts', icon: Calendar, moduleKey: 'SHIFT_SCHEDULING' },
       { title: 'Lunch & Break Tracker', href: '/attendance/breaks', icon: Coffee, moduleKey: 'MY_ATTENDANCE' },
       {
@@ -209,7 +234,14 @@ export const enterpriseNavigation: NavSectionConfig[] = [
         moduleKey: 'LATE_FINES',
         roles: WORKFORCE,
       },
-      { title: 'Digital QR Passes', href: '/attendance/qr-codes', icon: QrCode, badge: 'Live ID' },
+      {
+        title: 'Digital QR Passes',
+        href: '/attendance/qr-codes',
+        icon: QrCode,
+        badge: 'Live ID',
+        moduleKey: 'QR_SECURITY_POLICY',
+        roles: WORKFORCE,
+      },
       {
         title: 'Biometric Device Manager',
         href: '/attendance/devices',
@@ -315,7 +347,7 @@ export const enterpriseNavigation: NavSectionConfig[] = [
       { title: 'Live Attendance Floor', href: '/operations/live-attendance', icon: LayoutDashboard, roles: OPERATIONS },
       { title: 'Live Streams', href: '/operations/live-streams', icon: Eye, roles: OPERATIONS },
       { title: 'Break Policy Ops', href: '/operations/breaks', icon: Coffee, roles: OPERATIONS },
-      { title: 'Contactless QR Scanner', href: '/operations/qr-scanner', icon: QrCode, badge: 'Scanner' },
+      { title: 'Contactless QR Scanner', href: '/operations/qr-scanner', icon: QrCode, badge: 'Scanner', roles: OPERATIONS },
       { title: 'Time Shifts Board', href: '/operations/time-shifts', icon: Clock, roles: OPERATIONS },
     ],
   },
@@ -395,6 +427,7 @@ export function isNavItemAllowed(
   if (item.roles && !roleInGroup(role, item.roles)) return false;
 
   if (item.moduleKey && access && !access.loading && access.source === 'rbac') {
+    if (item.requiresExport) return canAction(access, item.moduleKey, 'export');
     return item.requiresEdit
       ? canEditModule(access, item.moduleKey)
       : canViewModule(access, item.moduleKey);

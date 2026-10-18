@@ -99,7 +99,8 @@ staffOpsRouter.get('/live-status', authorize('VIEW'), async (req: AuthRequest, r
       shift: a.shift,
       attendance: {
         status: a.status,
-        lateMinutes: a.lateLoginSeconds ? Math.round(a.lateLoginSeconds / 60000) : 0,
+        // Stored in seconds, same as the single-employee branch above.
+        lateMinutes: a.lateLoginSeconds ? Math.round(a.lateLoginSeconds / 60) : 0,
         isWeekOff: a.status === 'WEEKLY_OFF',
         break: null,
       },

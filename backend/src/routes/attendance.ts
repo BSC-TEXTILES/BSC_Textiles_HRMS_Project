@@ -556,7 +556,13 @@ router.get('/employee/:employeeId', authorize('VIEW'), async (req: AuthRequest, 
 
 router.post('/punch', authorize('RECORD'), async (req: AuthRequest, res) => {
   try {
-    const { employeeId, punchType = 'IN', faceMatchPercentage = 95.0, reason } = req.body;
+    const { employeeId, punchType = 'IN', faceMatchPercentage, reason } = req.body;
+    // A punch recorded without the terminal's own verify result must not invent a
+    // face-match score: the value is kept only when the caller actually reports one.
+    const reportedMatch = faceMatchPercentage === undefined || faceMatchPercentage === null || faceMatchPercentage === ''
+    ? null
+    : Number(faceMatchPercentage);
+    const hasValidMatch = reportedMatch !== null && Number.isFinite(reportedMatch);
     const employee = await prisma.employee.findUnique({
       where: { id: employeeId },
       include: { shift: true },
@@ -567,6 +573,9 @@ router.post('/punch', authorize('RECORD'), async (req: AuthRequest, res) => {
 
     const today = dbDate();
     const now = new Date();
+    // Shift times are stored on a dummy calendar day; re-anchor them to today's
+    // work date (overnight-aware) instead of interpolating the JS Date object.
+    const shiftWindow = computeShiftWindow(employee.shift, today.toISOString().slice(0, 10));
 
     let existing = await prisma.attendance.findFirst({
       where: { employeeId, attendanceDate: today },
@@ -579,11 +588,12 @@ router.post('/punch', authorize('RECORD'), async (req: AuthRequest, res) => {
           locationId: employee.locationId,
           shiftId: employee.shiftId,
           attendanceDate: today,
-          scheduledLogin: employee.shift?.startTime ? new Date(`${today.toISOString().slice(0, 10)}T${employee.shift.startTime}`) : now,
+          scheduledLogin: shiftWindow?.start ?? now,
+          scheduledLogout: shiftWindow?.end ?? null,
           actualLogin: punchType === 'IN' ? now : null,
           status: 'PRESENT',
-          faceVerified: faceMatchPercentage >= 85,
-          faceMatchPercentage,
+          faceVerified: hasValidMatch ? reportedMatch >= 85 : false,
+          faceMatchPercentage: hasValidMatch ? reportedMatch : null,
           notes: reason || 'Punch recorded',
         },
       });
@@ -600,9 +610,9 @@ router.post('/punch', authorize('RECORD'), async (req: AuthRequest, res) => {
           updateData.effectiveWorkingSeconds = duration;
         }
       }
-      if (faceMatchPercentage) {
-        updateData.faceVerified = faceMatchPercentage >= 85;
-        updateData.faceMatchPercentage = faceMatchPercentage;
+      if (hasValidMatch) {
+        updateData.faceVerified = reportedMatch >= 85;
+        updateData.faceMatchPercentage = reportedMatch;
       }
       existing = await prisma.attendance.update({
         where: { id: existing.id },
@@ -633,11 +643,11 @@ router.post('/punch', authorize('RECORD'), async (req: AuthRequest, res) => {
       }
 
       // Check for face verification failure
-      if (faceMatchPercentage < 85) {
+      if (hasValidMatch && reportedMatch < 85) {
         await container.notificationService.publishEvent({
           eventId: 'ATT.FACE_VERIFY_FAILED',
           title: 'Face Verification Failed',
-          message: `${employee.fullName} (${employee.employeeCode}) face verification failed with ${faceMatchPercentage}% match.`,
+          message: `${employee.fullName} (${employee.employeeCode}) terminal reported a ${reportedMatch}% match, below the 85% threshold.`,
           type: 'DANGER',
           severity: 'HIGH',
           entityType: 'faceVerification',
@@ -645,7 +655,7 @@ router.post('/punch', authorize('RECORD'), async (req: AuthRequest, res) => {
           locationId: employee.locationId,
           actionUrl: `/operations/face-verification?employeeId=${employee.id}`,
           correlationId: `fv_failed_${employee.id}_${Date.now()}`,
-          metadata: { matchPercentage: faceMatchPercentage, employeeCode: employee.employeeCode },
+          metadata: { matchPercentage: reportedMatch, employeeCode: employee.employeeCode },
         });
       }
     }
@@ -1543,29 +1553,22 @@ router.post('/', authorize('RECORD'), validate(attendanceSchema), async (req: Au
       return res.status(400).json({ error: 'Attendance record already exists for this date' });
     }
     
-    // Calculate times
-    const scheduledIn = scheduledLogin ? new Date(scheduledLogin) : shift?.startTime || rules?.loginTime;
-    const scheduledOut = scheduledLogout ? new Date(scheduledLogout) : shift?.endTime || rules?.logoutTime;
+    // Calculate times. Shift/rule times are stored on a dummy calendar day, so
+    // the wall-clock time is re-anchored to this attendance date (overnight-aware).
+    const dateYmd = date.toISOString().slice(0, 10);
+    const rulesWindow = rules && (rules.loginTime || rules.logoutTime)
+      ? { startTime: rules.loginTime, endTime: rules.logoutTime }
+      : null;
+    const shiftWindow = computeShiftWindow(shift ?? rulesWindow, dateYmd);
+    const scheduledIn = scheduledLogin ? new Date(scheduledLogin) : shiftWindow?.start ?? null;
+    const scheduledOut = scheduledLogout ? new Date(scheduledLogout) : shiftWindow?.end ?? null;
     const actualIn = actualLogin ? new Date(actualLogin) : null;
     const actualOut = actualLogout ? new Date(actualLogout) : null;
     
     // Calculate early/late/overtime
-    let earlyLoginSeconds = 0;
-    let lateLoginSeconds = 0;
-    let earlyLogoutSeconds = 0;
-    let overtimeSeconds = 0;
-    
-    if (actualIn && scheduledIn) {
-      const diff = scheduledIn.getTime() - actualIn.getTime();
-      if (diff > 0) earlyLoginSeconds = Math.floor(diff / 1000);
-      else if (diff < -(rules?.lateThresholdMinutes || 5) * 60 * 1000) lateLoginSeconds = Math.floor(Math.abs(diff) / 1000);
-    }
-    
-    if (actualOut && scheduledOut) {
-      const diff = actualOut.getTime() - scheduledOut.getTime();
-      if (diff < 0) earlyLogoutSeconds = Math.floor(Math.abs(diff) / 1000);
-      else overtimeSeconds = Math.floor(diff / 1000);
-    }
+    const window = windowFromScheduled(scheduledIn, scheduledOut) ?? shiftWindow;
+    const durations = computeDurations(window, actualIn, actualOut, rules?.lateThresholdMinutes);
+    const { earlyLoginSeconds, lateLoginSeconds, earlyLogoutSeconds, overtimeSeconds } = durations;
     
     // Calculate incentives/penalties
     let earlyLoginIncentive = 0;
@@ -1596,10 +1599,7 @@ router.post('/', authorize('RECORD'), validate(attendanceSchema), async (req: Au
     }
     
     // Calculate total working time
-    let totalWorkingSeconds = 0;
-    if (actualIn && actualOut) {
-      totalWorkingSeconds = Math.floor((actualOut.getTime() - actualIn.getTime()) / 1000);
-    }
+    const totalWorkingSeconds = durations.totalWorkingSeconds;
     
     const status = !actualIn ? 'ABSENT' : 
       lateLoginSeconds > 0 ? 'LATE' : 
@@ -1668,35 +1668,41 @@ router.put('/:id', authorize('EDIT'), async (req: AuthRequest, res) => {
       const actualIn = updateData.actualLogin || existing.actualLogin;
       const actualOut = updateData.actualLogout || existing.actualLogout;
       
-      if (actualIn && scheduledIn) {
-        const diff = scheduledIn.getTime() - actualIn.getTime();
-        updateData.earlyLoginSeconds = diff > 0 ? Math.floor(diff / 1000) : 0;
-        updateData.lateLoginSeconds = diff < -(rules?.lateThresholdMinutes || 5) * 60 * 1000 ? Math.floor(Math.abs(diff) / 1000) : 0;
-      }
+      // Shift/rule times live on a dummy calendar day, so the window is
+      // re-anchored to this record's attendance date (overnight-aware).
+      const dateYmd = new Date(existing.attendanceDate).toISOString().slice(0, 10);
+      const window = windowFromScheduled(scheduledIn, scheduledOut) ?? computeShiftWindow(shift, dateYmd);
+      const durations = computeDurations(window, actualIn, actualOut, rules?.lateThresholdMinutes);
+      updateData.earlyLoginSeconds = durations.earlyLoginSeconds;
+      updateData.lateLoginSeconds = durations.lateLoginSeconds;
+      updateData.earlyLogoutSeconds = durations.earlyLogoutSeconds;
+      updateData.overtimeSeconds = durations.overtimeSeconds;
+      updateData.totalWorkingSeconds = durations.totalWorkingSeconds;
       
-      if (actualOut && scheduledOut) {
-        const diff = actualOut.getTime() - scheduledOut.getTime();
-        updateData.earlyLogoutSeconds = diff < 0 ? Math.floor(Math.abs(diff) / 1000) : 0;
-        updateData.overtimeSeconds = diff > 0 ? Math.floor(diff / 1000) : 0;
+      // Recalculate incentives — always overwritten so a corrected record can
+      // never keep an incentive from its previous, longer punch.
+      updateData.earlyLoginIncentive =
+        updateData.earlyLoginSeconds > 0 && rules?.earlyLoginIncentiveEnabled
+          ? Math.round((updateData.earlyLoginSeconds / 60.0) * Number(rules.earlyLoginRatePerMinute || rules.earlyLoginRatePerSecond || 1))
+          : 0;
+      if (rules?.earlyLoginMaxDaily && updateData.earlyLoginIncentive > Number(rules.earlyLoginMaxDaily)) {
+        updateData.earlyLoginIncentive = Number(rules.earlyLoginMaxDaily);
       }
-      
-      // Recalculate incentives
-      if (updateData.earlyLoginSeconds > 0 && rules?.earlyLoginIncentiveEnabled) {
-        updateData.earlyLoginIncentive = Math.round((updateData.earlyLoginSeconds / 60.0) * Number(rules.earlyLoginRatePerMinute || rules.earlyLoginRatePerSecond || 1));
+      updateData.lateLoginPenalty =
+        updateData.lateLoginSeconds > 0 && rules?.latePenaltyEnabled
+          ? Math.round((updateData.lateLoginSeconds / 60.0) * Number(rules.latePenaltyRatePerMinute || rules.latePenaltyRatePerSecond || 1))
+          : 0;
+      if (rules?.latePenaltyMaxDaily && updateData.lateLoginPenalty > Number(rules.latePenaltyMaxDaily)) {
+        updateData.lateLoginPenalty = Number(rules.latePenaltyMaxDaily);
       }
-      if (updateData.lateLoginSeconds > 0 && rules?.latePenaltyEnabled) {
-        updateData.lateLoginPenalty = Math.round((updateData.lateLoginSeconds / 60.0) * Number(rules.latePenaltyRatePerMinute || rules.latePenaltyRatePerSecond || 1));
-      }
-      if (updateData.overtimeSeconds > 0 && rules?.overtimeIncentiveEnabled) {
-        updateData.overtimeIncentive = updateData.overtimeSeconds * Number(rules.overtimeRatePerSecond || 1.5);
-      }
-      if (updateData.earlyLogoutSeconds > 0 && rules?.earlyLogoutPenaltyEnabled) {
-        updateData.earlyLogoutPenalty = updateData.earlyLogoutSeconds * Number(rules.earlyLogoutRatePerSecond || 1);
-      }
-      
-      if (actualIn && actualOut) {
-        updateData.totalWorkingSeconds = Math.floor((actualOut.getTime() - actualIn.getTime()) / 1000);
-      }
+      updateData.overtimeIncentive =
+        updateData.overtimeSeconds > 0 && rules?.overtimeIncentiveEnabled
+          ? updateData.overtimeSeconds * Number(rules.overtimeRatePerSecond || 1.5)
+          : 0;
+      updateData.earlyLogoutPenalty =
+        updateData.earlyLogoutSeconds > 0 && rules?.earlyLogoutPenaltyEnabled
+          ? updateData.earlyLogoutSeconds * Number(rules.earlyLogoutRatePerSecond || 1)
+          : 0;
     }
     
     if (status) updateData.status = status;

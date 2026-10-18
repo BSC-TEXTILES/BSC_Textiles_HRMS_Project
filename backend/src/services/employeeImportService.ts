@@ -60,7 +60,7 @@ export interface ImportColumn {
 
 export const IMPORT_COLUMNS: ImportColumn[] = [
   // ── Employee identification ────────────────────────────────────────────────
-  { key: 'employee_id', label: 'Employee ID', group: 'identification', presence: 'optional', dbColumn: 'employee.employeeCode', description: 'Official unique Employee ID (e.g. BSC-EMP-0036). Used to match existing employees. Auto-generated when blank.', example: 'BSC-EMP-0036' },
+  { key: 'employee_id', label: 'Employee ID', group: 'identification', presence: 'optional', dbColumn: 'employee.employeeCode', description: 'Official unique Employee ID (digits only, 1-30 characters). Used to match existing employees. Auto-generated when blank.', example: '000123' },
   { key: 'employee_code', label: 'Employee Code (Legacy)', group: 'identification', presence: 'optional', dbColumn: 'employee.legacyEmployeeCode', description: 'Pre-existing / legacy identifier kept alongside the official Employee ID. Never overwrites it.', example: '1372' },
   { key: 'first_name', label: 'First Name', group: 'identification', presence: 'new', dbColumn: 'employee.firstName', description: 'Given name. Required for new employees.', example: 'Anitha' },
   { key: 'middle_name', label: 'Middle Name', group: 'identification', presence: 'optional', dbColumn: 'employee.middleName', description: 'Middle name, if any.', example: 'Raghavendra' },
@@ -91,7 +91,7 @@ export const IMPORT_COLUMNS: ImportColumn[] = [
   { key: 'section', label: 'Section', group: 'work_allocation', presence: 'optional', dbColumn: 'employee.sectionId ← section.code|name', description: 'Section code or name (e.g. Silk Sarees, BEL-SEC-1).', example: 'Silk Sarees' },
   { key: 'shift_id', label: 'Shift Code', group: 'work_allocation', presence: 'optional', dbColumn: 'employee.shiftId ← shift.code', description: 'Shift code within the location: GENERAL, MORNING, EVENING or NIGHT.', example: 'GENERAL' },
   { key: 'shift_name', label: 'Shift Name', group: 'work_allocation', presence: 'optional', dbColumn: 'employee.shiftId ← shift.name', description: 'Shift name within the location (alternative to shift_id).', example: 'General Shift' },
-  { key: 'reporting_manager_employee_id', label: 'Reporting Manager Employee ID', group: 'work_allocation', presence: 'optional', dbColumn: 'employee.reportingManagerId ← employee.id', description: 'Employee ID of the reporting manager.', example: 'BSC-EMP-0003' },
+  { key: 'reporting_manager_employee_id', label: 'Reporting Manager Employee ID', group: 'work_allocation', presence: 'optional', dbColumn: 'employee.reportingManagerId ← employee.id', description: 'Employee ID of the reporting manager.', example: '000003' },
   { key: 'joining_date', label: 'Joining Date', group: 'work_allocation', presence: 'new', dbColumn: 'employee.joiningDate', description: 'Date of joining (YYYY-MM-DD or DD/MM/YYYY). Required for new employees.', example: '2026-01-15' },
   { key: 'confirmation_date', label: 'Confirmation Date', group: 'work_allocation', presence: 'optional', dbColumn: 'employee.confirmationDate', description: 'Date of confirmation after probation.', example: '2026-07-15' },
   { key: 'employee_category', label: 'Employee Category', group: 'work_allocation', presence: 'optional', dbColumn: 'employee.employeeCategory', description: 'STAFF, WORKER, MANAGEMENT or CONTRACT.', example: 'STAFF' },
@@ -342,7 +342,7 @@ function formulaWarning(key: string, value: string): string | null {
 export async function buildTemplateCsv(): Promise<string> {
   const policy = await getEmployeeIdPolicy().catch(() => null);
   const previewId = (n: number) =>
-    policy ? `${policy.prefix}${String(n).padStart(policy.padding, '0')}` : `BSC-EMP-${String(n).padStart(4, '0')}`;
+    policy ? `${policy.prefix}${String(n).padStart(policy.padding, '0')}` : String(n).padStart(6, '0');
 
   const header = IMPORT_COLUMNS.map((c) => c.key);
 
@@ -544,7 +544,7 @@ export async function buildTemplateCsv(): Promise<string> {
 export async function buildTemplateExcel(): Promise<Buffer> {
   const policy = await getEmployeeIdPolicy().catch(() => null);
   const previewId = (n: number) =>
-    policy ? `${policy.prefix}${String(n).padStart(policy.padding, '0')}` : `BSC-EMP-${String(n).padStart(4, '0')}`;
+    policy ? `${policy.prefix}${String(n).padStart(policy.padding, '0')}` : String(n).padStart(6, '0');
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'BSC Textiles HRMS Platform';
@@ -816,7 +816,7 @@ export async function buildTemplateExcel(): Promise<Buffer> {
   s1Header.font = { bold: true };
   guideSheet.addRow(['Mandatory for ALL rows', 'location_code', 'Store retail hub code (e.g. BEL, DAV, SHI)', 'Rows outside authorized hub are rejected']);
   guideSheet.addRow(['Mandatory for NEW staff', 'first_name, last_name, joining_date', 'Basic identity and date of joining', 'Required when employee_id is left blank']);
-  guideSheet.addRow(['Auto ID Allocation', 'employee_id blank', 'System automatically allocates next sequential ID', 'Format: BSC-EMP-XXXX sequential counter']);
+  guideSheet.addRow(['Auto ID Allocation', 'employee_id blank', 'System automatically allocates next sequential ID', 'Format: numeric, zero-padded sequential counter']);
   guideSheet.addRow(['Updates & Upserts', 'employee_id or legacy employee_code', 'Matches existing employee record to update', 'Blank cells preserve existing values']);
   guideSheet.addRow(['Phone Numbers', 'mobile_number, emergency_contact_number', '10 digits (e.g. 9845012345 or +91 98450 12345)', 'Stored as exact text to prevent scientific notation']);
 

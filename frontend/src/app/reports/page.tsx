@@ -125,57 +125,25 @@ export default function ReportsPage() {
       if (selectedShift !== 'all') base.set('shiftId', selectedShift);
       const baseQ = `?${base.toString()}`;
 
+      // Every tab reads a real endpoint. When it returns no rows the table shows
+      // its empty state — nothing is synthesised to fill the screen.
       if (activeTab === 'attendance') {
         const res = await api.get(`/reports/attendance-summary${baseQ}`).catch(() => null);
         rows = Array.isArray(res?.data) ? res.data : (res?.data?.summary || res?.data?.data || []);
       } else if (activeTab === 'face') {
-        const res = await api.get(`/reports/face-verification-accuracy${baseQ}`).catch(() => null);
-        rows = Array.isArray(res?.data) ? res.data : (res?.data?.records || res?.data?.rows || res?.data?.data || []);
+        const res = await api.get(`/face-verification${baseQ}`).catch(() => null);
+        rows = res?.data?.verifications || res?.data?.rows || (Array.isArray(res?.data) ? res.data : []);
       } else if (activeTab === 'qr') {
-        const res = await api.get(`/reports/qr-scans-summary${baseQ}`).catch(() => null);
-        rows = Array.isArray(res?.data) ? res.data : (res?.data?.records || res?.data?.scans || res?.data?.data || []);
+        const res = await api.get(`/qr-codes/scans${baseQ}`).catch(() => null);
+        rows = res?.data?.scans || (Array.isArray(res?.data) ? res.data : []);
       } else if (activeTab === 'incentives') {
-        const res = await api.get(`/reports/incentives-summary${baseQ}`).catch(() => null);
-        rows = Array.isArray(res?.data) ? res.data : (res?.data?.summary || res?.data?.records || res?.data?.data || []);
+        const res = await api.get(`/incentives/transactions${baseQ}`).catch(() => null);
+        rows = res?.data?.transactions || (Array.isArray(res?.data) ? res.data : []);
       } else if (activeTab === 'payroll') {
         const res = await api.get('/payroll/runs').catch(() => null);
         rows = res?.data?.runs || (Array.isArray(res?.data) ? res.data : []);
       }
-
-      // If empty, generate high-fidelity synthetic demo reporting dataset
-      if (!rows || rows.length === 0) {
-        if (activeTab === 'attendance') {
-          rows = [
-            { id: 1, location: 'Belagavi Flagship (BEL-01)', totalStaff: 28, presentCount: 27, onLeaveCount: 1, lateArrivals: 2, overtimeHours: 14.5, musterHealth: '98.4%' },
-            { id: 2, location: 'Davanagere Mill (DAV-02)', totalStaff: 42, presentCount: 40, onLeaveCount: 2, lateArrivals: 4, overtimeHours: 28.0, musterHealth: '97.2%' },
-            { id: 3, location: 'Shivamogga Apex (SHI-03)', totalStaff: 18, presentCount: 18, onLeaveCount: 0, lateArrivals: 1, overtimeHours: 8.5, musterHealth: '100%' },
-          ];
-        } else if (activeTab === 'face') {
-          rows = [
-            { id: 1, terminal: 'BEL-IN-02 RFID/Optical', attempts: 184, successfulMatches: 182, failedMatches: 2, avgConfidence: '99.4%', livenessConfirmed: '100%' },
-            { id: 2, terminal: 'DAV-GATE-01 Turnstile', attempts: 240, successfulMatches: 236, failedMatches: 4, avgConfidence: '98.8%', livenessConfirmed: '99.6%' },
-            { id: 3, terminal: 'SHI-RETAIL-01 Scanner', attempts: 96, successfulMatches: 96, failedMatches: 0, avgConfidence: '99.7%', livenessConfirmed: '100%' },
-          ];
-        } else if (activeTab === 'qr') {
-          rows = [
-            { id: 1, facility: 'Belagavi Staff Canteen', quotaType: 'Lunch Token (45m)', scansToday: 26, overageFlags: 0, teaTokensRedeemed: 28 },
-            { id: 2, facility: 'Davanagere Mill Cafeteria', quotaType: 'Lunch Token (45m)', scansToday: 41, overageFlags: 0, teaTokensRedeemed: 42 },
-            { id: 3, facility: 'Shivamogga Refreshment Counter', quotaType: 'Tea Token (15m)', scansToday: 18, overageFlags: 0, teaTokensRedeemed: 18 },
-          ];
-        } else if (activeTab === 'incentives') {
-          rows = [
-            { id: 1, employee: 'Rajeshwari V. Patil', code: 'BSC-EMP-0042', tier: 'Senior Lead', bridalSalesVolume: '₹14.2L', festivalIncentiveAccrued: '₹4,250', status: 'AUDITED' },
-            { id: 2, employee: 'Veeranna Pattar', code: 'BSC-MGR-0021', tier: 'Loom Master', bridalSalesVolume: 'N/A (Production)', festivalIncentiveAccrued: '₹3,500', status: 'AUDITED' },
-            { id: 3, employee: 'Amit Deshpande', code: 'BSC-EMP-0089', tier: 'Master Tailor', bridalSalesVolume: '142 Alterations', festivalIncentiveAccrued: '₹2,800', status: 'PENDING_PAYOUT' },
-          ];
-        } else if (activeTab === 'payroll') {
-          rows = [
-            { id: 1, monthYear: 'October 2024', totalGross: '₹18,42,800', statutoryPf: '₹1,44,200', statutoryEsic: '₹18,400', professionalTax: '₹8,400', netDisbursed: '₹16,71,800', status: 'COMMITTED' },
-            { id: 2, monthYear: 'September 2024', totalGross: '₹18,10,400', statutoryPf: '₹1,41,600', statutoryEsic: '₹18,100', professionalTax: '₹8,400', netDisbursed: '₹16,42,300', status: 'DISBURSED' },
-          ];
-        }
-      }
-      setData(rows);
+      setData(Array.isArray(rows) ? rows : []);
     } catch (e) {
       console.error('Fetch report error:', e);
       setData([]);
@@ -198,8 +166,18 @@ export default function ReportsPage() {
       toast.error('No report data to export');
       return;
     }
-    const headers = Object.keys(data[0]).join(',');
-    const rows = data.map((d) => Object.values(d).join(','));
+    const cell = (value: unknown): string => {
+      let text: string;
+      if (value === null || value === undefined) text = '';
+      else if (value instanceof Date) text = value.toISOString();
+      else if (typeof value === 'object') text = JSON.stringify(value);
+      else text = String(value);
+      return `"${text.replace(/"/g, '""')}"`;
+    };
+    // Columns are the union of the keys the loaded rows actually carry.
+    const columns = Array.from(new Set(data.flatMap((d) => Object.keys(d || {}))));
+    const headers = columns.map(cell).join(',');
+    const rows = data.map((d) => columns.map((c) => cell(d?.[c])).join(','));
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers, ...rows].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
@@ -272,46 +250,91 @@ export default function ReportsPage() {
     selectedStatus,
   ]);
 
-  /** Consistent dynamic card metrics linked directly to underlying datasets */
+  /**
+   * Card metrics counted from the rows the active tab actually loaded. A card
+   * whose dataset is not on screen (or returned no rows) shows '—' — the page
+   * never quotes an attendance rate, match score, latency or rupee total that the
+   * server did not send.
+   */
   const cardMetrics = useMemo(() => {
-    let musterVal = '98.2%';
-    let musterSub = 'Across 4 Karnataka Hubs';
-    let faceVal = '99.4% Match';
-    let faceSub = '0.18s Ingestion Latency';
-    let qrVal = '100% Verified';
-    let qrSub = 'Zero Meal Overage';
-    let incentiveVal = '₹1,84,500';
-    let incentiveSub = 'Diwali Peak Accrued';
-    let complianceVal = 'Audited';
-    let complianceSub = 'Zero Compliance Leakage';
+    const hubLabel =
+      selectedLocation === 'ALL'
+        ? 'All Karnataka hubs'
+        : locations.find((l) => l.code === selectedLocation)?.name || selectedLocation;
+    const rows = data;
+    const notLoaded = (tab: string) => ({ value: '—', sub: `Open the ${tab} tab to load rows` });
 
-    if (selectedLocation === 'BEL') {
-      musterVal = '98.4%';
-      musterSub = 'Belagavi Flagship (BEL-01)';
-      incentiveVal = '₹95,000';
-    } else if (selectedLocation === 'DAV') {
-      musterVal = '97.2%';
-      musterSub = 'Davanagere Mill (DAV-02)';
-      incentiveVal = '₹60,000';
-    } else if (selectedLocation === 'SHI') {
-      musterVal = '100.0%';
-      musterSub = 'Shivamogga Apex (SHI-03)';
-      incentiveVal = '₹29,500';
+    const num = (v: unknown) => {
+      const n = Number(v ?? 0);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    let muster = notLoaded('Attendance Muster Roll');
+    if (activeTab === 'attendance' && rows.length > 0) {
+      const totalDays = rows.reduce((acc, r) => acc + num(r.totalDays), 0);
+      const absent = rows.reduce((acc, r) => acc + num(r.absent), 0);
+      if (totalDays > 0) {
+        muster = {
+          value: `${Math.round(((totalDays - absent) / totalDays) * 1000) / 10}%`,
+          sub: `${rows.length} employee row(s) • ${hubLabel}`,
+        };
+      }
+    }
+
+    let face = notLoaded('Biometric Face Telemetry');
+    if (activeTab === 'face' && rows.length > 0) {
+      const verified = rows.filter((r) => String(r.status || r.result || '').toUpperCase() === 'VERIFIED').length;
+      const scores = rows.map((r) => Number(r.score ?? r.matchPercentage)).filter((n) => Number.isFinite(n));
+      face = {
+        value: `${Math.round((verified / rows.length) * 1000) / 10}% Verified`,
+        sub: scores.length > 0
+          ? `Mean stored score ${Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10}%`
+          : 'No score stored on these transactions',
+      };
+    }
+
+    let qr = notLoaded('Canteen & QR Scan Passes');
+    if (activeTab === 'qr' && rows.length > 0) {
+      const ok = rows.filter((r) => String(r.result || '').toUpperCase() === 'SUCCESS').length;
+      qr = {
+        value: `${Math.round((ok / rows.length) * 1000) / 10}% Successful`,
+        sub: `${ok} of ${rows.length} scan row(s) succeeded`,
+      };
+    }
+
+    let incentive = notLoaded('Festive Incentives Ledger');
+    if (activeTab === 'incentives' && rows.length > 0) {
+      const total = rows.reduce((acc, r) => acc + num(r.calculatedAmount), 0);
+      incentive = {
+        value: '₹' + Math.round(total).toLocaleString('en-IN'),
+        sub: `${rows.length} transaction(s) loaded`,
+      };
+    }
+
+    let compliance = notLoaded('Statutory Payroll Summary');
+    if (activeTab === 'payroll' && rows.length > 0) {
+      const latest = rows[0];
+      compliance = {
+        value: String(latest.status || '—'),
+        sub: latest.periodStart
+          ? `Latest run ${new Date(latest.periodStart).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}`
+          : `${rows.length} payroll run(s) loaded`,
+      };
     }
 
     return {
-      musterVal,
-      musterSub,
-      faceVal,
-      faceSub,
-      qrVal,
-      qrSub,
-      incentiveVal,
-      incentiveSub,
-      complianceVal,
-      complianceSub,
+      musterVal: muster.value,
+      musterSub: muster.sub,
+      faceVal: face.value,
+      faceSub: face.sub,
+      qrVal: qr.value,
+      qrSub: qr.sub,
+      incentiveVal: incentive.value,
+      incentiveSub: incentive.sub,
+      complianceVal: compliance.value,
+      complianceSub: compliance.sub,
     };
-  }, [selectedLocation]);
+  }, [selectedLocation, locations, data, activeTab]);
 
   return (
     <DashboardLayout>
@@ -514,9 +537,11 @@ export default function ReportsPage() {
                 className="bg-surface-container-low rounded-lg px-space-md py-1.5 font-label-md text-label-md text-on-surface focus:outline-none cursor-pointer border border-slate-200/50"
               >
                 <option value="ALL">All Hubs (Karnataka)</option>
-                <option value="BEL">BEL-01 Flagship Belagavi</option>
-                <option value="DAV">DAV-02 Weaving Davanagere</option>
-                <option value="SHI">SHI-03 Retail Apex Shivamogga</option>
+                {locations.map((l) => (
+                  <option key={l.id} value={l.code}>
+                    {`${l.name}${l.code ? ` (${l.code})` : ''}`}
+                  </option>
+                ))}
               </select>
 
               <label

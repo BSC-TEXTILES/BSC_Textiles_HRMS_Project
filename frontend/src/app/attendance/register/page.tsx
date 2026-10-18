@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
+import { describeExportError, downloadAttendanceExport } from '@/lib/exportDownload';
 import toast from 'react-hot-toast';
 
 interface EmployeeRegisterItem {
@@ -56,9 +57,10 @@ export default function AttendanceRegisterPage() {
   const [locations, setLocations] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedYear, setSelectedYear] = useState<number>(2024);
-  const [selectedMonth, setSelectedMonth] = useState<number>(10); // October default
+  const [selectedYear, setSelectedYear] = useState<number>(() => new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number>(() => new Date().getMonth() + 1);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
 
   // Matrix stored as: { [employeeId]: { [dayNum]: DayAttendanceRecord } }
   const [attendanceMatrix, setAttendanceMatrix] = useState<Record<string, Record<number, DayAttendanceRecord>>>({});
@@ -77,6 +79,28 @@ export default function AttendanceRegisterPage() {
     notes: '',
   });
   const [savingRecord, setSavingRecord] = useState(false);
+
+  // The server builds the workbook, so the register that downloads is the same
+  // numbers the monthly screens show.
+  const exportMuster = useCallback(async () => {
+    setExporting(true);
+    try {
+      const filename = await downloadAttendanceExport(
+        'monthly',
+        {
+          year: selectedYear,
+          month: selectedMonth,
+          locationId: selectedLocation === 'ALL' ? undefined : selectedLocation,
+        },
+        `form-t-muster-${selectedYear}-${String(selectedMonth).padStart(2, '0')}.xlsx`
+      );
+      toast.success(`Downloaded ${filename}`);
+    } catch (err: any) {
+      toast.error(await describeExportError(err));
+    } finally {
+      setExporting(false);
+    }
+  }, [selectedLocation, selectedMonth, selectedYear]);
 
   // Calculate days in selected month
   const daysInMonth = useMemo(() => {
@@ -262,7 +286,7 @@ export default function AttendanceRegisterPage() {
 
           <div className="flex items-center gap-2 flex-wrap self-start md:self-center">
             <button
-              onClick={() => toast.success('Form T Muster Roll PDF generated!')}
+              onClick={() => window.print()}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white text-slate-700 hover:bg-slate-50 transition-colors rounded-xl text-xs font-semibold shadow-xs border border-slate-200"
               type="button"
             >
@@ -270,12 +294,15 @@ export default function AttendanceRegisterPage() {
               Print Form T
             </button>
             <button
-              onClick={() => toast.success('Exported monthly attendance register (.xlsx)')}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#1346a1] text-white hover:bg-[#0e3882] transition-colors rounded-xl text-xs font-bold shadow-xs"
+              onClick={exportMuster}
+              disabled={exporting}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#1346a1] text-white hover:bg-[#0e3882] transition-colors rounded-xl text-xs font-bold shadow-xs disabled:opacity-60"
               type="button"
             >
-              <span className="material-symbols-outlined text-[16px]">file_download</span>
-              Export Muster (XLSX)
+              <span className={`material-symbols-outlined text-[16px]${exporting ? ' animate-spin' : ''}`}>
+                {exporting ? 'progress_activity' : 'file_download'}
+              </span>
+              {exporting ? 'Generating…' : 'Export Muster (XLSX)'}
             </button>
           </div>
         </div>

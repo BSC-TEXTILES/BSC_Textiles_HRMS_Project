@@ -105,9 +105,11 @@ const IMPORT_BATCH_DDL = [
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
-const DEFAULT_FORMAT_KEY = 'BSC-EMP';
-const DEFAULT_PREFIX = 'BSC-EMP-';
-const DEFAULT_PADDING = 4;
+// Must match DEFAULT_ID_POLICY in services/employeeIdService.ts and the ENFORCED
+// digits-only check installed by migration 025.
+const DEFAULT_FORMAT_KEY = 'NUMERIC';
+const DEFAULT_PREFIX = '';
+const DEFAULT_PADDING = 6;
 
 function isSqlite(): boolean {
   return String(process.env.DB_TYPE || 'mysql').toLowerCase() === 'sqlite';

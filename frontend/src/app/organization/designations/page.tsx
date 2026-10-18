@@ -34,7 +34,7 @@ export default function DesignationsPage() {
         icon: 'badge',
       },
     ]);
-    toast.success(`Designation "${newTitle}" created successfully!`);
+    toast(`Designation "${newTitle}" added for this session only — this screen has no backend store yet`, { icon: 'ℹ' });
     setIsModalOpen(false);
     setNewTitle('');
     setNewBand('');
@@ -70,6 +70,16 @@ export default function DesignationsPage() {
             <span className="material-symbols-outlined text-[18px]">add_circle</span>
             Add Designation
           </button>
+        </div>
+
+
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 mb-space-lg">
+          <p className="text-[12px] leading-relaxed text-amber-900">
+            <span className="font-bold">Not connected to the employee master.</span> The designations, grades and
+            salary bands below are illustrative text held in this page only — adding or editing one does not save
+            anything, and it is gone on reload. A person&apos;s actual designation lives on their employee record
+            (Workforce Directory → employee → Designation).
+          </p>
         </div>
 
         {/* 4 KPI Cards */}

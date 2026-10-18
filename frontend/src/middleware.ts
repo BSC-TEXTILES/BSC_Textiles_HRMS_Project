@@ -81,6 +81,11 @@ const EXACT_RULES: Array<{ path: string; roles: string[] }> = [
     path: '/attendance/missed-punching',
     roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'],
   },
+  {
+    // Attendance workbooks leave the system; same audience as the ledger.
+    path: '/attendance/export',
+    roles: ['SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER'],
+  },
 ];
 
 function isAllowed(pathname: string, role?: string): boolean {

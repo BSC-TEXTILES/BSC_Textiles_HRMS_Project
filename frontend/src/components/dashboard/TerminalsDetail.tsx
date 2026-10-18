@@ -35,7 +35,11 @@ interface TerminalDevice {
   latency: number;
   packetLoss: number;
   heartbeat: string;
-  uptime: number;
+  /**
+   * Uptime is not measured anywhere in this stack — no probe keeps an online-time
+   * window per terminal — so the UI never asserts a percentage for it.
+   */
+  uptime?: number | null;
   firmwareVersion: string;
   updateAvailable: boolean;
   punchesRecordedToday: number;
@@ -50,8 +54,8 @@ interface TerminalsApiResponse {
     onlineTerminals: number;
     offlineTerminals: number;
     maintenanceTerminals: number;
-    averageLatencyMs: number;
-    averagePacketLossPct: number;
+    averageLatencyMs: number | null;
+    averagePacketLossPct: number | null;
     packetLossGraph: Array<{ time: string; lossPct: number; latency: number }>;
     latencyDistribution: Array<{ bucket: string; count: number; color: string }>;
     hubsSummary: Array<{ hub: string; terminals: number; status: string }>;
@@ -61,173 +65,22 @@ interface TerminalsApiResponse {
   };
 }
 
-const FALLBACK_TERMINALS_DATA: TerminalsApiResponse = {
-  terminals: [
-    {
-      id: 'TERM-01',
-      code: 'BEL-01',
-      name: 'BEL-01 Entrance Face Gate A',
-      location: 'Belagavi Flagship (Karnataka HQ)',
-      ipAddress: 'Protected Showroom LAN',
-      status: 'ONLINE',
-      latency: 12,
-      packetLoss: 0.0,
-      heartbeat: '2s ago',
-      uptime: 99.9,
-      firmwareVersion: 'v3.2.1-prod',
-      updateAvailable: false,
-      punchesRecordedToday: 28,
-      cameraActive: true,
-      mode: 'ACTIVE_SCAN',
-    },
-    {
-      id: 'TERM-02',
-      code: 'BEL-02',
-      name: 'BEL-02 Floor 1 Loom Terminal B',
-      location: 'Belagavi Flagship (Weaving Bay)',
-      ipAddress: 'Protected Showroom LAN',
-      status: 'ONLINE',
-      latency: 18,
-      packetLoss: 0.0,
-      heartbeat: '4s ago',
-      uptime: 99.8,
-      firmwareVersion: 'v3.2.1-prod',
-      updateAvailable: false,
-      punchesRecordedToday: 14,
-      cameraActive: true,
-      mode: 'ACTIVE_SCAN',
-    },
-    {
-      id: 'TERM-03',
-      code: 'BEL-03',
-      name: 'BEL-03 Tea & Canteen Scanner C',
-      location: 'Belagavi Flagship (Refreshment Hub)',
-      ipAddress: 'Protected Showroom LAN',
-      status: 'ONLINE',
-      latency: 15,
-      packetLoss: 0.0,
-      heartbeat: '1s ago',
-      uptime: 100.0,
-      firmwareVersion: 'v3.2.1-prod',
-      updateAvailable: false,
-      punchesRecordedToday: 42,
-      cameraActive: true,
-      mode: 'ACTIVE_SCAN',
-    },
-    {
-      id: 'TERM-04',
-      code: 'BEL-04',
-      name: 'BEL-04 Dispatch Gate Terminal D',
-      location: 'Belagavi Flagship (Loading Bay)',
-      ipAddress: 'Protected Showroom LAN',
-      status: 'ONLINE',
-      latency: 22,
-      packetLoss: 0.0,
-      heartbeat: '6s ago',
-      uptime: 99.7,
-      firmwareVersion: 'v3.1.9-stable',
-      updateAvailable: true,
-      punchesRecordedToday: 9,
-      cameraActive: true,
-      mode: 'ACTIVE_SCAN',
-    },
-    {
-      id: 'TERM-05',
-      code: 'DAV-02A',
-      name: 'DAV-02 Main Showroom Scanner 1',
-      location: 'Davanagere Showroom (KB Extension)',
-      ipAddress: 'Protected Showroom LAN',
-      status: 'ONLINE',
-      latency: 19,
-      packetLoss: 0.0,
-      heartbeat: '3s ago',
-      uptime: 99.8,
-      firmwareVersion: 'v3.2.1-prod',
-      updateAvailable: false,
-      punchesRecordedToday: 18,
-      cameraActive: true,
-      mode: 'ACTIVE_SCAN',
-    },
-    {
-      id: 'TERM-06',
-      code: 'DAV-02B',
-      name: 'DAV-02 Staff Lounge Biometric 2',
-      location: 'Davanagere Showroom (Fitting Wing)',
-      ipAddress: 'Protected Showroom LAN',
-      status: 'ONLINE',
-      latency: 24,
-      packetLoss: 0.0,
-      heartbeat: '8s ago',
-      uptime: 99.6,
-      firmwareVersion: 'v3.2.1-prod',
-      updateAvailable: false,
-      punchesRecordedToday: 11,
-      cameraActive: true,
-      mode: 'ACTIVE_SCAN',
-    },
-    {
-      id: 'TERM-07',
-      code: 'SHI-03A',
-      name: 'SHI-03 Front Concierge Face Cam 1',
-      location: 'Shivamogga Retail Apex (B.H. Road)',
-      ipAddress: 'Protected Showroom LAN',
-      status: 'ONLINE',
-      latency: 16,
-      packetLoss: 0.0,
-      heartbeat: '2s ago',
-      uptime: 100.0,
-      firmwareVersion: 'v3.2.1-prod',
-      updateAvailable: false,
-      punchesRecordedToday: 21,
-      cameraActive: true,
-      mode: 'ACTIVE_SCAN',
-    },
-    {
-      id: 'TERM-08',
-      code: 'SHI-03B',
-      name: 'SHI-03 Weaving Stock Entry Cam 2',
-      location: 'Shivamogga Retail Apex (Inventory Base)',
-      ipAddress: 'Protected Showroom LAN',
-      status: 'ONLINE',
-      latency: 20,
-      packetLoss: 0.0,
-      heartbeat: '5s ago',
-      uptime: 99.9,
-      firmwareVersion: 'v3.2.0-prod',
-      updateAvailable: false,
-      punchesRecordedToday: 15,
-      cameraActive: true,
-      mode: 'ACTIVE_SCAN',
-    },
-  ],
+
+// Nothing is displayed when the network-status probe is unavailable: the empty
+// shape below carries no demonstration terminals, latency or packet-loss figures.
+const EMPTY_TERMINALS_DATA: TerminalsApiResponse = {
+  terminals: [],
   networkMetrics: {
-    totalTerminals: 8,
-    onlineTerminals: 8,
+    totalTerminals: 0,
+    onlineTerminals: 0,
     offlineTerminals: 0,
     maintenanceTerminals: 0,
-    averageLatencyMs: 18,
-    averagePacketLossPct: 0.0,
-    packetLossGraph: [
-      { time: '08:00', lossPct: 0.0, latency: 17 },
-      { time: '08:30', lossPct: 0.0, latency: 19 },
-      { time: '09:00', lossPct: 0.0, latency: 21 },
-      { time: '09:30', lossPct: 0.0, latency: 18 },
-      { time: '10:00', lossPct: 0.0, latency: 16 },
-      { time: 'Current', lossPct: 0.0, latency: 18 },
-    ],
-    latencyDistribution: [
-      { bucket: '< 15ms (Ultra-Fast)', count: 2, color: '#10b981' },
-      { bucket: '15 - 20ms (Optimal)', count: 4, color: '#0058be' },
-      { bucket: '21 - 30ms (Good)', count: 2, color: '#3b82f6' },
-      { bucket: '31 - 50ms (Fair)', count: 0, color: '#f59e0b' },
-      { bucket: '> 50ms (Degraded)', count: 0, color: '#ef4444' },
-    ],
-    hubsSummary: [
-      { hub: 'Belagavi Flagship (BEL)', terminals: 4, status: 'All Online' },
-      { hub: 'Davanagere Showroom (DAV)', terminals: 2, status: 'All Online' },
-      { hub: 'Shivamogga Apex (SHI)', terminals: 2, status: 'All Online' },
-    ]
-  }
+    averageLatencyMs: null,
+    averagePacketLossPct: null,
+    packetLossGraph: [],
+    latencyDistribution: [],
+    hubsSummary: [],
+  },
 };
 
 let terminalsCache: { data: TerminalsApiResponse; timestamp: number } | null = null;
@@ -296,16 +149,16 @@ export function TerminalsDetail({
         }
       }
 
-      // If network status endpoint returned non-200 or empty, gracefully apply cached or fallback data
+      // No probe result: keep any cached snapshot, otherwise show the empty shape.
       if (!dataRef.current) {
-        const fallback = terminalsCache?.data || FALLBACK_TERMINALS_DATA;
+        const fallback = terminalsCache?.data || EMPTY_TERMINALS_DATA;
         terminalsCache = { data: fallback, timestamp: now };
         setData(fallback);
       }
     } catch {
-      // Graceful offline fallback to prevent unhandled TypeError: Failed to fetch
+      // Network failure — same behaviour, never a synthetic terminal fleet.
       if (!dataRef.current) {
-        const fallback = terminalsCache?.data || FALLBACK_TERMINALS_DATA;
+        const fallback = terminalsCache?.data || EMPTY_TERMINALS_DATA;
         terminalsCache = { data: fallback, timestamp: now };
         setData(fallback);
       }
@@ -371,15 +224,29 @@ export function TerminalsDetail({
   const latencies = terminalsList.map(t => t.latency).filter(l => typeof l === 'number');
   const minLatency = latencies.length > 0 ? Math.min(...latencies) : null;
   const maxLatency = latencies.length > 0 ? Math.max(...latencies) : null;
-  const avgLatency = data?.networkMetrics?.averageLatencyMs ?? 18;
-  const avgPacketLoss = data?.networkMetrics?.averagePacketLossPct ?? 0;
+  const reportedLatencies = terminalsList
+    .map((t) => (typeof t.latency === 'number' ? t.latency : null))
+    .filter((v): v is number => v !== null);
+  const avgLatency =
+    data?.networkMetrics?.averageLatencyMs ??
+    (reportedLatencies.length > 0
+      ? Math.round(reportedLatencies.reduce((a, b) => a + b, 0) / reportedLatencies.length)
+      : null);
+  const avgPacketLoss = data?.networkMetrics?.averagePacketLossPct ?? null;
 
   const acceptableLossThreshold = 1.0;
   const exceedingLossTerminals = terminalsList.filter(
     t => typeof t.packetLoss === 'number' && t.packetLoss > acceptableLossThreshold
   );
 
-  const slaStatus = avgLatency < 50 ? 'Healthy' : avgLatency <= 100 ? 'Warning' : 'Degraded';
+  const slaStatus =
+    avgLatency === null
+      ? 'Unknown'
+      : avgLatency < 50
+      ? 'Healthy'
+      : avgLatency <= 100
+      ? 'Warning'
+      : 'Degraded';
 
   const degradedOrDisconnected = terminalsList.filter(
     t => t.status === 'OFFLINE' || (typeof t.latency === 'number' && t.latency > 100)
@@ -404,7 +271,11 @@ export function TerminalsDetail({
             </div>
             <div>
               <h2 className="text-base font-bold text-[#0b1c30]">Active Terminals — IoT Biometric Network Health</h2>
-              <p className="text-[11px] text-slate-500">8 Edge Terminals in Karnataka • Zero Packet Loss • Real-Time Ping</p>
+              <p className="text-[11px] text-slate-500">
+                {terminalsList.length === 0
+                  ? 'No terminals reported by the network probe yet'
+                  : `${terminalsList.length} terminal(s) probed • ${data?.networkMetrics?.onlineTerminals ?? 0} reachable`}
+              </p>
             </div>
           </div>
         </div>
@@ -458,9 +329,13 @@ export function TerminalsDetail({
                   )}
                 </div>
                 <div className="text-2xl font-bold text-[#0b1c30] mt-1 flex items-center gap-2">
-                  {data?.networkMetrics?.onlineTerminals ?? 8} / {data?.networkMetrics?.totalTerminals ?? 8} Online
+                  {data?.networkMetrics?.onlineTerminals ?? 0} / {data?.networkMetrics?.totalTerminals ?? 0} Online
                   <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
-                    All Up
+                    {terminalsList.length === 0
+                      ? 'No probe data'
+                      : (data?.networkMetrics?.offlineTerminals ?? 0) === 0
+                      ? 'All reachable'
+                      : 'Partial'}
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1">100% Karnataka Hub Coverage</div>
@@ -485,7 +360,7 @@ export function TerminalsDetail({
                   )}
                 </div>
                 <div className="text-2xl font-bold text-emerald-600 mt-1">
-                  {data?.networkMetrics?.averagePacketLossPct != null ? `${data.networkMetrics.averagePacketLossPct.toFixed(2)}%` : '0.00%'}
+                  {data?.networkMetrics?.averagePacketLossPct != null ? `${data.networkMetrics.averagePacketLossPct.toFixed(2)}%` : 'Not measured'}
                 </div>
                 <div className="text-[11px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" />
@@ -512,9 +387,9 @@ export function TerminalsDetail({
                   )}
                 </div>
                 <div className="text-2xl font-bold text-[#0058be] mt-1">
-                  {data?.networkMetrics?.averageLatencyMs != null ? `${data.networkMetrics.averageLatencyMs}ms` : '18ms'}
+                  {data?.networkMetrics?.averageLatencyMs != null ? `${data.networkMetrics.averageLatencyMs}ms` : 'Not measured'}
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">Edge response &lt; 50ms SLA</div>
+                <div className="text-[11px] text-slate-500 mt-1">Ping measured by the network probe</div>
               </button>
 
               {/* Card 4: Hub Topology Status */}
@@ -536,9 +411,13 @@ export function TerminalsDetail({
                   )}
                 </div>
                 <div className="text-2xl font-bold text-slate-700 mt-1">
-                  {data?.networkMetrics?.hubsSummary?.length ?? 3} Store Hubs
+                  {data?.networkMetrics?.hubsSummary?.length ?? 0} Store Hubs
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">4 BEL • 2 DAV • 2 SHI</div>
+                <div className="text-[11px] text-slate-500 mt-1">
+                  {(data?.networkMetrics?.hubsSummary || []).length > 0
+                    ? (data?.networkMetrics?.hubsSummary || []).map((h) => `${h.hub}: ${h.terminals}`).join(' • ')
+                    : 'No hub topology reported'}
+                </div>
               </button>
             </div>
 
@@ -586,7 +465,7 @@ export function TerminalsDetail({
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 text-[11px]">
-                          {data?.networkMetrics?.onlineTerminals ?? 8} Online
+                          {data?.networkMetrics?.onlineTerminals ?? 0} Online
                         </span>
                         <span className="px-2.5 py-1 rounded-md bg-slate-50 text-slate-600 font-semibold border border-slate-200 text-[11px]">
                           {data?.networkMetrics?.offlineTerminals ?? 0} Offline
@@ -663,7 +542,8 @@ export function TerminalsDetail({
                               <div>
                                 <span className="text-slate-400 block">Uptime:</span>
                                 <span className="font-semibold text-emerald-700">
-                                  {term.uptime != null ? `${term.uptime}%` : 'Not available'}
+                                  {/* No uptime measurement exists — never asserted. */}
+                                  Not measured
                                 </span>
                               </div>
                               <div className="col-span-2">
@@ -978,9 +858,11 @@ export function TerminalsDetail({
                           </span>
                           <span className="text-[11px] opacity-80">
                             {slaStatus === 'Healthy'
-                              ? 'Edge facial biometric verification SLA requires round-trip latency < 50ms. Current average is 18ms.'
+                              ? `Measured average latency across probed terminals is ${avgLatency}ms (target < 50ms).`
                               : slaStatus === 'Warning'
                               ? 'Fleet latency is approaching warning threshold (50ms - 100ms).'
+                              : slaStatus === 'Unknown'
+                              ? 'No latency measurement returned by the network probe yet.'
                               : 'Network latency degraded beyond 100ms SLA target.'}
                           </span>
                         </div>
@@ -994,7 +876,7 @@ export function TerminalsDetail({
                             : 'bg-red-100 text-red-800 border-red-300'
                         }`}
                       >
-                        {slaStatus === 'Healthy' ? '< 50ms Compliant' : `${avgLatency}ms Status`}
+                        {slaStatus === 'Healthy' ? '< 50ms Compliant' : avgLatency === null ? 'No measurement' : `${avgLatency}ms Status`}
                       </span>
                     </div>
 
@@ -1005,9 +887,9 @@ export function TerminalsDetail({
                           Overall Average Latency
                         </span>
                         <div className="text-2xl font-bold text-[#0058be] mt-1">
-                          {avgLatency != null ? `${avgLatency}ms` : '18ms'}
+                          {avgLatency != null ? `${avgLatency}ms` : '—'}
                         </div>
-                        <div className="text-[11px] text-slate-500 mt-1">Across all 8 edge nodes</div>
+                        <div className="text-[11px] text-slate-500 mt-1">Across {reportedLatencies.length} probed terminal(s)</div>
                       </div>
 
                       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
@@ -1103,13 +985,16 @@ export function TerminalsDetail({
                               <th className="px-4 py-3">Location &amp; IP</th>
                               <th className="px-4 py-3">Current Latency</th>
                               <th className="px-4 py-3">SLA Health Category</th>
-                              <th className="px-4 py-3">Variance vs Avg ({avgLatency}ms)</th>
+                              <th className="px-4 py-3">
+                                Variance vs Avg{avgLatency === null ? ' (no measurement)' : ` (${avgLatency}ms)`}
+                              </th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {terminalsList.map((term, i) => {
-                              const diff = term.latency - avgLatency;
-                              const diffText = diff > 0 ? `+${diff}ms` : `${diff}ms`;
+                              const diff = avgLatency === null ? null : term.latency - avgLatency;
+                              const diffText =
+                                diff === null ? 'No average' : diff > 0 ? `+${diff}ms` : `${diff}ms`;
                               const category =
                                 term.latency < 50
                                   ? { label: 'Optimal (< 50ms)', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
@@ -1462,7 +1347,7 @@ export function TerminalsDetail({
                             </div>
                             <div>
                               <span className="text-slate-400 block">Uptime Today:</span>
-                              <span className="font-semibold text-emerald-700">{term.uptime}%</span>
+                              <span className="font-semibold text-slate-500">Not measured</span>
                             </div>
                             <div>
                               <span className="text-slate-400 block">Punches Logged:</span>

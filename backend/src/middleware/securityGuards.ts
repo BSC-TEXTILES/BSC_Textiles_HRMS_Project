@@ -206,6 +206,14 @@ export const sensitiveRateLimit = limiter({
   sensitive: true,
 });
 
+/** Hardware ADMS: tailored for eSSL/ZKTeco real-time pushes and heartbeats. */
+export const admsRateLimit = limiter({
+  name: 'adms',
+  limit: 240, // 240 requests/min per device IP (allows rapid real-time bursts)
+  windowMs: 60 * 1000,
+  sensitive: false,
+});
+
 /** Drops every stored window, used by the Admin "clear limiter state" action. */
 export async function resetRateLimitState(): Promise<number> {
   return storeDeleteByPrefix(KEY_PREFIX.rateLimit);

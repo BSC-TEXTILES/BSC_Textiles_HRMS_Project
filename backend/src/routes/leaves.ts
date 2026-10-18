@@ -25,11 +25,7 @@ router.get('/types', authorize('VIEW'), async (req: AuthRequest, res) => {
  */
 router.get('/balances', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
-    let targetEmpId = (req.query.employeeId as string) || req.user?.employeeId;
-    if (!targetEmpId) {
-      const emps = await container.employeeRepo.listActive();
-      targetEmpId = emps[0]?.id;
-    }
+    const targetEmpId = (req.query.employeeId as string) || req.user?.employeeId;
     if (!targetEmpId) {
       return res.status(400).json({ error: 'Employee ID is required' });
     }

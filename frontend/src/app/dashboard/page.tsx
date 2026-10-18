@@ -67,16 +67,20 @@ interface DashboardStats {
 
 interface PunchRecord {
   id: string;
-  employeeCode: string;
-  employeeName: string;
+  employeeCode: string | null;
+  employeeName: string | null;
+  /** Device-side user id, shown when no employee row could be matched. */
+  deviceUserId: string | null;
   locationName: string;
   terminal: string;
-  scheduledTime: string;
-  actualTime: string;
+  serialNumber: string | null;
+  direction: string;
+  punchTime: string;
+  /** Verify-code label resolved at ingest; 'Unknown' when the device sent no code. */
   method: string;
-  score?: number;
-  status: 'ON_TIME' | 'EARLY' | 'LATE' | 'OVERTIME' | 'PRESENT';
-  incentive?: string;
+  /** Only ever the score the terminal itself reported — null when it reported none. */
+  matchValue: number | null;
+  status: 'MATCHED' | 'MISMATCH' | 'UNKNOWN_USER' | 'ID_MISMATCH' | 'NOT_SYNCED';
 }
 
 // Detail-view titles for each drill-down KPI card.
@@ -99,6 +103,47 @@ const HUB_LABELS: Record<string, string> = {
   SHI: 'Shivamogga Hub (SHI-03)',
 };
 
+
+const NOT_REPORTED_METHOD = 'Not reported by device';
+
+/** True only when the terminal itself named the method; 'Unknown (7)' is not confirmation. */
+function isDeviceConfirmedMethod(method: string): boolean {
+  return Boolean(method) && method !== NOT_REPORTED_METHOD && !method.startsWith('Unknown');
+}
+
+function ledgerStatusClass(status: PunchRecord['status']): string {
+  switch (status) {
+    case 'MATCHED':
+      return 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800';
+    case 'MISMATCH':
+      return 'bg-red-50 dark:bg-red-950/80 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800';
+    case 'UNKNOWN_USER':
+    case 'ID_MISMATCH':
+      return 'bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800';
+    default:
+      return 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700';
+  }
+}
+
+function toTerminalPunch(row: any): PunchRecord {
+  const rawMatch = row.matchValue;
+  const matchValue =
+    rawMatch === null || rawMatch === undefined || rawMatch === '' ? null : Number(rawMatch);
+  return {
+    id: row.id,
+    employeeCode: row.employeeCode ?? null,
+    employeeName: row.employeeName ?? null,
+    deviceUserId: row.enrollmentNumber ?? row.normalizedId ?? null,
+    locationName: HUB_LABELS[row.locationCode] || row.locationCode || 'Unregistered terminal',
+    terminal: row.deviceName || 'Unregistered terminal',
+    serialNumber: row.serialNumber ?? null,
+    direction: row.direction || '—',
+    punchTime: row.punchTimeLocal || '—',
+    method: row.verifyModeLabel || 'Unknown',
+    matchValue: matchValue !== null && Number.isFinite(matchValue) ? matchValue : null,
+    status: row.status,
+  };
+}
 const DEFAULT_HUBS = [
   { id: 'all', code: 'ALL', name: 'All Hubs (Karnataka Combined)' },
   { id: 'BEL', code: 'BEL', name: 'Belagavi Flagship (BEL-01)' },
@@ -348,169 +393,49 @@ export default function DashboardPage() {
     try {
       setLoading(true);
 
+      // The executive hub filter lists the company's standard departments; those
+      // option ids are slugs, not department row ids, so the request carries the
+      // department *name* and the API resolves it against the employee master.
+      const deptFilterValue =
+        selectedDept === 'all' ? null : (deptOptions.find((d) => d.id === selectedDept)?.name ?? selectedDept);
+
       // Build comprehensive filter query parameters for backend
       const qp = new URLSearchParams();
       if (selectedHub !== 'all') qp.set('locationId', selectedHub);
-      if (selectedDept !== 'all') qp.set('departmentId', selectedDept);
+      if (selectedDept !== 'all' && deptFilterValue) qp.set('departmentId', deptFilterValue);
       if (selectedShift !== 'all') qp.set('shiftId', selectedShift);
       if (selectedDate) qp.set('date', selectedDate);
       const qs = qp.toString() ? `?${qp.toString()}` : '';
 
-      const [summaryRes, attendanceRes, fvRes] = await Promise.all([
+      const ledgerQp = new URLSearchParams();
+      if (selectedHub !== 'all') ledgerQp.set('locationCode', selectedHub);
+      if (deptFilterValue) ledgerQp.set('departmentId', deptFilterValue);
+      if (selectedDate) {
+        ledgerQp.set('from', selectedDate);
+        ledgerQp.set('to', selectedDate);
+      }
+      ledgerQp.set('limit', '10');
+
+      const [summaryRes, ledgerRes] = await Promise.all([
         api.get(`/reports/dashboard-summary${qs}`).catch(() => ({ data: null })),
-        api.get(`/attendance${qs ? `${qs}&limit=16` : '?limit=16'}`).catch(() => ({ data: { attendances: [] } })),
-        api.get(`/face-verification${qs ? `${qs}&limit=16` : '?limit=16'}`).catch(() => ({ data: { verifications: [] } })),
+        api.get(`/devices/attendance-log?${ledgerQp.toString()}`).catch(() => ({ data: { rows: [] } })),
       ]);
 
       if (summaryRes.data) {
         setStats(summaryRes.data);
       }
 
-      // Format punch records for display
-      const attList = attendanceRes.data?.attendances || attendanceRes.data?.attendance || [];
-      if (attList.length > 0) {
-        const mapped: PunchRecord[] = attList.slice(0, 8).map((a: any, idx: number) => {
-          const emp = a.employee || {};
-          const isEarly = Number(a.earlyLoginIncentive) > 0;
-          const isLate = a.status === 'LATE';
-          return {
-            id: a.id || `punch-${idx}`,
-            employeeCode: emp.employeeCode || `TEST-EMP-00${idx + 1}`,
-            employeeName: emp.fullName || 'Rajesh Kumar',
-            locationName: a.location?.name || 'Belagavi Flagship (BEL-01)',
-            terminal: idx % 2 === 0 ? 'Entrance Biometric Tablet A' : 'Floor 1 Gate Scanner B',
-            scheduledTime: a.shift?.startTime ? `${a.shift.startTime.slice(0, 5)} AM` : '09:30 AM',
-            actualTime: a.actualLogin ? new Date(a.actualLogin).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:24 AM',
-            method: a.faceVerified ? 'Biometric Face (96.4%)' : 'Encrypted QR Scan',
-            score: a.faceMatchPercentage ? Number(a.faceMatchPercentage) : 96.4,
-            status: isEarly ? 'EARLY' : isLate ? 'LATE' : 'ON_TIME',
-            incentive: isEarly ? `+₹${Number(a.earlyLoginIncentive)}` : undefined,
-          };
-        });
-        setRecentPunches(mapped);
-      } else {
-        // Fallback realistic seeded records filtered by selected criteria
-        const allFallbacks: PunchRecord[] = [
-          {
-            id: 'p-1',
-            employeeCode: 'TEST-EMP-001',
-            employeeName: 'Rajesh Kumar',
-            locationName: 'Belagavi Flagship (BEL-01)',
-            terminal: 'Entrance Biometric Tablet A',
-            scheduledTime: '09:30 AM',
-            actualTime: '09:20 AM',
-            method: 'Biometric Face (96.4%)',
-            score: 96.4,
-            status: 'EARLY',
-            incentive: '+₹600',
-          },
-          {
-            id: 'p-2',
-            employeeCode: 'TEST-EMP-002',
-            employeeName: 'Priya Sharma',
-            locationName: 'Belagavi Flagship (BEL-01)',
-            terminal: 'Floor 1 Gate Scanner B',
-            scheduledTime: '09:30 AM',
-            actualTime: '09:28 AM',
-            method: 'Encrypted QR Scan',
-            score: 98.2,
-            status: 'ON_TIME',
-          },
-          {
-            id: 'p-3',
-            employeeCode: 'TEST-EMP-003',
-            employeeName: 'Amit Patel',
-            locationName: 'Davanagere Showroom (DAV-02)',
-            terminal: 'Central Biometric Terminal 1',
-            scheduledTime: '10:30 AM',
-            actualTime: '10:24 AM',
-            method: 'Biometric Face (95.1%)',
-            score: 95.1,
-            status: 'EARLY',
-            incentive: '+₹360',
-          },
-          {
-            id: 'p-4',
-            employeeCode: 'TEST-EMP-007',
-            employeeName: 'Suresh Reddy',
-            locationName: 'Shivamogga Megastore (SHI-03)',
-            terminal: 'Staff Entry Scanner S-1',
-            scheduledTime: '10:30 AM',
-            actualTime: '10:30 AM',
-            method: 'Biometric Face (94.0%)',
-            score: 94.0,
-            status: 'ON_TIME',
-          },
-          {
-            id: 'p-5',
-            employeeCode: 'TEST-EMP-012',
-            employeeName: 'Meenakshi Sundaram',
-            locationName: 'Belagavi Flagship (BEL-01)',
-            terminal: 'Atelier Staff Biometric Gate',
-            scheduledTime: '09:00 AM',
-            actualTime: '08:55 AM',
-            method: 'Biometric Face (97.8%)',
-            score: 97.8,
-            status: 'EARLY',
-            incentive: '+₹300',
-          },
-          {
-            id: 'p-6',
-            employeeCode: 'TEST-EMP-018',
-            employeeName: 'Deepak Vernekar',
-            locationName: 'Shivamogga Megastore (SHI-03)',
-            terminal: 'Cash Desk Biometric Terminal C',
-            scheduledTime: '12:00 PM',
-            actualTime: '11:58 AM',
-            method: 'Encrypted QR Scan',
-            score: 99.1,
-            status: 'ON_TIME',
-          },
-          {
-            id: 'p-7',
-            employeeCode: 'TEST-EMP-025',
-            employeeName: 'Kavitha Patil',
-            locationName: 'Bellary Silk Emporium (BLY-04)',
-            terminal: 'Main Concourse Biometric Terminal B',
-            scheduledTime: '09:30 AM',
-            actualTime: '09:25 AM',
-            method: 'Biometric Face (95.8%)',
-            score: 95.8,
-            status: 'EARLY',
-            incentive: '+₹300',
-          },
-        ];
-
-        const filtered = allFallbacks.filter((item) => {
-          if (selectedHub !== 'all') {
-            const h = selectedHub.toLowerCase();
-            const loc = item.locationName.toLowerCase();
-            if (h.includes('bel') && !loc.includes('belagavi')) return false;
-            if (h.includes('dav') && !loc.includes('davanagere')) return false;
-            if (h.includes('shi') && !loc.includes('shivamogga')) return false;
-            if (h.includes('bly') && !loc.includes('bellary')) return false;
-          }
-          if (selectedShift !== 'all') {
-            const activeOpt = shiftOptions.find((o) => o.id === selectedShift);
-            const s = (activeOpt?.name || selectedShift).toLowerCase();
-            if (s.includes('shift i') || s.includes('shift 1')) {
-              if (!item.scheduledTime.includes('10:00') && !item.scheduledTime.includes('09:30')) return false;
-            } else if (s.includes('shift 2')) {
-              if (!item.scheduledTime.includes('11:00') && !item.scheduledTime.includes('10:30')) return false;
-            }
-          }
-          return true;
-        });
-
-        setRecentPunches(filtered);
-      }
+      // The ledger lists raw terminal events, not calculated attendance: a row
+      // appears here only because a device actually sent it.
+      const ledgerRows: any[] = ledgerRes.data?.rows || [];
+      setRecentPunches(ledgerRows.map(toTerminalPunch));
     } catch (err) {
       console.error('Failed to load dashboard data:', err);
     } finally {
       setLoading(false);
       setFilterAnimationKey((prev) => prev + 1);
     }
-  }, [selectedHub, selectedDept, selectedDate, selectedShift, shiftOptions]);
+  }, [selectedHub, selectedDept, selectedDate, selectedShift, deptOptions]);
 
   // Execute reactive refresh whenever any filter changes
   useEffect(() => {
@@ -1012,16 +937,16 @@ export default function DashboardPage() {
               <LiveActivitiesSection selectedDate={selectedDate} />
             </WidgetGate>
 
-            {/* SECTION 3: RECENT BIOMETRIC TERMINAL PUNCHES LEDGER */}
+            {/* SECTION 3: TERMINAL PUNCH LEDGER — raw device-reported events. */}
             <WidgetGate widgetKey="PUNCH_LEDGER" access={access}>
             <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
               <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-[#0058be] dark:text-blue-400 text-[20px]">fingerprint</span>
                   <div>
-                    <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Live Biometric & IoT Terminal Punch Ledger</h3>
+                    <h3 className="text-sm font-bold text-[#0b1c30] dark:text-slate-100">Terminal Punch Ledger</h3>
                     <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                      {recentPunches.length} punch records • {selectedHub !== 'all' ? (HUB_LABELS[selectedHub] || selectedHub) : 'Karnataka Hubs'} • {selectedDate}
+                      {recentPunches.length} events reported by the terminals • {selectedHub !== 'all' ? (HUB_LABELS[selectedHub] || selectedHub) : 'Karnataka Hubs'} • {selectedDate}
                     </p>
                   </div>
                 </div>
@@ -1042,9 +967,10 @@ export default function DashboardPage() {
                     <div className="w-12 h-12 rounded-full bg-[#eff4ff] dark:bg-slate-800 flex items-center justify-center text-[#0058be] dark:text-blue-400">
                       <span className="material-symbols-outlined text-[24px]">search_off</span>
                     </div>
-                    <h4 className="text-sm font-bold text-[#0b1c30] dark:text-slate-200">No punches found for the selected filter combination</h4>
+                    <h4 className="text-sm font-bold text-[#0b1c30] dark:text-slate-200">No terminal reported a punch for this filter</h4>
                     <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
-                      There are no attendance records matching this specific Hub, Department, Date, or Shift criteria.
+                      This ledger only lists events the biometric terminals actually sent. Nothing is generated here when a
+                      device is offline, unsynced or filtered out — check terminal status under Attendance → Devices.
                     </p>
                     <button
                       type="button"
@@ -1059,60 +985,77 @@ export default function DashboardPage() {
                     <thead className="bg-[#eff4ff]/60 dark:bg-[#111c33] text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 border-b border-slate-100 dark:border-slate-800 tracking-wider">
                       <tr>
                         <th className="py-3 px-4">Employee</th>
-                        <th className="py-3 px-4">Store Hub & Terminal</th>
-                        <th className="py-3 px-4">Scheduled</th>
-                        <th className="py-3 px-4">Actual Punch</th>
-                        <th className="py-3 px-4">Biometric Verification</th>
-                        <th className="py-3 px-4">Status & Incentive</th>
+                        <th className="py-3 px-4">Store Hub &amp; Terminal</th>
+                        <th className="py-3 px-4">Direction</th>
+                        <th className="py-3 px-4">Device Punch Time</th>
+                        <th className="py-3 px-4">Verification Method</th>
+                        <th className="py-3 px-4">Record Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                      {recentPunches.map((punch, idx) => (
-                        <tr key={`${punch.id || idx}-${idx}`} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-7 h-7 rounded-full bg-[#131b2e] dark:bg-blue-600 text-white flex items-center justify-center font-bold text-[10px]">
-                                {punch.employeeName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                      {recentPunches.map((punch, idx) => {
+                        const methodKnown = isDeviceConfirmedMethod(punch.method);
+                        const initials = (punch.employeeName || punch.deviceUserId || '?')
+                          .split(' ')
+                          .map((n) => n[0])
+                          .join('')
+                          .slice(0, 2)
+                          .toUpperCase();
+                        return (
+                          <tr key={`${punch.id}-${idx}`} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-7 h-7 rounded-full bg-[#131b2e] dark:bg-blue-600 text-white flex items-center justify-center font-bold text-[10px]">
+                                  {initials}
+                                </div>
+                                <div>
+                                  {punch.employeeName ? (
+                                    <>
+                                      <div className="font-bold text-[#0b1c30] dark:text-slate-100">{punch.employeeName}</div>
+                                      <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{punch.employeeCode}</div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <div className="font-bold text-amber-700 dark:text-amber-300">Unmatched device ID</div>
+                                      <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{punch.deviceUserId}</div>
+                                    </>
+                                  )}
+                                </div>
                               </div>
-                              <div>
-                                <div className="font-bold text-[#0b1c30] dark:text-slate-100">{punch.employeeName}</div>
-                                <div className="text-[10px] font-mono text-slate-400 dark:text-slate-500">{punch.employeeCode}</div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="font-medium text-[#0b1c30] dark:text-slate-200">{punch.locationName}</div>
+                              <div className="text-[10px] text-slate-400 dark:text-slate-500">
+                                {punch.terminal}{punch.serialNumber ? ` • ${punch.serialNumber}` : ''}
                               </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="font-medium text-[#0b1c30] dark:text-slate-200">{punch.locationName}</div>
-                            <div className="text-[10px] text-slate-400 dark:text-slate-500">{punch.terminal}</div>
-                          </td>
-                          <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400">
-                            {punch.scheduledTime}
-                          </td>
-                          <td className="py-3 px-4 font-mono font-bold text-[#0b1c30] dark:text-slate-100">
-                            {punch.actualTime}
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="inline-flex items-center gap-1 text-[11px] text-[#0058be] dark:text-blue-400 font-medium bg-[#eff4ff] dark:bg-blue-950/60 px-2 py-0.5 rounded border border-[#dce9ff] dark:border-blue-900/50">
-                              <span className="material-symbols-outlined text-[13px]">verified</span>
-                              {punch.method}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${punch.status === 'EARLY' ? 'bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' :
-                                  punch.status === 'LATE' ? 'bg-red-50 dark:bg-red-950/80 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800' :
-                                    'bg-blue-50 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
-                                }`}>
-                                {punch.status}
+                            </td>
+                            <td className="py-3 px-4 font-mono text-slate-500 dark:text-slate-400">
+                              {punch.direction}
+                            </td>
+                            <td className="py-3 px-4 font-mono font-bold text-[#0b1c30] dark:text-slate-100">
+                              {punch.punchTime}
+                            </td>
+                            <td className="py-3 px-4">
+                              <span
+                                className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded border ${
+                                  methodKnown
+                                    ? 'text-[#0058be] dark:text-blue-400 bg-[#eff4ff] dark:bg-blue-950/60 border-[#dce9ff] dark:border-blue-900/50'
+                                    : 'text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800'
+                                }`}
+                                title={methodKnown ? 'Method reported by the terminal' : 'The terminal did not report a verifiable method for this event'}
+                              >
+                                <span className="material-symbols-outlined text-[13px]">{methodKnown ? 'verified' : 'help'}</span>
+                                {punch.method}{punch.matchValue !== null ? ` · ${punch.matchValue}` : ''}
                               </span>
-                              {punch.incentive && (
-                                <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                                  {punch.incentive}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${ledgerStatusClass(punch.status)}`}>
+                                {punch.status.replace('_', ' ')}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 )}

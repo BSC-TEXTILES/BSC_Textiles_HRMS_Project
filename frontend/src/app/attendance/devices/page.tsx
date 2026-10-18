@@ -71,6 +71,9 @@ interface DeviceStatus {
   photoPushEnabled: boolean;
   userCount: number;
   attLogCount: number;
+  environment?: string;
+  environmentLabel?: string | null;
+  usableAsProductionEvidence?: boolean;
 }
 
 interface DeviceRow extends DeviceStatus {
@@ -301,6 +304,9 @@ export default function BiometricDeviceConsole() {
   const [heartbeatTimeout, setHeartbeatTimeout] = useState(15);
   const [infoById, setInfoById] = useState<Record<string, any>>({});
   const [busyInfo, setBusyInfo] = useState<string | null>(null);
+  // Which terminal's clock is being set right now, so the button shows a pending
+  // state and a second click cannot start a second attempt.
+  const [clockBusy, setClockBusy] = useState<string | null>(null);
   const [reportFilters, setReportFilters] = useState({
     from: new Date(Date.now() - 86_400_000).toISOString().slice(0, 10),
     to: new Date().toISOString().slice(0, 10),
@@ -744,14 +750,72 @@ export default function BiometricDeviceConsole() {
     }
   };
 
+  /**
+   * The reason a clock sync failed, in the operator's terms. The API answers a
+   * failure with a class (timeout / refused / protocol-auth / disabled /
+   * unreachable) instead of a green tick, so the message says which one happened
+   * and that the terminal's clock was NOT changed.
+   */
+  const clockSyncFailureReason = (payload: any, status: number | undefined, deviceName: string): string => {
+    const code = String(payload?.failureCode || payload?.code || '');
+    const target = payload?.ipAddress ? `${payload.ipAddress}${payload.port ? `:${payload.port}` : ''}` : 'the configured address';
+    const waited = typeof payload?.durationMs === 'number' ? `${Math.round(payload.durationMs / 100) / 10}s` : null;
+
+    switch (code) {
+      case 'CONNECT_TIMEOUT':
+        return `${deviceName} never answered on ${target}${waited ? ` (gave up after ${waited})` : ''}. Its clock was NOT changed — check the terminal is powered and reachable from this server.`;
+      case 'CONNECT_REFUSED':
+        return `${deviceName} refused the connection on ${target}: nothing is listening there. Its clock was NOT changed — confirm the IP and port are really this terminal's.`;
+      case 'AUTH_ERROR':
+        return `${deviceName} answered but rejected our credentials (comm key). Its clock was NOT changed — set the same Comm Key on the device and here.`;
+      case 'PROTOCOL_ERROR':
+        return `${deviceName} answered on ${target} but did not complete the ZK exchange, so the new clock was never acknowledged. Its clock was NOT changed.`;
+      case 'DEVICE_DISABLED':
+        return `${deviceName} is deactivated in the registry, so no connection was attempted and its clock was NOT changed. Re-activate it to sync.`;
+      case 'NETWORK_UNREACHABLE':
+        return `This server has no route to ${deviceName} at ${target}. Its clock was NOT changed — the terminal sits on an isolated showroom LAN.`;
+      case 'UNREACHABLE':
+        return `${deviceName} could not be reached at ${target}${status ? ` (HTTP ${status})` : ''}. Its clock was NOT changed${payload?.message ? `: ${payload.message}` : '.'}`;
+      default:
+        return `${deviceName}: clock sync failed${status ? ` (HTTP ${status})` : ''} — ${payload?.error || payload?.message || 'the terminal never confirmed the new clock, so nothing was changed.'}`;
+    }
+  };
+
   const syncClock = async (deviceId: string) => {
+    // One attempt at a time; the server also joins a duplicate request to the
+    // attempt already in flight, so a double click cannot count twice.
+    if (clockBusy) return;
+    const device = devices.find((d) => d.deviceId === deviceId) || statuses.find((s) => s.deviceId === deviceId);
+    const deviceName = device?.name || deviceId;
+
+    setClockBusy(deviceId);
+    const toastId = toast.loading(`Setting ${deviceName}'s clock from the server…`);
     try {
       const { data } = await api.post(`/devices/${deviceId}/sync-clock`);
-      if (data.ok) toast.success(data.message);
-      else toast.error(data.message);
+      const after = data?.driftSecondsAfter;
+      // 200 from this endpoint means the terminal acknowledged SET_TIME and the
+      // clock was read back. Anything else is not a success, whatever it returns.
+      if (data?.ok && typeof after === 'number') {
+        const before = data?.driftSecondsBefore;
+        const measured = before === null || before === undefined ? 'not measured' : `${before}s`;
+        const fixture = data?.usableAsProductionEvidence === false
+          ? ' (development fixture on this machine — not shop-floor evidence)'
+          : '';
+        toast.success(`${deviceName}: clock set, drift ${measured} → ${after}s${fixture}`, { id: toastId });
+      } else {
+        toast.error(`${deviceName}: the terminal did not confirm the new clock, so nothing was changed.`, { id: toastId });
+      }
       void fetchStatuses();
+      void fetchDevices();
     } catch (err: any) {
-      toast.error(err?.response?.data?.error || 'Clock sync failed');
+      const payload = err?.response?.data;
+      toast.error(clockSyncFailureReason(payload, err?.response?.status, deviceName), { id: toastId });
+      // The failure moved lastError / consecutiveFailures on the server, so the
+      // card must re-read them instead of showing the stale state.
+      void fetchStatuses();
+      void fetchDevices();
+    } finally {
+      setClockBusy(null);
     }
   };
 
@@ -1081,6 +1145,13 @@ export default function BiometricDeviceConsole() {
                     </Badge>
                   </div>
 
+                  {status && status.usableAsProductionEvidence === false && (
+                    <p className="rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                      Not a shop-floor terminal — {status.environmentLabel || 'development fixture'}. Its punches
+                      are excluded from production evidence.
+                    </p>
+                  )}
+
                   <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
                     <p>Last seen: {formatAge(status?.secondsSinceLastSeen ?? null)}{connected ? ` (within ${device.heartbeatTimeoutSeconds || heartbeatTimeout}s)` : ''}</p>
                     <p>Device time: {status?.deviceTimeLocal || 'not read yet'}</p>
@@ -1102,7 +1173,13 @@ export default function BiometricDeviceConsole() {
                     <Button size="sm" variant="outline" onClick={() => void readInfo(device.deviceId)} loading={busyInfo === device.deviceId}>
                       <Server className="w-4 h-4 mr-1" /> Read device info
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => void syncClock(device.deviceId)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => void syncClock(device.deviceId)}
+                      loading={clockBusy === device.deviceId}
+                      disabled={Boolean(clockBusy) && clockBusy !== device.deviceId}
+                    >
                       <TimerReset className="w-4 h-4 mr-1" /> Sync device time
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => void syncNow(device.deviceId)}>

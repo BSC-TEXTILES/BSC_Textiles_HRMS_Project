@@ -31,6 +31,7 @@ import {
   getDeviceStatusSnapshot,
   readLiveDeviceInfo,
   syncDeviceClock,
+  deviceEnvironmentOf,
   recordDeviceHeartbeat,
   decoratePunchRow,
   listDeviceAttendanceLog,
@@ -41,6 +42,7 @@ import {
   getDeviceConfig,
   listDeviceConfigs,
 } from '../services/biometric/settings.js';
+import { deviceIntegrationConfig } from '../config/deviceConfig.js';
 import {
   listUnmappedPunches,
   assignUnmappedPunch,
@@ -62,7 +64,12 @@ import {
   describeFilters,
   ReportFilters,
 } from '../services/biometric/report.js';
-import { deviceLog, classifyDeviceError } from '../services/biometric/logger.js';
+import {
+  deviceLog,
+  classifyDeviceError,
+  failureCodeForDeviceCode,
+  type DeviceFailureCode,
+} from '../services/biometric/logger.js';
 import {
   listMismatchRecords,
   getMismatchRecord,
@@ -147,6 +154,80 @@ function canResolveMismatches(req: AuthRequest): boolean {
 }
 
 /**
+ * The public HTTP contract for a device operation that did not complete
+ * (repair brief §4). A terminal that was never reached can be reported in two
+ * truthful ways only: the right status code, and the class of what went wrong.
+ *
+ * `200` is reserved for an operation the terminal actually confirmed — there is
+ * no code here that returns a success shape for a failure, and nothing in this
+ * map ever returns 200.
+ */
+function deviceHttpFailure(code?: DeviceFailureCode | null): {
+  status: number;
+  code: 'CONNECT_TIMEOUT' | 'CONNECT_REFUSED' | 'DEVICE_DISABLED' | 'PROTOCOL_ERROR' | 'UNREACHABLE';
+} {
+  switch (code) {
+    case 'CONNECT_TIMEOUT':
+      // The server gave up waiting on the terminal: a gateway timeout, exactly as
+      // an operator reading "the device never answered" would expect.
+      return { status: 504, code: 'CONNECT_TIMEOUT' };
+    case 'CONNECT_REFUSED':
+      return { status: 502, code: 'CONNECT_REFUSED' };
+    case 'DEVICE_DISABLED':
+      // Not a network fault at all; the registry says do not talk to it.
+      return { status: 409, code: 'DEVICE_DISABLED' };
+    case 'AUTH_ERROR':
+    case 'PROTOCOL_ERROR':
+      // The brief's contract folds "the terminal answered and refused us" into the
+      // protocol class; the precise class is still returned as `failureCode`.
+      return { status: 502, code: 'PROTOCOL_ERROR' };
+    case 'NETWORK_UNREACHABLE':
+    case 'UNREACHABLE':
+    default:
+      return { status: 502, code: 'UNREACHABLE' };
+  }
+}
+
+/**
+ * The structured error body every device operation returns on failure. `error`
+ * and `message` carry the same operator-facing sentence (`error` because that is
+ * the shape the frontend's axios handler already reads), and `requestId` is the
+ * id `timingMiddleware` put on this request and its `X-Request-Id` header, so one
+ * failed click can be followed through the device log.
+ */
+function sendDeviceFailure(
+  res: any,
+  req: AuthRequest,
+  args: {
+    failureCode?: DeviceFailureCode | null;
+    deviceId: string;
+    serialNumber: string | null;
+    message: string;
+    durationMs: number;
+    extra?: Record<string, unknown>;
+    explicitCode?: 'CONNECT_TIMEOUT' | 'CONNECT_REFUSED' | 'DEVICE_DISABLED' | 'PROTOCOL_ERROR' | 'UNREACHABLE' | 'DEVICE_NOT_FOUND';
+    explicitStatus?: number;
+  }
+): void {
+  const mapped = deviceHttpFailure(args.failureCode);
+  const status = args.explicitStatus ?? mapped.status;
+  const code = args.explicitCode ?? mapped.code;
+  const requestId = req.metrics?.requestId ?? (req.headers['x-request-id'] as string) ?? null;
+
+  res.status(status).json({
+    error: args.message,
+    code,
+    failureCode: args.failureCode ?? null,
+    deviceId: args.deviceId,
+    serialNumber: args.serialNumber,
+    message: args.message,
+    durationMs: args.durationMs,
+    requestId,
+    ...(args.extra || {}),
+  });
+}
+
+/**
  * Registry writes (add / edit / deactivate / re-map) reuse the same role set as
  * mismatch resolution on purpose: both rewrite the data that decides *whose*
  * punch a record is. `authorize('EDIT')` alone let any floor manager with EDIT
@@ -181,6 +262,7 @@ router.get('/status', authorize('VIEW'), async (req: AuthRequest, res) => {
     const workerHeartbeat = await readWorkerHeartbeat();
     res.json({
       success: true,
+      syncMode: deviceIntegrationConfig.syncMode,
       devices: allowed,
       connected: allowed.filter((d) => d.connected).length,
       disconnected: allowed.filter((d) => !d.connected).length,
@@ -209,6 +291,8 @@ router.get('/sdk-status', authorize('VIEW'), async (req: AuthRequest, res) => {
     const locationCode = scopedLocation(req, req.query.locationCode as string);
     if (!locationCode) return res.status(403).json({ error: 'Forbidden: devices in another showroom' });
     const devices = await listBiometricDevices(locationCode);
+    const statuses = await getDeviceStatusSnapshot();
+    const statusById = new Map(statuses.map((s) => [s.deviceId, s]));
     const protocols = Array.from(new Set(devices.map((d: any) => d.protocol).filter(Boolean))) as string[];
     const subnets = Array.from(
       new Set(
@@ -222,18 +306,65 @@ router.get('/sdk-status', authorize('VIEW'), async (req: AuthRequest, res) => {
       )
     ) as string[];
 
+    // Which failure class each registered terminal is currently in, and how many
+    // of them are real shop-floor hardware rather than this machine's simulator.
+    const byFailureClass: Record<string, number> = {};
+    for (const device of devices) {
+      const code = (device as any).failureCode ?? (statusById.get((device as any).id)?.failureCode ?? null);
+      const key = code ?? ((device as any).connected ? 'HEALTHY' : 'UNREACHABLE');
+      byFailureClass[key] = (byFailureClass[key] || 0) + 1;
+    }
+    const production = devices.filter((d: any) => d.usableAsProductionEvidence !== false);
+    const fixtures = devices.filter((d: any) => d.usableAsProductionEvidence === false);
+    const productionSynced = production.filter((d: any) => Boolean(d.lastSyncAt) && d.connected);
+    const productionReachable = production.filter((d: any) => d.connected);
+
     res.json({
       success: true,
       sdkCompatibility: devices.length > 0 ? 'SUPPORTED' : 'NO_DEVICES',
       protocol: protocols.length === 0 ? 'ZK-TCP (eSSL/ZKTeco push SDK)' : protocols.join(', '),
       supportedProtocols: protocols,
       deviceCount: devices.length,
-      devices: devices.map((d: any) => ({
-        id: d.id,
-        serialNumber: d.serialNumber,
-        protocol: d.protocol,
-        locationCode: d.locationCode,
-      })),
+      devices: devices.map((d: any) => {
+        const snapshot = statusById.get(d.id);
+        return {
+          id: d.id,
+          serialNumber: d.serialNumber,
+          name: d.name,
+          protocol: d.protocol,
+          locationCode: d.locationCode,
+          ipAddress: d.ipAddress,
+          port: d.port,
+          connected: d.connected ?? snapshot?.connected ?? false,
+          status: d.status ?? snapshot?.status ?? 'DISCONNECTED',
+          lastSyncAt: d.lastSyncAt ?? snapshot?.lastSyncAt ?? null,
+          /** Log code as stored, e.g. CONNECT_TIMEOUT. */
+          lastErrorCode: d.lastErrorCode ?? snapshot?.lastErrorCode ?? null,
+          /** Public class (brief §2), or null while the link is healthy. */
+          failureCode: d.failureCode ?? snapshot?.failureCode ?? null,
+          lastError: d.lastError ?? snapshot?.lastError ?? null,
+          consecutiveFailures: d.consecutiveFailures ?? snapshot?.consecutiveFailures ?? 0,
+          nextRetryAt: d.nextRetryAt ?? snapshot?.nextRetryAt ?? null,
+          environment: d.environment ?? snapshot?.environment ?? 'PRODUCTION',
+          environmentLabel: d.environmentLabel ?? snapshot?.environmentLabel ?? 'Registered terminal address',
+          usableAsProductionEvidence: d.usableAsProductionEvidence ?? snapshot?.usableAsProductionEvidence ?? true,
+        };
+      }),
+      diagnostics: {
+        /** Counts by failure class so "all offline" and "all refused" are not the same message. */
+        byFailureClass,
+        productionTerminals: production.length,
+        developmentFixtures: fixtures.length,
+        /**
+         * Reachable here means a terminal answered, and synchronised means records
+         * were actually stored — never a claim inferred from a config row.
+         */
+        productionTerminalsReachable: productionReachable.length,
+        productionTerminalsSynchronised: productionSynced.length,
+        note: production.length > 0 && productionReachable.length === 0
+          ? 'No registered shop-floor terminal answered the configured SDK from this machine; anything reported as synchronised here came from stored history, not from a live device.'
+          : 'Reachability is measured against the terminal; development fixtures are counted separately and are never shop-floor evidence.',
+      },
       networkEnvironment: {
         isolatedShowroomSubnets: true,
         subnets: subnets.length > 0 ? subnets : ['192.168.100.0/24'],
@@ -548,9 +679,10 @@ router.post('/:id/test-connection', authorize('VIEW'), async (req: AuthRequest, 
     });
 
     if (!tcp.online) {
+      const failureCode = tcp.errorCode ?? 'UNREACHABLE';
       await pool.query(
         `UPDATE biometric_devices SET status = 'DISCONNECTED', lastError = ? WHERE id = ?`,
-        [tcp.error || 'unreachable', device.id]
+        [`${failureCode}: ${tcp.error || 'unreachable'}`.slice(0, 1000), device.id]
       ).catch(() => undefined);
       return res.json({
         success: false,
@@ -558,9 +690,21 @@ router.post('/:id/test-connection', authorize('VIEW'), async (req: AuthRequest, 
         failedStep: 'tcp-port',
         steps,
         deviceId: device.id,
+        serialNumber: device.serialNumber,
+        deviceName: device.name,
         ipAddress: device.ipAddress,
         port: device.port,
-        hint: 'Check the terminal is powered and on this network, or point it at this server with ADMS push instead.',
+        errorCode: tcp.transportCode || null,
+        failureCode,
+        environment: deviceEnvironmentOf(device).environment,
+        environmentLabel: deviceEnvironmentOf(device).environmentLabel,
+        usableAsProductionEvidence: deviceEnvironmentOf(device).usableAsProductionEvidence,
+        requestId: req.metrics?.requestId ?? null,
+        hint: failureCode === 'CONNECT_REFUSED'
+          ? `Nothing is listening on ${device.ipAddress}:${device.port}. Check the terminal is powered and that this address is really its own.`
+          : failureCode === 'NETWORK_UNREACHABLE'
+            ? `This server has no route to ${device.ipAddress}. Run the edge connector on that showroom LAN, or point the terminal at this server with ADMS push instead.`
+            : 'Check the terminal is powered and on this network, or point it at this server with ADMS push instead.',
       });
     }
 
@@ -579,7 +723,16 @@ router.post('/:id/test-connection', authorize('VIEW'), async (req: AuthRequest, 
         connected: false,
         failedStep: 'zk-handshake',
         steps,
+        deviceId: device.id,
+        serialNumber: device.serialNumber,
+        deviceName: device.name,
+        error: live.error,
         errorCode: live.errorCode,
+        failureCode: live.failureCode,
+        environment: live.environment,
+        environmentLabel: live.environmentLabel,
+        usableAsProductionEvidence: live.usableAsProductionEvidence,
+        requestId: req.metrics?.requestId ?? null,
         hint: live.errorCode === 'COMM_KEY_REJECTED'
           ? 'Set the same Comm Key on the terminal (Menu → Comm → Communication Key) as here.'
           : 'Port is open but the ZK protocol did not respond — confirm the address belongs to the terminal.',
@@ -805,6 +958,7 @@ router.get('/:id/info', authorize('VIEW'), async (req: AuthRequest, res) => {
     res.json({
       success: live.reachable,
       ...live,
+      requestId: req.metrics?.requestId ?? null,
       transport: {
         ip: device.ipAddress,
         port: device.port,
@@ -821,35 +975,189 @@ router.get('/:id/info', authorize('VIEW'), async (req: AuthRequest, res) => {
       reachable: false,
       error: classified.message,
       errorCode: classified.code,
+      failureCode: failureCodeForDeviceCode(classified.code) ?? 'UNREACHABLE',
       deviceId: req.params.id,
+      requestId: req.metrics?.requestId ?? null,
     });
   }
 });
 
+/**
+ * POST /api/devices/:id/sync-clock
+ *
+ * `200` is returned only when the terminal was contacted, its clock read back, and
+ * the write acknowledged by the ZK protocol — the service itself refuses to claim
+ * anything weaker. Any other outcome is an error status with the class that
+ * happened, and the service writes no success-implying column on the way out
+ * (no `timeSyncedAt`, no status change, no `lastSyncAt`, and `consecutiveFailures`
+ * is raised rather than cleared).
+ */
 router.post('/:id/sync-clock', authorize('EDIT'), async (req: AuthRequest, res) => {
+  const started = Date.now();
+  const requestId = req.metrics?.requestId ?? (req.headers['x-request-id'] as string) ?? null;
   try {
     const device = await getDeviceConfig(req.params.id);
-    if (!device) return res.status(404).json({ error: 'Device not found' });
+    if (!device) {
+      deviceLog.warn('Clock sync target is not in the registry', { deviceId: req.params.id, requestId });
+      return sendDeviceFailure(res, req, {
+        deviceId: req.params.id,
+        serialNumber: null,
+        message: `No biometric terminal is registered as "${req.params.id}" — nothing was synchronised.`,
+        durationMs: Date.now() - started,
+        explicitStatus: 404,
+        explicitCode: 'DEVICE_NOT_FOUND',
+      });
+    }
     if (!checkDeviceLocationAccess(req.user, device.locationId, device.locationCode)) {
       return res.status(403).json({ error: 'Forbidden: device belongs to another showroom' });
     }
-    const result = await syncDeviceClock(device.id);
-    res.json({ success: result.ok, ...result });
+
+    const result = await syncDeviceClock(device.id, { requestId: requestId ?? undefined });
+    const durationMs = Date.now() - started;
+
+    if (result.ok) {
+      deviceLog.info('Clock sync answered HTTP 200', {
+        deviceId: result.deviceId,
+        serialNumber: result.serialNumber,
+        requestId,
+        latencyMs: durationMs,
+        detail: `drift ${result.driftSecondsBefore ?? 'unknown'}s -> ${result.driftSecondsAfter}s; ${result.confirmedBy}`,
+      });
+      return res.status(200).json({
+        success: true,
+        ok: true,
+        code: null,
+        failureCode: null,
+        message: result.message,
+        deviceId: result.deviceId,
+        serialNumber: result.serialNumber,
+        deviceName: result.deviceName,
+        ipAddress: result.ipAddress,
+        port: result.port,
+        driftSecondsBefore: result.driftSecondsBefore,
+        driftSecondsAfter: result.driftSecondsAfter,
+        confirmedBy: result.confirmedBy,
+        durationMs,
+        requestId,
+        environment: result.environment,
+        environmentLabel: result.environmentLabel,
+        usableAsProductionEvidence: result.usableAsProductionEvidence,
+      });
+    }
+
+    const mapped = deviceHttpFailure(result.failureCode);
+    deviceLog.warn('Clock sync answered a failure', {
+      deviceId: result.deviceId,
+      serialNumber: result.serialNumber,
+      code: result.errorCode ?? undefined,
+      requestId,
+      latencyMs: durationMs,
+      detail: `HTTP ${mapped.status} [${mapped.code}] — ${result.message}`,
+    });
+
+    return sendDeviceFailure(res, req, {
+      failureCode: result.failureCode,
+      deviceId: result.deviceId,
+      serialNumber: result.serialNumber,
+      message: result.message,
+      durationMs,
+      extra: {
+        deviceName: result.deviceName,
+        ipAddress: result.ipAddress,
+        port: result.port,
+        errorCode: result.errorCode,
+        driftSecondsBefore: result.driftSecondsBefore,
+        driftSecondsAfter: result.driftSecondsAfter,
+        environment: result.environment,
+        environmentLabel: result.environmentLabel,
+        usableAsProductionEvidence: result.usableAsProductionEvidence,
+        // Stated explicitly so no reader has to infer it: the failed attempt left
+        // the registry's sync evidence exactly where it was.
+        timeSyncedAtUpdated: false,
+        clockSynchronised: false,
+      },
+    });
   } catch (error: any) {
-    res.status(500).json({ error: 'Clock sync failed: ' + error.message });
+    // Only an unknown device id reaches here (the service throws when the
+    // registry has no such row); everything else returns a classified result.
+    const classified = classifyDeviceError(error);
+    deviceLog.error('Clock sync request threw', {
+      deviceId: req.params.id, code: classified.code, requestId, detail: error?.message,
+    });
+    return sendDeviceFailure(res, req, {
+      deviceId: req.params.id,
+      serialNumber: null,
+      message: `Clock sync failed: ${error?.message || classified.message}`,
+      durationMs: Date.now() - started,
+      explicitStatus: 500,
+      explicitCode: 'UNREACHABLE',
+    });
   }
 });
 
+/**
+ * POST /api/devices/:id/sync
+ *
+ * Pulling logs is a device operation, so it follows the same rule as the clock:
+ * a terminal that was never reached cannot answer with a success shape.
+ */
 router.post('/:id/sync', authorize('EDIT'), async (req: AuthRequest, res) => {
+  const started = Date.now();
+  const requestId = req.metrics?.requestId ?? (req.headers['x-request-id'] as string) ?? null;
   try {
     const device = await getDeviceConfig(req.params.id);
-    if (!device) return res.status(404).json({ error: 'Device not found' });
+    if (!device) {
+      return sendDeviceFailure(res, req, {
+        deviceId: req.params.id,
+        serialNumber: null,
+        message: `No biometric terminal is registered as "${req.params.id}" — nothing was synchronised.`,
+        durationMs: Date.now() - started,
+        explicitStatus: 404,
+        explicitCode: 'DEVICE_NOT_FOUND',
+      });
+    }
     if (!checkDeviceLocationAccess(req.user, device.locationId, device.locationCode)) {
       return res.status(403).json({ error: 'Forbidden: device belongs to another showroom' });
     }
+
     const result = await syncSingleDevice(device.id, 'MANUAL_USER');
-    res.json({ success: result.status !== 'FAILED', message: 'Device sync completed', result });
+
+    // SUCCESS here means the ZK session was established and the log was read;
+    // PARTIAL means it was read but some records were rejected. Neither claims
+    // records were stored unless the counts say so.
+    if (result.status === 'SUCCESS' || result.status === 'PARTIAL') {
+      return res.status(200).json({
+        success: true,
+        status: result.status,
+        message: result.recordsInserted > 0
+          ? `Synchronised ${result.deviceName}: ${result.recordsInserted} record(s) stored, ${result.recordsSkipped} already present, ${result.recordsRejected} rejected.`
+          : `Reached ${result.deviceName}: the terminal reported ${result.recordsPulled} record(s), all already stored — nothing new to import.`,
+        requestId,
+        result,
+      });
+    }
+
+    return sendDeviceFailure(res, req, {
+      failureCode: result.failureCode ?? null,
+      deviceId: result.deviceId,
+      serialNumber: result.serialNumber,
+      message: result.errorMessage || 'The terminal did not answer, so no attendance was pulled.',
+      durationMs: Date.now() - started,
+      extra: {
+        status: result.status,
+        deviceName: result.deviceName,
+        recordsPulled: result.recordsPulled,
+        recordsInserted: result.recordsInserted,
+        environment: result.environment,
+        usableAsProductionEvidence: result.usableAsProductionEvidence,
+        attendanceSynchronised: false,
+      },
+    });
   } catch (error: any) {
+    const classified = classifyDeviceError(error);
+    deviceLog.error('Device sync request threw', {
+      deviceId: req.params.id, code: classified.code, requestId, detail: error?.message,
+    });
     res.status(500).json({ error: 'Sync failed: ' + error.message });
   }
 });

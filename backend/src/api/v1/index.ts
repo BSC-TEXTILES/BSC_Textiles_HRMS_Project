@@ -10,6 +10,7 @@ import sellingPointRoutes from '../../routes/sellingPoints.js';
 import employeeRoutes from '../../routes/employees.js';
 import shiftRoutes from '../../routes/shifts.js';
 import attendanceRoutes from '../../routes/attendance.js';
+import attendanceExportRoutes from '../../routes/attendanceExports.js';
 import breakRoutes from '../../routes/breaks.js';
 import faceVerificationRoutes from '../../routes/faceVerification.js';
 import qrCodeRoutes from '../../routes/qrCodes.js';
@@ -77,6 +78,9 @@ apiV1Router.use('/employees/import', employeeImportRoutes);
 apiV1Router.use('/employees/export', employeeExportRouter);
 apiV1Router.use('/employees', employeeRoutes);
 apiV1Router.use('/shifts', shiftRoutes);
+// Mounted before /attendance so /attendance/exports/* can never fall through to
+// that router's own GET /:id handler.
+apiV1Router.use('/attendance/exports', attendanceExportRoutes);
 apiV1Router.use('/attendance', attendanceRoutes);
 apiV1Router.use('/late-fines', lateFineRoutes);
 apiV1Router.use('/staff-ops', staffOpsRouter);

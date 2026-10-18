@@ -63,11 +63,16 @@ async function syncDeviceRegistry() {
     const locationId = locRows[0]?.id || null;
     const locationName = locRows[0]?.name || dev.locationCode;
 
+    const communicationMode = (process.env.DEVICE_SYNC_MODE || 'CLOUD_PUSH').toUpperCase().includes('LAN')
+      ? 'LOCAL_LAN'
+      : 'CLOUD_PUSH';
+    const protocol = communicationMode === 'CLOUD_PUSH' ? 'ADMS_PUSH' : 'TCP_SDK';
+
     await pool.query(
       `INSERT INTO biometric_devices (
         id, serialNumber, name, model, firmwareVersion, ipAddress, port,
-        locationId, locationCode, status, protocol, isActive
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'DISCONNECTED', 'TCP_SDK', 1)
+        locationId, locationCode, status, protocol, communicationMode, isActive
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'DISCONNECTED', ?, ?, 1)
       ON DUPLICATE KEY UPDATE
         name = VALUES(name),
         model = VALUES(model),
@@ -76,6 +81,8 @@ async function syncDeviceRegistry() {
         port = VALUES(port),
         locationId = VALUES(locationId),
         locationCode = VALUES(locationCode),
+        protocol = VALUES(protocol),
+        communicationMode = VALUES(communicationMode),
         isActive = 1,
         updatedAt = NOW()`,
       [
@@ -88,11 +95,13 @@ async function syncDeviceRegistry() {
         dev.port,
         locationId,
         dev.locationCode,
+        protocol,
+        communicationMode,
       ]
     );
 
     console.log(
-      `✔ Registered ${dev.name} [SN: ${dev.serialNumber}] -> ${dev.ipAddress}:${dev.port} (${locationName})`
+      `✔ Registered ${dev.name} [SN: ${dev.serialNumber}] -> ${dev.ipAddress}:${dev.port} (${locationName}) [${communicationMode}]`
     );
   }
 

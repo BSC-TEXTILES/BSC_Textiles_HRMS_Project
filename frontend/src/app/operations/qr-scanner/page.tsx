@@ -51,18 +51,10 @@ const PURPOSES = [
   { value: 'SELLING_POINT_CHECK_IN', label: 'Selling Point Check-in', icon: Store },
 ];
 
-const LOCATIONS = [
+// Store hubs come from GET /locations/all — the scanner sends the real location
+// id to POST /qr-codes/scan instead of a made-up showroom code.
+const LOCATION_FALLBACK: Array<{ value: string; label: string }> = [
   { value: 'all', label: 'Auto-detect' },
-  { value: 'bel', label: 'Belagavi Flagship (BEL-01)' },
-  { value: 'dav', label: 'Davanagere City Hub (DAV-01)' },
-  { value: 'shi', label: 'Shivamogga Central (SHI-01)' },
-];
-
-const SAMPLE_EMPLOYEES = [
-  { code: 'BSC-001', name: 'Priya Sharma', dept: 'Retail Sales', hub: 'Belagavi' },
-  { code: 'BSC-002', name: 'Rahul Patil', dept: 'Operations & Billing', hub: 'Belagavi' },
-  { code: 'BSC-003', name: 'Ananya Rao', dept: 'Customer Support', hub: 'Davanagere' },
-  { code: 'BSC-004', name: 'Kiran Kumar', dept: 'Showroom Floor', hub: 'Shivamogga' },
 ];
 
 // Web Audio API confirmation tone
@@ -95,6 +87,7 @@ export default function QRScannerPage() {
   const [scanning, setScanning] = useState(false);
   const [purpose, setPurpose] = useState('ATTENDANCE_CHECK_IN');
   const [locationId, setLocationId] = useState('all');
+  const [locationOptions, setLocationOptions] = useState<Array<{ value: string; label: string }>>(LOCATION_FALLBACK);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [hasTorch, setHasTorch] = useState(false);
   const [isTorchOn, setIsTorchOn] = useState(false);
@@ -114,6 +107,9 @@ export default function QRScannerPage() {
     reason?: string;
   }>>([]);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  // Quick-pick staff are real rows from GET /employees/lookup — this scanner has
+  // no demonstration roster.
+  const [quickStaff, setQuickStaff] = useState<Array<{ code: string; name: string }>>([]);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -182,8 +178,8 @@ export default function QRScannerPage() {
         navigator.vibrate([120, 60, 120]);
       }
 
-      const empCode = data.employee?.employeeCode || 'EMP-PASS';
-      const empName = data.employee?.fullName || 'Verified Employee';
+      const empCode = data.employee?.employeeCode || '—';
+      const empName = data.employee?.fullName || 'Unknown employee';
       toast.success(`Scanned: ${empName} (${empCode})`);
 
       setRecentScans((prev) => [
@@ -359,6 +355,53 @@ export default function QRScannerPage() {
     setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
   };
 
+  // Load the real store hubs for the location selector.
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get('/locations/all')
+      .then((res) => {
+        if (cancelled) return;
+        const list: any[] = Array.isArray(res.data) ? res.data : [];
+        setLocationOptions([
+          { value: 'all', label: 'Auto-detect' },
+          ...list.map((l) => ({
+            value: String(l.id),
+            label: `${l.name || l.code || 'Store'}${l.code ? ` (${l.code})` : ''}`,
+          })),
+        ]);
+      })
+      .catch(() => {
+        if (!cancelled) setLocationOptions(LOCATION_FALLBACK);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Load the real employee roster behind the quick-pick buttons.
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get('/employees/lookup')
+      .then((res) => {
+        if (cancelled) return;
+        const list: any[] = Array.isArray(res.data) ? res.data : res.data?.employees || [];
+        setQuickStaff(
+          list
+            .filter((e) => e && e.employeeCode)
+            .slice(0, 8)
+            .map((e) => ({ code: String(e.employeeCode), name: String(e.fullName || '—') }))
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setQuickStaff([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Start on mount / restart when facingMode changes
   useEffect(() => {
     startCamera();
@@ -432,7 +475,7 @@ export default function QRScannerPage() {
                   onChange={(e) => setLocationId(e.target.value)}
                   className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-200 rounded-lg px-3 py-2 outline-none cursor-pointer focus:ring-2 focus:ring-[#0058be]"
                 >
-                  {LOCATIONS.map((loc) => (
+                  {locationOptions.map((loc) => (
                     <option key={loc.value} value={loc.value}>
                       {loc.label}
                     </option>
@@ -599,29 +642,35 @@ export default function QRScannerPage() {
               </div>
             </div>
 
-            {/* QUICK SAMPLE PERSONAS BAR */}
+            {/* QUICK STAFF SCAN BAR (real employee codes from /employees/lookup) */}
             <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-xl p-3">
               <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-2 flex items-center justify-between">
-                <span>Quick Test Persona (1-Click Test Token):</span>
-                <span className="text-[10px] text-slate-400">Click to test instant scan</span>
+                <span>Quick Staff Scan (1-Click Employee Code):</span>
+                <span className="text-[10px] text-slate-400">Real roster via /employees/lookup</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {SAMPLE_EMPLOYEES.map((emp) => (
-                  <button
-                    key={emp.code}
-                    type="button"
-                    onClick={() => handleScanToken(emp.code)}
-                    disabled={loading}
-                    className="p-2 text-left rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-[#0058be] hover:bg-[#eff4ff]/50 dark:hover:bg-blue-950/40 transition-all text-xs"
-                  >
-                    <div className="font-bold text-slate-800 dark:text-slate-200 font-mono text-[11px]">
-                      {emp.code}
-                    </div>
-                    <div className="text-slate-600 dark:text-slate-400 text-[11px] truncate">
-                      {emp.name}
-                    </div>
-                  </button>
-                ))}
+                {quickStaff.length === 0 ? (
+                  <div className="col-span-full text-[11px] text-slate-400">
+                    No employees loaded for your scope — scan a QR pass or use Manual Entry.
+                  </div>
+                ) : (
+                  quickStaff.map((emp) => (
+                    <button
+                      key={emp.code}
+                      type="button"
+                      onClick={() => handleScanToken(emp.code)}
+                      disabled={loading}
+                      className="p-2 text-left rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-[#0058be] hover:bg-[#eff4ff]/50 dark:hover:bg-blue-950/40 transition-all text-xs"
+                    >
+                      <div className="font-bold text-slate-800 dark:text-slate-200 font-mono text-[11px]">
+                        {emp.code}
+                      </div>
+                      <div className="text-slate-600 dark:text-slate-400 text-[11px] truncate">
+                        {emp.name}
+                      </div>
+                    </button>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -850,22 +899,28 @@ export default function QRScannerPage() {
                   />
                 </div>
 
-                {/* Quick Presets in modal */}
+                {/* Quick staff code presets in modal (real roster) */}
                 <div>
                   <span className="text-[10px] font-bold text-slate-400 block mb-1">
-                    Quick Sample Codes:
+                    Quick Staff Codes:
                   </span>
                   <div className="flex flex-wrap gap-1.5">
-                    {SAMPLE_EMPLOYEES.map((emp) => (
-                      <button
-                        key={emp.code}
-                        type="button"
-                        onClick={() => setManualToken(emp.code)}
-                        className="px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-800 hover:bg-[#eff4ff] hover:text-[#0058be] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
-                      >
-                        {emp.code}
-                      </button>
-                    ))}
+                    {quickStaff.length === 0 ? (
+                      <span className="text-[10px] text-slate-400">
+                        No employees loaded for your scope.
+                      </span>
+                    ) : (
+                      quickStaff.map((emp) => (
+                        <button
+                          key={emp.code}
+                          type="button"
+                          onClick={() => setManualToken(emp.code)}
+                          className="px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-slate-100 dark:bg-slate-800 hover:bg-[#eff4ff] hover:text-[#0058be] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700"
+                        >
+                          {emp.code}
+                        </button>
+                      ))
+                    )}
                   </div>
                 </div>
 

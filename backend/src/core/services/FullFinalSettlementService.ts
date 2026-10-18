@@ -78,6 +78,26 @@ export class FullFinalSettlementService {
     return created;
   }
 
+  /**
+   * Settlement fields HR may edit, with audit reason. Anything else is rejected
+   * so an arbitrary caller-supplied field name cannot reach the UPDATE.
+   */
+  private static readonly EDITABLE_COMPONENT_FIELDS = new Set([
+    'unpaid_salary_days',
+    'unpaid_salary_amount',
+    'gratuity_amount',
+    'leave_encashment_days',
+    'leave_encashment_amount',
+    'bonus_incentive_amount',
+    'other_earnings',
+    'notice_shortfall_days',
+    'notice_recovery_amount',
+    'salary_advance_recovery',
+    'loan_balance_recovery',
+    'asset_damage_recovery',
+    'other_deductions',
+  ]);
+
   public async updateSettlementComponent(
     settlementId: string,
     field: string,
@@ -85,6 +105,14 @@ export class FullFinalSettlementService {
     reason: string,
     changedBy: string
   ): Promise<SettlementEntity> {
+    if (!FullFinalSettlementService.EDITABLE_COMPONENT_FIELDS.has(field)) {
+      throw new Error(`Field "${field}" is not an editable settlement component`);
+    }
+    const numeric = Number(newValue);
+    if (!Number.isFinite(numeric) || numeric < 0) {
+      throw new Error(`Value for ${field} must be a non-negative number`);
+    }
+
     const existing = await this.settlementRepo.findById(settlementId);
     if (!existing) throw new Error(`Settlement ${settlementId} not found`);
     if (existing.status === 'PAID' || existing.status === 'CLOSED') {
@@ -100,13 +128,33 @@ export class FullFinalSettlementService {
       settlement_id: settlementId,
       field_name: field,
       old_value: oldValue,
-      new_value: String(newValue),
+      new_value: String(numeric),
       reason,
       changed_by: changedBy,
     });
 
-    // Update field and recalculate totals
-    const updatedRecord: any = { ...existing, [field]: Number(newValue) };
+    // Update field. Day-based edits also refresh the dependent rupee amounts
+    // (daily rate = monthly salary / 30, same convention as the original
+    // calculation) so totals reflect the change instead of drifting.
+    const dailyWageRate = await this.getDailyWageRate(existing);
+    const updatedRecord: any = { ...existing, [field]: numeric };
+    if (field === 'unpaid_salary_days') {
+      updatedRecord.unpaid_salary_amount = Math.round(dailyWageRate * numeric * 100) / 100;
+    } else if (field === 'leave_encashment_days') {
+      updatedRecord.leave_encashment_amount = Math.round(dailyWageRate * numeric * 100) / 100;
+    } else if (field === 'notice_shortfall_days') {
+      updatedRecord.notice_recovery_amount = Math.round(dailyWageRate * numeric * 100) / 100;
+    }
+
+    // Statutory deductions track the unpaid salary amount (PF 12% capped at
+    // ₹1800, PT ₹200 above ₹15000) — same rules as SettlementCalculationService.
+    if (field === 'unpaid_salary_days' || field === 'unpaid_salary_amount') {
+      const unpaidSalaryAmount = Number(updatedRecord.unpaid_salary_amount || 0);
+      const pfDeduction = Math.round(Math.min(1800, unpaidSalaryAmount * 0.12) * 100) / 100;
+      const professionalTax = unpaidSalaryAmount > 15000 ? 200 : 0;
+      updatedRecord.statutory_deductions = Math.round((pfDeduction + professionalTax) * 100) / 100;
+    }
+
     const totalEarnings =
       Number(updatedRecord.unpaid_salary_amount || 0) +
       Number(updatedRecord.leave_encashment_amount || 0) +
@@ -130,6 +178,68 @@ export class FullFinalSettlementService {
       total_deductions: totalDeductions,
       net_payable: netPayable,
     });
+
+    const refreshed = await this.settlementRepo.findById(settlementId);
+    return refreshed!;
+  }
+
+  /** Daily wage rate for the settlement's employee (monthly salary / 30). */
+  private async getDailyWageRate(settlement: SettlementEntity): Promise<number> {
+    const employee = await this.employeeRepo.findById(settlement.employee_id);
+    const monthlySalary = Math.max(0, Number(employee?.base_salary || 0));
+    return Math.round((monthlySalary / 30) * 100) / 100;
+  }
+
+  /**
+   * Move a settlement from HR review into the management sign-off queue.
+   */
+  public async submitForApproval(settlementId: string, submittedBy: string): Promise<SettlementEntity> {
+    const existing = await this.settlementRepo.findById(settlementId);
+    if (!existing) throw new Error('Settlement not found');
+    if (existing.status !== 'HR_REVIEW' && existing.status !== 'DRAFT') {
+      throw new Error(`Only a settlement in HR review can be submitted for approval (current: ${existing.status})`);
+    }
+
+    await this.settlementRepo.recordAdjustment({
+      id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      settlement_id: settlementId,
+      field_name: 'status',
+      old_value: existing.status,
+      new_value: 'PENDING_APPROVAL',
+      reason: 'Submitted for management sign-off',
+      changed_by: submittedBy,
+    });
+    await this.settlementRepo.updateStatus(settlementId, 'PENDING_APPROVAL');
+    await this.exitRepo.updateExitStatus(existing.exit_id, 'PAYMENT_PENDING');
+
+    const refreshed = await this.settlementRepo.findById(settlementId);
+    return refreshed!;
+  }
+
+  /**
+   * Send a management rejection back to HR review with the stated reason.
+   */
+  public async rejectSettlement(settlementId: string, rejectedBy: string, reason: string): Promise<SettlementEntity> {
+    const existing = await this.settlementRepo.findById(settlementId);
+    if (!existing) throw new Error('Settlement not found');
+    if (existing.status !== 'PENDING_APPROVAL' && existing.status !== 'APPROVED') {
+      throw new Error(`Only a settlement awaiting/holding approval can be rejected (current: ${existing.status})`);
+    }
+    if (!reason || !reason.trim()) {
+      throw new Error('A rejection reason is required');
+    }
+
+    await this.settlementRepo.recordAdjustment({
+      id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      settlement_id: settlementId,
+      field_name: 'status',
+      old_value: existing.status,
+      new_value: 'HR_REVIEW',
+      reason: reason.trim(),
+      changed_by: rejectedBy,
+    });
+    await this.settlementRepo.updateStatus(settlementId, 'HR_REVIEW');
+    await this.exitRepo.updateExitStatus(existing.exit_id, 'HR_REVIEW');
 
     const refreshed = await this.settlementRepo.findById(settlementId);
     return refreshed!;

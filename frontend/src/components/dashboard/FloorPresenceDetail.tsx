@@ -33,41 +33,28 @@ import {
 
 interface StaffItem {
   id: string;
-  code: string;
-  name: string;
-  dept: string;
-  zone: string;
-  role: string;
-  punchIn?: string;
-  status?: string;
-  terminal?: string;
-  reason?: string;
-  detail?: string;
-  expectedShift?: string;
-}
-
-interface CapacitySlot {
-  slotNumber: number;
-  slotName: string;
-  isOccupied: boolean;
-  occupant?: {
-    name: string;
-    code: string;
-    role: string;
-    punchIn: string;
-  };
-  unoccupiedReason?: string;
+  code: string | null;
+  name: string | null;
+  dept: string | null;
+  zone: string | null;
+  role: string | null;
+  punchIn?: string | null;
+  status?: string | null;
+  terminal?: string | null;
+  reason?: string | null;
+  detail?: string | null;
+  expectedShift?: string | null;
 }
 
 interface SensorFeedItem {
-  terminalId: string;
-  terminalName: string;
-  timestamp: string;
-  employeeCode: string;
-  employeeName: string;
-  authMethod: string;
-  signalHealth: string;
-  status: string;
+  terminalId: string | null;
+  terminalName: string | null;
+  timestamp: string | null;
+  employeeCode: string | null;
+  employeeName: string | null;
+  authMethod: string | null;
+  signalHealth: string | null;
+  status: string | null;
 }
 
 interface HourlyTrendItem {
@@ -75,26 +62,44 @@ interface HourlyTrendItem {
   occupancy: number;
 }
 
+interface CapacitySlot {
+  slotNumber: number;
+  slotName?: string | null;
+  isOccupied?: boolean;
+  unoccupiedReason?: string | null;
+  occupant?: {
+    name?: string | null;
+    code?: string | null;
+    punchIn?: string | null;
+  } | null;
+}
+
+interface CapacityUtilization {
+  occupied: number;
+  capacity: number;
+  pct: number | null;
+  unoccupiedSlot?: { slotNumber: number; slotName: string; reason: string } | null;
+  slots: Array<{
+    slotNumber: number;
+    slotName: string;
+    isOccupied: boolean;
+    occupant?: { name: string; code: string; role?: string; punchIn: string | null } | null;
+    unoccupiedReason?: string | null;
+  }>;
+}
+
 interface FloorZone {
   id: string;
   name: string;
-  badge?: string;
+  badge?: string | null;
   count: number;
-  capacity: number;
-  occupancyPct: number;
+  /** Seating capacity is not modelled in the database; null means unreported. */
+  capacity: number | null;
+  occupancyPct: number | null;
   status: string;
   staff: StaffItem[];
-  capacityUtilization?: {
-    occupied: number;
-    capacity: number;
-    pct: number;
-    unoccupiedSlot?: {
-      slotNumber: number;
-      slotName: string;
-      reason: string;
-    };
-    slots: CapacitySlot[];
-  };
+  /** Only present where HRMS models slot capacity; null means unreported. */
+  capacityUtilization?: CapacityUtilization | null;
   sensorFeed?: SensorFeedItem[];
   hourlyTrend?: HourlyTrendItem[];
 }
@@ -102,18 +107,14 @@ interface FloorZone {
 interface PresenceData {
   summary: {
     presentCount: number;
-    expectedTotal: number;
+    expectedTotal: number | null;
     missingCount: number;
-    floorOccupancyRate: number;
-    occupancyDelta: string;
-    lastWeekAverage: number;
+    floorOccupancyRate: number | null;
+    occupancyDelta: string | null;
+    lastWeekAverage: number | null;
+    recordsToday?: number;
   };
-  missingReasonsSummary: {
-    onApprovedLeave: number;
-    remoteOrFieldDuty: number;
-    shiftPendingOrLater: number;
-    unauthorizedLate: number;
-  };
+  missingReasonsSummary?: unknown;
   presentStaff: StaffItem[];
   missingStaff: StaffItem[];
   departmentSplit: Array<{
@@ -127,135 +128,40 @@ interface PresenceData {
   floorZones: FloorZone[];
   historicalTrend: Array<{
     day: string;
-    today: number;
-    lastWeek: number;
+    today: number | null;
+    lastWeek: number | null;
   }>;
 }
-
-const ZONE_FALLBACKS: Record<string, {
-  capacityUtilization: {
-    occupied: number;
-    capacity: number;
-    pct: number;
-    unoccupiedSlot: { slotNumber: number; slotName: string; reason: string };
-    slots: CapacitySlot[];
-  };
-  sensorFeed: SensorFeedItem[];
-  hourlyTrend: HourlyTrendItem[];
-}> = {
-  'zone-a': {
-    capacityUtilization: {
-      occupied: 5,
-      capacity: 6,
-      pct: 94.2,
-      unoccupiedSlot: {
-        slotNumber: 6,
-        slotName: 'Visual Merchandiser / Shift B Lead',
-        reason: 'Scheduled Shift B check-in pending at 14:00',
-      },
-      slots: [
-        { slotNumber: 1, slotName: 'Showroom Lead', isOccupied: true, occupant: { name: 'Pooja Deshmukh', code: 'EMP-004', role: 'Showroom Lead', punchIn: '09:05 AM' } },
-        { slotNumber: 2, slotName: 'Senior Sales Exec', isOccupied: true, occupant: { name: 'Rajesh Kumar', code: 'EMP-009', role: 'Senior Sales Exec', punchIn: '09:15 AM' } },
-        { slotNumber: 3, slotName: 'HR Executive', isOccupied: true, occupant: { name: 'Kavita Bhat', code: 'EMP-003', role: 'HR Executive', punchIn: '08:52 AM' } },
-        { slotNumber: 4, slotName: 'Accounts Officer', isOccupied: true, occupant: { name: 'Vijay Kamath', code: 'EMP-018', role: 'Accounts Officer', punchIn: '09:10 AM' } },
-        { slotNumber: 5, slotName: 'Executive Maintenance', isOccupied: true, occupant: { name: 'Harish Rao', code: 'EMP-025', role: 'Facilities Tech', punchIn: '08:40 AM' } },
-        { slotNumber: 6, slotName: 'Visual Merchandiser / Shift B Lead', isOccupied: false, unoccupiedReason: 'Shift B Lead - Scheduled check-in at 14:00' },
-      ],
-    },
-    sensorFeed: [
-      { terminalId: 'BEL-01', terminalName: 'Entrance Tablet A', timestamp: '09:15:22 AM', employeeCode: 'EMP-009', employeeName: 'Rajesh Kumar', authMethod: 'AI Face Verification (99.6%)', signalHealth: '14ms • Optical Optimal', status: 'VERIFIED' },
-      { terminalId: 'BEL-01', terminalName: 'Executive Turnstile', timestamp: '09:10:04 AM', employeeCode: 'EMP-018', employeeName: 'Vijay Kamath', authMethod: 'Encrypted RFID Badge', signalHealth: '18ms • Optical Strong', status: 'VERIFIED' },
-      { terminalId: 'BEL-01', terminalName: 'Entrance Tablet A', timestamp: '09:05:41 AM', employeeCode: 'EMP-004', employeeName: 'Pooja Deshmukh', authMethod: 'AI Face Verification (99.8%)', signalHealth: '16ms • Optical Optimal', status: 'VERIFIED' },
-      { terminalId: 'BEL-01', terminalName: 'Executive Turnstile', timestamp: '08:52:19 AM', employeeCode: 'EMP-003', employeeName: 'Kavita Bhat', authMethod: 'AI Face Verification (99.4%)', signalHealth: '15ms • Optical Strong', status: 'VERIFIED' },
-      { terminalId: 'BEL-01', terminalName: 'Executive Turnstile', timestamp: '08:40:02 AM', employeeCode: 'EMP-025', employeeName: 'Harish Rao', authMethod: 'Dynamic QR Pass', signalHealth: '19ms • Optical Normal', status: 'VERIFIED' },
-    ],
-    hourlyTrend: [
-      { hour: '06:00', occupancy: 40.0 },
-      { hour: '07:00', occupancy: 60.5 },
-      { hour: '08:00', occupancy: 83.3 },
-      { hour: '09:00', occupancy: 94.2 },
-      { hour: '10:00', occupancy: 94.2 },
-      { hour: '11:00', occupancy: 94.2 },
-      { hour: '12:00', occupancy: 94.2 },
-    ],
-  },
-  'zone-b': {
-    capacityUtilization: {
-      occupied: 4,
-      capacity: 5,
-      pct: 91.0,
-      unoccupiedSlot: {
-        slotNumber: 5,
-        slotName: 'Junior Weaver / Apprentice Line 3',
-        reason: 'On Approved Casual Leave (Anand Nayak - EMP-005)',
-      },
-      slots: [
-        { slotNumber: 1, slotName: 'Master Weaver', isOccupied: true, occupant: { name: 'Ramesh Kulkarni', code: 'EMP-001', role: 'Master Weaver', punchIn: '08:45 AM' } },
-        { slotNumber: 2, slotName: 'QC Floor Manager', isOccupied: true, occupant: { name: 'Amit Patel', code: 'EMP-011', role: 'QC Floor Manager', punchIn: '08:30 AM' } },
-        { slotNumber: 3, slotName: 'Spinning Operator', isOccupied: true, occupant: { name: 'Mohammed Irfan', code: 'EMP-007', role: 'Spinning Operator', punchIn: '09:12 AM' } },
-        { slotNumber: 4, slotName: 'Finishing Tech', isOccupied: true, occupant: { name: 'Lakshmi Hegde', code: 'EMP-016', role: 'Finishing Tech', punchIn: '09:00 AM' } },
-        { slotNumber: 5, slotName: 'Junior Weaver / Apprentice Line 3', isOccupied: false, unoccupiedReason: 'On Approved Leave (Anand Nayak - EMP-005)' },
-      ],
-    },
-    sensorFeed: [
-      { terminalId: 'BEL-02', terminalName: 'Floor 1 Gate Scanner B', timestamp: '09:12:11 AM', employeeCode: 'EMP-007', employeeName: 'Mohammed Irfan', authMethod: 'AI Face Verification (99.7%)', signalHealth: '18ms • Looms Optimal', status: 'VERIFIED' },
-      { terminalId: 'BEL-02', terminalName: 'Floor 1 Gate Scanner B', timestamp: '09:00:30 AM', employeeCode: 'EMP-016', employeeName: 'Lakshmi Hegde', authMethod: 'Encrypted RFID Badge', signalHealth: '19ms • Looms Optimal', status: 'VERIFIED' },
-      { terminalId: 'BEL-02', terminalName: 'Weaving Hall Sensor B', timestamp: '08:45:12 AM', employeeCode: 'EMP-001', employeeName: 'Ramesh Kulkarni', authMethod: 'AI Face Verification (99.9%)', signalHealth: '17ms • Looms Optimal', status: 'VERIFIED' },
-      { terminalId: 'BEL-02', terminalName: 'Weaving Hall Sensor B', timestamp: '08:30:55 AM', employeeCode: 'EMP-011', employeeName: 'Amit Patel', authMethod: 'Dynamic QR Pass', signalHealth: '21ms • Looms Optimal', status: 'VERIFIED' },
-    ],
-    hourlyTrend: [
-      { hour: '06:00', occupancy: 35.0 },
-      { hour: '07:00', occupancy: 60.0 },
-      { hour: '08:00', occupancy: 80.0 },
-      { hour: '09:00', occupancy: 91.0 },
-      { hour: '10:00', occupancy: 91.0 },
-      { hour: '11:00', occupancy: 91.0 },
-      { hour: '12:00', occupancy: 91.0 },
-    ],
-  },
-  'zone-c': {
-    capacityUtilization: {
-      occupied: 3,
-      capacity: 4,
-      pct: 92.5,
-      unoccupiedSlot: {
-        slotNumber: 4,
-        slotName: 'Dispatch Handler / Loading Lead',
-        reason: 'Field Transit / Scheduled Shift B at 13:30',
-      },
-      slots: [
-        { slotNumber: 1, slotName: 'Security Supervisor', isOccupied: true, occupant: { name: 'Divya Reddy', code: 'EMP-020', role: 'Security Supervisor', punchIn: '07:55 AM' } },
-        { slotNumber: 2, slotName: 'CCTV Operator', isOccupied: true, occupant: { name: 'Chetan Joshi', code: 'EMP-023', role: 'CCTV Operator', punchIn: '08:00 AM' } },
-        { slotNumber: 3, slotName: 'Cashier / POS Lead', isOccupied: true, occupant: { name: 'Sunita Rao', code: 'EMP-014', role: 'Cashier / POS', punchIn: '09:33 AM' } },
-        { slotNumber: 4, slotName: 'Dispatch Handler / Loading Lead', isOccupied: false, unoccupiedReason: 'Field Transit / Shift B (13:30)' },
-      ],
-    },
-    sensorFeed: [
-      { terminalId: 'BEL-03', terminalName: 'Canteen & Dispatch Scanner C', timestamp: '09:33:45 AM', employeeCode: 'EMP-014', employeeName: 'Sunita Rao', authMethod: 'Encrypted RFID Badge', signalHealth: '22ms • Dispatch Normal', status: 'VERIFIED' },
-      { terminalId: 'BEL-03', terminalName: 'Main Gate Scanner C', timestamp: '08:00:15 AM', employeeCode: 'EMP-023', employeeName: 'Chetan Joshi', authMethod: 'AI Face Verification (99.8%)', signalHealth: '16ms • Gate Optimal', status: 'VERIFIED' },
-      { terminalId: 'BEL-03', terminalName: 'Main Gate Scanner C', timestamp: '07:55:09 AM', employeeCode: 'EMP-020', employeeName: 'Divya Reddy', authMethod: 'AI Face Verification (99.5%)', signalHealth: '15ms • Gate Optimal', status: 'VERIFIED' },
-    ],
-    hourlyTrend: [
-      { hour: '06:00', occupancy: 50.0 },
-      { hour: '07:00', occupancy: 75.0 },
-      { hour: '08:00', occupancy: 92.5 },
-      { hour: '09:00', occupancy: 92.5 },
-      { hour: '10:00', occupancy: 92.5 },
-      { hour: '11:00', occupancy: 92.5 },
-      { hour: '12:00', occupancy: 92.5 },
-    ],
-  },
-};
 
 type ActiveViewType = 'roster' | 'zones' | 'missing' | 'weekly';
 
 const CACHE_TTL_MS = 15000;
 let presenceCache: { data: PresenceData; timestamp: number } | null = null;
 
-function getInitials(name?: string): string {
-  if (!name) return 'ST';
+/** Honest placeholder for anything the backend did not report. */
+const NO_DATA = '—';
+
+function formatPercent(value: number | null | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value) ? `${value}%` : NO_DATA;
+}
+
+function formatCount(value: number | null | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value) ? String(value) : NO_DATA;
+}
+
+/** Renders an attendance status code as readable text without inventing a category. */
+function reasonLabel(reason: string | null | undefined): string {
+  if (!reason) return 'Status not reported';
+  return reason
+    .split('_')
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function getInitials(name?: string | null): string {
+  if (!name) return NO_DATA;
   const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return 'ST';
+  if (parts.length === 0) return NO_DATA;
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
@@ -346,17 +252,17 @@ export function FloorPresenceDetail({
   const filteredRoster = useMemo(() => {
     if (!data?.presentStaff) return [];
     return data.presentStaff.filter((staff) => {
-      if (rosterDeptFilter !== 'all' && !staff.dept.toLowerCase().includes(rosterDeptFilter.toLowerCase())) {
+      if (rosterDeptFilter !== 'all' && !(staff.dept || '').toLowerCase().includes(rosterDeptFilter.toLowerCase())) {
         return false;
       }
       if (rosterSearch) {
         const q = rosterSearch.toLowerCase();
         return (
-          staff.name.toLowerCase().includes(q) ||
-          staff.code.toLowerCase().includes(q) ||
-          staff.dept.toLowerCase().includes(q) ||
-          staff.zone.toLowerCase().includes(q) ||
-          (staff.terminal && staff.terminal.toLowerCase().includes(q))
+          (staff.name || '').toLowerCase().includes(q) ||
+          (staff.code || '').toLowerCase().includes(q) ||
+          (staff.dept || '').toLowerCase().includes(q) ||
+          (staff.zone || '').toLowerCase().includes(q) ||
+          (staff.terminal || '').toLowerCase().includes(q)
         );
       }
       return true;
@@ -367,36 +273,56 @@ export function FloorPresenceDetail({
   const filteredMissing = useMemo(() => {
     if (!data?.missingStaff) return [];
     return data.missingStaff.filter((staff) => {
-      if (missingCategoryFilter === 'LEAVE' && staff.reason !== 'APPROVED_LEAVE') return false;
-      if (missingCategoryFilter === 'REMOTE' && staff.reason !== 'REMOTE_FIELD') return false;
-      if (missingCategoryFilter === 'PENDING' && staff.reason !== 'SHIFT_PENDING' && staff.reason !== 'WEEKLY_OFF') return false;
+      const reason = (staff.reason || '').toUpperCase();
+      if (missingCategoryFilter === 'LEAVE' && !reason.includes('LEAVE')) return false;
+      if (missingCategoryFilter === 'REMOTE' && !reason.includes('REMOTE') && !reason.includes('FIELD')) return false;
+      if (
+        missingCategoryFilter === 'PENDING' &&
+        !reason.includes('PENDING') &&
+        !reason.includes('WEEKLY_OFF') &&
+        !reason.includes('OFF')
+      ) {
+        return false;
+      }
 
       if (missingSearch) {
         const q = missingSearch.toLowerCase();
         return (
-          staff.name.toLowerCase().includes(q) ||
-          staff.code.toLowerCase().includes(q) ||
-          staff.dept.toLowerCase().includes(q) ||
-          (staff.detail && staff.detail.toLowerCase().includes(q)) ||
-          (staff.expectedShift && staff.expectedShift.toLowerCase().includes(q))
+          (staff.name || '').toLowerCase().includes(q) ||
+          (staff.code || '').toLowerCase().includes(q) ||
+          (staff.dept || '').toLowerCase().includes(q) ||
+          (staff.detail || '').toLowerCase().includes(q) ||
+          (staff.expectedShift || '').toLowerCase().includes(q)
         );
       }
       return true;
     });
   }, [data?.missingStaff, missingCategoryFilter, missingSearch]);
 
-  // Active selected zone resolved with fallback safety
+  // Absence categories counted from the rows that actually exist.
+  const missingCounts = useMemo(() => {
+    const rows = data?.missingStaff || [];
+    const count = (predicate: (reason: string) => boolean) =>
+      rows.filter((r) => predicate((r.reason || '').toUpperCase())).length;
+    return {
+      total: rows.length,
+      leave: count((reason) => reason.includes('LEAVE')),
+      remote: count((reason) => reason.includes('REMOTE') || reason.includes('FIELD')),
+      pending: count((reason) => reason.includes('PENDING') || reason.includes('OFF')),
+    };
+  }, [data?.missingStaff]);
+
+  // Active selected zone — no invented fallback telemetry.
   const activeZone = useMemo(() => {
     if (!selectedZoneId || !data?.floorZones) return null;
     const rawZone = data.floorZones.find((z) => z.id === selectedZoneId);
     if (!rawZone) return null;
-    const fallback = ZONE_FALLBACKS[rawZone.id];
     return {
       ...rawZone,
       staff: Array.isArray(rawZone.staff) ? rawZone.staff : [],
-      capacityUtilization: rawZone.capacityUtilization || fallback?.capacityUtilization,
-      sensorFeed: (rawZone.sensorFeed && rawZone.sensorFeed.length > 0) ? rawZone.sensorFeed : (fallback?.sensorFeed || []),
-      hourlyTrend: (rawZone.hourlyTrend && rawZone.hourlyTrend.length > 0) ? rawZone.hourlyTrend : (fallback?.hourlyTrend || []),
+      capacityUtilization: rawZone.capacityUtilization ?? null,
+      sensorFeed: Array.isArray(rawZone.sensorFeed) ? rawZone.sensorFeed : [],
+      hourlyTrend: Array.isArray(rawZone.hourlyTrend) ? rawZone.hourlyTrend : [],
     };
   }, [selectedZoneId, data?.floorZones]);
 
@@ -488,12 +414,12 @@ export function FloorPresenceDetail({
                   )}
                 </div>
                 <div className="text-2xl font-bold text-[#0b1c30] mt-1">
-                  {data?.summary?.presentCount ?? 12}{' '}
-                  <span className="text-xs font-normal text-slate-400">/ {data?.summary?.expectedTotal ?? 35}</span>
+                  {formatCount(data?.summary?.presentCount)}{' '}
+                  <span className="text-xs font-normal text-slate-400">/ {formatCount(data?.summary?.expectedTotal)}</span>
                 </div>
                 <div className="text-[11px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                  <span>Physically present on sensors</span>
+                  <span>Checked in and still on shift</span>
                 </div>
               </div>
 
@@ -527,10 +453,10 @@ export function FloorPresenceDetail({
                   )}
                 </div>
                 <div className="text-2xl font-bold text-[#0058be] mt-1">
-                  {data?.summary?.floorOccupancyRate ?? 92.5}%
+                  {formatPercent(data?.summary?.floorOccupancyRate)}
                 </div>
                 <div className="text-[11px] text-emerald-600 font-semibold mt-1">
-                  {data?.summary?.occupancyDelta ?? '+1.8% vs Expected Shift A'}
+                  {data?.summary?.occupancyDelta ?? 'No shift comparison reported'}
                 </div>
               </div>
 
@@ -564,10 +490,10 @@ export function FloorPresenceDetail({
                   )}
                 </div>
                 <div className="text-2xl font-bold text-slate-800 mt-1">
-                  {data?.summary?.missingCount ?? 23} Staff
+                  {formatCount(data?.summary?.missingCount)} Staff
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1 truncate">
-                  14 On Leave • 7 Remote/Field
+                  {missingCounts.leave} On Leave • {missingCounts.remote} Remote/Field
                 </div>
               </div>
 
@@ -601,10 +527,12 @@ export function FloorPresenceDetail({
                   )}
                 </div>
                 <div className="text-2xl font-bold text-emerald-600 mt-1">
-                  {data?.summary?.lastWeekAverage ?? 90.7}%
+                  {formatPercent(data?.summary?.lastWeekAverage)}
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1">
-                  +1.8% efficiency improvement today
+                  {data?.summary?.lastWeekAverage === null || data?.summary?.lastWeekAverage === undefined
+                    ? 'No prior-week occupancy recorded'
+                    : 'Baseline from stored attendance'}
                 </div>
               </div>
             </div>
@@ -627,16 +555,16 @@ export function FloorPresenceDetail({
 
                 <span>
                   {activeView === 'roster' && (
-                    <><strong>Live Staff Roster View:</strong> Showing all {data?.presentStaff.length || 12} employees actively verified on floor terminal sensors.</>
+                    <><strong>Live Staff Roster View:</strong> Showing {data?.presentStaff.length ?? 0} employee{data?.presentStaff.length === 1 ? '' : 's'} with a recorded check-in and no clock-out yet.</>
                   )}
                   {activeView === 'zones' && (
-                    <><strong>Zone Occupancy Breakdown View:</strong> Inspecting 92.5% occupancy distribution across Belagavi factory & showroom zones.</>
+                    <><strong>Zone Occupancy Breakdown View:</strong> Floors reported by the terminals today — {data?.floorZones.length ?? 0} zone{data?.floorZones.length === 1 ? '' : 's'} with check-in telemetry.</>
                   )}
                   {activeView === 'missing' && (
-                    <><strong>Missing Staff Audit View:</strong> Reconciling 23 absent personnel (14 approved leaves, 7 remote/field, 2 scheduled shifts).</>
+                    <><strong>Missing Staff Audit View:</strong> {data?.summary?.missingCount ?? 0} personnel not on the floor, grouped by the attendance status the system holds.</>
                   )}
                   {activeView === 'weekly' && (
-                    <><strong>Weekly Comparison Chart View:</strong> Day-by-day telemetry analyzing where the +1.8% efficiency gain originated.</>
+                    <><strong>Weekly Comparison Chart View:</strong> Occupancy across the last 7 days, only where the database holds those attendance rows.</>
                   )}
                 </span>
               </div>
@@ -712,7 +640,7 @@ export function FloorPresenceDetail({
                     </span>
                     <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1.5">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <span>100% Terminal Sensor Adherence</span>
+                      <span>HRMS Checked-In Records</span>
                     </span>
                   </div>
 
@@ -744,18 +672,18 @@ export function FloorPresenceDetail({
                                     {getInitials(staff.name)}
                                   </div>
                                   <div>
-                                    <div className="font-bold text-[#0b1c30]">{staff.name}</div>
-                                    <div className="text-[10px] text-slate-400 font-mono">{staff.code}</div>
+                                    <div className="font-bold text-[#0b1c30]">{staff.name || 'Unmatched device ID'}</div>
+                                    <div className="text-[10px] text-slate-400 font-mono">{staff.code || NO_DATA}</div>
                                   </div>
                                 </div>
                               </td>
 
                               <td className="py-3 px-4 font-semibold text-slate-700">
-                                {staff.role}
+                                {staff.role || NO_DATA}
                               </td>
 
                               <td className="py-3 px-4 text-slate-600">
-                                {staff.dept}
+                                {staff.dept || NO_DATA}
                               </td>
 
                               <td className="py-3 px-4">
@@ -773,7 +701,7 @@ export function FloorPresenceDetail({
                               </td>
 
                               <td className="py-3 px-4 font-mono font-semibold text-slate-700">
-                                {staff.punchIn}
+                                {staff.punchIn || NO_DATA}
                               </td>
 
                               <td className="py-3 px-4">
@@ -817,7 +745,7 @@ export function FloorPresenceDetail({
                             setSelectedZoneId(isSelected ? null : zone.id);
                           }
                         }}
-                        aria-label={`Interactive Zone Card: ${zone.name}. Status: ${zone.status}. Capacity: ${zone.count} of ${zone.capacity}.`}
+                        aria-label={`Interactive Zone Card: ${zone.name}. Status: ${zone.status}. On floor: ${zone.count}.`}
                         className={`p-4 rounded-xl border bg-white shadow-xs cursor-pointer select-none transition-all duration-200 hover:shadow-md hover:scale-[1.01] text-left ${
                           isSelected
                             ? 'ring-2 ring-[#0058be] border-[#0058be] bg-blue-50/25 shadow-md'
@@ -850,8 +778,10 @@ export function FloorPresenceDetail({
 
                         <div className="flex items-baseline gap-1.5 my-2">
                           <span className="text-2xl font-bold text-[#0058be]">{zone.count}</span>
-                          <span className="text-xs text-slate-400">/ {zone.capacity} Optimal Capacity</span>
-                          <span className="ml-auto text-xs font-mono font-bold text-slate-700">{zone.occupancyPct}%</span>
+                          <span className="text-xs text-slate-400">
+                            {zone.capacity === null || zone.capacity === undefined ? 'Capacity not reported' : `/ ${zone.capacity} Optimal Capacity`}
+                          </span>
+                          <span className="ml-auto text-xs font-mono font-bold text-slate-700">{formatPercent(zone.occupancyPct)}</span>
                         </div>
 
                         {/* Progress / Concentration Bar */}
@@ -864,13 +794,13 @@ export function FloorPresenceDetail({
                                 ? 'bg-gradient-to-r from-emerald-500 to-teal-600'
                                 : 'bg-gradient-to-r from-blue-500 to-emerald-500'
                             }`}
-                            style={{ width: `${zone.occupancyPct}%` }}
+                            style={{ width: `${zone.occupancyPct ?? 0}%` }}
                           />
                         </div>
 
                         <div className="text-[11px] text-slate-500 flex items-center justify-between pt-1 border-t border-slate-100 mt-2">
                           <span>Occupancy Concentration:</span>
-                          <span className="font-bold text-slate-700 font-mono">{zone.occupancyPct}%</span>
+                          <span className="font-bold text-slate-700 font-mono">{formatPercent(zone.occupancyPct)}</span>
                         </div>
 
                         <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
@@ -916,7 +846,11 @@ export function FloorPresenceDetail({
                             </span>
                           </div>
                           <p className="text-[11px] text-slate-500">
-                            {activeZone.count} of {activeZone.capacity} Slots Utilized • {activeZone.occupancyPct}% Concentration Rate • Live Terminal Telemetry
+                            {activeZone.count} on this floor •{' '}
+                            {activeZone.capacity === null || activeZone.capacity === undefined
+                              ? 'Capacity not reported'
+                              : `${activeZone.capacity} slots recorded`} •{' '}
+                            {formatPercent(activeZone.occupancyPct)} concentration • recorded terminal punch events
                           </p>
                         </div>
                       </div>
@@ -969,18 +903,18 @@ export function FloorPresenceDetail({
                                         {getInitials(staff.name)}
                                       </div>
                                       <div>
-                                        <div className="font-bold text-[#0b1c30]">{staff.name}</div>
-                                        <div className="text-[10px] text-slate-400 font-mono">{staff.code}</div>
+                                        <div className="font-bold text-[#0b1c30]">{staff.name || 'Unmatched device ID'}</div>
+                                        <div className="text-[10px] text-slate-400 font-mono">{staff.code || NO_DATA}</div>
                                       </div>
                                     </div>
                                   </td>
 
                                   <td className="py-3 px-4 font-semibold text-slate-700">
-                                    {staff.role}
+                                    {staff.role || NO_DATA}
                                   </td>
 
                                   <td className="py-3 px-4 text-slate-600">
-                                    {staff.dept}
+                                    {staff.dept || NO_DATA}
                                   </td>
 
                                   <td className="py-3 px-4">
@@ -991,7 +925,7 @@ export function FloorPresenceDetail({
                                   </td>
 
                                   <td className="py-3 px-4 font-mono font-semibold text-slate-700">
-                                    {staff.punchIn}
+                                    {staff.punchIn || NO_DATA}
                                   </td>
 
                                   <td className="py-3 px-4">
@@ -1025,7 +959,7 @@ export function FloorPresenceDetail({
                         </div>
                         <span className="text-[11px] font-mono text-slate-500 flex items-center gap-1">
                           <Wifi className="w-3.5 h-3.5 text-blue-500" />
-                          <span>Active Hardware Stream</span>
+                          <span>Recorded punch events</span>
                         </span>
                       </div>
 
@@ -1050,25 +984,25 @@ export function FloorPresenceDetail({
                                     <div className="text-[10px] text-slate-400 font-mono">{feed.terminalId}</div>
                                   </td>
                                   <td className="py-3 px-4 font-mono font-semibold text-slate-700">
-                                    {feed.timestamp}
+                                    {feed.timestamp || NO_DATA}
                                   </td>
                                   <td className="py-3 px-4">
-                                    <div className="font-bold text-[#0b1c30]">{feed.employeeName}</div>
-                                    <div className="text-[10px] text-slate-400 font-mono">{feed.employeeCode}</div>
+                                    <div className="font-bold text-[#0b1c30]">{feed.employeeName || 'Unmatched device ID'}</div>
+                                    <div className="text-[10px] text-slate-400 font-mono">{feed.employeeCode || NO_DATA}</div>
                                   </td>
                                   <td className="py-3 px-4">
                                     <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
                                       <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                                      {feed.authMethod}
+                                      {feed.authMethod || 'Not reported by device'}
                                     </span>
                                   </td>
                                   <td className="py-3 px-4 text-slate-600 text-[11px] font-mono">
-                                    {feed.signalHealth}
+                                    {feed.signalHealth || NO_DATA}
                                   </td>
                                   <td className="py-3 px-4">
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                       <CheckCircle2 className="w-3 h-3" />
-                                      {feed.status}
+                                      {feed.status || NO_DATA}
                                     </span>
                                   </td>
                                 </tr>
@@ -1085,14 +1019,15 @@ export function FloorPresenceDetail({
                       </div>
                     </div>
 
-                    {/* Section 3: Capacity Utilization Breakdown */}
+                    {/* Section 3: Capacity Utilization Breakdown (only when reported) */}
+                    {(activeZone.capacityUtilization?.slots?.length ?? 0) > 0 ? (
                     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
                         <div className="flex items-center gap-2">
                           <Cpu className="w-4 h-4 text-[#0058be]" />
                           <div>
                             <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                              Capacity Utilization Breakdown ({activeZone.capacityUtilization?.occupied} / {activeZone.capacityUtilization?.capacity} Slots Occupied)
+                              Capacity Utilization Breakdown ({activeZone.capacityUtilization?.occupied ?? NO_DATA} / {activeZone.capacityUtilization?.capacity ?? NO_DATA} Slots Occupied)
                             </h4>
                             <p className="text-[11px] text-slate-500">
                               Precise allocation audit identifying current occupants and unoccupied position details
@@ -1103,7 +1038,7 @@ export function FloorPresenceDetail({
                         <div className="flex items-center gap-2 self-start sm:self-auto">
                           <span className="text-xs font-semibold text-slate-600">Capacity Rate:</span>
                           <span className="px-2 py-0.5 rounded text-xs font-bold font-mono bg-blue-50 text-[#0058be] border border-blue-200">
-                            {activeZone.capacityUtilization?.pct || activeZone.occupancyPct}%
+                            {formatPercent(activeZone.capacityUtilization?.pct ?? activeZone.occupancyPct)}
                           </span>
                         </div>
                       </div>
@@ -1128,7 +1063,7 @@ export function FloorPresenceDetail({
 
                       {/* Slot-by-Slot Grid */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-1">
-                        {activeZone.capacityUtilization?.slots?.map((slot) => (
+                        {activeZone.capacityUtilization?.slots?.map((slot: CapacitySlot) => (
                           <div
                             key={slot.slotNumber}
                             className={`p-3.5 rounded-lg border text-left transition-all ${
@@ -1161,8 +1096,8 @@ export function FloorPresenceDetail({
                               <div className="mt-2 pt-2 border-t border-slate-200/60 text-[11px]">
                                 <div className="font-semibold text-slate-800">{slot.occupant.name}</div>
                                 <div className="text-slate-500 text-[10px] font-mono flex items-center justify-between mt-0.5">
-                                  <span>{slot.occupant.code}</span>
-                                  <span className="text-slate-600 font-semibold">{slot.occupant.punchIn}</span>
+                                  <span>{slot.occupant.code || NO_DATA}</span>
+                                  <span className="text-slate-600 font-semibold">{slot.occupant.punchIn || NO_DATA}</span>
                                 </div>
                               </div>
                             ) : (
@@ -1174,6 +1109,14 @@ export function FloorPresenceDetail({
                         ))}
                       </div>
                     </div>
+                    ) : (
+                      <div className="bg-white p-4 rounded-xl border border-dashed border-slate-300 text-xs text-slate-500 flex items-center gap-2">
+                        <Info className="w-4 h-4 text-slate-400 shrink-0" />
+                        <span>
+                          Slot-level capacity is not modelled in HRMS, so this floor has no seat allocation to report.
+                        </span>
+                      </div>
+                    )}
 
                     {/* Section 4: Zone Occupancy Concentration Trend */}
                     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
@@ -1182,10 +1125,10 @@ export function FloorPresenceDetail({
                           <TrendingUp className="w-4 h-4 text-[#0058be]" />
                           <div>
                             <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                              Zone Occupancy Concentration Trend ({activeZone.occupancyPct}%)
+                              Zone Occupancy Concentration Trend ({formatPercent(activeZone.occupancyPct)})
                             </h4>
                             <p className="text-[11px] text-slate-500">
-                              Hourly telemetry concentration curve across operating windows (06:00 - 12:00)
+                              Hourly presence curve, only where punch history exists for this floor
                             </p>
                           </div>
                         </div>
@@ -1193,7 +1136,7 @@ export function FloorPresenceDetail({
                         <div className="flex items-center gap-3">
                           <div className="text-right">
                             <span className="text-[10px] text-slate-400 font-semibold block">CURRENT CONCENTRATION</span>
-                            <span className="text-sm font-bold text-[#0058be] font-mono">{activeZone.occupancyPct}%</span>
+                            <span className="text-sm font-bold text-[#0058be] font-mono">{formatPercent(activeZone.occupancyPct)}</span>
                           </div>
                           <div className="text-right">
                             <span className="text-[10px] text-slate-400 font-semibold block">OPERATIONAL CADENCE</span>
@@ -1202,6 +1145,11 @@ export function FloorPresenceDetail({
                         </div>
                       </div>
 
+                      {(activeZone.hourlyTrend?.length ?? 0) === 0 ? (
+                        <div className="h-48 w-full flex items-center justify-center text-xs text-slate-400">
+                          No hourly occupancy history reported for this floor.
+                        </div>
+                      ) : (
                       <div className="h-48 w-full pt-2">
                         {isMounted && (
                           <ResponsiveContainer width="100%" height="100%">
@@ -1257,6 +1205,7 @@ export function FloorPresenceDetail({
                           </ResponsiveContainer>
                         )}
                       </div>
+                      )}
                     </div>
                   </div>
                 ) : (
@@ -1269,7 +1218,7 @@ export function FloorPresenceDetail({
                       <div className="flex items-center gap-2">
                         <Info className="w-4 h-4 text-[#0058be] shrink-0" />
                         <span>
-                          <strong>Interactive Zone Telemetry:</strong> Click any of the 3 white zone cards above (<strong>Zone A</strong>, <strong>Zone B</strong>, or <strong>Zone C</strong>) to reveal its live personnel roster, real-time sensor feed, capacity slot breakdown, and concentration curve.
+                          <strong>Interactive Zone Telemetry:</strong> Click any zone card above to reveal the staff checked in on that floor, the punch events the terminals reported for it, and any capacity breakdown HRMS holds.
                         </span>
                       </div>
                     </div>
@@ -1279,9 +1228,11 @@ export function FloorPresenceDetail({
                       <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
                           <Building2 className="w-4 h-4 text-[#0058be]" />
-                          Department Coverage Across 92.5% Occupancy
+                          Department Coverage — Checked-In vs Roster
                         </h3>
-                        <span className="text-[11px] text-slate-400">Total Scheduled: 35 Employees</span>
+                        <span className="text-[11px] text-slate-400">
+                          Total On Roster: {formatCount(data?.summary?.expectedTotal)} Employees
+                        </span>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
@@ -1340,9 +1291,11 @@ export function FloorPresenceDetail({
                               <tr key={zone.id} className="hover:bg-slate-50/80">
                                 <td className="py-3 px-4 font-bold text-[#0b1c30]">{zone.id.toUpperCase()}</td>
                                 <td className="py-3 px-4 font-semibold text-slate-700">{zone.name}</td>
-                                <td className="py-3 px-4 text-center font-mono text-slate-600">{zone.capacity} Staff</td>
+                                <td className="py-3 px-4 text-center font-mono text-slate-600">
+                                  {zone.capacity === null || zone.capacity === undefined ? NO_DATA : `${zone.capacity} Staff`}
+                                </td>
                                 <td className="py-3 px-4 text-center font-mono font-bold text-[#0058be]">{zone.count} Staff</td>
-                                <td className="py-3 px-4 text-center font-mono font-bold text-emerald-600">{zone.occupancyPct}%</td>
+                                <td className="py-3 px-4 text-center font-mono font-bold text-emerald-600">{formatPercent(zone.occupancyPct)}</td>
                                 <td className="py-3 px-4">
                                   <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                     {zone.status}
@@ -1375,7 +1328,7 @@ export function FloorPresenceDetail({
                           : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                       }`}
                     >
-                      All Missing (23)
+                      All Missing ({missingCounts.total})
                     </button>
 
                     <button
@@ -1386,7 +1339,7 @@ export function FloorPresenceDetail({
                           : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200'
                       }`}
                     >
-                      Approved Leave ({data?.missingReasonsSummary?.onApprovedLeave ?? 14} Staff)
+                      Leave Status ({missingCounts.leave} Staff)
                     </button>
 
                     <button
@@ -1397,7 +1350,7 @@ export function FloorPresenceDetail({
                           : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200'
                       }`}
                     >
-                      Remote / Field Duty ({data?.missingReasonsSummary?.remoteOrFieldDuty ?? 7} Staff)
+                      Remote / Field Duty ({missingCounts.remote} Staff)
                     </button>
 
                     <button
@@ -1408,7 +1361,7 @@ export function FloorPresenceDetail({
                           : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200'
                       }`}
                     >
-                      Roster Off / Later Shifts ({(data?.missingReasonsSummary?.shiftPendingOrLater ?? 0) + (data?.missingReasonsSummary?.unauthorizedLate ?? 0) || 2} Staff)
+                      Roster Off / Later Shifts ({missingCounts.pending} Staff)
                     </button>
                   </div>
 
@@ -1437,11 +1390,11 @@ export function FloorPresenceDetail({
                         Missing Staff Audit ({filteredMissing.length} Personnel Listed)
                       </span>
                       <p className="text-[10px] text-slate-400">
-                        Fully reconciled across HRMS approved leaves, remote duty authorizations, and shift rosters
+                        Grouped only by the attendance status stored in HRMS — approvals are not inferred
                       </p>
                     </div>
-                    <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full font-bold border border-emerald-200">
-                      0 Unauthorized Absences
+                    <span className="text-[10px] bg-slate-50 text-slate-600 px-2.5 py-0.5 rounded-full font-bold border border-slate-200">
+                      {data?.missingStaff?.length ?? 0} On Record
                     </span>
                   </div>
 
@@ -1468,48 +1421,42 @@ export function FloorPresenceDetail({
                           filteredMissing.map((staff, idx) => (
                             <tr key={`${staff.id || idx}-${idx}`} className="hover:bg-slate-50/80 transition-colors">
                               <td className="py-3 px-4">
-                                <div className="font-bold text-[#0b1c30]">{staff.name}</div>
-                                <div className="text-[10px] text-slate-400 font-mono">{staff.code}</div>
+                                <div className="font-bold text-[#0b1c30]">{staff.name || 'Unmatched device ID'}</div>
+                                <div className="text-[10px] text-slate-400 font-mono">{staff.code || NO_DATA}</div>
                               </td>
 
                               <td className="py-3 px-4 font-semibold text-slate-700">
-                                {staff.dept}
+                                {staff.dept || NO_DATA}
                               </td>
 
                               <td className="py-3 px-4">
                                 <span
                                   className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                    staff.reason === 'APPROVED_LEAVE'
+                                    (staff.reason || '').includes('LEAVE')
                                       ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                      : staff.reason === 'WEEKLY_OFF'
+                                      : (staff.reason || '').includes('WEEKLY') || (staff.reason || '').includes('OFF')
                                       ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                      : staff.reason === 'REMOTE_FIELD'
+                                      : (staff.reason || '').includes('REMOTE') || (staff.reason || '').includes('FIELD')
                                       ? 'bg-purple-50 text-purple-700 border border-purple-200'
                                       : 'bg-slate-100 text-slate-700 border border-slate-200'
                                   }`}
                                 >
-                                  {staff.reason === 'APPROVED_LEAVE'
-                                    ? 'Approved Leave'
-                                    : staff.reason === 'WEEKLY_OFF'
-                                    ? 'Weekly Off'
-                                    : staff.reason === 'REMOTE_FIELD'
-                                    ? 'Remote / Field Duty'
-                                    : 'Shift Pending'}
+                                  {reasonLabel(staff.reason)}
                                 </span>
                               </td>
 
                               <td className="py-3 px-4 text-slate-600">
-                                {staff.detail}
+                                {staff.detail || 'No authorisation detail recorded'}
                               </td>
 
                               <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">
-                                {staff.expectedShift}
+                                {staff.expectedShift || NO_DATA}
                               </td>
 
                               <td className="py-3 px-4">
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                  <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                                  <span>VERIFIED</span>
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-600 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                                  <ShieldCheck className="w-3 h-3 text-slate-400" />
+                                  <span>Status on record</span>
                                 </span>
                               </td>
                             </tr>
@@ -1533,10 +1480,10 @@ export function FloorPresenceDetail({
                     <div>
                       <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
                         <TrendingUp className="w-4 h-4 text-emerald-600" />
-                        Weekly Adherence Comparison: This Week (92.5%) vs Last Week Baseline (90.7%)
+                        Weekly Adherence Comparison: This Week vs Last Week Baseline
                       </h3>
                       <p className="text-[11px] text-slate-400">
-                        Tracking daily variance explaining where the +1.8% efficiency gain originated
+                        Occupancy per day, computed only from attendance rows the database holds
                       </p>
                     </div>
                     <div className="flex items-center gap-3 text-xs">
@@ -1599,7 +1546,7 @@ export function FloorPresenceDetail({
                   <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-700">Day-by-Day Occupancy Variance & Origin Breakdown</span>
                     <span className="text-[10px] font-bold text-[#0058be] bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                      Average Weekly Lift: +1.4%
+                      {(data?.historicalTrend?.length ?? 0) > 0 ? `${data?.historicalTrend?.length ?? 0} days reported` : 'No days reported'}
                     </span>
                   </div>
 
@@ -1615,41 +1562,49 @@ export function FloorPresenceDetail({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {[
-                          { day: 'Mon', thisWeek: '89.2%', baseline: '88.0%', delta: '+1.2%', reason: 'Morning shift turnover queue reduced at Entrance Gate Tablet A' },
-                          { day: 'Tue', thisWeek: '91.0%', baseline: '89.5%', delta: '+1.5%', reason: 'Reduced unscheduled break overruns across Weaving section' },
-                          { day: 'Wed', thisWeek: '90.5%', baseline: '90.0%', delta: '+0.5%', reason: 'Mid-week roster stable adherence across Spinning Mill' },
-                          { day: 'Thu', thisWeek: '92.0%', baseline: '91.2%', delta: '+0.8%', reason: 'On-floor retail showroom leads clocked in promptly at 09:00 AM' },
-                          { day: 'Fri (Today)', thisWeek: '92.5%', baseline: '90.7%', delta: '+1.8%', reason: 'Shift A on-time arrival surge in Belagavi Looms & zero unlogged absences' },
-                        ].map((row) => (
-                          <tr key={row.day} className="hover:bg-slate-50/80">
-                            <td className="py-3 px-4 font-bold text-[#0b1c30]">{row.day}</td>
-                            <td className="py-3 px-4 text-center font-mono font-bold text-[#0058be]">{row.thisWeek}</td>
-                            <td className="py-3 px-4 text-center font-mono text-slate-500">{row.baseline}</td>
-                            <td className="py-3 px-4 text-center font-mono font-bold text-emerald-600">{row.delta}</td>
-                            <td className="py-3 px-4 text-slate-600">{row.reason}</td>
+                        {(data?.historicalTrend?.length ?? 0) === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="py-8 text-center text-slate-400">
+                              No occupancy history reported for the selected week.
+                            </td>
                           </tr>
-                        ))}
+                        ) : (
+                          (data?.historicalTrend || []).map((row) => {
+                            const delta =
+                              typeof row.today === 'number' && typeof row.lastWeek === 'number'
+                                ? `${row.today - row.lastWeek >= 0 ? '+' : ''}${(row.today - row.lastWeek).toFixed(1)}%`
+                                : NO_DATA;
+                            return (
+                              <tr key={row.day} className="hover:bg-slate-50/80">
+                                <td className="py-3 px-4 font-bold text-[#0b1c30]">{row.day}</td>
+                                <td className="py-3 px-4 text-center font-mono font-bold text-[#0058be]">{formatPercent(row.today)}</td>
+                                <td className="py-3 px-4 text-center font-mono text-slate-500">{formatPercent(row.lastWeek)}</td>
+                                <td className="py-3 px-4 text-center font-mono font-bold text-emerald-600">{delta}</td>
+                                <td className="py-3 px-4 text-slate-600">Not reported</td>
+                              </tr>
+                            );
+                          })
+                        )}
                       </tbody>
                     </table>
                   </div>
                 </div>
 
-                {/* Efficiency Origin Key Drivers Card */}
+                {/* Data provenance note — replaces the unverifiable "key drivers" claims */}
                 <div className="bg-emerald-50/70 border border-emerald-200 p-4 rounded-xl text-xs text-emerald-950 space-y-2">
                   <div className="font-bold flex items-center gap-1.5 text-emerald-900">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    <span>Key Operational Drivers for the +1.8% Floor Presence Lift:</span>
+                    <Info className="w-4 h-4 text-emerald-600" />
+                    <span>What this view is built from:</span>
                   </div>
                   <ul className="list-disc pl-5 space-y-1 text-slate-700">
                     <li>
-                      <strong>Manufacturing Adherence:</strong> Master weavers and loom technicians achieved 100% on-time check-in by 09:00 AM.
+                      <strong>Attendance rows:</strong> who is checked in today, straight from the HRMS attendance table.
                     </li>
                     <li>
-                      <strong>Break Policy Enforcement:</strong> Automated tea break timer alerts minimized unauthorized line-stopping overruns.
+                      <strong>Terminal punch events:</strong> device, timestamp and the verification method the terminal itself reported.
                     </li>
                     <li>
-                      <strong>Proactive Remote Duty Logging:</strong> 7 sales and compliance staff were pre-cleared for field duties rather than flagged as floor dropouts.
+                      <strong>Not available:</strong> seat capacity per floor, prior-week occupancy baseline and the reason behind an absence are not stored, so they are left unreported rather than estimated.
                     </li>
                   </ul>
                 </div>

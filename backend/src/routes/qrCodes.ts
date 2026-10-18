@@ -6,6 +6,7 @@ import { prisma } from '../index.js';
 import { dbDate } from '../utils/dates.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
+import { computeShiftWindow, windowFromScheduled } from '../core/services/AttendanceCalculationService.js';
 
 const router = Router();
 
@@ -401,22 +402,32 @@ router.post('/scan', authorize('SCAN'), validate(qrScanSchema), async (req: Auth
       if (!existing) {
         const shift = qrCode.employee.shift;
         const attRules = ruleLocationId ? await prisma.attendanceRules.findUnique({ where: { locationId: ruleLocationId } }) : null;
-        const scheduledIn = shift?.startTime || attRules?.loginTime;
+        // Shift/rule times live on a dummy calendar day — re-anchor to today's
+        // work date so the early-login maths is measured against today, not 2024.
+        const window = computeShiftWindow(
+          shift ?? (attRules ? { startTime: attRules.loginTime, endTime: attRules.logoutTime } : null),
+          today.toISOString().slice(0, 10)
+        );
+        const scheduledIn = window?.start ?? null;
         
         const earlyLoginSeconds = scheduledIn ? Math.max(0, Math.floor((scheduledIn.getTime() - now.getTime()) / 1000)) : 0;
         
         let earlyLoginIncentive = 0;
         if (earlyLoginSeconds > 0 && attRules?.earlyLoginIncentiveEnabled) {
           earlyLoginIncentive = Math.round((earlyLoginSeconds / 60.0) * Number(attRules.earlyLoginRatePerMinute || attRules.earlyLoginRatePerSecond || 1));
+          if (attRules.earlyLoginMaxDaily && earlyLoginIncentive > Number(attRules.earlyLoginMaxDaily)) {
+            earlyLoginIncentive = Number(attRules.earlyLoginMaxDaily);
+          }
         }
         
         await prisma.attendance.create({
           data: {
             employeeId: qrCode.employeeId,
-            locationId,
+            locationId: effectiveLocationId || qrCode.locationId,
             shiftId: shift?.id,
             attendanceDate: today,
             scheduledLogin: scheduledIn,
+            scheduledLogout: window?.end ?? null,
             actualLogin: now,
             earlyLoginSeconds,
             earlyLoginIncentive,
@@ -432,15 +443,25 @@ router.post('/scan', authorize('SCAN'), validate(qrScanSchema), async (req: Auth
       });
       
       if (existing) {
-        const rules = await prisma.attendanceRules.findUnique({ where: { locationId } });
+        // Resolve the rules row for the employee's own hub — not the raw body
+        // locationId (which may be undefined and would match an arbitrary row).
+        const attRules = ruleLocationId ? await prisma.attendanceRules.findUnique({ where: { locationId: ruleLocationId } }) : null;
         const shift = existing.shiftId ? await prisma.shift.findUnique({ where: { id: existing.shiftId } }) : null;
-        const scheduledOut = shift?.endTime || rules?.logoutTime;
+        // Prefer the record's own scheduled window; fall back to the shift /
+        // rules times re-anchored to today (they are dummy-dated, and the
+        // shift's end may roll over past midnight for night shifts).
+        const window = windowFromScheduled(existing.scheduledLogin, existing.scheduledLogout)
+          ?? computeShiftWindow(
+            shift ?? (attRules ? { startTime: attRules.loginTime, endTime: attRules.logoutTime } : null),
+            today.toISOString().slice(0, 10)
+          );
+        const scheduledOut = window?.end ?? null;
         
         const overtimeSeconds = scheduledOut ? Math.max(0, Math.floor((now.getTime() - scheduledOut.getTime()) / 1000)) : 0;
         
         let overtimeIncentive = 0;
-        if (overtimeSeconds > 0 && rules?.overtimeIncentiveEnabled) {
-          overtimeIncentive = overtimeSeconds * Number(rules.overtimeRatePerSecond || 1.5);
+        if (overtimeSeconds > 0 && attRules?.overtimeIncentiveEnabled) {
+          overtimeIncentive = overtimeSeconds * Number(attRules.overtimeRatePerSecond || 1.5);
         }
         
         await prisma.attendance.update({

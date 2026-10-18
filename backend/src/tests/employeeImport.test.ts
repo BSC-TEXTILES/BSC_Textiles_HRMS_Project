@@ -8,6 +8,7 @@ import {
 import {
   getIdAllocationInfo,
   allocateEmployeeId,
+  isEmployeeCodeAcceptedByDatabase,
 } from '../services/employeeIdService.js';
 import { TestResult } from './attendance.test.js';
 import { prisma } from '../db.js';
@@ -57,20 +58,27 @@ export async function runEmployeeImportTests(baseUrl?: string, token?: string): 
   });
 
   // 2. ID Policy & Format
-  await runTest('Employee ID Policy returns BSC-EMP-XXXX sequential format configuration', async () => {
+  await runTest('Employee ID policy is numeric, matching the enforced employeeCode check', async () => {
     const info = await getIdAllocationInfo();
     assert.ok(info, 'ID info must return');
-    assert.strictEqual(info.policy.sampleFormat, 'BSC-EMP-0001');
+    // Migration 025 installs an ENFORCED `employeeCode REGEXP '^[0-9]+$'`, and
+    // every valid employee row is numeric — a policy minting anything else fails
+    // at INSERT. This assertion is the guard against the two drifting apart again.
+    assert.ok(isEmployeeCodeAcceptedByDatabase(info.policy.sampleFormat), `sample ${info.policy.sampleFormat} must satisfy the DB check`);
+    assert.ok(isEmployeeCodeAcceptedByDatabase(info.nextEmployeeId), `next id ${info.nextEmployeeId} must satisfy the DB check`);
+    assert.match(info.policy.prefix, /^$/, 'the approved format has no prefix');
     assert.ok(typeof info.totalEmployees === 'number');
     assert.ok(typeof info.withLegacyNumericId === 'number');
     assert.ok(typeof info.withTestId === 'number');
   });
 
   // 3. Concurrency-Safe ID Generation
-  await runTest('allocateEmployeeId allocates BSC-EMP-XXXX sequential IDs safely', async () => {
-    const nextId = await allocateEmployeeId();
-    assert.ok(nextId.startsWith('BSC-EMP-'), `ID should start with BSC-EMP-, got: ${nextId}`);
-    assert.strictEqual(nextId.length, 12, `ID should be formatted as BSC-EMP-0001 (12 chars), got: ${nextId}`);
+  await runTest('allocateEmployeeId mints strictly increasing database-valid IDs', async () => {
+    const first = await allocateEmployeeId();
+    const second = await allocateEmployeeId();
+    assert.match(first, /^[0-9]{1,30}$/, `ID must be digits only, got: ${first}`);
+    assert.match(second, /^[0-9]{1,30}$/, `ID must be digits only, got: ${second}`);
+    assert.ok(Number(second) > Number(first), `IDs must increase: ${first} -> ${second}`);
   });
 
   // 4. Data Quality Audit

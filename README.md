@@ -1327,38 +1327,51 @@ MAX_FILE_SIZE=10485760
 ## 34. Local Development
 
 ### System Prerequisites
-- **Node.js:** v20.x LTS or higher
+- **Node.js:** v20 LTS or higher. **v22 LTS is the recommended version** and is what `.nvmrc` pins — prebuilt native modules (`@node-rs/argon2`) are published against LTS ABIs.
 - **MySQL:** v8.0 or higher
-- **npm:** v10.x or higher
+- **npm:** v10.x or higher (v11.12.1 is what the verified install was run with)
 - **Git:** v2.40 or higher
+
+One package manager, one lockfile: `package-lock.json` at the repository root. There is no `yarn.lock`, `pnpm-lock.yaml` or `bun.lock` in this repository. `frontend`, `backend` and `database` are npm **workspaces** — dependencies are hoisted to the root, so install once from the root and never run `npm install` inside a workspace folder.
 
 ### Step-by-Step Installation
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/BSC-TEXTILES/BSC_Textiles_HRMS_Project-.git
-cd "BSC Textiles HRMS"
+git clone https://github.com/BSC-TEXTILES/BSC_Textiles_HRMS_Project.git
+cd BSC_Textiles_HRMS_Project
 
 # 2. Configure Environment File
 cp .env.example .env
 # Ensure DATABASE_URL, JWT_SECRET, and PORT are configured
+
+# 3. Install every workspace from the lockfile (run from the repository root)
+npm ci
+
+# 4. Apply database migrations
+npm run db:migrate
 ```
 
-### Launching Backend Server (Port 4000)
+### Launching everything (API :4000, web :3000, supervised device worker)
 ```bash
-cd backend
-npm install
 npm run dev
 ```
 
-### Launching Frontend Web Application (Port 3000)
+### Or launch the processes separately
 ```bash
-cd ../frontend
-npm install
-npm run dev
+# Backend API — port 4000
+npm run dev:backend
+
+# Frontend web application — port 3000
+npm run dev:frontend
+
+# Biometric sync worker (needed for device polling / cloud push ingestion)
+npm run worker:supervised
 ```
 
 Open `http://localhost:3000` in your web browser.
+
+`docs/INSTALLATION.md` section 6 records the exact clean-install commands, the real output of each one, and the native-binary matrix for Linux deployment.
 
 ---
 

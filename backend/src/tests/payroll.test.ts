@@ -1,11 +1,11 @@
 import assert from 'node:assert';
 import axios from 'axios';
+import { loginWithRetry } from './testAuth.js';
 
 const BASE_URL = process.env.API_URL || 'http://localhost:4000/api';
 
 async function login(email: string, password = 'password123') {
-  const res = await axios.post(`${BASE_URL}/auth/login`, { email, password });
-  return res.data.token;
+  return loginWithRetry(email, password, { baseUrl: BASE_URL });
 }
 
 export async function runPayrollTestSuite() {

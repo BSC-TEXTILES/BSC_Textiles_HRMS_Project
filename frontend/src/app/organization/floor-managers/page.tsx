@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import toast from 'react-hot-toast';
+import api from '@/lib/api';
 
 interface Follower {
   id: string;
@@ -115,6 +116,34 @@ export default function FloorManagersPage() {
   const [selectedStaff, setSelectedStaff] = useState<Follower | null>(null);
   const [observationText, setObservationText] = useState('');
 
+  // Floor adherence is measured from GET /reports/dashboard-summary: checked-in
+  // attendance rows against the active roster for the scoped store. null means the
+  // server gave us nothing to compute from, so the UI says so instead of guessing.
+  const [floorStats, setFloorStats] = useState<{ present: number; roster: number; weeklyOff: number } | null>(null);
+
+  const fetchFloorStats = useCallback(async () => {
+    try {
+      const { data } = await api.get('/reports/dashboard-summary');
+      const roster = Number(data?.totalEmployees || 0);
+      const present = Number(data?.present || 0);
+      const weeklyOff = Number(data?.weeklyOff || 0);
+      setFloorStats(roster > 0 ? { present, roster, weeklyOff } : null);
+    } catch {
+      setFloorStats(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFloorStats();
+  }, [fetchFloorStats]);
+
+  const expectedOnFloor = floorStats ? Math.max(floorStats.roster - floorStats.weeklyOff, 0) : 0;
+  const adherence =
+    floorStats && expectedOnFloor > 0
+      ? Math.round((floorStats.present / expectedOnFloor) * 1000) / 10
+      : null;
+  const adherenceLabel = adherence === null ? 'Floor adherence unavailable' : `Live Floor Adherence: ${adherence}%`;
+
   const filteredFollowers = followers.filter((f) => {
     let matchesTab = true;
     if (activeTab === 'PENDING') matchesTab = f.directiveType !== 'CLEAR';
@@ -189,7 +218,7 @@ export default function FloorManagersPage() {
                 <span className="text-outline-variant">•</span>
                 <div className="flex items-center gap-1">
                   <span className="material-symbols-outlined text-[16px] text-secondary">verified</span>
-                  <span className="font-label-md text-label-md text-secondary font-bold">Live Floor Adherence: 96.4%</span>
+                  <span className="font-label-md text-label-md text-secondary font-bold">{adherenceLabel}</span>
                 </div>
                 <span className="text-outline-variant">•</span>
                 <div className="flex items-center gap-1 text-on-surface-variant">
@@ -267,8 +296,12 @@ export default function FloorManagersPage() {
             </div>
             <div>
               <div className="flex items-baseline gap-2">
-                <span className="font-display-lg text-display-lg text-secondary font-bold">96.4%</span>
-                <span className="px-2 py-0.5 rounded-full bg-surface-container font-label-sm text-label-sm text-secondary font-bold">+1.8% vs Wk Avg</span>
+                <span className="font-display-lg text-display-lg text-secondary font-bold">
+                  {adherence === null ? '—' : `${adherence}%`}
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-surface-container font-label-sm text-label-sm text-secondary font-bold">
+                  {floorStats ? `${floorStats.present} of ${expectedOnFloor} checked in` : 'No attendance feed'}
+                </span>
               </div>
               <div className="flex items-center gap-1.5 mt-1 font-body-sm text-body-sm text-on-surface-variant">
                 <span>2 Early Check-ins (09:12 AM)</span>

@@ -1,3 +1,4 @@
+import { fixtureDevicesAllowed } from '../../config/bootFixtures.js';
 /**
  * Device and global configuration for the biometric subsystem.
  *
@@ -25,6 +26,8 @@ export interface GlobalBiometricSettings {
 }
 
 export interface DeviceConfig {
+  /** Development simulator/fixture, not shop-floor evidence. */
+  isFixture: boolean
   id: string;
   serialNumber: string;
   name: string;
@@ -58,6 +61,9 @@ export interface DeviceConfig {
   fpCount: number;
   faceCount: number;
   pushVersion: string | null;
+  communicationMode?: string | null;
+  cloudServerUrl?: string | null;
+  lastSyncMode?: string | null;
 }
 
 export const SETTINGS_DEFAULTS: GlobalBiometricSettings = {
@@ -197,11 +203,15 @@ const DEVICE_SELECT = `
          locationId, locationCode, protocol, status, isActive,
          lastConnectionAt, lastHeartbeatAt, lastSeenAt, lastSyncAt, lastWatermarkAt,
          deviceClockAt, clockDriftSeconds, consecutiveFailures, nextRetryAt, lastError,
-         userCount, attLogCount, fpCount, faceCount, pushVersion
+         userCount, attLogCount, fpCount, faceCount, pushVersion,
+         COALESCE(isFixture, 0) AS isFixture,
+         COALESCE(communicationMode, 'CLOUD_PUSH') AS communicationMode,
+         cloudServerUrl, lastSyncMode
     FROM biometric_devices`;
 
 function mapDevice(row: any): DeviceConfig {
   return {
+    isFixture: Boolean(Number(row.isFixture ?? 0)),
     id: row.id,
     serialNumber: row.serialNumber,
     name: row.name,
@@ -235,11 +245,18 @@ function mapDevice(row: any): DeviceConfig {
     fpCount: Number(row.fpCount ?? 0),
     faceCount: Number(row.faceCount ?? 0),
     pushVersion: row.pushVersion ?? null,
+    communicationMode: row.communicationMode || 'CLOUD_PUSH',
+    cloudServerUrl: row.cloudServerUrl ?? null,
+    lastSyncMode: row.lastSyncMode ?? null,
   };
 }
 
 export async function listDeviceConfigs(activeOnly = true): Promise<DeviceConfig[]> {
-  const sql = `${DEVICE_SELECT} ${activeOnly ? 'WHERE isActive = 1' : ''} ORDER BY locationCode, name`;
+  const clauses: string[] = [];
+  if (activeOnly) clauses.push('isActive = 1');
+  // A production boot must not poll (or report on) the loopback simulator.
+  if (!fixtureDevicesAllowed()) clauses.push('COALESCE(isFixture, 0) = 0');
+  const sql = `${DEVICE_SELECT} ${clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''} ORDER BY locationCode, name`;
   const [rows]: any = await pool.query(sql);
   return rows.map(mapDevice);
 }
@@ -328,6 +345,7 @@ export async function registerDeviceConfig(input: {
   model?: string;
   firmwareVersion?: string;
   protocol?: string;
+  isFixture?: boolean;
 }): Promise<DeviceConfig> {
   const settings = await loadGlobalSettings();
   const [loc]: any = await pool.query('SELECT id FROM location WHERE code = ? LIMIT 1', [input.locationCode.toUpperCase()]);
@@ -336,13 +354,13 @@ export async function registerDeviceConfig(input: {
   await pool.query(
     `INSERT INTO biometric_devices
        (id, serialNumber, name, model, firmwareVersion, ipAddress, port, commKey, timezone,
-        locationId, locationCode, status, protocol, isActive, lastWatermarkAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DISCONNECTED', ?, 1, NULL)
+        locationId, locationCode, status, protocol, isActive, lastWatermarkAt, isFixture)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DISCONNECTED', ?, 1, NULL, ?)
      ON DUPLICATE KEY UPDATE
        name = VALUES(name), model = VALUES(model), firmwareVersion = VALUES(firmwareVersion),
        ipAddress = VALUES(ipAddress), port = VALUES(port), commKey = VALUES(commKey),
        timezone = VALUES(timezone), locationId = VALUES(locationId), locationCode = VALUES(locationCode),
-       protocol = VALUES(protocol), isActive = 1, updatedAt = NOW()`,
+       protocol = VALUES(protocol), isActive = 1, isFixture = VALUES(isFixture), updatedAt = NOW()`,
     [
       id,
       input.serialNumber.trim(),
@@ -356,6 +374,7 @@ export async function registerDeviceConfig(input: {
       loc[0]?.id ?? null,
       input.locationCode.toUpperCase(),
       input.protocol || 'ADMS_PUSH',
+      input.isFixture ? 1 : 0,
     ]
   );
 

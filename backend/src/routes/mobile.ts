@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { container } from '../core/container/ServiceContainer.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { prisma } from '../index.js';
+import { dbDate } from '../utils/dates.js';
+import { computeShiftWindow } from '../core/services/AttendanceCalculationService.js';
 
 const router = Router();
 router.use(authenticate);
@@ -29,14 +32,10 @@ router.get('/dashboard', async (req: AuthRequest, res) => {
  */
 router.get('/profile', async (req: AuthRequest, res) => {
   try {
-    let employeeId = req.user?.employeeId;
+    const employeeId = req.user?.employeeId;
     let employee = employeeId ? await container.employeeService.getEmployeeById(employeeId) : null;
     if (!employee && req.user?.email) {
       employee = await container.employeeRepo.findByEmail(req.user.email);
-    }
-    if (!employee) {
-      const emps = await container.employeeRepo.listActive();
-      employee = emps[0] || null;
     }
     if (!employee) {
       return res.status(404).json({ error: 'Employee profile not found' });
@@ -177,29 +176,83 @@ router.get('/manager/pending-leaves', async (req: AuthRequest, res) => {
  */
 router.post('/punch', async (req: AuthRequest, res) => {
   try {
-    let employeeId = req.user?.employeeId;
-    if (!employeeId && req.user?.email) {
-      const emp = await container.employeeRepo.findByEmail(req.user.email);
-      employeeId = emp?.id;
-    }
+    const employeeId = req.user?.employeeId;
     if (!employeeId) {
-      const emps = await container.employeeRepo.listActive();
-      employeeId = emps[0]?.id;
+      return res.status(400).json({ error: 'Employee context not found for user' });
     }
+
     const { punchType = 'CHECK_IN', latitude, longitude, deviceInfo } = req.body;
-    const punchId = `punch_${Date.now()}`;
-    const punchTime = new Date().toISOString();
+    if (!['CHECK_IN', 'CHECK_OUT'].includes(punchType)) {
+      return res.status(400).json({ error: 'punchType must be CHECK_IN or CHECK_OUT' });
+    }
+
+    const employee = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      include: { shift: true },
+    });
+    if (!employee) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+
+    const today = dbDate();
+    const now = new Date();
+    const shiftWindow = computeShiftWindow(employee.shift, today.toISOString().slice(0, 10));
+    const geoNote = latitude !== undefined && longitude !== undefined ? ` @${Number(latitude).toFixed(5)},${Number(longitude).toFixed(5)}` : '';
+    const deviceNote = typeof deviceInfo === 'string' && deviceInfo ? ` ${deviceInfo}` : '';
+    const note = `Mobile ${punchType}${geoNote}${deviceNote}`.slice(0, 191);
+
+    let existing = await prisma.attendance.findFirst({
+      where: { employeeId, attendanceDate: today },
+    });
+
+    if (!existing) {
+      existing = await prisma.attendance.create({
+        data: {
+          employeeId,
+          locationId: employee.locationId,
+          shiftId: employee.shiftId,
+          attendanceDate: today,
+          scheduledLogin: shiftWindow?.start ?? now,
+          scheduledLogout: shiftWindow?.end ?? null,
+          actualLogin: punchType === 'CHECK_IN' ? now : null,
+          actualLogout: punchType === 'CHECK_OUT' ? now : null,
+          status: 'PRESENT',
+          notes: note,
+        },
+      });
+    } else {
+      const existingLogin = existing.actualLogin ? new Date(existing.actualLogin) : null;
+      const existingLogout = existing.actualLogout ? new Date(existing.actualLogout) : null;
+      const updateData: Record<string, unknown> = { notes: note };
+      // Earliest IN wins (a double tap must not move the login later);
+      // the latest OUT wins, matching the manual punch endpoint.
+      if (punchType === 'CHECK_IN' && (!existingLogin || now < existingLogin)) {
+        updateData.actualLogin = now;
+      } else if (punchType === 'CHECK_OUT') {
+        updateData.actualLogout = now;
+      }
+      const login = updateData.actualLogin instanceof Date ? updateData.actualLogin : existingLogin;
+      const logout = updateData.actualLogout instanceof Date ? updateData.actualLogout : existingLogout;
+      if (login && logout) {
+        updateData.totalWorkingSeconds = Math.max(0, Math.floor((logout.getTime() - login.getTime()) / 1000));
+      }
+      existing = await prisma.attendance.update({
+        where: { id: existing.id },
+        data: updateData,
+      });
+    }
+
     res.json({
       success: true,
-      punchTime,
+      punchTime: now.toISOString(),
       punch: {
-        id: punchId,
-        employeeId: employeeId!,
+        id: existing.id,
+        employeeId,
         punchType,
         latitude,
         longitude,
         deviceInfo,
-        verified: true,
+        verified: Boolean(existing.faceVerified),
       },
     });
   } catch (error: any) {
@@ -212,17 +265,12 @@ router.post('/punch', async (req: AuthRequest, res) => {
  */
 router.get('/leave-balances', async (req: AuthRequest, res) => {
   try {
-    let employeeId = req.user?.employeeId;
-    if (!employeeId && req.user?.email) {
-      const emp = await container.employeeRepo.findByEmail(req.user.email);
-      employeeId = emp?.id;
-    }
+    const employeeId = req.user?.employeeId;
     if (!employeeId) {
-      const emps = await container.employeeRepo.listActive();
-      employeeId = emps[0]?.id;
+      return res.status(400).json({ error: 'Employee context not found for user' });
     }
     const year = new Date().getFullYear();
-    const balances = await container.leaveBalanceService.getBalancesForEmployee(employeeId!, year);
+    const balances = await container.leaveBalanceService.getBalancesForEmployee(employeeId, year);
     res.json(balances);
   } catch (error: any) {
     res.status(500).json({ error: error.message });

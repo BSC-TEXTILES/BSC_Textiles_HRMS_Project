@@ -42,6 +42,7 @@ import {
   readLiveDeviceInfo,
 } from '../services/biometricService.js';
 import { runFullMismatchScan } from '../services/biometric/mismatch.js';
+import { deviceIntegrationConfig } from '../config/deviceConfig.js';
 
 interface DeviceRuntime {
   deviceId: string;
@@ -137,6 +138,12 @@ async function pollDevice(device: DeviceConfig): Promise<void> {
   const runtime = runtimes.get(device.id);
   if (!runtime) return;
   if (Date.now() < runtime.nextAllowedPollAt) return;
+
+  // In cloud_push mode, direct TCP socket polling to private LAN IPs is bypassed
+  if (!deviceIntegrationConfig.shouldPollDevice(device.ipAddress)) {
+    runtime.nextAllowedPollAt = Date.now() + 60_000;
+    return;
+  }
 
   const outcome = await syncSingleDevice(device.id, 'POLL_DAEMON');
 
@@ -285,6 +292,7 @@ export async function startWorker(options: { once?: boolean } = {}): Promise<voi
   const settings = await loadGlobalSettings();
   log({
     msg: 'biometric worker starting',
+    syncMode: deviceIntegrationConfig.syncMode,
     pollIntervalMs: settings.pollIntervalMs,
     heartbeatTimeoutSeconds: settings.heartbeatTimeoutSeconds,
     defaultTimezone: settings.defaultTimezone,

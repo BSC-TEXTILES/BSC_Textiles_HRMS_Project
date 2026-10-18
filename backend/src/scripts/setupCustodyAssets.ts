@@ -1,6 +1,6 @@
 import { pool } from '../nativeDb.js';
 
-export async function setupCustodyAssets() {
+export async function setupCustodyAssets(options?: { schemaOnly?: boolean }) {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS employee_custody_assets (
       id VARCHAR(191) PRIMARY KEY,
@@ -22,6 +22,10 @@ export async function setupCustodyAssets() {
 
   console.log('employee_custody_assets table verified/created.');
 
+  if (options?.schemaOnly) {
+    console.log('setupCustodyAssets: schema/reference shaping complete; the invented asset custody records were not seeded (boot fixtures disabled).');
+    return;
+  }
   const [countRows]: any = await pool.query('SELECT count(*) as c FROM employee_custody_assets');
   if (countRows[0].c === 0) {
     const [emps]: any = await pool.query('SELECT id, employeeCode, fullName, locationId FROM employee LIMIT 50');

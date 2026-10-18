@@ -35,10 +35,12 @@ by push and later re-read by the poll is stored once.
 
 * Node.js 20+ and MySQL 8.0 (local install, no Windows service needed).
 * The API (`:4000`), the web app (`:3000`) and the worker are three processes.
-* `npm install` — on a machine without Visual Studio Build Tools use
-  `npm install --ignore-scripts`. `better-sqlite3` cannot compile there, but it
-  is only required lazily by the offline-desktop SQLite path; the MySQL path is
-  unaffected.
+* `npm ci` from the repository root. `better-sqlite3` is an
+  **optionalDependency**: if it cannot compile (no Visual Studio Build Tools on
+  Windows, no `python3`/`make`/`g++` on Linux, or a Node ABI with no prebuild)
+  npm skips it and the install still succeeds. It is required lazily and only by
+  the offline-desktop SQLite path, so the MySQL API, the worker and the device
+  receiver are unaffected. `--ignore-scripts` is no longer needed.
 
 ## 3. Environment
 
