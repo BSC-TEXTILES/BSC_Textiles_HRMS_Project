@@ -571,14 +571,16 @@ router.post('/punch', authorize('RECORD'), async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Employee not found' });
     }
 
-    const today = dbDate();
+    // DATE columns only match a plain YYYY-MM-DD string (a JS Date serializes
+    // to "YYYY-MM-DD 05:30:00" and never compares equal).
+    const todayStr = new Date().toISOString().slice(0, 10);
     const now = new Date();
     // Shift times are stored on a dummy calendar day; re-anchor them to today's
     // work date (overnight-aware) instead of interpolating the JS Date object.
-    const shiftWindow = computeShiftWindow(employee.shift, today.toISOString().slice(0, 10));
+    const shiftWindow = computeShiftWindow(employee.shift, todayStr);
 
     let existing = await prisma.attendance.findFirst({
-      where: { employeeId, attendanceDate: today },
+      where: { employeeId, attendanceDate: todayStr },
     });
 
     if (!existing) {
@@ -587,7 +589,7 @@ router.post('/punch', authorize('RECORD'), async (req: AuthRequest, res) => {
           employeeId,
           locationId: employee.locationId,
           shiftId: employee.shiftId,
-          attendanceDate: today,
+          attendanceDate: todayStr,
           scheduledLogin: shiftWindow?.start ?? now,
           scheduledLogout: shiftWindow?.end ?? null,
           actualLogin: punchType === 'IN' ? now : null,
@@ -674,7 +676,7 @@ router.post('/punch', authorize('RECORD'), async (req: AuthRequest, res) => {
 router.get('/calculate/:employeeId/:date', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
     const { employeeId, date } = req.params;
-    const targetDate = dbDate(new Date(date));
+    const targetDate = dbDate(new Date(date)).toISOString().slice(0, 10);
 
     const employee = await prisma.employee.findUnique({
       where: { id: employeeId },
@@ -790,7 +792,7 @@ router.get('/calculate/:employeeId/:date', authorize('VIEW'), async (req: AuthRe
 router.get('/summary/:employeeId/:date', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
     const { employeeId, date } = req.params;
-    const targetDate = dbDate(new Date(date));
+    const targetDate = dbDate(new Date(date)).toISOString().slice(0, 10);
 
     const attendance = await prisma.attendance.findFirst({
       where: { employeeId, attendanceDate: targetDate },
@@ -1542,11 +1544,11 @@ router.post('/', authorize('RECORD'), validate(attendanceSchema), async (req: Au
         : null;
     const rules = await prisma.attendanceRules.findUnique({ where: { locationId } });
     
-    const date = dbDate(new Date(attendanceDate));
+    const dateYmd = dbDate(new Date(attendanceDate)).toISOString().slice(0, 10);
     
     // Check if attendance already exists
     const existing = await prisma.attendance.findUnique({
-      where: { employeeId_attendanceDate: { employeeId, attendanceDate: date } },
+      where: { employeeId_attendanceDate: { employeeId, attendanceDate: dateYmd } },
     });
     
     if (existing) {
@@ -1555,7 +1557,6 @@ router.post('/', authorize('RECORD'), validate(attendanceSchema), async (req: Au
     
     // Calculate times. Shift/rule times are stored on a dummy calendar day, so
     // the wall-clock time is re-anchored to this attendance date (overnight-aware).
-    const dateYmd = date.toISOString().slice(0, 10);
     const rulesWindow = rules && (rules.loginTime || rules.logoutTime)
       ? { startTime: rules.loginTime, endTime: rules.logoutTime }
       : null;
@@ -1610,7 +1611,7 @@ router.post('/', authorize('RECORD'), validate(attendanceSchema), async (req: Au
         employeeId,
         locationId,
         shiftId,
-        attendanceDate: date,
+        attendanceDate: dateYmd,
         scheduledLogin: scheduledIn,
         actualLogin: actualIn,
         scheduledLogout: scheduledOut,

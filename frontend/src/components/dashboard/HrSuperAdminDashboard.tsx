@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   Users,
@@ -8,30 +8,21 @@ import {
   UserX,
   CalendarDays,
   Clock,
-  Briefcase,
   TrendingUp,
   Download,
   Plus,
   Filter,
   Calendar,
-  AlertCircle,
   AlertTriangle,
   CheckCircle2,
   ChevronRight,
-  ShieldAlert,
   FileText,
   Sparkles,
-  Cake,
-  Award,
+  Users2,
   Fingerprint,
-  FileBadge,
   Building2,
-  ExternalLink,
-  ChevronLeft,
-  Check,
-  Percent,
-  Layers,
-  ArrowRight,
+  ScanFace,
+  RefreshCw,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
@@ -43,202 +34,352 @@ interface HrSuperAdminDashboardProps {
   onOpenAddEmployee?: () => void;
 }
 
+interface HrCommandCenterData {
+  date: string;
+  kpis: {
+    headcount: number;
+    present: number;
+    absent: number;
+    unplannedAbsent: number;
+    onLeave: number;
+    returnTomorrow: number;
+    newJoiners: number;
+    late: number;
+    lateRate: number | null;
+    attendanceRate: number | null;
+    faceVerified: number;
+  };
+  hubs: Array<{ locationId: string; name: string; code: string | null; headcount: number; present: number; coveragePct: number | null }>;
+  trend: Array<{ month: string; joinings: number; exits: number; headcount: number }>;
+  departments: Array<{ name: string; count: number; pct: number | null }>;
+  leave: {
+    onLeaveTodayByType: Array<{ name: string; count: number }>;
+    calendarMonth: string;
+    daysWithLeave: Array<{ date: string; count: number }>;
+    pendingRequests: number;
+    upcomingRequests: number;
+  };
+  actionCenter: {
+    leaveRequestsPending: number;
+    correctionsPending: number;
+    documentsPending: number;
+    biometricSyncFailures: number;
+    probationReviewsDue: number;
+    resignationsPending: number;
+    fnfPending: number;
+  };
+  compliance: { missingKyc: number; bankPending: number; pfEsiPending: number };
+  onboarding: { joiningThisWeek: number; documentsPending: number; assetsPending: number };
+  payrollReadiness: { runStatus: string | null; periodStart: string | null; periodEnd: string | null; payslipCount: number; coveragePct: number | null };
+  recruitment: { activeCandidates: number; interviewsToday: number };
+  engagements: { birthdaysToday: { count: number; names: string[] }; upcomingHolidays: Array<{ name: string; date: string }> };
+}
+
+const EMPTY_DATA: HrCommandCenterData = {
+  date: '',
+  kpis: { headcount: 0, present: 0, absent: 0, unplannedAbsent: 0, onLeave: 0, returnTomorrow: 0, newJoiners: 0, late: 0, lateRate: null, attendanceRate: null, faceVerified: 0 },
+  hubs: [],
+  trend: [],
+  departments: [],
+  leave: { onLeaveTodayByType: [], calendarMonth: '', daysWithLeave: [], pendingRequests: 0, upcomingRequests: 0 },
+  actionCenter: { leaveRequestsPending: 0, correctionsPending: 0, documentsPending: 0, biometricSyncFailures: 0, probationReviewsDue: 0, resignationsPending: 0, fnfPending: 0 },
+  compliance: { missingKyc: 0, bankPending: 0, pfEsiPending: 0 },
+  onboarding: { joiningThisWeek: 0, documentsPending: 0, assetsPending: 0 },
+  payrollReadiness: { runStatus: null, periodStart: null, periodEnd: null, payslipCount: 0, coveragePct: null },
+  recruitment: { activeCandidates: 0, interviewsToday: 0 },
+  engagements: { birthdaysToday: { count: 0, names: [] }, upcomingHolidays: [] },
+};
+
+const fmtDate = (iso: string | null | undefined): string => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
 export function HrSuperAdminDashboard({ onOpenAddEmployee }: HrSuperAdminDashboardProps) {
-  // Filter States
   const [selectedHub, setSelectedHub] = useState('all');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
-  const [selectedTimeframe, setSelectedTimeframe] = useState('today');
+  const [selectedDate, setSelectedDate] = useState('');
 
-  // Interactive Add Employee Dialog
+  const [data, setData] = useState<HrCommandCenterData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [hubs, setHubs] = useState<any[]>(CANONICAL_HUB_STORES);
+  const [departments, setDepartments] = useState<any[]>([]);
+
+  const [activeKpiDrawer, setActiveKpiDrawer] = useState<KpiDrawerType | null>(null);
+  const [hoveredSlice, setHoveredSlice] = useState<string | null>(null);
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState<number | null>(null);
+  const [todayYmd, setTodayYmd] = useState<string>('');
+  const [displayDate, setDisplayDate] = useState<string>('');
+  const [greeting, setGreeting] = useState('Good morning');
+
+  // Add Employee dialog
   const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
   const [dialogLocations, setDialogLocations] = useState<any[]>(CANONICAL_HUB_STORES);
   const [dialogDepartments, setDialogDepartments] = useState<any[]>([]);
   const [departmentsLoading, setDepartmentsLoading] = useState(false);
 
+  const requestRef = useRef(0);
+
   useEffect(() => {
-    if (isAddEmployeeOpen) {
+    const now = new Date();
+    const ymd = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+    setTodayYmd(ymd);
+    setSelectedDate((prev) => prev || ymd);
+    setSelectedCalendarDay(Number(ymd.slice(8, 10)));
+    setDisplayDate(
+      now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' })
+    );
+    const hour = now.getHours();
+    setGreeting(hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening');
+  }, []);
+
+  const fetchCommandCenter = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const params: Record<string, string> = {};
+      if (selectedHub !== 'all') params.locationId = selectedHub;
+      if (selectedDepartment !== 'all') params.departmentId = selectedDepartment;
+      if (selectedDate) params.date = selectedDate;
+      const res = await api.get('/reports/hr-command-center', { params });
+      if (requestId !== requestRef.current) return;
+      setData(res.data && typeof res.data === 'object' ? res.data : null);
+    } catch (err: any) {
+      if (requestId !== requestRef.current) return;
+      setData(null);
+      setLoadError(err?.response?.data?.error || err?.message || 'The HR command center data could not be loaded.');
+    } finally {
+      if (requestId === requestRef.current) setLoading(false);
+    }
+  }, [selectedHub, selectedDepartment, selectedDate]);
+
+  useEffect(() => {
+    fetchCommandCenter();
+  }, [fetchCommandCenter]);
+
+  useEffect(() => {
+    Promise.all([
+      api.get('/locations/all').catch(() => ({ data: [] })),
+      api.get('/departments?limit=100').catch(() => ({ data: [] })),
+    ]).then(([locRes, deptRes]) => {
+      const locs = Array.isArray(locRes?.data) && locRes.data.length > 0 ? locRes.data : CANONICAL_HUB_STORES;
+      const depts = deptRes?.data?.departments || deptRes?.data || [];
+      setHubs(locs);
+      setDialogLocations(locs);
+      setDepartments(Array.isArray(depts) ? depts : []);
+      setDialogDepartments(Array.isArray(depts) ? depts : []);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (isAddEmployeeOpen && departments.length === 0) {
       setDepartmentsLoading(true);
-      Promise.all([
-        api.get('/locations/all').catch(() => ({ data: [] })),
-        api.get('/departments?limit=100').catch(() => ({ data: [] })),
-      ])
-        .then(([locRes, deptRes]) => {
-          const fetchedLocs = Array.isArray(locRes?.data) && locRes.data.length > 0 ? locRes.data : CANONICAL_HUB_STORES;
-          setDialogLocations(fetchedLocs);
-          setDialogDepartments(deptRes?.data?.departments || deptRes?.data || []);
+      api
+        .get('/departments?limit=100')
+        .then((res) => {
+          const depts = res?.data?.departments || res?.data || [];
+          setDialogDepartments(depts);
         })
-        .catch(() => {
-          setDialogLocations(CANONICAL_HUB_STORES);
-        })
-        .finally(() => {
-          setDepartmentsLoading(false);
-        });
+        .catch(() => setDialogDepartments([]))
+        .finally(() => setDepartmentsLoading(false));
     }
-  }, [isAddEmployeeOpen]);
+  }, [isAddEmployeeOpen, departments.length]);
 
-  // Active KPI Detail Drawer
-  const [activeKpiDrawer, setActiveKpiDrawer] = useState<KpiDrawerType | null>(null);
+  const d = data || EMPTY_DATA;
+  const kpis = d.kpis;
 
-  // Calendar Day Selection for October 2024
-  const [selectedCalendarDay, setSelectedCalendarDay] = useState<number>(14);
-
-  // Hover states for chart tooltips
-  const [hoveredSlice, setHoveredSlice] = useState<string | null>(null);
-  const [hoveredMonthIdx, setHoveredMonthIdx] = useState<number | null>(null);
-
-  // October 2024 days with high leave volume (amber / red dots)
-  const highLeaveDays: Record<number, { count: number; severity: 'amber' | 'red' }> = {
-    4: { count: 18, severity: 'amber' },
-    11: { count: 22, severity: 'amber' },
-    14: { count: 31, severity: 'red' }, // Today
-    18: { count: 24, severity: 'amber' },
-    25: { count: 28, severity: 'amber' },
-    31: { count: 42, severity: 'red' }, // Diwali Festival
-  };
-
-  // 6-Month Headcount & Turnover Data
-  const workforceTrend = [
-    { month: 'May', headcount: 1280, joinings: 28, exits: 10 },
-    { month: 'Jun', headcount: 1304, joinings: 32, exits: 8 },
-    { month: 'Jul', headcount: 1328, joinings: 30, exits: 6 },
-    { month: 'Aug', headcount: 1340, joinings: 24, exits: 12 },
-    { month: 'Sep', headcount: 1348, joinings: 20, exits: 12 },
-    { month: 'Oct', headcount: 1372, joinings: 36, exits: 12 },
-  ];
-
-  // Dynamic KPI Stats calculated from active filters
-  const kpiStats = useMemo(() => {
-    let headcount = 1372;
-    let newJoiners = 24;
-    let present = 1145;
-    let absent = 46;
-    let unplannedAbsent = 12;
-    let onLeave = 31;
-    let returnTomorrow = 9;
-    let late = 18;
-    let lateFollowUp = 6;
-    let openPositions = 12;
-    let urgentPositions = 4;
-
-    if (selectedHub === 'davanagere') {
-      headcount = 420; newJoiners = 8; present = 351; absent = 16; unplannedAbsent = 4; onLeave = 11; returnTomorrow = 3; late = 6; lateFollowUp = 2; openPositions = 4; urgentPositions = 2;
-    } else if (selectedHub === 'belagavi') {
-      headcount = 360; newJoiners = 6; present = 301; absent = 14; unplannedAbsent = 3; onLeave = 8; returnTomorrow = 2; late = 5; lateFollowUp = 2; openPositions = 3; urgentPositions = 1;
-    } else if (selectedHub === 'hubli') {
-      headcount = 310; newJoiners = 5; present = 259; absent = 10; unplannedAbsent = 3; onLeave = 7; returnTomorrow = 2; late = 4; lateFollowUp = 1; openPositions = 3; urgentPositions = 1;
-    } else if (selectedHub === 'bengaluru') {
-      headcount = 282; newJoiners = 5; present = 234; absent = 6; unplannedAbsent = 2; onLeave = 5; returnTomorrow = 2; late = 3; lateFollowUp = 1; openPositions = 2; urgentPositions = 0;
+  const leaveDots = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const entry of d.leave.daysWithLeave) {
+      const day = Number(entry.date.slice(8, 10));
+      if (Number.isFinite(day)) map.set(day, entry.count);
     }
+    return map;
+  }, [d.leave.daysWithLeave]);
 
-    if (selectedDepartment === 'sales') {
-      const ratio = 0.354;
-      headcount = Math.round(headcount * ratio);
-      newJoiners = Math.max(1, Math.round(newJoiners * ratio));
-      present = Math.round(present * ratio);
-      absent = Math.max(1, Math.round(absent * ratio));
-      unplannedAbsent = Math.max(1, Math.round(unplannedAbsent * ratio));
-      onLeave = Math.max(1, Math.round(onLeave * ratio));
-      returnTomorrow = Math.max(1, Math.round(returnTomorrow * ratio));
-      late = Math.max(1, Math.round(late * ratio));
-      lateFollowUp = Math.max(1, Math.round(lateFollowUp * ratio));
-      openPositions = Math.max(1, Math.round(openPositions * 0.4));
-      urgentPositions = Math.max(1, Math.round(urgentPositions * 0.4));
-    } else if (selectedDepartment === 'operations') {
-      const ratio = 0.227;
-      headcount = Math.round(headcount * ratio);
-      newJoiners = Math.max(1, Math.round(newJoiners * ratio));
-      present = Math.round(present * ratio);
-      absent = Math.max(1, Math.round(absent * ratio));
-      unplannedAbsent = Math.max(1, Math.round(unplannedAbsent * ratio));
-      onLeave = Math.max(1, Math.round(onLeave * ratio));
-      returnTomorrow = Math.max(1, Math.round(returnTomorrow * ratio));
-      late = Math.max(1, Math.round(late * ratio));
-      lateFollowUp = Math.max(1, Math.round(lateFollowUp * ratio));
-      openPositions = Math.max(1, Math.round(openPositions * 0.25));
-      urgentPositions = Math.max(1, Math.round(urgentPositions * 0.25));
-    } else if (selectedDepartment === 'warehouse') {
-      const ratio = 0.163;
-      headcount = Math.round(headcount * ratio);
-      newJoiners = Math.max(1, Math.round(newJoiners * ratio));
-      present = Math.round(present * ratio);
-      absent = Math.max(1, Math.round(absent * ratio));
-      unplannedAbsent = Math.max(1, Math.round(unplannedAbsent * ratio));
-      onLeave = Math.max(1, Math.round(onLeave * ratio));
-      returnTomorrow = Math.max(1, Math.round(returnTomorrow * ratio));
-      late = Math.max(1, Math.round(late * ratio));
-      lateFollowUp = Math.max(1, Math.round(lateFollowUp * ratio));
-      openPositions = Math.max(1, Math.round(openPositions * 0.25));
-      urgentPositions = Math.max(1, Math.round(urgentPositions * 0.25));
-    } else if (selectedDepartment === 'finance-hr') {
-      const ratio = 0.063;
-      headcount = Math.round(headcount * ratio);
-      newJoiners = Math.max(1, Math.round(newJoiners * ratio));
-      present = Math.round(present * ratio);
-      absent = Math.max(1, Math.round(absent * ratio));
-      unplannedAbsent = Math.max(0, Math.round(unplannedAbsent * ratio));
-      onLeave = Math.max(1, Math.round(onLeave * ratio));
-      returnTomorrow = Math.max(0, Math.round(returnTomorrow * ratio));
-      late = Math.max(1, Math.round(late * ratio));
-      lateFollowUp = Math.max(0, Math.round(lateFollowUp * ratio));
-      openPositions = Math.max(0, Math.round(openPositions * 0.1));
-      urgentPositions = 0;
-    } else if (selectedDepartment === 'others') {
-      const ratio = 0.192;
-      headcount = Math.round(headcount * ratio);
-      newJoiners = Math.max(1, Math.round(newJoiners * ratio));
-      present = Math.round(present * ratio);
-      absent = Math.max(1, Math.round(absent * ratio));
-      unplannedAbsent = Math.max(1, Math.round(unplannedAbsent * ratio));
-      onLeave = Math.max(1, Math.round(onLeave * ratio));
-      returnTomorrow = Math.max(1, Math.round(returnTomorrow * ratio));
-      late = Math.max(1, Math.round(late * ratio));
-      lateFollowUp = Math.max(1, Math.round(lateFollowUp * ratio));
-      openPositions = Math.max(1, Math.round(openPositions * 0.1));
-      urgentPositions = Math.max(0, Math.round(urgentPositions * 0.1));
-    }
+  const calendarDays = useMemo(() => {
+    const month = selectedDate ? selectedDate.slice(0, 7) : d.leave.calendarMonth || todayYmd.slice(0, 7);
+    if (!month) return { label: '—', cells: [] as Array<number | null> };
+    const [y, m] = month.split('-').map(Number);
+    const first = new Date(Date.UTC(y, m - 1, 1));
+    const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+    const offset = first.getUTCDay();
+    const cells: Array<number | null> = Array.from({ length: offset }, () => null);
+    for (let day = 1; day <= daysInMonth; day++) cells.push(day);
+    const label = first.toLocaleDateString('en-IN', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    return { label, cells };
+  }, [selectedDate, d.leave.calendarMonth, todayYmd]);
 
-    const attendanceRate = ((present / (headcount || 1)) * 100).toFixed(1);
-
+  const ring = useMemo(() => {
+    const present = kpis.present;
+    const absent = kpis.absent;
+    const onLeave = kpis.onLeave;
+    const late = kpis.late;
+    const denom = Math.max(present + absent + late, 1);
+    const frac = (v: number) => Math.min(1, v / denom);
+    const f1 = frac(present);
+    const f2 = frac(absent);
+    const f3 = frac(onLeave);
+    const f4 = frac(late);
     return {
-      headcount: headcount.toLocaleString(),
-      newJoiners,
-      present: present.toLocaleString(),
-      attendanceRate,
-      absent,
-      unplannedAbsent,
-      onLeave,
-      returnTomorrow,
-      late,
-      lateFollowUp,
-      openPositions,
-      urgentPositions,
+      present: { dash: 377 - 377 * f1, rotate: 0 },
+      absent: { dash: 377 - 377 * f2, rotate: f1 * 360 },
+      onLeave: { dash: 377 - 377 * f3, rotate: (f1 + f2) * 360 },
+      late: { dash: 377 - 377 * f4, rotate: (f1 + f2 + f3) * 360 },
     };
-  }, [selectedHub, selectedDepartment]);
+  }, [kpis]);
 
-  // Export report action
+  const trendChart = useMemo(() => {
+    const trend = d.trend;
+    if (!trend.length) return null;
+    const values = trend.map((t) => t.headcount);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const span = Math.max(1, max - min);
+    const points = trend.map((t, i) => {
+      const x = 10 + (i * 300) / Math.max(1, trend.length - 1);
+      const y = 95 - 80 * ((t.headcount - min) / span);
+      return { x, y, val: t.headcount, month: t.month };
+    });
+    const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+    const areaPath = `${linePath} L ${points[points.length - 1].x.toFixed(1)} 95 L ${points[0].x.toFixed(1)} 95 Z`;
+    const growth = values[0] > 0 ? Math.round(((values[values.length - 1] - values[0]) / values[0]) * 10000) / 100 : null;
+    const maxFlow = Math.max(1, ...trend.map((t) => Math.max(t.joinings, t.exits)));
+    return { points, linePath, areaPath, growth, maxFlow };
+  }, [d.trend]);
+
+  const actionTotal = useMemo(() => {
+    const a = d.actionCenter;
+    return (
+      a.leaveRequestsPending +
+      a.correctionsPending +
+      a.documentsPending +
+      a.biometricSyncFailures +
+      a.probationReviewsDue +
+      a.resignationsPending +
+      a.fnfPending
+    );
+  }, [d.actionCenter]);
+
+  const complianceTotal = d.compliance.missingKyc + d.compliance.bankPending + d.compliance.pfEsiPending;
+
   const handleExportReport = () => {
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      'Metric,Value,Supporting Note\n' +
-      'Total Headcount,1372,+24 this month\n' +
-      'Present Today,1145,83.5% attendance\n' +
-      'Absent Today,46,12 unplanned absences\n' +
-      'On Leave,31,9 return tomorrow\n' +
-      'Late Arrivals,18,6 need follow-up\n' +
-      'Open Positions,12,4 urgent vacancies\n';
-    const encodedUri = encodeURI(csvContent);
+    if (!data) {
+      toast.error('Nothing to export — the command center has not loaded.');
+      return;
+    }
+    const rows: string[][] = [
+      ['Metric', 'Value', 'As of'],
+      ['Total Headcount', String(kpis.headcount), d.date],
+      ['New Joiners (Month)', String(kpis.newJoiners), d.date],
+      ['Present', String(kpis.present), d.date],
+      ['Attendance Rate %', kpis.attendanceRate != null ? String(kpis.attendanceRate) : '—', d.date],
+      ['Absent', String(kpis.absent), d.date],
+      ['Unplanned Absent', String(kpis.unplannedAbsent), d.date],
+      ['On Leave', String(kpis.onLeave), d.date],
+      ['Late Arrivals', String(kpis.late), d.date],
+      ['Face Verified', String(kpis.faceVerified), d.date],
+      ['Corrections Pending', String(d.actionCenter.correctionsPending), d.date],
+      ['Documents Pending', String(d.actionCenter.documentsPending), d.date],
+      ['Biometric Sync Failures', String(d.actionCenter.biometricSyncFailures), d.date],
+      ['Missing KYC (PAN/Aadhaar)', String(d.compliance.missingKyc), d.date],
+      ['Bank Details Pending', String(d.compliance.bankPending), d.date],
+      ['PF/ESI Pending', String(d.compliance.pfEsiPending), d.date],
+    ];
+    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `BSC_Textiles_Workforce_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.href = url;
+    link.download = `BSC_Workforce_Report_${d.date || new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    toast.success('Workforce Report exported successfully!');
+    window.URL.revokeObjectURL(url);
+    toast.success('Workforce report exported from live figures.');
   };
+
+  const kpiCardClass =
+    'p-4 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:shadow-md transition-all cursor-pointer group focus:outline-none focus:ring-2 active:scale-[0.99]';
+
+  const kpiCards: Array<{
+    key: KpiDrawerType;
+    label: string;
+    value: string;
+    icon: React.ReactNode;
+    iconClass: string;
+    hint: React.ReactNode;
+    hintClass: string;
+  }> = [
+    {
+      key: 'headcount',
+      label: 'Total Headcount',
+      value: kpis.headcount.toLocaleString(),
+      icon: <Users className="w-4 h-4" />,
+      iconClass: 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400',
+      hint: kpis.newJoiners > 0 ? `+${kpis.newJoiners} this month` : 'No joiners this month',
+      hintClass: 'text-blue-600 dark:text-blue-400',
+    },
+    {
+      key: 'present',
+      label: 'Present Today',
+      value: kpis.present.toLocaleString(),
+      icon: <UserCheck className="w-4 h-4" />,
+      iconClass: 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400',
+      hint: kpis.attendanceRate != null ? `${kpis.attendanceRate}% attendance` : 'Attendance rate unavailable',
+      hintClass: 'text-emerald-600 dark:text-emerald-400',
+    },
+    {
+      key: 'absent',
+      label: 'Absent Today',
+      value: kpis.absent.toLocaleString(),
+      icon: <UserX className="w-4 h-4" />,
+      iconClass: 'bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400',
+      hint: `${kpis.unplannedAbsent} without approved leave`,
+      hintClass: 'text-rose-600 dark:text-rose-400',
+    },
+    {
+      key: 'leave',
+      label: 'On Leave',
+      value: kpis.onLeave.toLocaleString(),
+      icon: <CalendarDays className="w-4 h-4" />,
+      iconClass: 'bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400',
+      hint: `${kpis.returnTomorrow} return tomorrow`,
+      hintClass: 'text-purple-600 dark:text-purple-400',
+    },
+    {
+      key: 'late',
+      label: 'Late Arrivals',
+      value: kpis.late.toLocaleString(),
+      icon: <Clock className="w-4 h-4" />,
+      iconClass: 'bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400',
+      hint: kpis.lateRate != null ? `${kpis.lateRate}% of present` : 'No present records',
+      hintClass: 'text-amber-600 dark:text-amber-400',
+    },
+    {
+      key: 'face_verified',
+      label: 'Face Verified',
+      value: kpis.faceVerified.toLocaleString(),
+      icon: <ScanFace className="w-4 h-4" />,
+      iconClass: 'bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400',
+      hint: 'Biometric matches today',
+      hintClass: 'text-indigo-600 dark:text-indigo-400',
+    },
+  ];
+
+  const colOf = (pct: number | null) =>
+    pct == null ? 'text-slate-500' : pct >= 90 ? 'text-emerald-600 dark:text-emerald-400' : pct >= 75 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400';
+  const barOf = (pct: number | null) =>
+    pct == null ? 'bg-slate-400' : pct >= 90 ? 'bg-emerald-500' : pct >= 75 ? 'bg-amber-500' : 'bg-rose-500';
 
   return (
     <div className="space-y-6">
-      {/* 4. MAIN DASHBOARD HEADING */}
+      {/* Heading */}
       <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 pb-2 border-b border-slate-200/80 dark:border-slate-800">
         <div>
           <div className="flex items-center gap-2 mb-1">
@@ -248,67 +389,65 @@ export function HrSuperAdminDashboard({ onOpenAddEmployee }: HrSuperAdminDashboa
             <span className="text-xs text-slate-400">•</span>
             <span className="flex items-center gap-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
               <Calendar className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-              Monday, 14 October 2024
+              {displayDate || 'Loading date…'}
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Good morning, Super Admin
-          </h1>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">{greeting}, Super Admin</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Here is your workforce overview for today across all textile showrooms, retail hubs, and central warehouses in Karnataka.
+            Live workforce figures straight from the HRMS database{d.date ? ` for ${d.date}` : ''}.
           </p>
         </div>
 
-        {/* Global Hub, Dept & Timeframe Filters + CTA Buttons */}
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Hub Selector */}
           <div className="relative">
             <select
               value={selectedHub}
               onChange={(e) => setSelectedHub(e.target.value)}
-              className="appearance-none bg-white dark:bg-[#131d36] text-slate-700 dark:text-slate-200 text-xs font-bold pl-3 pr-8 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              className="appearance-none bg-white dark:bg-[#131d36] text-slate-700 dark:text-slate-200 text-xs font-bold pl-3 pr-8 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
-              <option value="all">All Hubs (4 Locations)</option>
-              <option value="davanagere">Davanagere Mega Store</option>
-              <option value="belagavi">Belagavi Flagship</option>
-              <option value="hubli">Hubli Warehouse</option>
-              <option value="bengaluru">Bengaluru Store</option>
+              <option value="all">All Locations</option>
+              {hubs.map((h: any) => (
+                <option key={h.id} value={h.id}>
+                  {h.name}
+                </option>
+              ))}
             </select>
             <Building2 className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
 
-          {/* Department Selector */}
           <div className="relative">
             <select
               value={selectedDepartment}
               onChange={(e) => setSelectedDepartment(e.target.value)}
-              className="appearance-none bg-white dark:bg-[#131d36] text-slate-700 dark:text-slate-200 text-xs font-bold pl-3 pr-8 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+              className="appearance-none bg-white dark:bg-[#131d36] text-slate-700 dark:text-slate-200 text-xs font-bold pl-3 pr-8 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
             >
               <option value="all">All Departments</option>
-              <option value="sales">Sales & Retail (486)</option>
-              <option value="operations">Operations (312)</option>
-              <option value="warehouse">Warehouse (224)</option>
-              <option value="finance-hr">Finance & HR (86)</option>
-              <option value="others">Others (264)</option>
+              {departments.map((dept: any) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.name}
+                </option>
+              ))}
             </select>
             <Filter className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
 
-          {/* Timeframe Selector */}
-          <div className="relative">
-            <select
-              value={selectedTimeframe}
-              onChange={(e) => setSelectedTimeframe(e.target.value)}
-              className="appearance-none bg-white dark:bg-[#131d36] text-slate-700 dark:text-slate-200 text-xs font-bold pl-3 pr-8 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs hover:border-slate-300 dark:hover:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
-            >
-              <option value="today">Today</option>
-              <option value="week">This Week</option>
-              <option value="month">This Month</option>
-            </select>
-            <Clock className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="bg-white dark:bg-[#131d36] text-slate-700 dark:text-slate-200 text-xs font-bold px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+            aria-label="Report date"
+          />
 
-          {/* Secondary Action: Export Report */}
+          <button
+            onClick={() => fetchCommandCenter()}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#131d36] border border-slate-200 dark:border-slate-800 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-all cursor-pointer"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-slate-500 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </button>
+
           <button
             onClick={handleExportReport}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-white dark:bg-[#131d36] border border-slate-200 dark:border-slate-800 shadow-xs hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-blue-600 transition-all cursor-pointer"
@@ -317,14 +456,10 @@ export function HrSuperAdminDashboard({ onOpenAddEmployee }: HrSuperAdminDashboa
             <span>Export Report</span>
           </button>
 
-          {/* Primary Action: Add Employee */}
           <button
             onClick={() => {
-              if (onOpenAddEmployee) {
-                onOpenAddEmployee();
-              } else {
-                setIsAddEmployeeOpen(true);
-              }
+              if (onOpenAddEmployee) onOpenAddEmployee();
+              else setIsAddEmployeeOpen(true);
             }}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-600/20 active:scale-[0.98] transition-all cursor-pointer"
           >
@@ -334,340 +469,110 @@ export function HrSuperAdminDashboard({ onOpenAddEmployee }: HrSuperAdminDashboa
         </div>
       </div>
 
-      {/* 5. KPI SUMMARY CARDS IN THE FIRST ROW */}
+      {loadError && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-xl border border-rose-300 bg-rose-50 dark:bg-rose-950/40 dark:border-rose-800">
+          <p className="text-xs text-rose-900 dark:text-rose-200">
+            <strong>Command center could not be loaded.</strong> {loadError} No example figures are shown in place of missing data.
+          </p>
+          <button
+            onClick={() => fetchCommandCenter()}
+            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold inline-flex items-center gap-1.5"
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Retry
+          </button>
+        </div>
+      )}
+
+      {/* KPI cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {/* Card 1: Total Headcount */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setActiveKpiDrawer('headcount')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              setActiveKpiDrawer('headcount');
-            }
-          }}
-          aria-label={`Total Headcount: ${kpiStats.headcount}. Click to view workforce details.`}
-          className="p-4 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-blue-400/80 dark:hover:border-blue-600/80 transition-all cursor-pointer group focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-[#0e172a] active:scale-[0.99]"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-              Total Headcount
-            </span>
-            <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/60 transition-colors">
-              <Users className="w-4 h-4" />
+        {kpiCards.map((card) => (
+          <div
+            key={card.key}
+            role="button"
+            tabIndex={0}
+            onClick={() => setActiveKpiDrawer(card.key)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setActiveKpiDrawer(card.key);
+              }
+            }}
+            aria-label={`${card.label}: ${card.value}. Click to view details.`}
+            className={kpiCardClass}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                {card.label}
+              </span>
+              <div className={`p-2 rounded-xl ${card.iconClass}`}>{card.icon}</div>
             </div>
-          </div>
-          <div className="mt-2">
-            <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              {kpiStats.headcount}
-            </div>
-            <div className="flex items-center justify-between mt-1">
-              <div className="flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400">
-                <TrendingUp className="w-3.5 h-3.5 text-blue-600" />
-                <span>+{kpiStats.newJoiners} this month</span>
+            <div className="mt-2">
+              <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+                {loading && !data ? '…' : card.value}
               </div>
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold text-blue-600 dark:text-blue-400 flex items-center">
-                <span>View</span>
-                <ChevronRight className="w-3 h-3" />
+              <div className="flex items-center justify-between mt-1">
+                <div className={`text-[11px] font-semibold ${card.hintClass}`}>{card.hint}</div>
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold text-blue-600 dark:text-blue-400 flex items-center">
+                  <span>View</span>
+                  <ChevronRight className="w-3 h-3" />
+                </div>
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Card 2: Present Today */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setActiveKpiDrawer('present')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              setActiveKpiDrawer('present');
-            }
-          }}
-          aria-label={`Present Today: ${kpiStats.present}. Click to view present employees.`}
-          className="p-4 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-emerald-400/80 dark:hover:border-emerald-600/80 transition-all cursor-pointer group focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-[#0e172a] active:scale-[0.99]"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-              Present Today
-            </span>
-            <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/60 transition-colors">
-              <UserCheck className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              {kpiStats.present}
-            </div>
-            <div className="flex items-center justify-between mt-1">
-              <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>{kpiStats.attendanceRate}% attendance</span>
-              </div>
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center">
-                <span>View</span>
-                <ChevronRight className="w-3 h-3" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Absent Today */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setActiveKpiDrawer('absent')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              setActiveKpiDrawer('absent');
-            }
-          }}
-          aria-label={`Absent Today: ${kpiStats.absent}. Click to view absent employees.`}
-          className="p-4 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-rose-400/80 dark:hover:border-rose-600/80 transition-all cursor-pointer group focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2 dark:focus:ring-offset-[#0e172a] active:scale-[0.99]"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors">
-              Absent Today
-            </span>
-            <div className="p-2 rounded-xl bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 group-hover:bg-rose-100 dark:group-hover:bg-rose-900/60 transition-colors">
-              <UserX className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              {kpiStats.absent}
-            </div>
-            <div className="flex items-center justify-between mt-1">
-              <div className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
-                {kpiStats.unplannedAbsent} unplanned absences
-              </div>
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold text-rose-600 dark:text-rose-400 flex items-center">
-                <span>View</span>
-                <ChevronRight className="w-3 h-3" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 4: On Leave */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setActiveKpiDrawer('leave')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              setActiveKpiDrawer('leave');
-            }
-          }}
-          aria-label={`On Leave Today: ${kpiStats.onLeave}. Click to view leave details.`}
-          className="p-4 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-purple-400/80 dark:hover:border-purple-600/80 transition-all cursor-pointer group focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 dark:focus:ring-offset-[#0e172a] active:scale-[0.99]"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
-              On Leave
-            </span>
-            <div className="p-2 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/60 transition-colors">
-              <CalendarDays className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              {kpiStats.onLeave}
-            </div>
-            <div className="flex items-center justify-between mt-1">
-              <div className="text-[11px] font-semibold text-purple-600 dark:text-purple-400">
-                {kpiStats.returnTomorrow} return tomorrow
-              </div>
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold text-purple-600 dark:text-purple-400 flex items-center">
-                <span>View</span>
-                <ChevronRight className="w-3 h-3" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 5: Late Arrivals */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setActiveKpiDrawer('late')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              setActiveKpiDrawer('late');
-            }
-          }}
-          aria-label={`Late Arrivals: ${kpiStats.late}. Click to view late arrivals.`}
-          className="p-4 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-amber-400/80 dark:hover:border-amber-600/80 transition-all cursor-pointer group focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 dark:focus:ring-offset-[#0e172a] active:scale-[0.99]"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
-              Late Arrivals
-            </span>
-            <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 group-hover:bg-amber-100 dark:group-hover:bg-amber-900/60 transition-colors">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              {kpiStats.late}
-            </div>
-            <div className="flex items-center justify-between mt-1">
-              <div className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">
-                {kpiStats.lateFollowUp} need follow-up
-              </div>
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold text-amber-600 dark:text-amber-400 flex items-center">
-                <span>View</span>
-                <ChevronRight className="w-3 h-3" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 6: Open Positions */}
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={() => setActiveKpiDrawer('open_positions')}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              setActiveKpiDrawer('open_positions');
-            }
-          }}
-          aria-label={`Open Positions: ${kpiStats.openPositions}. Click to view recruitment requisitions.`}
-          className="p-4 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:shadow-md hover:border-indigo-400/80 dark:hover:border-indigo-600/80 transition-all cursor-pointer group focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-[#0e172a] active:scale-[0.99]"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-              Open Positions
-            </span>
-            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-900/60 transition-colors">
-              <Briefcase className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2">
-            <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">
-              {kpiStats.openPositions}
-            </div>
-            <div className="flex items-center justify-between mt-1">
-              <div className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400">
-                {kpiStats.urgentPositions} urgent vacancies
-              </div>
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-bold text-indigo-600 dark:text-indigo-400 flex items-center">
-                <span>View</span>
-                <ChevronRight className="w-3 h-3" />
-              </div>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* 6. MAIN DASHBOARD CONTENT: TWO-COLUMN LAYOUT (65% / 35%) */}
+      {/* Main two-column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* LEFT COLUMN: ~65% (8/12 COLS) */}
+        {/* LEFT */}
         <div className="lg:col-span-8 space-y-6">
-          {/* 7. LEFT COLUMN, FIRST LARGE CARD: Today's Attendance & Shift Coverage */}
+          {/* Attendance ring */}
           <div className="p-6 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100 dark:border-slate-800/80">
               <div>
-                <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
-                  Today’s Attendance & Shift Coverage
-                </h2>
+                <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">Today’s Attendance & Shift Coverage</h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Live workforce availability across all hubs
+                  {d.date ? `Records for ${d.date}` : 'No attendance date available'} across {d.hubs.length} location{d.hubs.length === 1 ? '' : 's'}
                 </p>
               </div>
-              <Link
-                href="/attendance/register"
-                className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:underline"
-              >
+              <Link href="/attendance/register" className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:underline">
                 <span>View Attendance Register</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
 
-            {/* Attendance Donut / Ring Chart + Legend */}
             <div className="py-6 flex flex-col md:flex-row items-center justify-around gap-6">
-              {/* SVG Interactive Ring Chart */}
               <div className="relative w-48 h-48 flex items-center justify-center">
                 <svg className="w-full h-full transform -rotate-90" viewBox="0 0 160 160">
-                  {/* Background Track */}
+                  <circle cx="80" cy="80" r="60" className="stroke-slate-100 dark:stroke-slate-800" strokeWidth="16" fill="transparent" />
                   <circle
-                    cx="80"
-                    cy="80"
-                    r="60"
-                    className="stroke-slate-100 dark:stroke-slate-800"
-                    strokeWidth="16"
-                    fill="transparent"
-                  />
-                  {/* Segment: Present 1,145 (91.4%) */}
-                  <circle
-                    cx="80"
-                    cy="80"
-                    r="60"
-                    stroke="#10b981"
-                    strokeWidth="16"
-                    strokeDasharray="377"
-                    strokeDashoffset={377 - (377 * 1145) / 1252}
-                    fill="transparent"
-                    strokeLinecap="round"
+                    cx="80" cy="80" r="60" stroke="#10b981" strokeWidth="16" strokeDasharray="377"
+                    strokeDashoffset={ring.present.dash} fill="transparent" strokeLinecap="round"
                     className="transition-all duration-500 cursor-pointer hover:opacity-90"
-                    onMouseEnter={() => setHoveredSlice('Present: 1,145')}
-                    onMouseLeave={() => setHoveredSlice(null)}
+                    onMouseEnter={() => setHoveredSlice(`Present: ${kpis.present}`)} onMouseLeave={() => setHoveredSlice(null)}
                   />
-                  {/* Segment: Absent 46 */}
                   <circle
-                    cx="80"
-                    cy="80"
-                    r="60"
-                    stroke="#ef4444"
-                    strokeWidth="16"
-                    strokeDasharray="377"
-                    strokeDashoffset={377 - (377 * 46) / 1252}
-                    fill="transparent"
+                    cx="80" cy="80" r="60" stroke="#ef4444" strokeWidth="16" strokeDasharray="377"
+                    strokeDashoffset={ring.absent.dash} fill="transparent"
+                    transform={`rotate(${ring.absent.rotate} 80 80)`}
                     className="transition-all duration-500 cursor-pointer hover:opacity-90"
-                    transform="rotate(320 80 80)"
-                    onMouseEnter={() => setHoveredSlice('Absent: 46')}
-                    onMouseLeave={() => setHoveredSlice(null)}
+                    onMouseEnter={() => setHoveredSlice(`Absent: ${kpis.absent}`)} onMouseLeave={() => setHoveredSlice(null)}
                   />
-                  {/* Segment: On Leave 31 */}
                   <circle
-                    cx="80"
-                    cy="80"
-                    r="60"
-                    stroke="#8b5cf6"
-                    strokeWidth="16"
-                    strokeDasharray="377"
-                    strokeDashoffset={377 - (377 * 31) / 1252}
-                    fill="transparent"
+                    cx="80" cy="80" r="60" stroke="#8b5cf6" strokeWidth="16" strokeDasharray="377"
+                    strokeDashoffset={ring.onLeave.dash} fill="transparent"
+                    transform={`rotate(${ring.onLeave.rotate} 80 80)`}
                     className="transition-all duration-500 cursor-pointer hover:opacity-90"
-                    transform="rotate(334 80 80)"
-                    onMouseEnter={() => setHoveredSlice('On Leave: 31')}
-                    onMouseLeave={() => setHoveredSlice(null)}
+                    onMouseEnter={() => setHoveredSlice(`On Leave: ${kpis.onLeave}`)} onMouseLeave={() => setHoveredSlice(null)}
                   />
-                  {/* Segment: Late 18 */}
                   <circle
-                    cx="80"
-                    cy="80"
-                    r="60"
-                    stroke="#f59e0b"
-                    strokeWidth="16"
-                    strokeDasharray="377"
-                    strokeDashoffset={377 - (377 * 18) / 1252}
-                    fill="transparent"
+                    cx="80" cy="80" r="60" stroke="#f59e0b" strokeWidth="16" strokeDasharray="377"
+                    strokeDashoffset={ring.late.dash} fill="transparent"
+                    transform={`rotate(${ring.late.rotate} 80 80)`}
                     className="transition-all duration-500 cursor-pointer hover:opacity-90"
-                    transform="rotate(344 80 80)"
-                    onMouseEnter={() => setHoveredSlice('Late: 18')}
-                    onMouseLeave={() => setHoveredSlice(null)}
+                    onMouseEnter={() => setHoveredSlice(`Late: ${kpis.late}`)} onMouseLeave={() => setHoveredSlice(null)}
                   />
                 </svg>
-
-                {/* Donut Center Content */}
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
                   {hoveredSlice ? (
                     <div className="animate-in fade-in duration-150">
@@ -676,173 +581,100 @@ export function HrSuperAdminDashboard({ onOpenAddEmployee }: HrSuperAdminDashboa
                     </div>
                   ) : (
                     <>
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total</span>
-                      <span className="text-xl font-black text-slate-900 dark:text-white">1,252</span>
-                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">91.5% Active</span>
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Headcount</span>
+                      <span className="text-xl font-black text-slate-900 dark:text-white">{kpis.headcount.toLocaleString()}</span>
+                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                        {kpis.attendanceRate != null ? `${kpis.attendanceRate}% present` : 'Attendance rate —'}
+                      </span>
                     </>
                   )}
                 </div>
               </div>
 
-              {/* Legend with explicit counts */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 w-full max-w-md">
-                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#10b981]" />
-                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Present</span>
+                {[
+                  { label: 'Present', value: kpis.present, dot: 'bg-[#10b981]' },
+                  { label: 'Absent', value: kpis.absent, dot: 'bg-[#ef4444]' },
+                  { label: 'On Leave', value: kpis.onLeave, dot: 'bg-[#8b5cf6]' },
+                  { label: 'Late', value: kpis.late, dot: 'bg-[#f59e0b]' },
+                  { label: 'Face Verified', value: kpis.faceVerified, dot: 'bg-blue-500' },
+                  { label: 'Headcount', value: kpis.headcount, dot: 'bg-slate-400' },
+                ].map((tile) => (
+                  <div key={tile.label} className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2.5 h-2.5 rounded-full ${tile.dot}`} />
+                      <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{tile.label}</span>
+                    </div>
+                    <div className="text-base font-black text-slate-900 dark:text-white mt-1">{tile.value.toLocaleString()}</div>
                   </div>
-                  <div className="text-base font-black text-slate-900 dark:text-white mt-1">1,145</div>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444]" />
-                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Absent</span>
-                  </div>
-                  <div className="text-base font-black text-slate-900 dark:text-white mt-1">46</div>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#8b5cf6]" />
-                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">On Leave</span>
-                  </div>
-                  <div className="text-base font-black text-slate-900 dark:text-white mt-1">31</div>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b]" />
-                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Late</span>
-                  </div>
-                  <div className="text-base font-black text-slate-900 dark:text-white mt-1">18</div>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#94a3b8]" />
-                    <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Not Punched</span>
-                  </div>
-                  <div className="text-base font-black text-slate-900 dark:text-white mt-1">12</div>
-                </div>
-
-                <div className="p-2.5 rounded-xl bg-blue-50/50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                    <span className="text-xs font-bold text-blue-700 dark:text-blue-300">Scheduled</span>
-                  </div>
-                  <div className="text-base font-black text-blue-700 dark:text-blue-300 mt-1">1,252</div>
-                </div>
+                ))}
               </div>
             </div>
 
-            {/* Hub-wise coverage progress */}
+            {/* Hub-wise coverage */}
             <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 space-y-3.5">
-              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
-                Hub-wise Shift Coverage
-              </span>
-
-              {/* Davanagere Mega Store — 92% Coverage — green progress bar */}
-              <div>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="font-bold text-slate-800 dark:text-slate-200">Davanagere Mega Store</span>
-                  <span className="font-extrabold text-emerald-600 dark:text-emerald-400">92% Coverage</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: '92%' }} />
-                </div>
-              </div>
-
-              {/* Belagavi Flagship — 78% Coverage — amber progress bar and “Needs Attention” badge */}
-              <div>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-800 dark:text-slate-200">Belagavi Flagship</span>
-                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
-                      Needs Attention
-                    </span>
+              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">Location-wise Presence</span>
+              {d.hubs.length === 0 ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400">No location-wise attendance records for this day.</p>
+              ) : (
+                d.hubs.map((hub) => (
+                  <div key={hub.locationId}>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{hub.name}</span>
+                        {hub.coveragePct != null && hub.coveragePct < 75 && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                            Needs Attention
+                          </span>
+                        )}
+                      </div>
+                      <span className={`font-extrabold ${colOf(hub.coveragePct)}`}>
+                        {hub.coveragePct != null ? `${hub.coveragePct}%` : '—'}
+                        <span className="text-slate-400 font-semibold"> ({hub.present}/{hub.headcount})</span>
+                      </span>
+                    </div>
+                    <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                      <div className={`h-full rounded-full transition-all duration-500 ${barOf(hub.coveragePct)}`} style={{ width: `${Math.min(100, hub.coveragePct ?? 0)}%` }} />
+                    </div>
                   </div>
-                  <span className="font-extrabold text-amber-600 dark:text-amber-400">78% Coverage</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                  <div className="h-full bg-amber-500 rounded-full transition-all duration-500" style={{ width: '78%' }} />
-                </div>
-              </div>
-
-              {/* Hubli Warehouse — 96% Coverage — green progress bar */}
-              <div>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="font-bold text-slate-800 dark:text-slate-200">Hubli Warehouse</span>
-                  <span className="font-extrabold text-emerald-600 dark:text-emerald-400">96% Coverage</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: '96%' }} />
-                </div>
-              </div>
-
-              {/* Bengaluru Store — 88% Coverage — blue progress bar */}
-              <div>
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="font-bold text-slate-800 dark:text-slate-200">Bengaluru Store</span>
-                  <span className="font-extrabold text-blue-600 dark:text-blue-400">88% Coverage</span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                  <div className="h-full bg-blue-600 rounded-full transition-all duration-500" style={{ width: '88%' }} />
-                </div>
-              </div>
+                ))
+              )}
             </div>
           </div>
 
-          {/* 9. LEFT COLUMN, SECOND ROW: Leave Availability & Upcoming Absences */}
+          {/* Leave availability */}
           <div className="p-6 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100 dark:border-slate-800/80">
               <div>
-                <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
-                  Leave Availability & Upcoming Absences
-                </h2>
+                <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">Leave Availability & Upcoming Absences</h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  October 2024 monthly availability and team conflict analysis
+                  Approved leaves on record{calendarDays.label !== '—' ? ` • ${calendarDays.label}` : ''}
                 </p>
               </div>
-              <Link
-                href="/leaves"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 transition-colors"
-              >
+              <Link href="/leaves" className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 transition-colors">
                 <span>Open Leave Calendar</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 pt-5">
-              {/* Mini Monthly Calendar for October 2024 */}
               <div className="md:col-span-6 p-4 rounded-xl bg-slate-50/70 dark:bg-slate-800/30 border border-slate-200/60 dark:border-slate-800">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-black text-slate-800 dark:text-slate-200">October 2024</span>
-                  <span className="text-[10px] font-bold text-slate-400">Festival Peak Period</span>
+                  <span className="text-xs font-black text-slate-800 dark:text-slate-200">{calendarDays.label}</span>
+                  <span className="text-[10px] font-bold text-slate-400">Dots = approved leaves</span>
                 </div>
-
-                {/* Weekday headers */}
                 <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-extrabold text-slate-400 mb-1">
-                  <span>Su</span>
-                  <span>Mo</span>
-                  <span>Tu</span>
-                  <span>We</span>
-                  <span>Th</span>
-                  <span>Fr</span>
-                  <span>Sa</span>
+                  {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((w) => (
+                    <span key={w}>{w}</span>
+                  ))}
                 </div>
-
-                {/* Calendar Days */}
                 <div className="grid grid-cols-7 gap-1 text-center text-xs">
-                  {/* Empty cells for Sep offset (Oct 2024 starts on Tuesday) */}
-                  <div className="py-1.5 text-slate-300 dark:text-slate-600">29</div>
-                  <div className="py-1.5 text-slate-300 dark:text-slate-600">30</div>
-
-                  {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
+                  {calendarDays.cells.map((day, idx) => {
+                    if (day === null) return <div key={`pad-${idx}`} className="py-1.5" />;
+                    const dayStr = `${calendarDays.label === '—' ? '' : selectedDate.slice(0, 8)}${String(day).padStart(2, '0')}`;
+                    const dots = leaveDots.get(day);
+                    const isToday = todayYmd && dayStr === todayYmd;
                     const isSelected = selectedCalendarDay === day;
-                    const highLeave = highLeaveDays[day];
-                    const isToday = day === 14;
-
                     return (
                       <button
                         key={day}
@@ -854,22 +686,18 @@ export function HrSuperAdminDashboard({ onOpenAddEmployee }: HrSuperAdminDashboa
                             ? 'bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
                             : 'text-slate-700 dark:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'
                         }`}
+                        title={dots ? `${dots} approved leave${dots === 1 ? '' : 's'}` : 'No approved leaves'}
                       >
                         <span>{day}</span>
-                        {highLeave && (
-                          <span
-                            className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full ${
-                              highLeave.severity === 'red' ? 'bg-rose-500' : 'bg-amber-500'
-                            }`}
-                          />
-                        )}
+                        {dots ? (
+                          <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full ${dots >= 5 ? 'bg-rose-500' : 'bg-amber-500'}`} />
+                        ) : null}
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Leave Summary Metrics */}
               <div className="md:col-span-6 flex flex-col justify-between space-y-3">
                 <div className="p-3.5 rounded-xl bg-purple-50/60 dark:bg-purple-950/30 border border-purple-100 dark:border-purple-900/50">
                   <div className="flex items-center gap-2">
@@ -877,11 +705,13 @@ export function HrSuperAdminDashboard({ onOpenAddEmployee }: HrSuperAdminDashboa
                       <CalendarDays className="w-4 h-4" />
                     </span>
                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      31 Employees on Leave Today
+                      {kpis.onLeave} Employee{kpis.onLeave === 1 ? '' : 's'} on Leave Today
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 pl-8">
-                    18 Planned Privilege Leaves, 9 Casual Leaves, 4 Sick Leaves.
+                    {d.leave.onLeaveTodayByType.length > 0
+                      ? d.leave.onLeaveTodayByType.map((t) => `${t.count} ${t.name}`).join(', ')
+                      : 'No approved leave applications cover today.'}
                   </p>
                 </div>
 
@@ -891,11 +721,11 @@ export function HrSuperAdminDashboard({ onOpenAddEmployee }: HrSuperAdminDashboa
                       <AlertTriangle className="w-4 h-4" />
                     </span>
                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      9 Upcoming Team Availability Conflicts
+                      {d.leave.upcomingRequests} Upcoming Leave Request{d.leave.upcomingRequests === 1 ? '' : 's'} (Next 7 Days)
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 pl-8">
-                    Belagavi showroom sales counter has 5 overlapping requests for 18–20 Oct.
+                    Pending requests starting within a week are counted here.
                   </p>
                 </div>
 
@@ -905,214 +735,89 @@ export function HrSuperAdminDashboard({ onOpenAddEmployee }: HrSuperAdminDashboa
                       <Clock className="w-4 h-4" />
                     </span>
                     <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                      14 Leave Requests Pending Approval
+                      {d.leave.pendingRequests} Leave Request{d.leave.pendingRequests === 1 ? '' : 's'} Pending Approval
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 pl-8">
-                    Managers have reviewed 8; 6 awaiting HR Super Admin sign-off.
-                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 pl-8">Awaiting HR Super Admin sign-off in the leave ledger.</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: ~35% (4/12 COLS) */}
+        {/* RIGHT */}
         <div className="lg:col-span-4 space-y-6">
-          {/* 8. RIGHT COLUMN, FIRST LARGE CARD: Action Center */}
+          {/* Action Center */}
           <div className="p-6 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs">
             <div className="pb-4 border-b border-slate-100 dark:border-slate-800/80">
               <div className="flex items-center justify-between">
-                <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
-                  Action Center
-                </h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30">
-                  48 Pending
+                <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">Action Center</h2>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${actionTotal > 0 ? 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30' : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:border-slate-700'}`}>
+                  {actionTotal} Pending
                 </span>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Pending approvals and items needing attention
-              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Pending approvals and items needing attention</p>
             </div>
 
-            {/* Interactive Task Rows */}
             <div className="divide-y divide-slate-100 dark:divide-slate-800/80">
-              {/* 12 Leave Requests Pending — red/urgent */}
-              <Link
-                href="/leaves"
-                className="py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 px-2 -mx-2 rounded-xl transition-colors group"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse" />
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 transition-colors">
-                    12 Leave Requests Pending
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900">
-                    Urgent
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-              </Link>
-
-              {/* 8 Attendance Regularization Requests — orange */}
-              <Link
-                href="/attendance/missed-punching"
-                className="py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 px-2 -mx-2 rounded-xl transition-colors group"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="w-2.5 h-2.5 rounded-full bg-orange-500" />
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 transition-colors">
-                    8 Attendance Regularization Requests
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-900">
-                    Review
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-              </Link>
-
-              {/* 15 Employee Documents Pending — orange */}
-              <Link
-                href="/employees/documents"
-                className="py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 px-2 -mx-2 rounded-xl transition-colors group"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 transition-colors">
-                    15 Employee Documents Pending
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900">
-                    Dossier
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-              </Link>
-
-              {/* 6 Biometric Sync Failures — red */}
-              <Link
-                href="/attendance/devices"
-                className="py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 px-2 -mx-2 rounded-xl transition-colors group"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 transition-colors">
-                    6 Biometric Sync Failures
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-900">
-                    eSSL IoT
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-              </Link>
-
-              {/* 4 Probation Reviews Due — blue */}
-              <Link
-                href="/employees"
-                className="py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 px-2 -mx-2 rounded-xl transition-colors group"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 transition-colors">
-                    4 Probation Reviews Due
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-900">
-                    HR Review
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-              </Link>
-
-              {/* 3 Resignation Requests — purple */}
-              <Link
-                href="/employees/former"
-                className="py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 px-2 -mx-2 rounded-xl transition-colors group"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="w-2.5 h-2.5 rounded-full bg-purple-500" />
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 transition-colors">
-                    3 Resignation Requests
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-900">
-                    Notice
-                  </span>
-                  <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
-                </div>
-              </Link>
+              {[
+                { label: `${d.actionCenter.leaveRequestsPending} Leave Requests Pending`, href: '/leaves', tag: 'Urgent', tagClass: 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900', dot: 'bg-rose-500' },
+                { label: `${d.actionCenter.correctionsPending} Attendance Corrections Pending`, href: '/attendance/missed-punching', tag: 'Review', tagClass: 'bg-orange-50 dark:bg-orange-950/60 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900', dot: 'bg-orange-500' },
+                { label: `${d.actionCenter.documentsPending} Employee Documents Pending`, href: '/employees/documents', tag: 'Dossier', tagClass: 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900', dot: 'bg-amber-500' },
+                { label: `${d.actionCenter.biometricSyncFailures} Biometric Sync Failures`, href: '/attendance/devices', tag: 'eSSL IoT', tagClass: 'bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900', dot: 'bg-rose-500' },
+                { label: `${d.actionCenter.probationReviewsDue} Probation Reviews Due`, href: '/employees', tag: 'HR Review', tagClass: 'bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900', dot: 'bg-blue-500' },
+                { label: `${d.actionCenter.resignationsPending} Resignation / Exit Records`, href: '/employees/former', tag: 'Notice', tagClass: 'bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-900', dot: 'bg-purple-500' },
+                { label: `${d.actionCenter.fnfPending} F&F Settlements Pending`, href: '/employees/former', tag: 'F&F', tagClass: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700', dot: 'bg-slate-400' },
+              ].map((row) => (
+                <Link key={row.label} href={row.href} className="py-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/40 px-2 -mx-2 rounded-xl transition-colors group">
+                  <div className="flex items-center gap-3">
+                    <span className={`w-2.5 h-2.5 rounded-full ${row.dot}`} />
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 group-hover:text-blue-600 transition-colors">{row.label}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${row.tagClass}`}>{row.tag}</span>
+                    <ChevronRight className="w-4 h-4 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                </Link>
+              ))}
             </div>
 
-            {/* Bottom link: View All Pending Actions → */}
             <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80">
-              <Link
-                href="/organization/approvals"
-                className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 transition-colors"
-              >
+              <Link href="/organization/approvals" className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 transition-colors">
                 <span>View All Pending Actions →</span>
               </Link>
             </div>
           </div>
 
-          {/* 10. RIGHT COLUMN, SECOND CARD: Compliance Watch */}
+          {/* Compliance Watch */}
           <div className="p-6 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs">
             <div className="pb-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
               <div>
-                <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
-                  Compliance Watch
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Statutory and employee documentation alerts
-                </p>
+                <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">Compliance Watch</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Statutory and employee documentation alerts</p>
               </div>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30">
-                4 Critical
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${complianceTotal > 0 ? 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30' : 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30'}`}>
+                {complianceTotal > 0 ? `${complianceTotal} Open` : 'Clear'}
               </span>
             </div>
 
-            {/* Compact Alert Items */}
             <div className="py-4 space-y-3">
               <div className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-rose-500 mt-1 shrink-0" />
-                <span>21 Employees Missing Aadhaar/PAN Documents</span>
+                <span className={`w-2 h-2 rounded-full mt-1 shrink-0 ${d.compliance.missingKyc > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                <span>{d.compliance.missingKyc} Active Employees Missing Verified PAN / Aadhaar</span>
               </div>
               <div className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-amber-500 mt-1 shrink-0" />
-                <span>8 Bank Account Verifications Pending</span>
+                <span className={`w-2 h-2 rounded-full mt-1 shrink-0 ${d.compliance.bankPending > 0 ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                <span>{d.compliance.bankPending} Bank Account Details Pending</span>
               </div>
               <div className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-rose-500 mt-1 shrink-0" />
-                <span>4 PF/ESI Enrollments Pending</span>
-              </div>
-              <div className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-blue-500 mt-1 shrink-0" />
-                <span>6 Offer Letters Awaiting Signature</span>
-              </div>
-              <div className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-amber-500 mt-1 shrink-0" />
-                <span>3 Employee IDs Expiring This Month</span>
-              </div>
-              <div className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-purple-500 mt-1 shrink-0" />
-                <span>2 Shops & Establishments Compliance Tasks Due</span>
+                <span className={`w-2 h-2 rounded-full mt-1 shrink-0 ${d.compliance.pfEsiPending > 0 ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                <span>{d.compliance.pfEsiPending} PF / ESI Enrollments Pending</span>
               </div>
             </div>
 
-            {/* Action button: Review Compliance */}
             <div className="pt-2">
-              <Link
-                href="/reports"
-                className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors"
-              >
+              <Link href="/reports" className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors">
                 <span>Review Compliance</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </Link>
@@ -1121,215 +826,144 @@ export function HrSuperAdminDashboard({ onOpenAddEmployee }: HrSuperAdminDashboa
         </div>
       </div>
 
-      {/* 11. LOWER DASHBOARD SECTION: 4 EQUAL OPERATIONAL CARDS */}
+      {/* Operational cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Card 1: Onboarding */}
         <div className="p-5 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:shadow-md transition-all">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Onboarding
-              </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                Joining Week
-              </span>
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Onboarding</span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">Joining Week</span>
             </div>
-            <div className="text-3xl font-black text-slate-900 dark:text-white mt-2">8</div>
-            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-1">
-              Employees joining this week
-            </p>
+            <div className="text-3xl font-black text-slate-900 dark:text-white mt-2">{d.onboarding.joiningThisWeek}</div>
+            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-1">Employees joining this week</p>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              3 documents pending · 2 assets pending
+              {d.onboarding.documentsPending} documents pending · {d.onboarding.assetsPending} assets pending
             </p>
           </div>
           <div className="pt-4 mt-2">
-            <Link
-              href="/employees?filter=onboarding"
-              className="flex items-center justify-center w-full py-2 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 transition-colors"
-            >
+            <Link href="/employees?filter=onboarding" className="flex items-center justify-center w-full py-2 rounded-xl text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 transition-colors">
               View Onboarding
             </Link>
           </div>
         </div>
 
-        {/* Card 2: Payroll Readiness */}
         <div className="p-5 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:shadow-md transition-all">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Payroll Readiness
-              </span>
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Payroll Readiness</span>
               <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
-                Oct Cycle
+                {d.payrollReadiness.runStatus || 'No Run'}
               </span>
             </div>
-            <div className="text-3xl font-black text-slate-900 dark:text-white mt-2">94%</div>
-            {/* Horizontal progress bar */}
+            <div className="text-3xl font-black text-slate-900 dark:text-white mt-2">
+              {d.payrollReadiness.coveragePct != null ? `${d.payrollReadiness.coveragePct}%` : '—'}
+            </div>
             <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 mt-2 overflow-hidden">
-              <div className="h-full bg-emerald-500 rounded-full" style={{ width: '94%' }} />
+              <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(100, d.payrollReadiness.coveragePct ?? 0)}%` }} />
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2">
-              12 employee records need review
+              {d.payrollReadiness.payslipCount} payslip{d.payrollReadiness.payslipCount === 1 ? '' : 's'} for the latest run
+              {d.payrollReadiness.periodStart ? ` (${fmtDate(d.payrollReadiness.periodStart)} → ${fmtDate(d.payrollReadiness.periodEnd)})` : ''}
             </p>
           </div>
           <div className="pt-4 mt-2">
-            <Link
-              href="/payroll"
-              className="flex items-center justify-center w-full py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 transition-colors"
-            >
+            <Link href="/payroll" className="flex items-center justify-center w-full py-2 rounded-xl text-xs font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 transition-colors">
               Open Payroll Checklist
             </Link>
           </div>
         </div>
 
-        {/* Card 3: Recruitment Pipeline */}
         <div className="p-5 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:shadow-md transition-all">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Recruitment Pipeline
-              </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                12 Roles
-              </span>
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Recruitment Pipeline</span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">Hiring</span>
             </div>
-            <div className="text-3xl font-black text-slate-900 dark:text-white mt-2">86</div>
-            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-1">
-              Active candidates
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              9 interviews today · 4 offers pending
-            </p>
+            <div className="text-3xl font-black text-slate-900 dark:text-white mt-2">{d.recruitment.activeCandidates}</div>
+            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-1">Active candidates</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{d.recruitment.interviewsToday} interviews today</p>
           </div>
           <div className="pt-4 mt-2">
-            <Link
-              href="/organization/approvals"
-              className="flex items-center justify-center w-full py-2 rounded-xl text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 transition-colors"
-            >
+            <Link href="/hiring/candidates" className="flex items-center justify-center w-full py-2 rounded-xl text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 transition-colors">
               View Recruitment
             </Link>
           </div>
         </div>
 
-        {/* Card 4: Employee Lifecycle */}
         <div className="p-5 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between hover:shadow-md transition-all">
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Employee Lifecycle
-              </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
-                Exits & F&F
-              </span>
+              <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Employee Lifecycle</span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-300">Exits & F&F</span>
             </div>
-            <div className="text-3xl font-black text-slate-900 dark:text-white mt-2">6</div>
-            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-1">
-              Employees on notice period
-            </p>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-              3 F&F settlements pending
-            </p>
+            <div className="text-3xl font-black text-slate-900 dark:text-white mt-2">{d.actionCenter.resignationsPending}</div>
+            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mt-1">Exit records in process</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">{d.actionCenter.fnfPending} F&F settlements pending</p>
           </div>
           <div className="pt-4 mt-2">
-            <Link
-              href="/employees/former"
-              className="flex items-center justify-center w-full py-2 rounded-xl text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 transition-colors"
-            >
+            <Link href="/employees/former" className="flex items-center justify-center w-full py-2 rounded-xl text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 transition-colors">
               View Separations
             </Link>
           </div>
         </div>
       </div>
 
-      {/* 12. BOTTOM ANALYTICS AREA (WORKFORCE INSIGHTS & ANNOUNCEMENTS) */}
+      {/* Workforce insights + engagements */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* 12. Workforce Insights Card (Larger: 8/12 cols) */}
         <div className="lg:col-span-8 p-6 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100 dark:border-slate-800/80">
             <div>
-              <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
-                Workforce Insights
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                6-month headcount growth, joinings vs exits, and department distribution
-              </p>
+              <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">Workforce Insights</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">6-month headcount trend, joinings vs exits, and department distribution</p>
             </div>
-            <Link
-              href="/employees/analysis"
-              className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:underline"
-            >
+            <Link href="/employees/analysis" className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 hover:underline">
               <span>View Workforce Analytics</span>
               <ChevronRight className="w-3.5 h-3.5" />
             </Link>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 pt-5">
-            {/* Charts Column (7/12) */}
             <div className="md:col-span-7 space-y-6">
-              {/* Line chart: Headcount trend for the last 6 months */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                    Headcount Trend (Last 6 Months)
-                  </span>
-                  <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                    +7.18% Growth
-                  </span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Headcount Trend (Last 6 Months)</span>
+                  {trendChart?.growth != null && (
+                    <span className={`text-[11px] font-bold ${trendChart.growth >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                      {trendChart.growth >= 0 ? '+' : ''}{trendChart.growth}% Growth
+                    </span>
+                  )}
                 </div>
-                {/* SVG Line Chart */}
-                <div className="h-32 w-full">
-                  <svg className="w-full h-full overflow-visible" viewBox="0 0 320 100">
-                    <defs>
-                      <linearGradient id="hcGradient" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#0058be" stopOpacity="0.25" />
-                        <stop offset="100%" stopColor="#0058be" stopOpacity="0.0" />
-                      </linearGradient>
-                    </defs>
-                    {/* Area fill */}
-                    <path
-                      d="M 10 75 L 70 60 L 130 45 L 190 38 L 250 32 L 310 15 L 310 95 L 10 95 Z"
-                      fill="url(#hcGradient)"
-                    />
-                    {/* Line path */}
-                    <path
-                      d="M 10 75 L 70 60 L 130 45 L 190 38 L 250 32 L 310 15"
-                      fill="none"
-                      stroke="#0058be"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                    />
-                    {/* Data dots */}
-                    {[
-                      { x: 10, y: 75, val: '1,280' },
-                      { x: 70, y: 60, val: '1,304' },
-                      { x: 130, y: 45, val: '1,328' },
-                      { x: 190, y: 38, val: '1,340' },
-                      { x: 250, y: 32, val: '1,348' },
-                      { x: 310, y: 15, val: '1,372' },
-                    ].map((pt, i) => (
-                      <g key={i}>
-                        <circle cx={pt.x} cy={pt.y} r="3.5" fill="#0058be" className="stroke-white dark:stroke-slate-900 stroke-2" />
-                      </g>
-                    ))}
-                  </svg>
-                  {/* Month X-Labels */}
-                  <div className="flex justify-between text-[10px] font-bold text-slate-400 mt-1">
-                    <span>May</span>
-                    <span>Jun</span>
-                    <span>Jul</span>
-                    <span>Aug</span>
-                    <span>Sep</span>
-                    <span>Oct</span>
+                {!trendChart ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">No workforce history available.</p>
+                ) : (
+                  <div className="h-32 w-full">
+                    <svg className="w-full h-full overflow-visible" viewBox="0 0 320 100">
+                      <defs>
+                        <linearGradient id="hcGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#0058be" stopOpacity="0.25" />
+                          <stop offset="100%" stopColor="#0058be" stopOpacity="0.0" />
+                        </linearGradient>
+                      </defs>
+                      <path d={trendChart.areaPath} fill="url(#hcGradient)" />
+                      <path d={trendChart.linePath} fill="none" stroke="#0058be" strokeWidth="2.5" strokeLinecap="round" />
+                      {trendChart.points.map((pt) => (
+                        <circle key={pt.month + pt.x} cx={pt.x} cy={pt.y} r="3.5" fill="#0058be" className="stroke-white dark:stroke-slate-900 stroke-2">
+                          <title>{`${pt.month}: ${pt.val} employees`}</title>
+                        </circle>
+                      ))}
+                    </svg>
+                    <div className="flex justify-between text-[10px] font-bold text-slate-400 mt-1">
+                      {d.trend.map((t) => (
+                        <span key={t.month}>{t.month}</span>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
-              {/* Grouped Bar Chart: Joinings vs Exits */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                    Joinings vs Exits
-                  </span>
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Joinings vs Exits</span>
                   <div className="flex items-center gap-3 text-[10px] font-bold">
                     <span className="flex items-center gap-1 text-emerald-600">
                       <span className="w-2 h-2 rounded-full bg-emerald-500" /> Joinings
@@ -1339,210 +973,110 @@ export function HrSuperAdminDashboard({ onOpenAddEmployee }: HrSuperAdminDashboa
                     </span>
                   </div>
                 </div>
-                {/* SVG Bar Chart */}
-                <div className="h-28 w-full flex items-end justify-between gap-2 px-2 pt-2 border-b border-slate-100 dark:border-slate-800">
-                  {workforceTrend.map((item, idx) => (
-                    <div key={item.month} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
-                      <div className="flex items-end gap-1 w-full justify-center h-20">
-                        {/* Joining bar */}
-                        <div
-                          className="w-2.5 sm:w-3.5 bg-emerald-500 hover:bg-emerald-600 rounded-t-sm transition-all"
-                          style={{ height: `${(item.joinings / 40) * 100}%` }}
-                          title={`${item.month} Joinings: ${item.joinings}`}
-                        />
-                        {/* Exit bar */}
-                        <div
-                          className="w-2.5 sm:w-3.5 bg-rose-400 hover:bg-rose-500 rounded-t-sm transition-all"
-                          style={{ height: `${(item.exits / 40) * 100}%` }}
-                          title={`${item.month} Exits: ${item.exits}`}
-                        />
+                {d.trend.length === 0 ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">No joining or exit records yet.</p>
+                ) : (
+                  <div className="h-28 w-full flex items-end justify-between gap-2 px-2 pt-2 border-b border-slate-100 dark:border-slate-800">
+                    {d.trend.map((item) => (
+                      <div key={item.month} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
+                        <div className="flex items-end gap-1 w-full justify-center h-20">
+                          <div
+                            className="w-2.5 sm:w-3.5 bg-emerald-500 hover:bg-emerald-600 rounded-t-sm transition-all"
+                            style={{ height: `${trendChart ? (item.joinings / trendChart.maxFlow) * 100 : 0}%` }}
+                            title={`${item.month} Joinings: ${item.joinings}`}
+                          />
+                          <div
+                            className="w-2.5 sm:w-3.5 bg-rose-400 hover:bg-rose-500 rounded-t-sm transition-all"
+                            style={{ height: `${trendChart ? (item.exits / trendChart.maxFlow) * 100 : 0}%` }}
+                            title={`${item.month} Exits: ${item.exits}`}
+                          />
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-400">{item.month}</span>
                       </div>
-                      <span className="text-[10px] font-bold text-slate-400">{item.month}</span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Department Distribution List (5/12) */}
             <div className="md:col-span-5 p-4 rounded-xl bg-slate-50/70 dark:bg-slate-800/30 border border-slate-200/60 dark:border-slate-800 space-y-3">
-              <span className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">
-                Department Distribution
-              </span>
-
-              {/* Sales: 486 employees */}
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="font-bold text-slate-700 dark:text-slate-300">Sales & Showrooms</span>
-                  <span className="font-extrabold text-blue-600 dark:text-blue-400">486</span>
-                </div>
-                <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                  <div className="h-full bg-blue-600 rounded-full" style={{ width: '35.4%' }} />
-                </div>
-              </div>
-
-              {/* Operations: 312 employees */}
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="font-bold text-slate-700 dark:text-slate-300">Operations & Retail</span>
-                  <span className="font-extrabold text-indigo-600 dark:text-indigo-400">312</span>
-                </div>
-                <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                  <div className="h-full bg-indigo-600 rounded-full" style={{ width: '22.7%' }} />
-                </div>
-              </div>
-
-              {/* Warehouse: 224 employees */}
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="font-bold text-slate-700 dark:text-slate-300">Central Warehouse</span>
-                  <span className="font-extrabold text-amber-600 dark:text-amber-400">224</span>
-                </div>
-                <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                  <div className="h-full bg-amber-500 rounded-full" style={{ width: '16.3%' }} />
-                </div>
-              </div>
-
-              {/* Finance & HR: 86 employees */}
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="font-bold text-slate-700 dark:text-slate-300">Finance & HR HQ</span>
-                  <span className="font-extrabold text-emerald-600 dark:text-emerald-400">86</span>
-                </div>
-                <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full" style={{ width: '6.3%' }} />
-                </div>
-              </div>
-
-              {/* Others: 264 employees */}
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="font-bold text-slate-700 dark:text-slate-300">Logistics & Support</span>
-                  <span className="font-extrabold text-slate-600 dark:text-slate-400">264</span>
-                </div>
-                <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                  <div className="h-full bg-slate-500 rounded-full" style={{ width: '19.2%' }} />
-                </div>
-              </div>
+              <span className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">Department Distribution</span>
+              {d.departments.length === 0 ? (
+                <p className="text-xs text-slate-500 dark:text-slate-400">No departments configured for this filter.</p>
+              ) : (
+                d.departments.slice(0, 6).map((dept) => (
+                  <div key={dept.name}>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span className="font-bold text-slate-700 dark:text-slate-300">{dept.name}</span>
+                      <span className="font-extrabold text-blue-600 dark:text-blue-400">{dept.count}</span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                      <div className="h-full bg-blue-600 rounded-full" style={{ width: `${Math.min(100, dept.pct ?? 0)}%` }} />
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
 
-        {/* 13. Announcements & Events Card (4/12 cols) */}
+        {/* Engagements & notices */}
         <div className="lg:col-span-4 p-6 rounded-2xl bg-white dark:bg-[#131d36] border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col justify-between">
           <div>
             <div className="pb-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
               <div>
-                <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">
-                  Announcements & Events
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Internal notices, celebrations, and trainings
-                </p>
+                <h2 className="text-base font-extrabold text-slate-900 dark:text-white tracking-tight">Engagements & Notices</h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Birthdays and holidays from the records</p>
               </div>
               <Sparkles className="w-4 h-4 text-amber-500" />
             </div>
 
             <div className="py-4 space-y-3.5">
-              {/* Diwali Holiday Notice — 31 Oct 2024 */}
-              <div className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/50 flex items-start gap-3">
-                <span className="p-1.5 rounded-lg bg-amber-500 text-white shrink-0 mt-0.5">
-                  <Calendar className="w-3.5 h-3.5" />
-                </span>
-                <div>
-                  <div className="text-xs font-bold text-slate-900 dark:text-white">
-                    Diwali Holiday Notice — 31 Oct 2024
-                  </div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    Showroom rosters adjusted for festival evening timings.
-                  </div>
-                </div>
-              </div>
-
-              {/* Updated Leave Policy Published */}
-              <div className="p-3 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200/60 dark:border-blue-900/50 flex items-start gap-3">
-                <span className="p-1.5 rounded-lg bg-blue-600 text-white shrink-0 mt-0.5">
-                  <FileText className="w-3.5 h-3.5" />
-                </span>
-                <div>
-                  <div className="text-xs font-bold text-slate-900 dark:text-white">
-                    Updated Leave Policy Published
-                  </div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    Revision in casual leave rollover and compensatory off rules.
-                  </div>
-                </div>
-              </div>
-
-              {/* POSH Training: 82% Completed */}
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 flex items-start gap-3">
-                <span className="p-1.5 rounded-lg bg-purple-600 text-white shrink-0 mt-0.5">
-                  <Award className="w-3.5 h-3.5" />
-                </span>
-                <div className="flex-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900 dark:text-white">
-                      POSH Training: 82% Completed
-                    </span>
-                    <span className="text-[10px] font-extrabold text-purple-600 dark:text-purple-400">82%</span>
-                  </div>
-                  <div className="w-full h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 mt-1.5 overflow-hidden">
-                    <div className="h-full bg-purple-600 rounded-full" style={{ width: '82%' }} />
-                  </div>
-                </div>
-              </div>
-
-              {/* 12 Employee Birthdays Today */}
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/60 dark:bg-slate-800/20 border border-slate-100 dark:border-slate-800/60">
                 <div className="flex items-center gap-2.5">
                   <span className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400">
-                    <Cake className="w-3.5 h-3.5" />
+                    <Users2 className="w-3.5 h-3.5" />
                   </span>
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                    12 Employee Birthdays Today
+                    {d.engagements.birthdaysToday.count} Employee Birthday{d.engagements.birthdaysToday.count === 1 ? '' : 's'} Today
                   </span>
                 </div>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300">
-                  Wishes Sent
-                </span>
+                {d.engagements.birthdaysToday.count > 0 && (
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300">
+                    {d.engagements.birthdaysToday.names.slice(0, 2).join(', ')}
+                    {d.engagements.birthdaysToday.count > 2 ? ` +${d.engagements.birthdaysToday.count - 2}` : ''}
+                  </span>
+                )}
               </div>
 
-              {/* 5 Work Anniversaries This Week */}
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/60 dark:bg-slate-800/20 border border-slate-100 dark:border-slate-800/60">
-                <div className="flex items-center gap-2.5">
-                  <span className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-                    <Sparkles className="w-3.5 h-3.5" />
-                  </span>
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                    5 Work Anniversaries This Week
-                  </span>
+              {d.engagements.upcomingHolidays.length === 0 ? (
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+                  <div className="text-xs font-bold text-slate-700 dark:text-slate-300">No upcoming holidays configured</div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">The holiday master has no entries for this scope.</div>
                 </div>
-                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300">
-                  5+ Years
-                </span>
-              </div>
+              ) : (
+                d.engagements.upcomingHolidays.map((holiday) => (
+                  <div key={`${holiday.date}-${holiday.name}`} className="p-3 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/50 flex items-start gap-3">
+                    <span className="p-1.5 rounded-lg bg-amber-500 text-white shrink-0 mt-0.5">
+                      <Calendar className="w-3.5 h-3.5" />
+                    </span>
+                    <div>
+                      <div className="text-xs font-bold text-slate-900 dark:text-white">{holiday.name}</div>
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">{fmtDate(holiday.date)}</div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
           <div className="pt-2">
-            <button
-              onClick={() => toast.success('All announcements are up to date.')}
-              className="w-full py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors"
-            >
-              Manage Notice Board
-            </button>
+            <Link href="/organization/holidays" className="flex items-center justify-center w-full py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-400 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors">
+              Manage Holiday Calendar
+            </Link>
           </div>
         </div>
       </div>
-
-      {/* KPI Details Drawer */}
-      <KpiDetailsDrawer
-        type={activeKpiDrawer}
-        onClose={() => setActiveKpiDrawer(null)}
-        selectedHub={selectedHub}
-        selectedDepartment={selectedDepartment}
-        selectedTimeframe={selectedTimeframe}
-      />
 
       {/* Add Employee Dialog */}
       {isAddEmployeeOpen && (
@@ -1552,12 +1086,23 @@ export function HrSuperAdminDashboard({ onOpenAddEmployee }: HrSuperAdminDashboa
           onSuccess={() => {
             setIsAddEmployeeOpen(false);
             toast.success('Employee created successfully!');
+            fetchCommandCenter();
           }}
           locations={dialogLocations}
           departments={dialogDepartments}
           departmentsLoading={departmentsLoading}
         />
       )}
+
+      <KpiDetailsDrawer
+        type={activeKpiDrawer}
+        onClose={() => setActiveKpiDrawer(null)}
+        locationId={selectedHub}
+        departmentId={selectedDepartment}
+        date={selectedDate || d.date}
+      />
     </div>
   );
 }
+
+export default HrSuperAdminDashboard;

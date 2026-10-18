@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { container } from '../core/container/ServiceContainer.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { prisma } from '../index.js';
-import { dbDate } from '../utils/dates.js';
 import { computeShiftWindow } from '../core/services/AttendanceCalculationService.js';
 
 const router = Router();
@@ -194,15 +193,18 @@ router.post('/punch', async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Employee not found' });
     }
 
-    const today = dbDate();
+    // DATE columns are stored as local-midnight datetimes; only a plain
+    // YYYY-MM-DD string compares equal to them (a JS Date serializes to
+    // "YYYY-MM-DD 05:30:00" and never matches).
+    const todayStr = new Date().toISOString().slice(0, 10);
     const now = new Date();
-    const shiftWindow = computeShiftWindow(employee.shift, today.toISOString().slice(0, 10));
+    const shiftWindow = computeShiftWindow(employee.shift, todayStr);
     const geoNote = latitude !== undefined && longitude !== undefined ? ` @${Number(latitude).toFixed(5)},${Number(longitude).toFixed(5)}` : '';
     const deviceNote = typeof deviceInfo === 'string' && deviceInfo ? ` ${deviceInfo}` : '';
     const note = `Mobile ${punchType}${geoNote}${deviceNote}`.slice(0, 191);
 
     let existing = await prisma.attendance.findFirst({
-      where: { employeeId, attendanceDate: today },
+      where: { employeeId, attendanceDate: todayStr },
     });
 
     if (!existing) {
@@ -211,7 +213,7 @@ router.post('/punch', async (req: AuthRequest, res) => {
           employeeId,
           locationId: employee.locationId,
           shiftId: employee.shiftId,
-          attendanceDate: today,
+          attendanceDate: todayStr,
           scheduledLogin: shiftWindow?.start ?? now,
           scheduledLogout: shiftWindow?.end ?? null,
           actualLogin: punchType === 'CHECK_IN' ? now : null,

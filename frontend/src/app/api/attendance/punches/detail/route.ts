@@ -2,125 +2,267 @@ import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Total-punches drill-down (biometric ledger).
+ *
+ * Built only from endpoints that already exist on the backend:
+ *   GET /api/attendance/today        — today's punch rows (actual in/out times,
+ *                                      stored late seconds, shift window)
+ *   GET /api/devices/attendance-log  — the real terminal punch ledger (verify
+ *                                      method, match value, device, floor)
+ *   GET /api/devices                 — the terminal registry (dropdown list)
+ *   GET /api/departments             — department id → name map
+ *
+ * Every figure is derived from those rows. Nothing is seeded: when the terminals
+ * or the attendance ledger have no record, the count is zero, the field is null
+ * and the drawer renders an empty state instead of a demonstration fleet.
+ */
+
+const API_BASE = (
+  process.env.BACKEND_URL
+    ? `${process.env.BACKEND_URL.replace(/\/+$/, '')}/api`
+    : 'http://localhost:4000/api'
+).replace(/\/+$/, '');
+
+async function backendGet(request: Request, path: string): Promise<any | null> {
+  try {
+    const cookie = request.headers.get('cookie');
+    const authorization = request.headers.get('authorization');
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (cookie) headers.cookie = cookie;
+    if (authorization) headers.authorization = authorization;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers,
+      cache: 'no-store',
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timer));
+
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+const GRACE_BUFFER_SECONDS = 300;
+const AVATAR_PALETTE = ['#0058be', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
+
+function textOr(value: any): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function clockText(value: any): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function hourLabel(hour24: number): string {
+  const suffix = hour24 < 12 ? 'AM' : 'PM';
+  const h = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  return `${String(h).padStart(2, '0')}:00 ${suffix}`;
+}
+
+function ymd(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const terminalFilter = searchParams.get('terminal') || 'all';
-  const deptFilter = searchParams.get('department') || 'all';
-  const page = parseInt(searchParams.get('page') || '1', 10);
-  const limit = parseInt(searchParams.get('limit') || '50', 10);
-  const search = (searchParams.get('search') || '').toLowerCase();
+  const today = ymd(new Date());
 
-  const DEPARTMENTS = ['Spinning Unit', 'Weaving Section', 'Garmenting', 'Quality Control', 'Retail & Sales', 'Administration'];
-  const TERMINALS = [
-    { code: 'BEL-01', name: 'BEL-01 Entrance Tablet A' },
-    { code: 'BEL-02', name: 'BEL-02 Floor 1 Gate Scanner B' },
-    { code: 'BEL-03', name: 'BEL-03 Canteen Scanner C' },
-    { code: 'DAV-02', name: 'DAV-02 Showroom Biometric' },
-    { code: 'SHI-03', name: 'SHI-03 Concierge Face Cam' }
-  ];
+  const [todayPayload, logPayload, devicesPayload, departmentsPayload] = await Promise.all([
+    backendGet(request, '/attendance/today'),
+    backendGet(request, `/devices/attendance-log?from=${today}&to=${today}&limit=500&sort=desc`),
+    backendGet(request, '/devices'),
+    backendGet(request, '/departments'),
+  ]);
 
-  const FIRST_NAMES = ['Ramesh', 'Suresh', 'Kavita', 'Pooja', 'Anand', 'Deepa', 'Mohammed', 'Priya', 'Rajesh', 'Sunita', 'Amit', 'Vikram', 'Lakshmi', 'Ganesh', 'Manjunath', 'Meenakshi', 'Arun', 'Vijay', 'Divya', 'Sneha', 'Mahesh', 'Bhavya', 'Chetan', 'Geetha', 'Harish'];
-  const LAST_NAMES = ['Kulkarni', 'Bhat', 'Patel', 'Deshmukh', 'Gowda', 'Kumar', 'Singh', 'Nayak', 'Irfan', 'Shetty', 'Joshi', 'Hegde', 'Rao', 'Reddy', 'Kamath'];
+  const attendances: any[] = Array.isArray(todayPayload?.attendances)
+    ? todayPayload.attendances
+    : [];
+  const ledgerRows: any[] = Array.isArray(logPayload?.rows) ? logPayload.rows : [];
+  const devices: any[] = Array.isArray(devicesPayload?.devices) ? devicesPayload.devices : [];
+  const departments: any[] = Array.isArray(departmentsPayload?.departments)
+    ? departmentsPayload.departments
+    : Array.isArray(departmentsPayload)
+      ? departmentsPayload
+      : [];
 
-  // Sets to guarantee exact counts: 12 OUT punches, 38 IN punches, 2 Missing punches
-  const OUT_INDICES = new Set([3, 7, 11, 15, 19, 23, 27, 31, 35, 39, 43, 47]); // 12
-  const MISSING_INDICES = new Set([5, 17]); // 2 (subset of IN punches)
-
-  // Generate 50 realistic punched-in employees
-  const allPunches = Array.from({ length: 50 }, (_, i) => {
-    const id = i + 1;
-    const empCode = `EMP-${String(id).padStart(3, '0')}`;
-    const firstName = FIRST_NAMES[i % FIRST_NAMES.length];
-    const lastName = LAST_NAMES[(i * 3) % LAST_NAMES.length];
-    const dept = DEPARTMENTS[i % DEPARTMENTS.length];
-    const termObj = TERMINALS[i % TERMINALS.length];
-
-    const isOut = OUT_INDICES.has(i);
-    const isMissing = MISSING_INDICES.has(i);
-
-    // Stagger punch times around 08:30 to 09:40
-    const inHour = i < 35 ? 9 : (i < 45 ? 8 : 10);
-    const inMinute = (i * 7) % 60;
-    const inTimeStr = `${String(inHour).padStart(2, '0')}:${String(inMinute).padStart(2, '0')} AM`;
-    const outTimeStr = `${String((inHour + 9) % 12 || 12).padStart(2, '0')}:${String((inMinute + 15) % 60).padStart(2, '0')} PM`;
-    const isGrace = i >= 10 && i < 15; // 5 in grace period
-
-    return {
-      id: `punch-${id}`,
-      employeeId: empCode,
-      employeeName: `${firstName} ${lastName}`,
-      department: dept,
-      terminalCode: termObj.code,
-      terminalName: termObj.name,
-      locationName: termObj.code.startsWith('BEL') ? 'Belagavi Flagship (BEL-01)' : termObj.code.startsWith('DAV') ? 'Davanagere Showroom (DAV-02)' : 'Shivamogga Apex (SHI-03)',
-      punchTime: isOut ? outTimeStr : inTimeStr,
-      punchType: isOut ? ('OUT' as const) : ('IN' as const),
-      method: (i % 3 === 0 ? 'FACE' : i % 3 === 1 ? 'QR' : 'RFID') as 'FACE' | 'QR' | 'RFID',
-      matchScore: 96 + (i % 4),
-      shiftName: i < 35 ? 'Shift A (Morning 09:30-18:30)' : (i < 47 ? 'Shift B (General 10:00-19:00)' : 'Shift C (Night)'),
-      status: isGrace ? ('GRACE' as const) : (isOut ? ('COMPLETED' as const) : ('ON_TIME' as const)),
-      avatarColor: ['#0058be', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'][i % 5],
-      isMissingPunch: isMissing,
-      expectedShiftEnd: isMissing ? '06:30 PM' : undefined,
-      missingReason: isMissing ? 'Unclosed checkout from shift (Shift ended 18:30)' : undefined,
-    };
-  });
-
-  // Apply filters
-  let filtered = allPunches;
-  if (terminalFilter !== 'all') {
-    filtered = filtered.filter(p => p.terminalCode === terminalFilter || p.terminalName.includes(terminalFilter));
-  }
-  if (deptFilter !== 'all') {
-    filtered = filtered.filter(p => p.department === deptFilter);
-  }
-  if (search) {
-    filtered = filtered.filter(p =>
-      p.employeeName.toLowerCase().includes(search) ||
-      p.employeeId.toLowerCase().includes(search) ||
-      p.department.toLowerCase().includes(search)
-    );
+  const deptName = new Map<string, string>();
+  for (const dept of departments) {
+    const id = textOr(dept?.id);
+    const name = textOr(dept?.name);
+    if (id && name) deptName.set(id, name);
   }
 
-  const total = filtered.length;
-  const paginated = filtered.slice((page - 1) * limit, page * limit);
+  // Latest terminal read per employee code — the real method/score/terminal for
+  // each punch row. Unmatched device ids stay flagged, never renamed.
+  const punchByCode = new Map<string, any>();
+  for (const row of ledgerRows) {
+    const code = textOr(row.employeeCode);
+    if (!code) continue;
+    const existing = punchByCode.get(code);
+    if (!existing || String(row.punchTimeUtc || '') > String(existing.punchTimeUtc || '')) {
+      punchByCode.set(code, row);
+    }
+  }
 
-  // Hourly velocity sparkline data (9AM peak)
-  const hourlyVelocity = [
-    { hour: '07:00 AM', punches: 2, velocity: 'Low' },
-    { hour: '08:00 AM', punches: 8, velocity: 'Normal' },
-    { hour: '08:30 AM', punches: 16, velocity: 'Surge' },
-    { hour: '09:00 AM', punches: 18, velocity: 'Peak (9AM)' },
-    { hour: '09:30 AM', punches: 4, velocity: 'Grace Window' },
-    { hour: '10:00 AM', punches: 2, velocity: 'Standard' },
-  ];
+  const now = Date.now();
+  const records = attendances
+    .filter((row) => row?.actualLogin || row?.actualLogout)
+    .map((row, idx) => {
+      const emp = row.employee ?? {};
+      const code = textOr(emp.employeeCode) ?? textOr(row.employeeId) ?? 'Unmatched device ID';
+      const punch = punchByCode.get(code);
+
+      const inAt = row.actualLogin ? new Date(row.actualLogin) : null;
+      const outAt = row.actualLogout ? new Date(row.actualLogout) : null;
+      const punchType: 'IN' | 'OUT' = outAt ? 'OUT' : 'IN';
+
+      const scheduledIn = row.scheduledLogin ? new Date(row.scheduledLogin) : null;
+      const scheduledOut = row.scheduledLogout ? new Date(row.scheduledLogout) : null;
+      const rawLateSeconds =
+        scheduledIn && inAt ? Math.round((inAt.getTime() - scheduledIn.getTime()) / 1000) : null;
+      const storedLateSeconds = Number(row.lateLoginSeconds);
+
+      let status: 'COMPLETED' | 'LATE' | 'GRACE' | 'ON_TIME' = 'ON_TIME';
+      if (outAt) status = 'COMPLETED';
+      else if (Number.isFinite(storedLateSeconds) && storedLateSeconds > 0) status = 'LATE';
+      else if (rawLateSeconds !== null && rawLateSeconds > 0 && rawLateSeconds <= GRACE_BUFFER_SECONDS) {
+        status = 'GRACE';
+      }
+
+      // An unclosed checkout is only reportable when the stored shift end has
+      // actually passed; a null schedule is not treated as a missing punch.
+      const shiftEnded = Boolean(scheduledOut && scheduledOut.getTime() < now);
+      const isMissingPunch = Boolean(inAt && !outAt && shiftEnded);
+
+      const method = textOr(punch?.verifyModeLabel);
+      const methodKnown = Boolean(method) && !method!.startsWith('Unknown');
+      const matchValue = punch?.matchValue === null || punch?.matchValue === undefined || punch?.matchValue === ''
+        ? null
+        : Number(punch.matchValue);
+
+      return {
+        id: String(row.id),
+        employeeId: code,
+        employeeName: textOr(emp.fullName) ?? 'Unmatched device ID',
+        department: (emp.departmentId ? deptName.get(emp.departmentId) : null) ?? textOr(punch?.departmentName) ?? 'Not recorded',
+        terminalCode: textOr(punch?.serialNumber),
+        terminalName: textOr(punch?.deviceName),
+        locationName: textOr(punch?.locationCode),
+        punchTime: clockText(outAt ?? inAt),
+        punchType,
+        method: methodKnown ? method : null,
+        matchScore: matchValue !== null && Number.isFinite(matchValue) ? matchValue : null,
+        shiftName: textOr(row.shift?.name) ?? textOr(emp.shift?.name) ?? null,
+        status,
+        avatarColor: AVATAR_PALETTE[idx % AVATAR_PALETTE.length],
+        isMissingPunch,
+        expectedShiftEnd: isMissingPunch ? clockText(scheduledOut) : undefined,
+        missingReason: isMissingPunch
+          ? `Shift ended${scheduledOut ? ` at ${clockText(scheduledOut)}` : ''} with no checkout punch recorded`
+          : undefined,
+      };
+    });
+
+  const inPunchOnly = records.filter((r) => r.punchType === 'IN').length;
+  const outPunchCompleted = records.filter((r) => r.punchType === 'OUT').length;
+  const missingPunchesCount = records.filter((r) => r.isMissingPunch).length;
+
+  // Terminal-side reconciliation rate for today's ledger rows.
+  const matchedRows = ledgerRows.filter(
+    (row) => row.mappingStatus === 'MAPPED' && row.syncStatus === 'PROCESSED'
+  ).length;
+  const syncRate =
+    ledgerRows.length > 0 ? Number(((matchedRows / ledgerRows.length) * 100).toFixed(1)) : null;
+
+  const shiftBuckets = new Map<string, number>();
+  for (const record of records) {
+    const key = record.shiftName ?? 'Shift not assigned';
+    shiftBuckets.set(key, (shiftBuckets.get(key) ?? 0) + 1);
+  }
+  const shiftDistribution = Object.fromEntries(shiftBuckets);
+
+  // Punch-in velocity by hour, straight from the stored login instants.
+  const hourBuckets = new Map<number, number>();
+  for (const row of attendances) {
+    if (!row.actualLogin) continue;
+    const at = new Date(row.actualLogin);
+    if (Number.isNaN(at.getTime())) continue;
+    const hour = at.getHours();
+    hourBuckets.set(hour, (hourBuckets.get(hour) ?? 0) + 1);
+  }
+  const hourEntries = [...hourBuckets.entries()].sort((a, b) => a[0] - b[0]);
+  const maxPunches = hourEntries.reduce((max, [, count]) => Math.max(max, count), 0);
+  const avgPunches =
+    hourEntries.length > 0
+      ? hourEntries.reduce((sum, [, count]) => sum + count, 0) / hourEntries.length
+      : 0;
+  const hourlyVelocity = hourEntries.map(([hour, punches]) => ({
+    hour: hourLabel(hour),
+    punches,
+    velocity:
+      punches === maxPunches && maxPunches > 0
+        ? 'Peak'
+        : punches >= avgPunches * 1.5
+          ? 'Surge'
+          : 'Normal',
+  }));
+
+  // Terminal dropdown: the real registry, extended with any ledger serial the
+  // registry does not know about (kept as "Unregistered terminal").
+  const terminalsList: Array<{ code: string; name: string }> = [];
+  const seenTerminals = new Set<string>();
+  for (const device of devices) {
+    const code = textOr(device.serialNumber) ?? textOr(device.id);
+    if (!code || seenTerminals.has(code)) continue;
+    seenTerminals.add(code);
+    terminalsList.push({ code, name: textOr(device.name) ?? 'Unnamed terminal' });
+  }
+  for (const row of ledgerRows) {
+    const code = textOr(row.serialNumber) ?? textOr(row.deviceId);
+    if (!code || seenTerminals.has(code)) continue;
+    seenTerminals.add(code);
+    terminalsList.push({ code, name: textOr(row.deviceName) ?? 'Unregistered terminal' });
+  }
+
+  const departmentsList = departments
+    .map((dept) => textOr(dept?.name))
+    .filter((name): name is string => Boolean(name))
+    .sort();
 
   return NextResponse.json({
     success: true,
     data: {
-      records: paginated,
+      records,
       pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+        total: records.length,
+        page: 1,
+        limit: records.length,
+        totalPages: 1,
       },
       stats: {
-        totalPunchesToday: 50,
-        inPunchOnly: 38,
-        outPunchCompleted: 12,
-        syncRate: 99.8,
-        missingPunchesCount: 2,
-        missingPunchesAlert: '2 previous-shift workers without confirmed checkout punch',
-        shiftDistribution: {
-          'Shift A (Morning)': 35,
-          'Shift B (General)': 12,
-          'Shift C (Evening)': 3,
-        },
+        totalPunchesToday: records.length,
+        inPunchOnly,
+        outPunchCompleted,
+        syncRate,
+        missingPunchesCount,
+        missingPunchesAlert:
+          missingPunchesCount > 0
+            ? `${missingPunchesCount} staff member${missingPunchesCount === 1 ? '' : 's'} without a confirmed checkout punch`
+            : null,
+        shiftDistribution,
       },
       hourlyVelocity,
-      terminalsList: TERMINALS,
-      departmentsList: DEPARTMENTS,
+      terminalsList,
+      departmentsList,
     },
     timestamp: new Date().toISOString(),
   });

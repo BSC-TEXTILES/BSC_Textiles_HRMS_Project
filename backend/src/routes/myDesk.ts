@@ -315,10 +315,10 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
       [employeeId]
     );
 
-    // Real incentive rows only. No row means the card shows nothing, not a
+    // Real incentive rows only. No row means the employee accrued ₹0 — never a
     // made-up ₹4,250 bonus with a 112% achievement figure.
     const latestIncentive = incentiveRows[0] || null;
-    const festiveBonusAmount = latestIncentive ? Number(latestIncentive.calculatedAmount) : null;
+    const festiveBonusAmount = latestIncentive ? Number(latestIncentive.calculatedAmount) : 0;
     const festiveTarget = latestIncentive?.targetAmount ? Number(latestIncentive.targetAmount) : null;
     const festiveBonusRuleName = latestIncentive?.ruleName ? String(latestIncentive.ruleName) : null;
     const festiveBonusStatus = latestIncentive?.status ? String(latestIncentive.status) : null;
