@@ -76,7 +76,7 @@ CREATE DATABASE bsc_shard_bel CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE bsc_shard_dav CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE bsc_shard_shi CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
-CREATE USER 'bsc_hrms_app'@'localhost' IDENTIFIED BY 'YOUR_STRONG_PROD_PASSWORD';
+CREATE USER 'bsc_hrms_app'@'localhost' IDENTIFIED BY '<STRONG_DB_PASSWORD>';
 GRANT ALL PRIVILEGES ON bsc_textiles_hrms.* TO 'bsc_hrms_app'@'localhost';
 GRANT ALL PRIVILEGES ON bsc_shard_bel.* TO 'bsc_hrms_app'@'localhost';
 GRANT ALL PRIVILEGES ON bsc_shard_dav.* TO 'bsc_hrms_app'@'localhost';
@@ -120,17 +120,17 @@ FRONTEND_URL="https://hrms.bsctextiles.com"
 DEVICE_SYNC_MODE="cloud_push"
 
 # Database Connections
-DATABASE_URL="mysql://bsc_hrms_app:YOUR_STRONG_PROD_PASSWORD@localhost:3306/bsc_textiles_hrms"
-DATABASE_URL_HQ="mysql://bsc_hrms_app:YOUR_STRONG_PROD_PASSWORD@localhost:3306/bsc_textiles_hrms"
-DATABASE_URL_BEL="mysql://bsc_hrms_app:YOUR_STRONG_PROD_PASSWORD@localhost:3306/bsc_shard_bel"
-DATABASE_URL_DAV="mysql://bsc_hrms_app:YOUR_STRONG_PROD_PASSWORD@localhost:3306/bsc_shard_dav"
-DATABASE_URL_SHI="mysql://bsc_hrms_app:YOUR_STRONG_PROD_PASSWORD@localhost:3306/bsc_shard_shi"
+DATABASE_URL="mysql://bsc_hrms_app:<DB_PASSWORD>@localhost:3306/bsc_textiles_hrms"
+DATABASE_URL_HQ="mysql://bsc_hrms_app:<DB_PASSWORD>@localhost:3306/bsc_textiles_hrms"
+DATABASE_URL_BEL="mysql://bsc_hrms_app:<DB_PASSWORD>@localhost:3306/bsc_shard_bel"
+DATABASE_URL_DAV="mysql://bsc_hrms_app:<DB_PASSWORD>@localhost:3306/bsc_shard_dav"
+DATABASE_URL_SHI="mysql://bsc_hrms_app:<DB_PASSWORD>@localhost:3306/bsc_shard_shi"
 
 # Security Secrets (Must be 32+ random characters)
-JWT_SECRET="GENERATE_A_64_CHAR_RANDOM_HEX_SECRET_FOR_PROD"
-NEXTAUTH_SECRET="GENERATE_ANOTHER_64_CHAR_RANDOM_SECRET"
+JWT_SECRET="<generate-with-openssl-rand-hex-32>"
+NEXTAUTH_SECRET="<generate-with-openssl-rand-hex-32>"
 NEXTAUTH_URL="https://hrms.bsctextiles.com"
-BIOMETRIC_CONNECTOR_KEY="GENERATE_A_STRONG_CONNECTOR_KEY"
+BIOMETRIC_CONNECTOR_KEY="<generate-with-openssl-rand-hex-32>"
 
 # Frontend Public Endpoints
 NEXT_PUBLIC_API_URL="https://hrms.bsctextiles.com/api"
