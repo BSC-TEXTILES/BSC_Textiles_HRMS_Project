@@ -299,7 +299,7 @@ router.get('/hr-command-center', authorize('VIEW'), async (req: AuthRequest, res
       q(
         `SELECT COUNT(*) c FROM attendance a JOIN employee e ON e.id = a.employeeId
          WHERE DATE(a.attendanceDate) = ? AND a.status IN (${pendingStatuses})${es.sql}`,
-        [targetYmd, ...es.params]
+        [targetYmd, ...ATTENDANCE_PRESENT_STATUSES, ...es.params]
       ),
       q(
         `SELECT COUNT(*) c FROM attendance a JOIN employee e ON e.id = a.employeeId
@@ -340,7 +340,7 @@ router.get('/hr-command-center', authorize('VIEW'), async (req: AuthRequest, res
         `SELECT a.locationId, COUNT(*) c FROM attendance a JOIN employee e ON e.id = a.employeeId
          WHERE DATE(a.attendanceDate) = ? AND a.status IN (${pendingStatuses})${es.sql}
          GROUP BY a.locationId`,
-        [targetYmd, ...es.params]
+        [targetYmd, ...ATTENDANCE_PRESENT_STATUSES, ...es.params]
       ),
       q(
         `SELECT d.name AS name, COUNT(*) c FROM employee e LEFT JOIN department d ON d.id = e.departmentId
@@ -420,7 +420,7 @@ router.get('/hr-command-center', authorize('VIEW'), async (req: AuthRequest, res
          WHERE ca.acknowledgedAt IS NULL AND ca.returnedAt IS NULL${es.sql}`,
         es.params
       ),
-      q(`SELECT id, status, periodStart, periodEnd FROM payrollrun ORDER BY createdAt DESC LIMIT 1`),
+      q(`SELECT id, status, periodStart, periodEnd FROM payrollrun ORDER BY periodStart DESC, createdAt DESC LIMIT 1`),
       q(`SELECT COUNT(*) c FROM candidate`),
       q(`SELECT COUNT(*) c FROM interview WHERE DATE(scheduledAt) = ?`, [todayYmd]),
       q(
