@@ -531,7 +531,7 @@ export default function BiometricPunchesPage() {
                 <tr>
                   <th className="py-2.5 px-4">Employee</th>
                   <th className="py-2.5 px-4">Location / Hub</th>
-                  <th className="py-2.5 px-4">Punch Time</th>
+                  <th className="py-2.5 px-4">Punch Date & Time</th>
                   <th className="py-2.5 px-4">Terminal Status</th>
                   <th className="py-2.5 px-4">AI Liveness</th>
                   <th className="py-2.5 px-4">Early Incentive</th>

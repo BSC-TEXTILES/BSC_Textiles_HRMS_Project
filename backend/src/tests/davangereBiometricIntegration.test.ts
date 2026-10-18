@@ -136,7 +136,7 @@ export async function runDavangereBiometricTests(): Promise<void> {
   // TEST 4: Resolve Active DAV Employee & Ensure Biometric Mapping
   // --------------------------------------------------------------------------
   let testEmpId = '';
-  let testEnrollment = '101';
+  let testEnrollment = '0101';
   total++;
   if (await runTest('Test 4: Resolve active DAV employee and seed biometric mapping', async () => {
     const [davEmps]: any = await pool.query(
@@ -145,8 +145,9 @@ export async function runDavangereBiometricTests(): Promise<void> {
     );
     assert.ok(davEmps.length > 0, 'Must have at least one active Davangere employee');
     testEmpId = davEmps[0].id;
+    testEnrollment = davEmps[0].employeeCode || '0101';
 
-    // Save mapping for PIN 101 -> DAV Employee
+    // Save mapping for PIN matching employeeCode -> DAV Employee
     await saveEmployeeBiometricMapping({
       employeeId: testEmpId,
       enrollmentNumber: testEnrollment,
@@ -165,11 +166,11 @@ export async function runDavangereBiometricTests(): Promise<void> {
   })) passed++;
 
   // Clean test day data
-  await pool.query(`DELETE FROM biometric_raw_punches WHERE punchTime >= '${testDate} 00:00:00' AND enrollmentNumber = ?`, [testEnrollment]);
+  await pool.query(`DELETE FROM biometric_raw_punches WHERE punchTime >= '${testDate} 00:00:00' AND (enrollmentNumber = ? OR enrollmentNumber = '101' OR enrollmentNumber = '0101')`, [testEnrollment]);
   await pool.query(`DELETE FROM attendance WHERE employeeId = ? AND attendanceDate = ?`, [testEmpId, testDate]);
   try {
     const { pool: davShard } = await shardRouter.resolveLocationDatabase('DAV');
-    await davShard.query(`DELETE FROM biometric_raw_punches WHERE punchTime >= '${testDate} 00:00:00' AND enrollmentNumber = ?`, [testEnrollment]).catch(() => {});
+    await davShard.query(`DELETE FROM biometric_raw_punches WHERE punchTime >= '${testDate} 00:00:00' AND (enrollmentNumber = ? OR enrollmentNumber = '101' OR enrollmentNumber = '0101')`, [testEnrollment]).catch(() => {});
     await davShard.query(`DELETE FROM attendance WHERE employeeId = ? AND attendanceDate = ?`, [testEmpId, testDate]).catch(() => {});
   } catch {}
 

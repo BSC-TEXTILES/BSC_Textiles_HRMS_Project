@@ -63,6 +63,8 @@ import {
   sendXlsx,
   describeFilters,
   ReportFilters,
+  ALLOWED_DAV_RANGE_CODES,
+  MB160_DAV_1601_1610_COLUMNS,
 } from '../services/biometric/report.js';
 import {
   deviceLog,
@@ -805,9 +807,22 @@ router.post('/', authorize('EDIT'), async (req: AuthRequest, res) => {
       });
     }
     const { serialNumber, name, model, firmwareVersion, ipAddress, port, commKey, timezone, locationCode, protocol, floorId, sectionId } = req.body;
-    if (!serialNumber || !name || !ipAddress || !locationCode) {
-      return res.status(400).json({ error: 'serialNumber, name, ipAddress and locationCode are required' });
+    const DAVANGERE_EXCLUSIVE_SERIALS = new Set([
+      'JNP2252300795',
+      'JNP2252300802',
+      'JNPJNP2252300802',
+      'JNP2252300797',
+      (process.env.BIOMETRIC_DEV1_SERIAL || '').trim(),
+      (process.env.BIOMETRIC_DEV2_SERIAL || '').trim(),
+      (process.env.BIOMETRIC_DEV3_SERIAL || '').trim(),
+    ].filter(Boolean));
+
+    if (DAVANGERE_EXCLUSIVE_SERIALS.has(String(serialNumber).trim()) && locationCode.toUpperCase() !== 'DAV') {
+      return res.status(400).json({
+        error: `Hardware terminal ${serialNumber} belongs exclusively to Davangere and cannot be registered under ${locationCode}.`,
+      });
     }
+
     // registerBiometricDevice upserts by serial, so without this a "new" device
     // whose serial already exists silently rewrites the existing terminal's
     // name, floor and section instead of failing. Two devices on one serial is
@@ -899,6 +914,22 @@ router.put('/:id', authorize('EDIT'), async (req: AuthRequest, res) => {
     if (!existing) return res.status(404).json({ error: 'Device not found' });
     if (!checkDeviceLocationAccess(req.user, existing.locationId, existing.locationCode)) {
       return res.status(403).json({ error: 'Forbidden: device belongs to another showroom' });
+    }
+
+    const DAVANGERE_EXCLUSIVE_SERIALS = new Set([
+      'JNP2252300795',
+      'JNP2252300802',
+      'JNPJNP2252300802',
+      'JNP2252300797',
+      (process.env.BIOMETRIC_DEV1_SERIAL || '').trim(),
+      (process.env.BIOMETRIC_DEV2_SERIAL || '').trim(),
+      (process.env.BIOMETRIC_DEV3_SERIAL || '').trim(),
+    ].filter(Boolean));
+
+    if (locationCode && locationCode.toUpperCase() !== 'DAV' && DAVANGERE_EXCLUSIVE_SERIALS.has(String(existing.serialNumber).trim())) {
+      return res.status(400).json({
+        error: `Terminal ${existing.serialNumber} is permanently bound to Davangere showroom and cannot be moved to ${locationCode}.`,
+      });
     }
 
     if (port !== undefined && (Number(port) < 1 || Number(port) > 65535)) {
@@ -1475,7 +1506,9 @@ function reportFiltersFrom(req: AuthRequest): ReportFilters {
     from: req.query.from as string,
     to: req.query.to as string,
     employeeId: req.query.employeeId as string,
+    employeeCode: req.query.employeeCode as string,
     employeeQuery: req.query.employeeQuery as string,
+    employeeRange: req.query.employeeRange as any,
     verifyMethod,
     serialNumber: req.query.serialNumber as string,
     deviceId: req.query.deviceId as string,
@@ -1514,6 +1547,35 @@ router.get('/report/export', authorize('VIEW'), async (req: AuthRequest, res) =>
     sendCsv(res, toCsv(report.rows), `BSC_Attendance_${stamp}.csv`);
   } catch (error: any) {
     res.status(500).json({ error: 'Export failed: ' + error.message });
+  }
+});
+
+router.get('/report/export-1601-1610', authorize('VIEW'), async (req: AuthRequest, res) => {
+  try {
+    const baseFilters = reportFiltersFrom(req);
+    // Backend-enforced filter: strictly range 1601 to 1610 only
+    const filters: ReportFilters = {
+      ...baseFilters,
+      employeeRange: '1601-1610',
+      limit: 10000,
+    };
+    if (baseFilters.employeeCode) {
+      const code = baseFilters.employeeCode.trim();
+      if (ALLOWED_DAV_RANGE_CODES.includes(code)) {
+        filters.employeeCode = code;
+      } else {
+        return res.status(400).json({ error: 'Selected employee code must be within 1601-1610' });
+      }
+    }
+
+    const report = await buildAttendanceReport(filters);
+    const stamp = new Date().toISOString().slice(0, 10);
+    const filename = `BSC_DAV_MB160_Attendance_1601-1610_${stamp}.csv`;
+
+    const csvData = toCsv(report.rows, MB160_DAV_1601_1610_COLUMNS);
+    sendCsv(res, csvData, filename);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Export 1601-1610 failed: ' + error.message });
   }
 });
 

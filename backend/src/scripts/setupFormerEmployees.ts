@@ -159,3 +159,4 @@ if (process.argv[1]?.includes('setupFormerEmployees')) {
       process.exit(1);
     });
 }
+

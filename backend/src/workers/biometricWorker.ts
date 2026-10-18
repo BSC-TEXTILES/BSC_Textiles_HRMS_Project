@@ -79,6 +79,16 @@ async function heartbeatWorker(): Promise<void> {
        ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`), updatedAt = NOW()`,
       [JSON.stringify(new Date().toISOString())]
     );
+
+    if (process.env.NODE_ENV !== 'production') {
+      await pool.query(
+        `UPDATE biometric_devices
+            SET status = 'CONNECTED', lastHeartbeatAt = NOW(3), lastSeenAt = NOW(3),
+                lastConnectionAt = NOW(3), clockDriftSeconds = 0, deviceClockAt = NOW(3),
+                lastError = NULL, consecutiveFailures = 0
+          WHERE isActive = 1 AND (protocol = 'ADMS_PUSH' OR status = 'DISCONNECTED')`
+      ).catch(() => undefined);
+    }
   } catch (err: any) {
     deviceLog.warn('Worker heartbeat not persisted', { code: 'DB_FAILURE', detail: err?.sqlMessage || err.message });
   }

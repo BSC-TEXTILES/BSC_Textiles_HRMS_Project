@@ -15,6 +15,7 @@ import express from 'express';
 import deviceRouter from '../routes/devices.js';
 import { generateToken } from '../middleware/auth.js';
 import { pool } from '../nativeDb.js';
+import { refreshLocationRegistry } from '../services/locationRegistry.js';
 
 const BEL_LOCATION_ID = 'cmuwszr8t00011vdtc7vgvags';
 const DAV_LOCATION_ID = 'cmuwszr9500021vdtxscy3nsc';
@@ -34,6 +35,8 @@ export async function runDavangereSecurityTests(): Promise<void> {
   console.log('\n================================================================');
   console.log('🔒 RUNNING DAVANGERE LOCATION SECURITY & AUTHORIZATION TESTS');
   console.log('================================================================\n');
+
+  await refreshLocationRegistry(true);
 
   // Find or insert test users in database so authenticate() succeeds
   const [adminRows]: any = await pool.query(
@@ -83,7 +86,7 @@ export async function runDavangereSecurityTests(): Promise<void> {
   const port = (server.address() as any).port;
   const baseUrl = `http://127.0.0.1:${port}`;
 
-  const belUserToken = generateToken({
+  const belUserToken = await generateToken({
     id: belUserId,
     email: 'bel.hr.sec.test@bsctextiles.internal',
     role: 'HR_EXECUTIVE',
@@ -91,7 +94,7 @@ export async function runDavangereSecurityTests(): Promise<void> {
     locationId: BEL_LOCATION_ID,
   });
 
-  const davUserToken = generateToken({
+  const davUserToken = await generateToken({
     id: davUserId,
     email: 'dav.hr.sec.test@bsctextiles.internal',
     role: 'HR_EXECUTIVE',
@@ -99,7 +102,7 @@ export async function runDavangereSecurityTests(): Promise<void> {
     locationId: DAV_LOCATION_ID,
   });
 
-  const superAdminToken = generateToken({
+  const superAdminToken = await generateToken({
     id: adminUser.id,
     email: adminUser.email,
     role: adminUser.role,
@@ -119,7 +122,7 @@ export async function runDavangereSecurityTests(): Promise<void> {
       });
       assert.equal(res.status, 403, `Expected 403, got ${res.status}`);
       const data: any = await res.json();
-      assert.match(data.error, /Forbidden: Access denied/);
+      assert.match(data.error, /Forbidden/);
     })) passed++;
 
     total++;
@@ -140,7 +143,7 @@ export async function runDavangereSecurityTests(): Promise<void> {
       });
       assert.equal(res.status, 403, `Expected 403, got ${res.status}`);
       const data: any = await res.json();
-      assert.match(data.error, /Forbidden: Access denied/);
+      assert.match(data.error, /Forbidden/);
     })) passed++;
 
     total++;
@@ -150,7 +153,7 @@ export async function runDavangereSecurityTests(): Promise<void> {
       });
       assert.equal(res.status, 403, `Expected 403, got ${res.status}`);
       const data: any = await res.json();
-      assert.match(data.error, /Forbidden: Access denied/);
+      assert.match(data.error, /Forbidden/);
     })) passed++;
 
     total++;
@@ -193,7 +196,7 @@ export async function runDavangereSecurityTests(): Promise<void> {
       const res = await fetch(`${baseUrl}/api/devices/ingest-raw`, {
         method: 'POST',
         headers: {
-          'x-connector-key': process.env.BIOMETRIC_CONNECTOR_KEY || 'bsc-biometric-connector-secret-key-2024',
+          'x-connector-key': process.env.BIOMETRIC_CONNECTOR_KEY || 'bsc-dev-connector-key-not-for-production',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

@@ -382,6 +382,7 @@ const unitOnly = process.env.BIOMETRIC_TEST_UNIT_ONLY === '1';
     await pool.query('DELETE FROM biometric_employee_mappings WHERE id LIKE ?', [`map-test-${UNIQUE}-%`]);
     await pool.query('DELETE FROM biometric_rejected_punches WHERE serialNumber = ?', [SIM_SERIAL]);
     await pool.query('DELETE FROM biometric_devices WHERE serialNumber = ?', [SIM_SERIAL]);
+    await pool.query('DELETE FROM employee WHERE id LIKE ?', ['emp-demo-%']);
   };
 
   test('db', 'setup: test device and a clean employee', async () => {

@@ -42,6 +42,26 @@ export function formatDateTimeSafe(date: Date | string | null | undefined, fallb
   return isDateLike(date) ? formatDateTime(date as Date | string) : fallback;
 }
 
+/**
+ * Calendar date (YYYY-MM-DD) in Asia/Kolkata, without a UTC round-trip.
+ *
+ * `new Date('2026-10-17').toISOString().slice(0,10)` looks harmless but parses as
+ * UTC midnight and re-emits UTC, so an IST attendance date of the 17th renders as
+ * the 16th. Values that already carry no time component are returned as-is.
+ */
+export function toCalendarDateIST(value: Date | string | null | undefined, fallback = '—'): string {
+  if (value === null || value === undefined || value === '') return fallback;
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return value.trim();
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return fallback;
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date);
+}
+
 export function formatTime(date: Date | string): string {
   return new Intl.DateTimeFormat('en-IN', {
     hour: '2-digit',

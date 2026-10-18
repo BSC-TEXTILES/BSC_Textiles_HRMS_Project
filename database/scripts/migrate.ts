@@ -33,6 +33,7 @@ const TOLERATED_ERROR_CODES = new Set<string>([
   'ER_BAD_FIELD_ERROR',        // 1054 unknown column
   'ER_NO_SUCH_TABLE',          // 1146 table absent in this database shape
   'ER_WRONG_OBJECT',           // 1347 object exists but is not the expected kind
+  'ER_NO_REFERENCED_ROW_2',    // 1452 foreign key reference missing in partial seed
 ]);
 
 /**
