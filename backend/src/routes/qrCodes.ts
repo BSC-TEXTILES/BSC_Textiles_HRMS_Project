@@ -392,11 +392,11 @@ router.post('/scan', authorize('SCAN'), validate(qrScanSchema), async (req: Auth
         });
       }
     } else if (purpose === 'ATTENDANCE_CHECK_IN') {
-      // Create or update attendance
-      const today = dbDate();
+      // Create or update attendance — DATE columns only match a YYYY-MM-DD string.
+      const todayStr = new Date().toISOString().slice(0, 10);
       
       const existing = await prisma.attendance.findUnique({
-        where: { employeeId_attendanceDate: { employeeId: qrCode.employeeId, attendanceDate: today } },
+        where: { employeeId_attendanceDate: { employeeId: qrCode.employeeId, attendanceDate: todayStr } },
       });
       
       if (!existing) {
@@ -406,7 +406,7 @@ router.post('/scan', authorize('SCAN'), validate(qrScanSchema), async (req: Auth
         // work date so the early-login maths is measured against today, not 2024.
         const window = computeShiftWindow(
           shift ?? (attRules ? { startTime: attRules.loginTime, endTime: attRules.logoutTime } : null),
-          today.toISOString().slice(0, 10)
+          todayStr
         );
         const scheduledIn = window?.start ?? null;
         
@@ -425,7 +425,7 @@ router.post('/scan', authorize('SCAN'), validate(qrScanSchema), async (req: Auth
             employeeId: qrCode.employeeId,
             locationId: effectiveLocationId || qrCode.locationId,
             shiftId: shift?.id,
-            attendanceDate: today,
+            attendanceDate: todayStr,
             scheduledLogin: scheduledIn,
             scheduledLogout: window?.end ?? null,
             actualLogin: now,
@@ -436,10 +436,10 @@ router.post('/scan', authorize('SCAN'), validate(qrScanSchema), async (req: Auth
         });
       }
     } else if (purpose === 'ATTENDANCE_CHECK_OUT') {
-      const today = dbDate();
+      const todayStr = new Date().toISOString().slice(0, 10);
       
       const existing = await prisma.attendance.findUnique({
-        where: { employeeId_attendanceDate: { employeeId: qrCode.employeeId, attendanceDate: today } },
+        where: { employeeId_attendanceDate: { employeeId: qrCode.employeeId, attendanceDate: todayStr } },
       });
       
       if (existing) {
@@ -453,7 +453,7 @@ router.post('/scan', authorize('SCAN'), validate(qrScanSchema), async (req: Auth
         const window = windowFromScheduled(existing.scheduledLogin, existing.scheduledLogout)
           ?? computeShiftWindow(
             shift ?? (attRules ? { startTime: attRules.loginTime, endTime: attRules.logoutTime } : null),
-            today.toISOString().slice(0, 10)
+            todayStr
           );
         const scheduledOut = window?.end ?? null;
         

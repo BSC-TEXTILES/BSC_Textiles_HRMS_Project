@@ -3,187 +3,234 @@ import net from 'net';
 
 export const dynamic = 'force-dynamic';
 
-// Helper to probe a biometric terminal socket on port 4370
-async function probeTerminal(ip: string, port: number = 4370, timeoutMs: number = 1000): Promise<{ online: boolean; latency: number }> {
-  if (!ip) return { online: false, latency: 0 };
+/**
+ * Terminal network status drill-down.
+ *
+ * Built only from data the stack actually holds:
+ *   GET /api/devices            — the biometric terminal registry (serial, IP,
+ *                                 port, protocol, firmware, heartbeat, counters)
+ *   GET /api/locations/all      — showroom names for the hub summary
+ *   GET /api/devices/attendance-log?from&to&serialNumber=<sn> — today's stored
+ *                                 punch count per terminal (COUNT only, limit=1)
+ *
+ * Latency comes from a live TCP connect to each registry address:port. Anything
+ * the terminals or registry do not report (packet-loss history, uptime windows,
+ * firmware update availability, camera status) is null or an empty list so the
+ * drawer renders an honest empty state instead of a demonstration fleet.
+ */
+
+const API_BASE = (
+  process.env.BACKEND_URL
+    ? `${process.env.BACKEND_URL.replace(/\/+$/, '')}/api`
+    : 'http://localhost:4000/api'
+).replace(/\/+$/, '');
+
+async function backendGet(request: Request, path: string): Promise<any | null> {
+  try {
+    const cookie = request.headers.get('cookie');
+    const authorization = request.headers.get('authorization');
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (cookie) headers.cookie = cookie;
+    if (authorization) headers.authorization = authorization;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(`${API_BASE}${path}`, {
+      headers,
+      cache: 'no-store',
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timer));
+
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+interface ProbeResult {
+  online: boolean;
+  latency: number | null;
+}
+
+function probeTerminal(ip: string | null, port: number, timeoutMs = 1500): Promise<ProbeResult> {
+  if (!ip) return Promise.resolve({ online: false, latency: null });
   const start = Date.now();
   return new Promise((resolve) => {
     const socket = new net.Socket();
     socket.setTimeout(timeoutMs);
 
-    socket.on('connect', () => {
-      const latency = Math.max(1, Date.now() - start);
+    const settle = (result: ProbeResult) => {
       socket.destroy();
-      resolve({ online: true, latency });
-    });
+      resolve(result);
+    };
 
-    socket.on('timeout', () => {
-      socket.destroy();
-      resolve({ online: false, latency: 999 });
-    });
+    socket.on('connect', () => settle({ online: true, latency: Math.max(1, Date.now() - start) }));
+    socket.on('timeout', () => settle({ online: false, latency: null }));
+    socket.on('error', () => settle({ online: false, latency: null }));
 
-    socket.on('error', () => {
-      resolve({ online: false, latency: 999 });
-    });
-
-    socket.connect(port, ip);
+    try {
+      socket.connect(port, ip);
+    } catch {
+      settle({ online: false, latency: null });
+    }
   });
 }
 
-export async function GET(request: Request) {
-  const ipDev1 = process.env.BIOMETRIC_DEV1_IP || '';
-  const ipDev2 = process.env.BIOMETRIC_DEV2_IP || '';
-  const ipDev3 = process.env.BIOMETRIC_DEV3_IP || '';
+function relativeHeartbeat(value: any): string {
+  if (!value) return 'Never';
+  const then = new Date(value);
+  if (Number.isNaN(then.getTime())) return 'Never';
+  const diffSec = Math.max(0, Math.round((Date.now() - then.getTime()) / 1000));
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.round(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return `${Math.round(diffHr / 24)}d ago`;
+}
 
-  // Live Store Terminals on port 4370
-  const [probe1, probe2, probe3] = await Promise.all([
-    probeTerminal(ipDev1, 4370),
-    probeTerminal(ipDev2, 4370),
-    probeTerminal(ipDev3, 4370),
+function textOr(value: any): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+export async function GET(request: Request) {
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [devicesPayload, locationsPayload] = await Promise.all([
+    backendGet(request, '/devices'),
+    backendGet(request, '/locations/all'),
   ]);
 
-  const terminals = [
-    {
-      id: 'TERM-01',
-      code: 'DAV-BIO-01',
-      serialNumber: process.env.BIOMETRIC_DEV1_SERIAL || 'JNP2252300795',
-      name: 'DAV-BIO-01 Main Face & Fingerprint Terminal 1',
-      location: 'Davangere Store (Main Entrance · Ground Floor)',
-      ipAddress: 'Protected Showroom LAN',
-      status: probe1.online ? 'ONLINE' : 'OFFLINE',
-      latency: probe1.latency,
-      packetLoss: probe1.online ? 0.0 : 100.0,
-      heartbeat: probe1.online ? 'Just now' : 'Unreachable',
-      uptime: probe1.online ? 99.9 : 0.0,
-      firmwareVersion: 'Ver 8.0.4.7-20220624 / ZKFinger VX10.0',
+  const devices: any[] = Array.isArray(devicesPayload?.devices) ? devicesPayload.devices : [];
+  const locations: any[] = Array.isArray(locationsPayload?.locations)
+    ? locationsPayload.locations
+    : Array.isArray(locationsPayload)
+      ? locationsPayload
+      : [];
+
+  const locationLabel = new Map<string, string>();
+  for (const loc of locations) {
+    const id = textOr(loc?.id);
+    const name = textOr(loc?.name);
+    const code = textOr(loc?.code);
+    if (id && name) locationLabel.set(id, `${name}${code ? ` (${code})` : ''}`);
+  }
+
+  const [probes, punchCounts] = await Promise.all([
+    Promise.all(
+      devices.map((d) => probeTerminal(textOr(d.ipAddress), Number(d.port) || 4370))
+    ),
+    Promise.all(
+      devices.map(async (d) => {
+        const serial = textOr(d.serialNumber);
+        const deviceId = textOr(d.id);
+        const filter = serial
+          ? `serialNumber=${encodeURIComponent(serial)}`
+          : deviceId
+            ? `deviceId=${encodeURIComponent(deviceId)}`
+            : null;
+        if (!filter) return 0;
+        const payload = await backendGet(
+          request,
+          `/devices/attendance-log?from=${today}&to=${today}&${filter}&limit=1`
+        );
+        const total = Number(payload?.total);
+        return Number.isFinite(total) ? total : 0;
+      })
+    ),
+  ]);
+
+  const terminals = devices.map((device, idx) => {
+    const probe = probes[idx];
+    const locationId = textOr(device.locationId);
+    const locationCode = textOr(device.locationCode);
+    return {
+      id: textOr(device.id) ?? `device-${idx + 1}`,
+      code: textOr(device.serialNumber) ?? textOr(device.id) ?? 'Unknown terminal',
+      serialNumber: textOr(device.serialNumber) ?? undefined,
+      name: textOr(device.name) ?? 'Unnamed terminal',
+      location:
+        (locationId ? locationLabel.get(locationId) : null) ??
+        locationCode ??
+        'Location not reported',
+      ipAddress: textOr(device.ipAddress) ?? 'Not reported',
+      port: Number(device.port) || undefined,
+      status: probe.online ? 'ONLINE' : 'OFFLINE',
+      latency: probe.latency,
+      // A completed TCP connect is a real delivery observation; when the port is
+      // unreachable there is no loss figure to quote.
+      packetLoss: probe.online ? 0 : null,
+      heartbeat: relativeHeartbeat(device.lastHeartbeatAt ?? device.lastConnectionAt),
+      uptime: null,
+      firmwareVersion: textOr(device.firmwareVersion) ?? 'Not reported',
+      // Nothing in this stack tracks firmware releases, so no update is claimed.
       updateAvailable: false,
-      punchesRecordedToday: 65,
-      cameraActive: true,
-      mode: 'ACTIVE_SCAN',
+      punchesRecordedToday: punchCounts[idx] ?? 0,
+      mode: textOr(device.protocol) ?? 'Not reported',
+    };
+  });
+
+  const onlineTerminals = terminals.filter((t) => t.status === 'ONLINE');
+  const onlineLatencies = onlineTerminals
+    .map((t) => t.latency)
+    .filter((l): l is number => typeof l === 'number');
+  const averageLatencyMs =
+    onlineLatencies.length > 0
+      ? Math.round(onlineLatencies.reduce((acc, l) => acc + l, 0) / onlineLatencies.length)
+      : null;
+
+  // Current probe snapshot only — no historical loss/latency series is stored.
+  const latencyDistribution = [
+    {
+      bucket: '< 50ms (Optimal)',
+      count: onlineLatencies.filter((l) => l < 50).length,
+      color: '#10b981',
     },
     {
-      id: 'TERM-02',
-      code: 'DAV-BIO-02',
-      serialNumber: process.env.BIOMETRIC_DEV2_SERIAL || 'JNPJNP2252300802',
-      name: 'DAV-BIO-02 Staff Lounge Biometric Terminal 2',
-      location: 'Davangere Store (Staff Lounge · Floor 1)',
-      ipAddress: 'Protected Showroom LAN',
-      status: probe2.online ? 'ONLINE' : 'OFFLINE',
-      latency: probe2.latency,
-      packetLoss: probe2.online ? 0.0 : 100.0,
-      heartbeat: probe2.online ? 'Just now' : 'Unreachable',
-      uptime: probe2.online ? 99.8 : 0.0,
-      firmwareVersion: 'Ver 8.0.4.7-20220624 / ZKFinger VX10.0',
-      updateAvailable: false,
-      punchesRecordedToday: 35,
-      cameraActive: true,
-      mode: 'ACTIVE_SCAN',
+      bucket: '50 - 100ms (Fair)',
+      count: onlineLatencies.filter((l) => l >= 50 && l <= 100).length,
+      color: '#f59e0b',
     },
     {
-      id: 'TERM-03',
-      code: 'DAV-BIO-03',
-      serialNumber: process.env.BIOMETRIC_DEV3_SERIAL || 'JNP2252300797',
-      name: 'DAV-BIO-03 Admin & Billing Biometric Terminal 3',
-      location: 'Davangere Store (Admin / Billing Floor)',
-      ipAddress: 'Protected Showroom LAN',
-      status: probe3.online ? 'ONLINE' : 'OFFLINE',
-      latency: probe3.latency,
-      packetLoss: probe3.online ? 0.0 : 100.0,
-      heartbeat: probe3.online ? 'Just now' : 'Unreachable',
-      uptime: probe3.online ? 100.0 : 0.0,
-      firmwareVersion: 'Ver 8.0.4.7-20220624 / ZKFinger VX10.0',
-      updateAvailable: false,
-      punchesRecordedToday: 24,
-      cameraActive: true,
-      mode: 'ACTIVE_SCAN',
-    },
-    {
-      id: 'TERM-04',
-      code: 'BEL-QR-02',
-      name: 'BEL-QR-02 Refreshment & Tea Break Scanner',
-      location: 'Belagavi Flagship (Break Zone)',
-      ipAddress: 'Protected Showroom LAN',
-      status: probe1.online ? 'ONLINE' : 'OFFLINE',
-      latency: probe1.latency + 2,
-      packetLoss: 0.0,
-      heartbeat: '2s ago',
-      uptime: 99.7,
-      firmwareVersion: 'v3.2.0-stable',
-      updateAvailable: false,
-      punchesRecordedToday: 42,
-      cameraActive: true,
-      mode: 'ACTIVE_SCAN',
-    },
-    {
-      id: 'TERM-05',
-      code: 'DAV-QR-01',
-      name: 'DAV-QR-01 Weaving & Loom Floor Terminal',
-      location: 'Davanagere Showroom (Fitting Wing)',
-      ipAddress: 'Protected Showroom LAN',
-      status: probe2.online ? 'ONLINE' : 'OFFLINE',
-      latency: probe2.latency + 3,
-      packetLoss: 0.0,
-      heartbeat: '3s ago',
-      uptime: 99.8,
-      firmwareVersion: 'v3.2.1-prod',
-      updateAvailable: false,
-      punchesRecordedToday: 18,
-      cameraActive: true,
-      mode: 'ACTIVE_SCAN',
-    },
-    {
-      id: 'TERM-06',
-      code: 'SHI-QR-01',
-      name: 'SHI-QR-01 Inventory Bay Gate Scanner',
-      location: 'Shivamogga Retail Apex (Inventory Base)',
-      ipAddress: 'Protected Showroom LAN',
-      status: probe3.online ? 'ONLINE' : 'OFFLINE',
-      latency: probe3.latency + 2,
-      packetLoss: 0.0,
-      heartbeat: '5s ago',
-      uptime: 99.9,
-      firmwareVersion: 'v3.2.0-prod',
-      updateAvailable: false,
-      punchesRecordedToday: 15,
-      cameraActive: true,
-      mode: 'ACTIVE_SCAN',
+      bucket: '> 100ms (Degraded)',
+      count: onlineLatencies.filter((l) => l > 100).length,
+      color: '#ef4444',
     },
   ];
 
-  const onlineCount = terminals.filter((t) => t.status === 'ONLINE').length;
-  const offlineCount = terminals.length - onlineCount;
-  const avgLatency = Math.round(
-    terminals.reduce((acc, t) => acc + (t.status === 'ONLINE' ? t.latency : 0), 0) / (onlineCount || 1)
-  );
+  const hubBuckets = new Map<string, { hub: string; terminals: number; online: number }>();
+  for (const term of terminals) {
+    const key = term.location;
+    const bucket = hubBuckets.get(key) ?? { hub: key, terminals: 0, online: 0 };
+    bucket.terminals += 1;
+    if (term.status === 'ONLINE') bucket.online += 1;
+    hubBuckets.set(key, bucket);
+  }
+  const hubsSummary = [...hubBuckets.values()].map((bucket) => ({
+    hub: bucket.hub,
+    terminals: bucket.terminals,
+    status:
+      bucket.online === bucket.terminals
+        ? 'All terminals reachable'
+        : bucket.online > 0
+          ? `${bucket.online}/${bucket.terminals} reachable`
+          : 'No terminal reachable',
+  }));
 
-  // Network packet loss & latency metrics
   const networkMetrics = {
     totalTerminals: terminals.length,
-    onlineTerminals: onlineCount,
-    offlineTerminals: offlineCount,
+    onlineTerminals: onlineTerminals.length,
+    offlineTerminals: terminals.length - onlineTerminals.length,
     maintenanceTerminals: 0,
-    averageLatencyMs: avgLatency,
-    averagePacketLossPct: offlineCount > 0 ? Number(((offlineCount / terminals.length) * 100).toFixed(1)) : 0.0,
-    packetLossGraph: [
-      { time: '08:00', lossPct: 0.0, latency: avgLatency },
-      { time: '09:00', lossPct: 0.0, latency: avgLatency + 2 },
-      { time: '10:00', lossPct: 0.0, latency: avgLatency - 1 },
-      { time: '11:00', lossPct: 0.0, latency: avgLatency + 1 },
-      { time: '12:00', lossPct: 0.0, latency: avgLatency },
-      { time: 'Current', lossPct: 0.0, latency: avgLatency },
-    ],
-    latencyDistribution: [
-      { bucket: '< 15ms (Ultra-Fast)', count: onlineCount, color: '#10b981' },
-      { bucket: '15 - 20ms (Optimal)', count: 0, color: '#0058be' },
-      { bucket: '21 - 30ms (Good)', count: 0, color: '#3b82f6' },
-      { bucket: '31 - 50ms (Fair)', count: 0, color: '#f59e0b' },
-      { bucket: '> 50ms (Degraded)', count: offlineCount, color: '#ef4444' },
-    ],
-    hubsSummary: [
-      { hub: `Belagavi Flagship (BEL · Protected LAN · SN: ${process.env.BIOMETRIC_DEV1_SERIAL || 'JNP2252300795'})`, terminals: 2, status: probe1.online ? 'Online (Encrypted Link)' : 'Offline' },
-      { hub: `Davanagere Mega Store (DAV · Protected LAN · SN: ${process.env.BIOMETRIC_DEV2_SERIAL || 'JNP2252300802'})`, terminals: 2, status: probe2.online ? 'Online (Encrypted Link)' : 'Offline' },
-      { hub: `Shivamogga Flagship (SHI · Protected LAN · SN: ${process.env.BIOMETRIC_DEV3_SERIAL || 'JNP2252300797'})`, terminals: 2, status: probe3.online ? 'Online (Encrypted Link)' : 'Offline' },
-    ],
+    averageLatencyMs,
+    // Packet loss is not measured by the registry or the terminals.
+    averagePacketLossPct: null,
+    packetLossGraph: [],
+    latencyDistribution,
+    hubsSummary,
   };
 
   return NextResponse.json({

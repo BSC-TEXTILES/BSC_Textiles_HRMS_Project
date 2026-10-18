@@ -25,15 +25,15 @@ interface PunchRecord {
   employeeId: string;
   employeeName: string;
   department: string;
-  terminalCode: string;
-  terminalName: string;
-  locationName: string;
-  punchTime: string;
+  terminalCode: string | null;
+  terminalName: string | null;
+  locationName: string | null;
+  punchTime: string | null;
   punchType: 'IN' | 'OUT';
-  method: 'FACE' | 'QR' | 'RFID';
-  matchScore: number;
-  shiftName: string;
-  status: 'ON_TIME' | 'GRACE' | 'COMPLETED';
+  method: string | null;
+  matchScore: number | null;
+  shiftName: string | null;
+  status: 'ON_TIME' | 'GRACE' | 'COMPLETED' | 'LATE';
   avatarColor: string;
   isMissingPunch?: boolean;
   expectedShiftEnd?: string;
@@ -52,9 +52,9 @@ interface PunchesApiResponse {
     totalPunchesToday: number;
     inPunchOnly: number;
     outPunchCompleted: number;
-    syncRate: number;
+    syncRate: number | null;
     missingPunchesCount: number;
-    missingPunchesAlert: string;
+    missingPunchesAlert: string | null;
     shiftDistribution: Record<string, number>;
   };
   hourlyVelocity: Array<{ hour: string; punches: number; velocity: string }>;
@@ -153,10 +153,7 @@ export function TotalPunchesDetail({
       // 1. Interactive Card Filter
       if (activeCardFilter === 'IN' && r.punchType !== 'IN') return false;
       if (activeCardFilter === 'OUT' && r.punchType !== 'OUT') return false;
-      if (activeCardFilter === 'MISSING') {
-        const isMissing = Boolean(r.isMissingPunch || r.id === 'punch-6' || r.id === 'punch-18');
-        if (!isMissing) return false;
-      }
+      if (activeCardFilter === 'MISSING' && !r.isMissingPunch) return false;
 
       // 2. Dropdown and Search Filters
       if (selectedTerminal !== 'all' && r.terminalCode !== selectedTerminal) return false;
@@ -166,13 +163,18 @@ export function TotalPunchesDetail({
         return (
           r.employeeName.toLowerCase().includes(query) ||
           r.employeeId.toLowerCase().includes(query) ||
-          r.department.toLowerCase().includes(query) ||
-          r.terminalName.toLowerCase().includes(query)
+          (r.department || '').toLowerCase().includes(query) ||
+          (r.terminalName || '').toLowerCase().includes(query)
         );
       }
       return true;
     });
   }, [data, activeCardFilter, selectedTerminal, selectedDepartment, searchTerm]);
+
+  const peakHour = useMemo(() => {
+    if (!data?.hourlyVelocity?.length) return null;
+    return data.hourlyVelocity.reduce((max, item) => (item.punches > max.punches ? item : max), data.hourlyVelocity[0]);
+  }, [data?.hourlyVelocity]);
 
   const totalPages = Math.ceil(filteredRecords.length / pageSize) || 1;
   const paginatedRecords = useMemo(() => {
@@ -190,12 +192,12 @@ export function TotalPunchesDetail({
       r.employeeId,
       `"${r.employeeName}"`,
       `"${r.department}"`,
-      `"${r.terminalName}"`,
-      r.punchTime,
+      `"${r.terminalName ?? ''}"`,
+      r.punchTime ?? '',
       r.punchType,
-      r.method,
-      `${r.matchScore}%`,
-      `"${r.shiftName}"`,
+      r.method ?? '',
+      r.matchScore != null ? `${r.matchScore}%` : '',
+      `"${r.shiftName ?? ''}"`,
       r.status,
     ]);
 
@@ -310,11 +312,13 @@ export function TotalPunchesDetail({
                   )}
                 </div>
                 <div className="text-2xl font-bold text-[#0b1c30] mt-1">
-                  {data?.stats?.totalPunchesToday || 50}
+                  {data ? data.stats.totalPunchesToday : '—'}
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="font-semibold text-emerald-600">99.8%</span>
+                  <span className="font-semibold text-emerald-600">
+                    {data?.stats?.syncRate != null ? `${data.stats.syncRate}%` : '—'}
+                  </span>
                   <span>Sync Rate</span>
                 </div>
               </div>
@@ -351,7 +355,7 @@ export function TotalPunchesDetail({
                   )}
                 </div>
                 <div className="text-2xl font-bold text-[#0058be] mt-1">
-                  {data?.stats?.inPunchOnly || 38}
+                  {data ? data.stats.inPunchOnly : '—'}
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1 truncate">
                   Currently on duty on floors
@@ -390,7 +394,7 @@ export function TotalPunchesDetail({
                   )}
                 </div>
                 <div className="text-2xl font-bold text-emerald-600 mt-1">
-                  {data?.stats?.outPunchCompleted || 12}
+                  {data ? data.stats.outPunchCompleted : '—'}
                 </div>
                 <div className="text-[11px] text-slate-500 mt-1 truncate">
                   Shift completed / logged out
@@ -427,7 +431,7 @@ export function TotalPunchesDetail({
                   <AlertTriangle className="w-4 h-4 text-amber-600" />
                 </div>
                 <div className="text-2xl font-bold text-amber-900 mt-1">
-                  {data?.stats?.missingPunchesCount || 2} Staff
+                  {data ? data.stats.missingPunchesCount : '—'} Staff
                 </div>
                 <div className="text-[11px] text-amber-700 mt-1 truncate">
                   Unclosed checkout from shift
@@ -443,11 +447,17 @@ export function TotalPunchesDetail({
                     <Clock className="w-4 h-4 text-[#0058be]" />
                     Punch-In Velocity Sparkline by Hour (Karnataka Terminals)
                   </h3>
-                  <p className="text-[11px] text-slate-400">Peak influx detected at 09:00 AM morning roster shift change</p>
+                  <p className="text-[11px] text-slate-400">
+                    {peakHour && peakHour.punches > 0
+                      ? `Peak influx at ${peakHour.hour} — ${peakHour.punches} punch-ins from the stored attendance ledger`
+                      : 'No punch-in events recorded yet today'}
+                  </p>
                 </div>
-                <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-[#0058be] text-[10px] font-bold border border-blue-200 self-start sm:self-auto">
-                  Peak: 18 Punches / 30m window
-                </span>
+                {peakHour && peakHour.punches > 0 && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-[#0058be] text-[10px] font-bold border border-blue-200 self-start sm:self-auto">
+                    Peak: {peakHour.punches} punches in {peakHour.hour}
+                  </span>
+                )}
               </div>
 
               <div className="h-36 w-full pt-2">
@@ -531,12 +541,12 @@ export function TotalPunchesDetail({
                   }}
                   className="bg-slate-50 border border-slate-200 text-xs text-slate-700 px-3 py-2 rounded-lg font-medium focus:outline-none"
                 >
-                  <option value="all">All Terminals (8/8)</option>
-                  <option value="BEL-01">BEL-01 Entrance Tablet A</option>
-                  <option value="BEL-02">BEL-02 Floor 1 Scanner B</option>
-                  <option value="BEL-03">BEL-03 Canteen Scanner C</option>
-                  <option value="DAV-02">DAV-02 Showroom Biometric</option>
-                  <option value="SHI-03">SHI-03 Concierge Cam</option>
+                  <option value="all">All Terminals ({data?.terminalsList?.length ?? 0})</option>
+                  {data?.terminalsList?.map((terminal) => (
+                    <option key={terminal.code} value={terminal.code}>
+                      {terminal.code} {terminal.name}
+                    </option>
+                  ))}
                 </select>
 
                 <select
@@ -548,12 +558,11 @@ export function TotalPunchesDetail({
                   className="bg-slate-50 border border-slate-200 text-xs text-slate-700 px-3 py-2 rounded-lg font-medium focus:outline-none"
                 >
                   <option value="all">All Departments</option>
-                  <option value="Spinning Unit">Spinning Unit</option>
-                  <option value="Weaving Section">Weaving Section</option>
-                  <option value="Garmenting">Garmenting</option>
-                  <option value="Quality Control">Quality Control</option>
-                  <option value="Retail & Sales">Retail & Sales</option>
-                  <option value="Administration">Administration</option>
+                  {data?.departmentsList?.map((department) => (
+                    <option key={department} value={department}>
+                      {department}
+                    </option>
+                  ))}
                 </select>
 
                 {(selectedTerminal !== 'all' || selectedDepartment !== 'all' || searchTerm || activeCardFilter !== 'ALL') && (
@@ -615,7 +624,7 @@ export function TotalPunchesDetail({
                   <div>
                     <div className="font-bold text-amber-950">Missing Punches Alert (Action Required):</div>
                     <div className="text-[11px] text-amber-800">
-                      2 staff members have unclosed checkouts from their completed shift schedules (Shift ended 18:30 with no exit punch recorded).
+                      {data?.stats?.missingPunchesAlert ?? 'No unclosed checkouts from completed shifts.'}
                     </div>
                   </div>
                 </div>
@@ -660,7 +669,7 @@ export function TotalPunchesDetail({
                       </tr>
                     ) : (
                       paginatedRecords.map((r, idx) => {
-                        const isMissingRecord = Boolean(r.isMissingPunch || r.id === 'punch-6' || r.id === 'punch-18');
+                        const isMissingRecord = Boolean(r.isMissingPunch);
                         return (
                           <tr key={`${r.id || idx}-${idx}`} className="hover:bg-slate-50/80 transition-colors">
                             {/* Employee */}
@@ -682,18 +691,18 @@ export function TotalPunchesDetail({
                             {/* Department & Shift */}
                             <td className="py-3 px-4">
                               <div className="font-semibold text-slate-700">{r.department}</div>
-                              <div className="text-[10px] text-slate-400">{r.shiftName}</div>
+                              <div className="text-[10px] text-slate-400">{r.shiftName ?? 'Shift not assigned'}</div>
                             </td>
 
                             {/* Terminal & Hub */}
                             <td className="py-3 px-4">
-                              <div className="font-medium text-slate-800">{r.terminalName}</div>
-                              <div className="text-[10px] text-slate-400">{r.locationName}</div>
+                              <div className="font-medium text-slate-800">{r.terminalName ?? 'Terminal not reported'}</div>
+                              <div className="text-[10px] text-slate-400">{r.locationName ?? 'Location not reported'}</div>
                             </td>
 
                             {/* Punch Time */}
                             <td className="py-3 px-4 font-mono font-semibold text-slate-700">
-                              {r.punchTime}
+                              {r.punchTime ?? '—'}
                             </td>
 
                             {/* Type */}

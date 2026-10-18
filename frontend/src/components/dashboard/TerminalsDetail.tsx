@@ -32,8 +32,10 @@ interface TerminalDevice {
   port?: number;
   serialNumber?: string;
   status: 'ONLINE' | 'OFFLINE' | 'MAINTENANCE';
-  latency: number;
-  packetLoss: number;
+  /** null when the terminal did not answer the latest probe */
+  latency: number | null;
+  /** null when no loss figure is available for the terminal */
+  packetLoss: number | null;
   heartbeat: string;
   /**
    * Uptime is not measured anywhere in this stack — no probe keeps an online-time
@@ -186,23 +188,18 @@ export function TerminalsDetail({
 
 
   const handleRestart = (term: TerminalDevice) => {
-    toast.promise(
-      new Promise((resolve) => setTimeout(resolve, 1200)),
-      {
-        loading: `Sending graceful restart signal to ${term.name}...`,
-        success: `${term.name} restarted successfully! Telemetry resumed in 14ms.`,
-        error: 'Failed to restart terminal',
-      }
-    );
+    // There is no remote-restart endpoint in this deployment; the terminal
+    // firmware is managed on-device. Report that instead of faking a restart.
+    toast(`${term.name}: remote restart is not supported by this deployment.`);
   };
 
   const handleToggleMaintenance = (term: TerminalDevice) => {
     const nextState = !maintenanceStates[term.id];
     setMaintenanceStates(prev => ({ ...prev, [term.id]: nextState }));
     if (nextState) {
-      toast(`${term.name} placed in Maintenance Mode. Sensor standby.`, { icon: '🔧' });
+      toast(`${term.name} marked for maintenance in this view. The device itself is not changed.`);
     } else {
-      toast.success(`${term.name} restored to Live Active Ingestion.`);
+      toast.success(`${term.name} unmarked in this view.`);
     }
   };
 
@@ -233,6 +230,7 @@ export function TerminalsDetail({
       ? Math.round(reportedLatencies.reduce((a, b) => a + b, 0) / reportedLatencies.length)
       : null);
   const avgPacketLoss = data?.networkMetrics?.averagePacketLossPct ?? null;
+  const measuredLossTerminals = terminalsList.filter(t => typeof t.packetLoss === 'number');
 
   const acceptableLossThreshold = 1.0;
   const exceedingLossTerminals = terminalsList.filter(
@@ -338,7 +336,11 @@ export function TerminalsDetail({
                       : 'Partial'}
                   </span>
                 </div>
-                <div className="text-[11px] text-slate-500 mt-1">100% Karnataka Hub Coverage</div>
+                <div className="text-[11px] text-slate-500 mt-1">
+                  {terminalsList.length === 0
+                    ? 'No registered terminals to probe'
+                    : `Live TCP probe of ${terminalsList.length} registered terminal(s)`}
+                </div>
               </button>
 
               {/* Card 2: Packet Loss Rate */}
@@ -362,9 +364,13 @@ export function TerminalsDetail({
                 <div className="text-2xl font-bold text-emerald-600 mt-1">
                   {data?.networkMetrics?.averagePacketLossPct != null ? `${data.networkMetrics.averagePacketLossPct.toFixed(2)}%` : 'Not measured'}
                 </div>
-                <div className="text-[11px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
+                <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Zero dropped frames across VPN mesh</span>
+                  <span>
+                    {data?.networkMetrics?.averagePacketLossPct != null
+                      ? `${data.networkMetrics.averagePacketLossPct.toFixed(2)}% measured fleet average`
+                      : 'Packet loss is not measured by the current probe'}
+                  </span>
                 </div>
               </button>
 
@@ -460,7 +466,7 @@ export function TerminalsDetail({
                           Terminal-Level Hardware Telemetry
                         </h3>
                         <p className="text-[11px] text-slate-400">
-                          Real-time ping, uptime, IP addresses, and daily punch ingestion
+                          Real-time probe latency, IP addresses, and daily punch ingestion per terminal
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -482,7 +488,9 @@ export function TerminalsDetail({
                         const isMaintenance = maintenanceStates[term.id];
                         const isOnline = term.status === 'ONLINE';
                         const latencyColor =
-                          term.latency < 50
+                          typeof term.latency !== 'number'
+                            ? 'text-slate-500 bg-slate-50 border-slate-200'
+                            : term.latency < 50
                             ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
                             : term.latency < 100
                             ? 'text-amber-600 bg-amber-50 border-amber-200'
@@ -530,7 +538,7 @@ export function TerminalsDetail({
                               <div>
                                 <span className="text-slate-400 block">Network Link:</span>
                                 <span className="font-mono font-semibold text-slate-700">
-                                  'Protected Showroom LAN'
+                                  {term.ipAddress || 'Not available'}
                                 </span>
                               </div>
                               <div>
@@ -581,7 +589,7 @@ export function TerminalsDetail({
                               </button>
                               <button
                                 onClick={() => setSelectedCameraTerminal(term)}
-                                title="View Live Camera Feed"
+                                title="View Terminal Details"
                                 className="flex items-center justify-center gap-1 py-1 px-1.5 rounded bg-blue-50 hover:bg-blue-100 text-[#0058be] text-[10px] font-bold transition-colors"
                               >
                                 <Camera className="w-3 h-3" />
@@ -627,12 +635,14 @@ export function TerminalsDetail({
                         <div>
                           <span className="font-bold text-sm block">
                             {exceedingLossTerminals.length === 0
-                              ? 'Zero Packet Loss Detected — Network Optimal'
+                              ? 'No Packet Loss Above Threshold Detected'
                               : `${exceedingLossTerminals.length} Terminal(s) Exceeding Packet Loss Threshold`}
                           </span>
                           <span className="text-[11px] opacity-80">
                             {exceedingLossTerminals.length === 0
-                              ? 'All 8 edge biometric terminals comply with the < 1.00% packet-loss SLA. Zero dropped frames.'
+                              ? measuredLossTerminals.length > 0
+                                ? `${measuredLossTerminals.length} of ${terminalsList.length} terminal(s) reported packet loss on the latest probe (SLA limit 1.00%).`
+                                : 'Packet loss is not reported by the current probe.'
                               : `Degraded terminals: ${exceedingLossTerminals.map(t => `${t.code} (${t.packetLoss}%)`).join(', ')}`}
                           </span>
                         </div>
@@ -655,7 +665,7 @@ export function TerminalsDetail({
                           Overall Packet Loss
                         </span>
                         <div className="text-2xl font-bold text-emerald-600 mt-1">
-                          {avgPacketLoss != null ? `${avgPacketLoss.toFixed(2)}%` : '0.00%'}
+                          {avgPacketLoss != null ? `${avgPacketLoss.toFixed(2)}%` : 'Not measured'}
                         </div>
                         <div className="text-[11px] text-slate-500 mt-1">Fleet average loss</div>
                       </div>
@@ -760,7 +770,7 @@ export function TerminalsDetail({
                       <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
                           <Network className="w-4 h-4 text-[#0058be]" />
-                          Per-Terminal Packet Loss Diagnostics (8 Units)
+                          Per-Terminal Packet Loss Diagnostics ({terminalsList.length} Units)
                         </h3>
                         <span className="text-[11px] text-slate-400">Acceptable SLA Threshold: &le; 1.00%</span>
                       </div>
@@ -791,7 +801,7 @@ export function TerminalsDetail({
                                   <td className="px-4 py-3 text-slate-500">
                                     <div>{term.location || 'Not available'}</div>
                                     <div className="flex items-center gap-1.5 mt-0.5">
-                                      <span className="font-mono text-[10px] text-slate-400">Protected Showroom LAN</span>
+                                      <span className="font-mono text-[10px] text-slate-400">{term.ipAddress || 'Not available'}</span>
                                       {term.serialNumber && (
                                         <span className="font-mono text-[9px] px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-100 font-semibold" title="Device Serial Number">
                                           SN: {term.serialNumber}
@@ -972,7 +982,7 @@ export function TerminalsDetail({
                       <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
                           <Server className="w-4 h-4 text-[#0058be]" />
-                          Per-Terminal Current Latency (8 Units)
+                          Per-Terminal Current Latency ({terminalsList.length} Units)
                         </h3>
                         <span className="text-[11px] text-slate-400">Target: &lt; 50ms Edge Response</span>
                       </div>
@@ -992,11 +1002,16 @@ export function TerminalsDetail({
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {terminalsList.map((term, i) => {
-                              const diff = avgLatency === null ? null : term.latency - avgLatency;
+                              const diff =
+                                avgLatency === null || typeof term.latency !== 'number'
+                                  ? null
+                                  : term.latency - avgLatency;
                               const diffText =
                                 diff === null ? 'No average' : diff > 0 ? `+${diff}ms` : `${diff}ms`;
                               const category =
-                                term.latency < 50
+                                typeof term.latency !== 'number'
+                                  ? { label: 'No measurement', cls: 'bg-slate-50 text-slate-600 border-slate-200' }
+                                  : term.latency < 50
                                   ? { label: 'Optimal (< 50ms)', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
                                   : term.latency <= 100
                                   ? { label: 'Warning (50-100ms)', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
@@ -1012,7 +1027,7 @@ export function TerminalsDetail({
                                   </td>
                                   <td className="px-4 py-3 text-slate-500">
                                     <div>{term.location || 'Not available'}</div>
-                                    <span className="font-mono text-[10px] text-slate-400">'Protected Showroom LAN'</span>
+                                    <span className="font-mono text-[10px] text-slate-400">{term.ipAddress || 'Not available'}</span>
                                   </td>
                                   <td className="px-4 py-3 font-mono font-bold text-slate-800">
                                     {term.latency != null ? `${term.latency}ms` : 'Not available'}
@@ -1054,19 +1069,23 @@ export function TerminalsDetail({
                         )}
                         <div>
                           <span className="font-bold text-sm block">
-                            {degradedOrDisconnected.length === 0
-                              ? 'All 3 Regional Hubs & Mesh Links Healthy'
+                            {terminalsList.length === 0
+                              ? 'No Terminal Topology Reported'
+                              : degradedOrDisconnected.length === 0
+                              ? `All ${data?.networkMetrics?.hubsSummary?.length ?? 0} Regional Hub(s) & Mesh Links Healthy`
                               : `${degradedOrDisconnected.length} Degraded or Disconnected Link(s) Detected`}
                           </span>
                           <span className="text-[11px] opacity-80">
-                            {degradedOrDisconnected.length === 0
-                              ? 'Zero disconnected or degraded connections across Karnataka edge hubs. Full mesh routing active.'
+                            {terminalsList.length === 0
+                              ? 'The network probe returned no terminals to map yet.'
+                              : degradedOrDisconnected.length === 0
+                              ? 'No disconnected or degraded connections detected on the latest probe.'
                               : `Degraded connection points: ${degradedOrDisconnected.map(t => `${t.code} (${t.location})`).join(', ')}`}
                           </span>
                         </div>
                       </div>
                       <span className="px-3 py-1 rounded-full font-bold text-xs bg-emerald-100 text-emerald-800 border border-emerald-300">
-                        {data?.networkMetrics?.hubsSummary?.length ?? 3} Hubs Active
+                        {data?.networkMetrics?.hubsSummary?.length ?? 0} Hubs Active
                       </span>
                     </div>
 
@@ -1120,7 +1139,7 @@ export function TerminalsDetail({
                               <div className="flex items-center gap-2">
                                 <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold flex items-center gap-1">
                                   <CheckCircle2 className="w-3.5 h-3.5" />
-                                  <span>{hub.status || 'All Online'}</span>
+                                  <span>{hub.status || 'Status not reported'}</span>
                                 </span>
                               </div>
                             </div>
@@ -1135,7 +1154,7 @@ export function TerminalsDetail({
                                 {hubTerminals.map((term, tIdx) => {
                                   const isMaint = maintenanceStates[term.id];
                                   const isDisconnected = term.status === 'OFFLINE';
-                                  const isDegraded = term.latency > 50;
+                                  const isDegraded = typeof term.latency === 'number' && term.latency > 50;
 
                                   const linkState = isDisconnected
                                     ? { label: 'Disconnected Link', cls: 'text-red-700 bg-red-50 border-red-200' }
@@ -1172,7 +1191,7 @@ export function TerminalsDetail({
                                       <div className="grid grid-cols-3 gap-2 text-[10px] bg-white p-2 rounded border border-slate-100">
                                         <div>
                                           <span className="text-slate-400 block">Network:</span>
-                                          <span className="font-mono font-semibold text-slate-700">'Protected Showroom LAN'</span>
+                                          <span className="font-mono font-semibold text-slate-700">{term.ipAddress || 'Not available'}</span>
                                         </div>
                                         <div>
                                           <span className="text-slate-400 block">Latency:</span>
@@ -1234,12 +1253,24 @@ export function TerminalsDetail({
                       <div>
                         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
                           <Wifi className="w-4 h-4 text-emerald-600" />
-                          Packet Loss Stream (Real-Time 0.00% Target)
+                          Packet Loss Stream (SLA Target 0.00%)
                         </h3>
-                        <p className="text-[11px] text-slate-400">Zero degradation detected over fiber &amp; 4G failover channels</p>
+                        <p className="text-[11px] text-slate-400">
+                          {avgPacketLoss != null
+                            ? `${avgPacketLoss.toFixed(2)}% fleet-average loss on the latest probe`
+                            : 'Packet loss is not measured by the current probe — no time series is stored'}
+                        </p>
                       </div>
-                      <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200">
-                        Optimal
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                          avgPacketLoss == null
+                            ? 'bg-slate-50 text-slate-600 border-slate-200'
+                            : avgPacketLoss <= 1
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : 'bg-red-50 text-red-700 border-red-200'
+                        }`}
+                      >
+                        {avgPacketLoss == null ? 'Not measured' : avgPacketLoss <= 1 ? 'Optimal' : 'Review'}
                       </span>
                     </div>
 
@@ -1269,12 +1300,12 @@ export function TerminalsDetail({
                       <div>
                         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
                           <Zap className="w-4 h-4 text-[#0058be]" />
-                          Latency Distribution (All 8 Terminals)
+                          Latency Distribution ({reportedLatencies.length} Probed)
                         </h3>
                         <p className="text-[11px] text-slate-400">Green range: &lt;50ms response ensures seamless facial unlock</p>
                       </div>
                       <span className="px-2 py-0.5 rounded bg-blue-50 text-[#0058be] text-[10px] font-bold border border-blue-200">
-                        Avg 18ms
+                        {avgLatency != null ? `Avg ${avgLatency}ms` : 'No measurement'}
                       </span>
                     </div>
 
@@ -1298,16 +1329,18 @@ export function TerminalsDetail({
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-2">
                       <Server className="w-4 h-4 text-[#0058be]" />
-                      Edge Terminal Inventory &amp; Telemetry (8 Units)
+                      Edge Terminal Inventory &amp; Telemetry ({data?.terminals?.length ?? 0} Units)
                     </h3>
-                    <span className="text-[11px] text-slate-400">Firmware Auto-Sync Enabled</span>
+                    <span className="text-[11px] text-slate-400">Firmware versions as last reported by the device registry</span>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                     {data?.terminals.map((term, idx) => {
                       const isMaintenance = maintenanceStates[term.id];
                       const latencyColor =
-                        term.latency < 50
+                        typeof term.latency !== 'number'
+                          ? 'text-slate-500 bg-slate-50 border-slate-200'
+                          : term.latency < 50
                           ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
                           : term.latency < 100
                           ? 'text-amber-600 bg-amber-50 border-amber-200'
@@ -1324,14 +1357,22 @@ export function TerminalsDetail({
                           <div className="flex items-start justify-between">
                             <div>
                               <div className="flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                <span
+                                  className={`w-2 h-2 rounded-full ${
+                                    term.status === 'ONLINE'
+                                      ? 'bg-emerald-500 animate-pulse'
+                                      : term.status === 'MAINTENANCE'
+                                      ? 'bg-amber-500'
+                                      : 'bg-red-500'
+                                  }`}
+                                />
                                 <span className="text-xs font-bold text-[#0b1c30]">{term.code}</span>
                               </div>
                               <h4 className="text-xs font-bold text-slate-800 line-clamp-1 mt-0.5">{term.name}</h4>
-                              <span className="text-[10px] text-slate-400">{term.location}</span>
+                              <span className="text-[10px] text-slate-400">{term.location || 'Not available'}</span>
                             </div>
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${latencyColor}`}>
-                              {term.latency}ms
+                              {term.latency != null ? `${term.latency}ms` : 'Not available'}
                             </span>
                           </div>
 
@@ -1339,11 +1380,11 @@ export function TerminalsDetail({
                           <div className="grid grid-cols-2 gap-2 text-[10px] bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                             <div>
                               <span className="text-slate-400 block">Network Link:</span>
-                              <span className="font-mono font-semibold text-slate-700">'Protected Showroom LAN'</span>
+                              <span className="font-mono font-semibold text-slate-700">{term.ipAddress || 'Not available'}</span>
                             </div>
                             <div>
                               <span className="text-slate-400 block">Heartbeat:</span>
-                              <span className="font-semibold text-slate-700">{term.heartbeat}</span>
+                              <span className="font-semibold text-slate-700">{term.heartbeat || 'Not available'}</span>
                             </div>
                             <div>
                               <span className="text-slate-400 block">Uptime Today:</span>
@@ -1351,13 +1392,15 @@ export function TerminalsDetail({
                             </div>
                             <div>
                               <span className="text-slate-400 block">Punches Logged:</span>
-                              <span className="font-semibold text-[#0058be]">{term.punchesRecordedToday}</span>
+                              <span className="font-semibold text-[#0058be]">
+                                {term.punchesRecordedToday != null ? term.punchesRecordedToday : 'Not available'}
+                              </span>
                             </div>
                           </div>
 
                           {/* Firmware & Badges */}
                           <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-100">
-                            <span className="text-slate-500 font-mono">{term.firmwareVersion}</span>
+                            <span className="text-slate-500 font-mono">{term.firmwareVersion || 'Not available'}</span>
                             {term.updateAvailable && (
                               <span className="px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 font-bold border border-purple-200 flex items-center gap-1">
                                 <Sparkles className="w-2.5 h-2.5" />
@@ -1378,7 +1421,7 @@ export function TerminalsDetail({
                             </button>
                             <button
                               onClick={() => setSelectedCameraTerminal(term)}
-                              title="View Live Camera Feed"
+                              title="View Terminal Details"
                               className="flex items-center justify-center gap-1 py-1 px-1.5 rounded bg-blue-50 hover:bg-blue-100 text-[#0058be] text-[10px] font-bold transition-colors"
                             >
                               <Camera className="w-3 h-3" />
@@ -1417,44 +1460,79 @@ export function TerminalsDetail({
                 <Camera className="w-5 h-5 text-[#0058be]" />
                 <div>
                   <h3 className="text-sm font-bold text-[#0b1c30]">
-                    {selectedCameraTerminal.name} — Live Camera Stream
+                    {selectedCameraTerminal.name} — Terminal Details
                   </h3>
                   <span className="text-[10px] text-slate-500 font-mono">
-                    Protected Showroom Video Channel (Encrypted)
+                    Registry record &amp; latest probe result
                   </span>
                 </div>
               </div>
               <button
                 onClick={() => setSelectedCameraTerminal(null)}
-                aria-label="Close camera preview"
+                aria-label="Close terminal details"
                 className="p-1 rounded-lg text-slate-400 hover:bg-slate-200"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Simulated Live Camera Stream Viewport */}
-            <div className="px-4 py-2">
-              <div className="relative aspect-video bg-slate-900 rounded-xl overflow-hidden flex flex-col items-center justify-center text-white border border-slate-800">
-                <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600/90 text-white px-2 py-0.5 rounded text-[10px] font-bold">
-                  <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                  <span>LIVE • 30 FPS</span>
-                </div>
-                <div className="absolute top-3 right-3 text-[10px] font-mono text-slate-300 bg-black/50 px-2 py-0.5 rounded">
-                  {selectedCameraTerminal.latency}ms Latency
-                </div>
+            {/* Terminal facts panel — terminals do not stream video to the HRMS */}
+            <div className="px-4 py-2 space-y-3">
+              <div className="flex items-center gap-2 text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-[11px] font-medium">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600" />
+                <span>
+                  Live video is not available — biometric terminals record punches on-device and do
+                  not stream camera feeds to this application.
+                </span>
+              </div>
 
-                {/* Facial detection reticle animation */}
-                <div className="w-32 h-40 border-2 border-emerald-400/80 rounded-2xl relative flex items-center justify-center shadow-lg">
-                  <div className="absolute -top-4 bg-emerald-500 text-slate-900 text-[9px] font-bold px-1.5 py-0.5 rounded">
-                    Liveness: 100%
-                  </div>
-                  <ScanFaceIcon className="w-12 h-12 text-emerald-400/40 animate-pulse" />
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5">
+                  <span className="text-slate-400 block text-[10px]">Status</span>
+                  <span
+                    className={`font-semibold ${
+                      selectedCameraTerminal.status === 'ONLINE'
+                        ? 'text-emerald-700'
+                        : selectedCameraTerminal.status === 'MAINTENANCE'
+                        ? 'text-amber-700'
+                        : 'text-red-600'
+                    }`}
+                  >
+                    {selectedCameraTerminal.status}
+                  </span>
                 </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5">
+                  <span className="text-slate-400 block text-[10px]">Last Heartbeat</span>
+                  <span className="font-semibold text-slate-700">{selectedCameraTerminal.heartbeat || 'Not available'}</span>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5">
+                  <span className="text-slate-400 block text-[10px]">IP Address</span>
+                  <span className="font-mono font-semibold text-slate-700">{selectedCameraTerminal.ipAddress || 'Not available'}</span>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5">
+                  <span className="text-slate-400 block text-[10px]">Firmware</span>
+                  <span className="font-mono font-semibold text-slate-700">{selectedCameraTerminal.firmwareVersion || 'Not available'}</span>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5">
+                  <span className="text-slate-400 block text-[10px]">Punches Today</span>
+                  <span className="font-semibold text-[#0058be]">
+                    {selectedCameraTerminal.punchesRecordedToday != null
+                      ? selectedCameraTerminal.punchesRecordedToday
+                      : 'Not available'}
+                  </span>
+                </div>
+                <div className="bg-slate-50 border border-slate-100 rounded-lg p-2.5">
+                  <span className="text-slate-400 block text-[10px]">Probe Latency</span>
+                  <span className="font-semibold text-slate-700">
+                    {selectedCameraTerminal.latency != null ? `${selectedCameraTerminal.latency}ms` : 'Not available'}
+                  </span>
+                </div>
+              </div>
 
-                <div className="absolute bottom-3 text-center text-xs text-slate-400 font-mono">
-                  {selectedCameraTerminal.location}
-                </div>
+              <div className="text-[10px] text-slate-400 font-mono">
+                {selectedCameraTerminal.code}
+                {selectedCameraTerminal.serialNumber ? ` • SN: ${selectedCameraTerminal.serialNumber}` : ''}
+                {` • ${selectedCameraTerminal.location || 'Location not reported'}`}
               </div>
             </div>
 
@@ -1463,20 +1541,12 @@ export function TerminalsDetail({
                 onClick={() => setSelectedCameraTerminal(null)}
                 className="px-4 py-2 bg-[#0058be] text-white rounded-lg text-xs font-bold hover:bg-blue-700"
               >
-                Close Stream
+                Close
               </button>
             </div>
           </div>
         </div>
       )}
     </div>
-  );
-}
-
-function ScanFaceIcon(props: any) {
-  return (
-    <svg fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z" />
-    </svg>
   );
 }

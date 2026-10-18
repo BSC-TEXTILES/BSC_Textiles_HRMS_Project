@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../index.js';
-import { dbDate } from '../utils/dates.js';
 import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
 
@@ -126,10 +125,10 @@ router.post('/', authorize('RECORD'), validate(fvSchema), async (req: AuthReques
       },
     });
     
-    // Update attendance if exists
-    const today = dbDate();
+    // Update attendance if exists — DATE columns only match a YYYY-MM-DD string.
+    const todayStr = new Date().toISOString().slice(0, 10);
     await prisma.attendance.updateMany({
-      where: { employeeId, attendanceDate: today },
+      where: { employeeId, attendanceDate: todayStr },
       data: { faceVerified: result === 'VERIFIED', faceMatchPercentage: matchPercentage },
     });
     
