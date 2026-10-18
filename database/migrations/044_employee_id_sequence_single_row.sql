@@ -42,7 +42,7 @@ BEGIN
   DECLARE v_batches INT;
 
   SELECT COUNT(*) INTO v_batches FROM `employee_import_batch`
-   WHERE `id_format_used` IS NOT NULL AND `id_format_used` <> '';
+   WHERE `id_format_used` = 'NUMERIC';
 
   IF v_batches > 0 THEN
     SIGNAL SQLSTATE '45000'
