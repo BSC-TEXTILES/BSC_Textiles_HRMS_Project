@@ -6,7 +6,15 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { HrSuperAdminDashboard } from '@/components/dashboard/HrSuperAdminDashboard';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
-import { toCalendarDateIST } from '@/lib/utils';
+import {
+  MY_DESK_PERIOD_SCREEN,
+  formatPeriodLabel,
+  getCurrentDateIST,
+  getCurrentPeriodIST,
+  persistReportingPeriod,
+  resolveReportingPeriod,
+  shiftPeriod,
+} from '@/lib/currentPeriod';
 import Link from 'next/link';
 import {
   Clock,
@@ -50,24 +58,37 @@ export default function MyDeskPage() {
   // Dual mode: Default to HR / Super Admin Command Center, allow toggle to personal employee desk
   const [deskMode, setDeskMode] = useState<'hr-admin' | 'personal'>('hr-admin');
 
-  // Selected period for Monthly Velocity
-  const [selectedYear, setSelectedYear] = useState<number>(2024);
-  const [selectedMonth, setSelectedMonth] = useState<number>(10); // 1-12 (October)
+  /**
+   * Selected period for Monthly Velocity.
+   *
+   * `null` means "not resolved yet": the default period is today in
+   * Asia/Kolkata, which only exists on the client, so both the server render and
+   * the first client render draw the placeholder. Resolving it in the mount
+   * effect keeps SSR/CSR identical (no hydration mismatch). Precedence is
+   * `?year=&month=` → the last period saved in localStorage → current IST month,
+   * so an explicitly chosen historical month is never reset to the present.
+   */
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [periodResolved, setPeriodResolved] = useState(false);
 
   // Live clock
   const [currentTime, setCurrentTime] = useState('14:22:08');
 
   // Desk summary state from API
   const [deskData, setDeskData] = useState<any>(null);
+  /** The server's own failure message for the summary — never hidden behind demo data. */
+  const [deskError, setDeskError] = useState<string | null>(null);
+  const [deskLoading, setDeskLoading] = useState(true);
   const [isPunching, setIsPunching] = useState(false);
 
   // Dynamic Shift & Punch state
-  const [isClockedIn, setIsClockedIn] = useState(true);
-  const [clockInTime, setClockInTime] = useState('09:28 AM');
+  const [isClockedIn, setIsClockedIn] = useState(false);
+  const [clockInTime, setClockInTime] = useState<string | null>(null);
   const [clockOutTime, setClockOutTime] = useState<string | null>(null);
-  const [shiftHours, setShiftHours] = useState('4h 54m');
-  const [shiftPercent, setShiftPercent] = useState(61.25);
-  const [earlyLateStatus, setEarlyLateStatus] = useState('2m Early');
+  const [shiftHours, setShiftHours] = useState<string | null>(null);
+  const [shiftPercent, setShiftPercent] = useState<number | null>(null);
+  const [earlyLateStatus, setEarlyLateStatus] = useState<string | null>(null);
 
   // Tea Break state
   const [isTeaBreakActive, setIsTeaBreakActive] = useState(false);
@@ -93,8 +114,9 @@ export default function MyDeskPage() {
   const [isSubmittingLeave, setIsSubmittingLeave] = useState(false);
 
   const [punchReason, setPunchReason] = useState('');
-  const [punchDate, setPunchDate] = useState('2024-10-24');
-  const [punchTime, setPunchTime] = useState('18:30 PM');
+  // Seeded with today in Asia/Kolkata on mount — never a hardcoded demo date.
+  const [punchDate, setPunchDate] = useState('');
+  const [punchTime, setPunchTime] = useState('');
   const [punchType, setPunchType] = useState<'IN' | 'OUT'>('OUT');
   const [isSubmittingPunch, setIsSubmittingPunch] = useState(false);
   const [recentCorrections, setRecentCorrections] = useState<any[]>([]);
@@ -118,8 +140,21 @@ export default function MyDeskPage() {
     return () => clearInterval(timer);
   }, []);
 
+  // 1b. Resolve the default period on the client only (URL → localStorage → today in IST)
+  useEffect(() => {
+    const period = resolveReportingPeriod(MY_DESK_PERIOD_SCREEN, window.location.search);
+    setSelectedYear(period.year);
+    setSelectedMonth(period.month);
+    setPunchDate(getCurrentDateIST());
+    setPeriodResolved(true);
+    // A user's explicit choice is preserved, so this runs exactly once per mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // 2. Fetch Desk Summary Data
   const fetchDeskData = useCallback(async (year: number, month: number) => {
+    setDeskLoading(true);
+    setDeskError(null);
     try {
       const res = await api.get('/my-desk/summary', {
         params: { year, month },
@@ -128,12 +163,12 @@ export default function MyDeskPage() {
       if (res.data) {
         setDeskData(res.data);
         if (res.data.today) {
-          setIsClockedIn(res.data.today.isClockedIn);
-          setClockInTime(res.data.today.clockInTime || '09:28 AM');
-          setClockOutTime(res.data.today.clockOutTime);
-          setShiftHours(res.data.today.shiftHoursFormatted || '4h 54m');
-          setShiftPercent(res.data.today.shiftPercent || 61.25);
-          setEarlyLateStatus(res.data.today.earlyLateStatus || '2m Early');
+          setIsClockedIn(Boolean(res.data.today.isClockedIn));
+          setClockInTime(res.data.today.clockInTime ?? null);
+          setClockOutTime(res.data.today.clockOutTime ?? null);
+          setShiftHours(res.data.today.shiftHoursFormatted ?? null);
+          setShiftPercent(typeof res.data.today.shiftPercent === 'number' ? res.data.today.shiftPercent : null);
+          setEarlyLateStatus(res.data.today.earlyLateStatus ?? null);
         }
         if (res.data.breaks?.tea) {
           setIsTeaBreakActive(res.data.breaks.tea.isActive);
@@ -146,14 +181,24 @@ export default function MyDeskPage() {
         }
       }
     } catch (err: any) {
-      console.warn('Could not fetch desk data from API, using default model', err?.message);
+      // Surfaced in the UI: a failed summary is never rendered as demo data or as
+      // an empty-but-successful desk.
+      setDeskData(null);
+      setDeskError(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          err?.message ||
+          'The desk summary request failed.'
+      );
+    } finally {
+      setDeskLoading(false);
     }
   }, []);
 
   // Fetch Punch Corrections History
-  const fetchCorrections = useCallback(async () => {
+  const fetchCorrections = useCallback(async (year: number, month: number) => {
     try {
-      const res = await api.get('/attendance/corrections');
+      const res = await api.get('/attendance/corrections', { params: { year, month } });
       if (res.data?.corrections) {
         setRecentCorrections(res.data.corrections);
       }
@@ -163,9 +208,22 @@ export default function MyDeskPage() {
   }, []);
 
   useEffect(() => {
+    if (!periodResolved || selectedYear === null || selectedMonth === null) return;
     fetchDeskData(selectedYear, selectedMonth);
-    fetchCorrections();
-  }, [fetchDeskData, fetchCorrections, selectedYear, selectedMonth]);
+    fetchCorrections(selectedYear, selectedMonth);
+  }, [fetchDeskData, fetchCorrections, periodResolved, selectedYear, selectedMonth]);
+
+  /** Re-read the summary for the period the user is looking at (no-op before it resolves). */
+  const reloadDesk = useCallback(() => {
+    if (selectedYear === null || selectedMonth === null) return;
+    fetchDeskData(selectedYear, selectedMonth);
+  }, [fetchDeskData, selectedYear, selectedMonth]);
+
+  /** Corrections history is scoped to the visible period, never to a cached month. */
+  const reloadCorrections = useCallback(() => {
+    if (selectedYear === null || selectedMonth === null) return;
+    fetchCorrections(selectedYear, selectedMonth);
+  }, [fetchCorrections, selectedYear, selectedMonth]);
 
   // 3. Tea Break Countdown
   useEffect(() => {
@@ -194,22 +252,43 @@ export default function MyDeskPage() {
 
       if (res.data) {
         setIsClockedIn(res.data.isClockedIn);
-        setClockInTime(res.data.clockInTime);
+        setClockInTime(res.data.clockInTime ?? null);
         toast.success(res.data.message || (isClockedIn ? 'Clock Out recorded' : 'Clock In recorded'));
-        fetchDeskData(selectedYear, selectedMonth);
+        reloadDesk();
       }
-    } catch {
-      const newStatus = !isClockedIn;
-      setIsClockedIn(newStatus);
-      if (newStatus) {
-        const nowStr = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-        setClockInTime(nowStr);
-        toast.success(`Clock In recorded at ${nowStr}! Biometric token active.`);
-      } else {
-        toast.success('Shift ended. Clock Out recorded successfully!');
-      }
+    } catch (err: any) {
+      // A punch that the server did not accept is reported as a failure — the
+      // clock state is never flipped locally to look like it worked.
+      toast.error(
+        err?.response?.data?.error || err?.response?.data?.message || 'The punch was not recorded by the HRMS API.'
+      );
     } finally {
       setIsPunching(false);
+    }
+  };
+
+  // Download the signed payslip PDF from the payroll API (real document, real amounts).
+  const handleDownloadPayslip = async (itemId: string | null, label: string) => {
+    if (!itemId) {
+      toast.error('No payslip PDF is on record to download.');
+      return;
+    }
+    try {
+      const res = await api.get(`/payroll/payslip/${itemId}/pdf`, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `BSC_Payslip_${String(label).replace(/[^A-Za-z0-9]+/g, '_')}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success('Signed payslip PDF downloaded.');
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.error || 'The payslip PDF could not be downloaded from the API.'
+      );
     }
   };
 
@@ -229,15 +308,12 @@ export default function MyDeskPage() {
           toast.success(res.data.message || 'Tea Break concluded early. Welcome back!');
         }
       }
-    } catch {
-      if (isTeaBreakActive) {
-        setIsTeaBreakActive(false);
-        toast.success('Tea Break concluded early.');
-      } else {
-        setIsTeaBreakActive(true);
-        setTeaBreakSeconds(900);
-        toast.success('Statutory 15m Afternoon Tea Break started!');
-      }
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          'The break was not updated by the HRMS API.'
+      );
     }
   };
 
@@ -263,11 +339,13 @@ export default function MyDeskPage() {
       setLeaveReason('');
       setLeaveStartDate('');
       setLeaveEndDate('');
-      fetchDeskData(selectedYear, selectedMonth);
-    } catch {
-      toast.success(`${leaveType} request submitted for Floor Lead approval!`);
-      setIsLeaveModalOpen(false);
-      setLeaveReason('');
+      reloadDesk();
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          'The leave request was not accepted by the HRMS API.'
+      );
     } finally {
       setIsSubmittingLeave(false);
     }
@@ -280,6 +358,14 @@ export default function MyDeskPage() {
       toast.error('Please provide justification for punch override');
       return;
     }
+    if (!punchDate) {
+      toast.error('Choose the attendance date this correction applies to.');
+      return;
+    }
+    if (!punchTime) {
+      toast.error('Enter the punch time to regularize (for example 18:30).');
+      return;
+    }
 
     try {
       setIsSubmittingPunch(true);
@@ -290,14 +376,18 @@ export default function MyDeskPage() {
         requestedLogout: punchType === 'OUT' ? `${punchDate} ${punchTime}` : null,
         reason: punchReason.trim(),
       });
-      toast.success('Punch regularization request submitted to Floor Manager Anand Kulkarni!');
+      toast.success('Punch regularization request submitted for approval.');
       setIsPunchModalOpen(false);
       setPunchReason('');
-      fetchCorrections();
-    } catch {
-      toast.success('Punch regularization request submitted to Floor Manager Anand Kulkarni!');
-      setIsPunchModalOpen(false);
-      setPunchReason('');
+      setPunchTime('');
+      setPunchDate(getCurrentDateIST());
+      reloadCorrections();
+    } catch (err: any) {
+      toast.error(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          'The correction was not accepted by the HRMS API.'
+      );
     } finally {
       setIsSubmittingPunch(false);
     }
@@ -314,32 +404,35 @@ export default function MyDeskPage() {
       setCustodyAssets((prev) =>
         prev.map((a) => (a.id === assetId ? { ...a, status: action === 'RETURN' ? 'RETURN_REQUESTED' : 'ACKNOWLEDGED' } : a))
       );
-    } catch {
-      toast.success(action === 'RETURN' ? 'Asset return handover requested' : 'Custody possession verified and acknowledged');
-      setCustodyAssets((prev) =>
-        prev.map((a) => (a.id === assetId ? { ...a, status: action === 'RETURN' ? 'RETURN_REQUESTED' : 'ACKNOWLEDGED' } : a))
+    } catch (err: any) {
+      // The ledger keeps its server-reported status; a failed call is not shown as done.
+      toast.error(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          'The asset status was not changed by the HRMS API.'
       );
     }
   };
 
-  // Month navigation helpers
+  // Month navigation helpers — every explicit choice is persisted (localStorage + URL)
+  // so a refresh or a return visit keeps the month the user selected.
+  const applyPeriod = (period: { year: number; month: number }) => {
+    setSelectedYear(period.year);
+    setSelectedMonth(period.month);
+    persistReportingPeriod(MY_DESK_PERIOD_SCREEN, period);
+  };
+
   const handlePrevMonth = () => {
-    if (selectedMonth === 1) {
-      setSelectedYear((prev) => prev - 1);
-      setSelectedMonth(12);
-    } else {
-      setSelectedMonth((prev) => prev - 1);
-    }
+    if (selectedYear === null || selectedMonth === null) return;
+    applyPeriod(shiftPeriod({ year: selectedYear, month: selectedMonth }, -1));
   };
 
   const handleNextMonth = () => {
-    if (selectedMonth === 12) {
-      setSelectedYear((prev) => prev + 1);
-      setSelectedMonth(1);
-    } else {
-      setSelectedMonth((prev) => prev + 1);
-    }
+    if (selectedYear === null || selectedMonth === null) return;
+    applyPeriod(shiftPeriod({ year: selectedYear, month: selectedMonth }, 1));
   };
+
+  const jumpToCurrentPeriod = () => applyPeriod(getCurrentPeriodIST());
 
   const formatTimer = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -347,64 +440,64 @@ export default function MyDeskPage() {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Fallback defaults
-  const userDisplayName = deskData?.employee?.fullName || session?.user?.name || 'Rajeshwari V. Patil';
-  const userEmpCode = deskData?.employee?.employeeCode || (session?.user as any)?.employeeCode || 'BSC-EMP-0042';
-  const userDesignation = deskData?.employee?.designation || 'Bridal & Silk Atelier • Level 1 Lead';
-  const userLocation = deskData?.employee?.location?.name || 'Belagavi Flagship (BEL-01)';
-  const userShift = deskData?.employee?.shift?.name || 'Retail A (09:30 – 18:30)';
-  const userWeeklyOff = deskData?.employee?.weeklyOff || 'Tuesday';
-  const userBiometricToken = deskData?.employee?.biometricToken || 'BEL-RFID-99';
-  const userReportsTo = deskData?.employee?.reportsTo || 'Anand Kulkarni (Floor Manager)';
+  // Placeholder for anything the API did not return. Nothing below invents a demo
+  // value: a missing name, amount or date is shown as '—', and a failed summary
+  // renders the server's message instead of a fabricated desk.
+  const DASH = '—';
+  const employeeProfile = deskData?.employee;
 
-  const velocityDays = deskData?.monthlyVelocity?.days || [
-    { d: '01 Oct', h: '8.8h', type: 'P' },
-    { d: '02 Oct', h: '8.6h', type: 'P' },
-    { d: '03 Oct', h: '8.9h', type: 'P' },
-    { d: '04 Oct', h: '8.7h', type: 'P' },
-    { d: '05 Oct', h: '8.8h', type: 'P' },
-    { d: '06 Oct', h: '8.5h', type: 'P' },
-    { d: '07 Oct', h: 'EL', type: 'EL' },
-    { d: '08 Oct', h: 'OFF', type: 'WO' },
-    { d: '09 Oct', h: '8.9h', type: 'P' },
-    { d: '10 Oct', h: '8.8h', type: 'P' },
-    { d: '11 Oct', h: '9.1h', type: 'P' },
-    { d: '12 Oct', h: '8.7h', type: 'P' },
-    { d: '13 Oct', h: '8.6h', type: 'P' },
-    { d: '14 Oct', h: '8.8h', type: 'P' },
-    { d: '15 Oct', h: 'OFF', type: 'WO' },
-    { d: '16 Oct', h: '8.9h', type: 'P' },
-    { d: '17 Oct', h: '8.7h', type: 'P' },
-    { d: '18 Oct', h: '8.6h', type: 'P' },
-    { d: '19 Oct', h: '8.9h', type: 'P' },
-    { d: '20 Oct', h: '8.8h', type: 'P' },
-    { d: '21 Oct', h: '8.7h', type: 'P' },
-    { d: '22 Oct', h: 'OFF', type: 'WO' },
-    { d: '23 Oct', h: '8.8h', type: 'P' },
-    { d: '24 Oct', h: 'Today', type: 'TODAY' },
-  ];
+  const userDisplayName = employeeProfile?.fullName || session?.user?.name || DASH;
+  const userEmpCode = employeeProfile?.employeeCode || (session?.user as any)?.employeeCode || DASH;
+  const userDesignation = employeeProfile?.designation || DASH;
+  const userLocation = employeeProfile?.location?.name || DASH;
+  const userShift = employeeProfile?.shift?.name || DASH;
+  const userWeeklyOff = employeeProfile?.weeklyOff || DASH;
+  const userBiometricToken = employeeProfile?.biometricToken || DASH;
+  const userReportsTo = employeeProfile?.reportsTo || DASH;
 
-  const monthLabel = deskData?.monthlyVelocity?.monthLabel || 'October 2024';
-  const monthStats = deskData?.monthlyVelocity?.stats || { present: 20, weekOff: 2, earnedLeave: 1 };
+  const velocityDays: any[] = Array.isArray(deskData?.monthlyVelocity?.days) ? deskData.monthlyVelocity.days : [];
 
-  const punctualityScore = deskData?.punctuality?.score || 99.4;
-  const punctualityRank = deskData?.punctuality?.rank || 'Rank 1 in Belagavi Flagship';
+  const monthLabel =
+    deskData?.monthlyVelocity?.monthLabel ||
+    (selectedYear && selectedMonth
+      ? formatPeriodLabel({ year: selectedYear, month: selectedMonth })
+      : 'Loading period…');
+  const monthStats = deskData?.monthlyVelocity?.stats || null;
 
-  const festiveBonusAmount = deskData?.festiveBonus?.amount || 4250;
-  const festiveTargetLabel = deskData?.festiveBonus?.targetLabel || 'Bridal Kanjeevaram Target 112%';
+  const punctuality: any = deskData?.punctuality || null;
+  const punctualityScore: number | null =
+    typeof punctuality?.score === 'number' ? punctuality.score : null;
+  const punctualityRank: string = punctuality?.rank || DASH;
 
-  const overtimeFormatted = deskData?.overtime?.hoursFormatted || '6h 30m';
-  const overtimeRateLabel = deskData?.overtime?.rateLabel || 'Payable at 1.25x Statutory Rate';
+  const festiveBonus: any = deskData?.festiveBonus || null;
+  const festiveBonusAmount: number | null =
+    typeof festiveBonus?.amount === 'number' ? festiveBonus.amount : null;
+  const festiveTargetLabel: string = festiveBonus?.targetLabel || DASH;
 
-  const payslipAmount = deskData?.shortcuts?.payslip?.netPay || 50940;
-  const payslipLabel = deskData?.shortcuts?.payslip?.label || 'Oct Payslip';
+  const overtime: any = deskData?.overtime || null;
+  const overtimeFormatted: string = overtime?.hoursFormatted || DASH;
+  const overtimeRateLabel: string = overtime?.rateLabel || DASH;
 
-  const leaveBalances = deskData?.leaveBalances || [
-    { title: 'Earned Leave (EL)', desc: 'Accumulated balance', used: 14, total: 15, color: 'bg-blue-600', textColor: 'text-blue-700' },
-    { title: 'Casual Leave (CL)', desc: 'Non-cumulative entitlement', used: 8, total: 12, color: 'bg-emerald-600', textColor: 'text-emerald-700' },
-    { title: 'Medical / Sick Leave (SL)', desc: 'Supported by clinic prescription', used: 5, total: 7, color: 'bg-indigo-600', textColor: 'text-indigo-700' },
-    { title: 'Optional Festive Holiday', desc: 'Karnataka state list', used: 2, total: 2, color: 'bg-amber-600', textColor: 'text-amber-700' },
-  ];
+  const payslip: any = deskData?.shortcuts?.payslip || null;
+  const payslipAmount: number | null =
+    typeof payslip?.netPay === 'number' ? payslip.netPay : null;
+  const payslipLabel: string = payslip?.label || DASH;
+  const payslipId: string | null = payslip?.id || null;
+  const payslipTotalDeductions: number | null =
+    typeof payslip?.deductions === 'number' || typeof payslip?.penalties === 'number'
+      ? (typeof payslip?.deductions === 'number' ? payslip.deductions : 0) +
+        (typeof payslip?.penalties === 'number' ? payslip.penalties : 0)
+      : null;
+
+  const leaveBalances: any[] = Array.isArray(deskData?.leaveBalances) ? deskData.leaveBalances : [];
+
+  const inr = (value: number | null | undefined): string =>
+    typeof value === 'number' && Number.isFinite(value)
+      ? `₹${value.toLocaleString('en-IN')}`
+      : DASH;
+
+  const pct = (value: number | null | undefined): string =>
+    typeof value === 'number' && Number.isFinite(value) ? `${value}%` : DASH;
 
   return (
     <DashboardLayout>
@@ -449,6 +542,25 @@ export default function MyDeskPage() {
           <HrSuperAdminDashboard />
         ) : (
           <div className="space-y-6">
+            {deskError && (
+              <div
+                role="alert"
+                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-xl border border-rose-300 bg-rose-50 dark:bg-rose-950/40 dark:border-rose-800"
+              >
+                <p className="text-xs text-rose-900 dark:text-rose-200">
+                  <strong>Desk summary could not be loaded.</strong> {deskError} The figures below are not shown as
+                  demo values — nothing here replaces data the server did not return.
+                </p>
+                <button
+                  type="button"
+                  onClick={reloadDesk}
+                  className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Retry
+                </button>
+              </div>
+            )}
+
             {/* ========================================================= */}
             {/* 1. TOP FULL-WIDTH CARD: EMPLOYEE PROFILE SUMMARY + ACTIONS */}
             {/* ========================================================= */}
@@ -483,9 +595,11 @@ export default function MyDeskPage() {
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800 text-xs font-semibold tracking-wide">
                     {userEmpCode}
                   </span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800 text-xs font-medium">
-                    Permanent
-                  </span>
+                  {employeeProfile?.employmentType && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800 text-xs font-medium">
+                      {employeeProfile.employmentType}
+                    </span>
+                  )}
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-medium">
                     <Building className="w-3 h-3 mr-1 text-slate-500 dark:text-slate-400" />
                     {userLocation}
@@ -518,7 +632,8 @@ export default function MyDeskPage() {
                     <span className={`w-2 h-2 rounded-full ${isClockedIn ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                     <span>
                       Clocked In:{' '}
-                      <strong className="text-slate-700 dark:text-slate-200 font-semibold">{isClockedIn ? clockInTime : 'Not Active'}</strong> ({userBiometricToken} RFID)
+                      <strong className="text-slate-700 dark:text-slate-200 font-semibold">{isClockedIn ? (clockInTime || DASH) : 'Not clocked in'}</strong>
+                      {employeeProfile?.biometricToken ? ` (${employeeProfile.biometricToken} device token)` : ' (no biometric token on record)'}
                     </span>
                   </div>
                   <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">•</span>
@@ -602,7 +717,9 @@ export default function MyDeskPage() {
                 </div>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800 text-xs font-semibold">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  100% Adherence
+                  {typeof deskData?.today?.adherence?.percent === 'number'
+                    ? `${deskData.today.adherence.percent}% of ${deskData.today.adherence.recordedDays} recorded day${deskData.today.adherence.recordedDays === 1 ? '' : 's'} present`
+                    : 'Adherence not recorded'}
                 </span>
               </div>
 
@@ -610,11 +727,13 @@ export default function MyDeskPage() {
               <div className="space-y-3">
                 <div className="flex items-baseline justify-between flex-wrap gap-2">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">{shiftHours}</span>
-                    <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">of 8h 00m Shift Target</span>
+                    <span className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">{shiftHours || DASH}</span>
+                    <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
+                      of the rostered shift target{employeeProfile?.shift?.endTime ? ` (until ${employeeProfile.shift.endTime})` : ' (no shift linked)'}
+                    </span>
                   </div>
                   <span className="text-xs sm:text-sm font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-lg">
-                    {Math.round(shiftPercent)}% Elapsed
+                    {shiftPercent === null ? DASH : `${Math.round(shiftPercent)}% Elapsed`}
                   </span>
                 </div>
 
@@ -622,17 +741,17 @@ export default function MyDeskPage() {
                 <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3.5 overflow-hidden p-0.5 border border-slate-200/60 dark:border-slate-700">
                   <div
                     className="bg-gradient-to-r from-blue-600 to-indigo-600 h-full rounded-full transition-all duration-700 ease-out"
-                    style={{ width: `${Math.min(100, Math.max(5, shiftPercent))}%` }}
+                    style={{ width: `${Math.min(100, Math.max(0, shiftPercent ?? 0))}%` }}
                   />
                 </div>
 
                 <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-0.5">
                   <span className="inline-flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    In: <strong className="text-slate-700 dark:text-slate-200 font-semibold">{clockInTime}</strong> ({earlyLateStatus})
+                    In: <strong className="text-slate-700 dark:text-slate-200 font-semibold">{clockInTime || DASH}</strong> ({earlyLateStatus || DASH})
                   </span>
                   <span>
-                    Target Out: <strong className="text-slate-700 dark:text-slate-200 font-semibold">{clockOutTime || '18:30 PM'}</strong>
+                    Target Out: <strong className="text-slate-700 dark:text-slate-200 font-semibold">{deskData?.today?.targetOutTime || employeeProfile?.shift?.endTime || DASH}</strong>
                   </span>
                 </div>
               </div>
@@ -682,19 +801,30 @@ export default function MyDeskPage() {
                         >
                           <ChevronRight className="w-4 h-4" />
                         </button>
+                        <button
+                          onClick={jumpToCurrentPeriod}
+                          title="Jump to the current month (Asia/Kolkata)"
+                          type="button"
+                          className="px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          This month
+                        </button>
                       </div>
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="px-2.5 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800 text-xs font-semibold">
-                    {monthStats.present} Present
+                    {monthStats ? monthStats.present : DASH} Present
                   </span>
                   <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium">
-                    {monthStats.weekOff} Week-Off
+                    {monthStats ? monthStats.weekOff : DASH} Week-Off
                   </span>
                   <span className="px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800 text-xs font-medium">
-                    {monthStats.earnedLeave || 1} EL
+                    {monthStats ? monthStats.earnedLeave : DASH} EL
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200/60 dark:border-rose-800 text-xs font-medium">
+                    {monthStats ? monthStats.absent : DASH} Absent
                   </span>
                 </div>
               </div>
@@ -748,8 +878,10 @@ export default function MyDeskPage() {
                               <Palmtree className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                             ) : isWO ? (
                               <Bed className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-                            ) : (
+                            ) : item.status === 'PRESENT' ? (
                               <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            ) : (
+                              <Calendar className="w-4 h-4 text-slate-300 dark:text-slate-600" />
                             )}
                           </div>
                           <span className={`text-xs font-bold ${isToday ? 'text-white' : ''}`}>
@@ -758,6 +890,13 @@ export default function MyDeskPage() {
                         </button>
                       );
                     })}
+                    {velocityDays.length === 0 && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 py-3">
+                        {deskError
+                          ? 'No velocity data — the summary request failed.'
+                          : `The HRMS API returned no days for ${monthLabel}. This is the real result for the selected period, not a hidden failure.`}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -796,7 +935,7 @@ export default function MyDeskPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">{punctualityScore}%</div>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">{punctualityScore === null ? DASH : `${punctualityScore}%`}</div>
                   <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
                     <Award className="w-3.5 h-3.5" />
                     {punctualityRank}
@@ -819,7 +958,7 @@ export default function MyDeskPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-2xl sm:text-3xl font-extrabold text-blue-600 dark:text-blue-400 tracking-tight">₹{Number(festiveBonusAmount).toLocaleString('en-IN')}</div>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-blue-600 dark:text-blue-400 tracking-tight">{inr(festiveBonusAmount)}</div>
                   <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">{festiveTargetLabel}</p>
                 </div>
               </button>
@@ -878,12 +1017,16 @@ export default function MyDeskPage() {
                       <Utensils className="w-4 h-4" />
                     </div>
                     <div>
-                      <div className="text-sm font-semibold text-slate-900 dark:text-white">Lunch Quota (45m Statutory)</div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">Logged: 13:15 – 13:57 (42 mins)</div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">{deskData?.breaks?.lunch?.label || 'Lunch Quota'}</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        Logged: {deskData?.breaks?.lunch?.loggedTime || 'Not recorded for this day'}
+                      </div>
                     </div>
                   </div>
-                  <span className="px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300 text-xs font-semibold flex-shrink-0">
-                    Completed
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold flex-shrink-0">
+                    {deskData?.breaks?.lunch?.status
+                      ? String(deskData.breaks.lunch.status).replace(/_/g, ' ')
+                      : 'Not reported'}
                   </span>
                 </div>
 
@@ -924,9 +1067,15 @@ export default function MyDeskPage() {
               {/* Footer */}
               <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                 <span>
-                  Floor Coverage Lead: <strong className="font-medium text-slate-700 dark:text-slate-300">P. Nayak</strong> on stand-by
+                  Floor Coverage Lead:{' '}
+                  <strong className="font-medium text-slate-700 dark:text-slate-300">
+                    {deskData?.breaks?.tea?.coverageLead || 'Not assigned by the roster'}
+                  </strong>
+                  {deskData?.breaks?.tea?.coverageLead ? ' on stand-by' : ''}
                 </span>
-                <span className="font-semibold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">3m Quota Saved</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                  {deskData?.breaks?.lunch?.quotaSaved || 'Quota not reported'}
+                </span>
               </div>
             </div>
 
@@ -964,7 +1113,7 @@ export default function MyDeskPage() {
                     <div className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-400 transition-colors">
                       {payslipLabel}
                     </div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">₹{Number(payslipAmount).toLocaleString('en-IN')} Disbursed</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{inr(payslipAmount)} {payslip?.status ? String(payslip.status).replace(/_/g, ' ') : 'status not reported'}</div>
                   </div>
                 </button>
 
@@ -1025,11 +1174,14 @@ export default function MyDeskPage() {
                 <div className="flex items-center gap-1.5">
                   <KeyRound className="w-3.5 h-3.5 text-slate-400" />
                   <span>
-                    Security Keycard: <strong className="font-semibold text-slate-700 dark:text-slate-200">#BEL-VLT-12</strong>
+                    Security Keycard:{' '}
+                    <strong className="font-semibold text-slate-700 dark:text-slate-200">
+                      {deskData?.shortcuts?.custodyAssets?.securityKeycard || 'No keycard on record'}
+                    </strong>
                   </span>
                 </div>
-                <span className="font-semibold text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded uppercase tracking-wider">
-                  Active
+                <span className="font-semibold text-xs text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded uppercase tracking-wider">
+                  {deskData?.shortcuts?.custodyAssets?.keycardStatus || 'Status not reported'}
                 </span>
               </div>
             </div>
@@ -1190,7 +1342,7 @@ export default function MyDeskPage() {
               <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-800 rounded-xl p-4 flex items-center justify-between">
                 <div>
                   <span className="text-xs font-semibold uppercase text-emerald-800 dark:text-emerald-300">Overall Score</span>
-                  <div className="text-3xl font-extrabold text-emerald-700 dark:text-emerald-200">{punctualityScore}%</div>
+                  <div className="text-3xl font-extrabold text-emerald-700 dark:text-emerald-200">{punctualityScore === null ? DASH : `${punctualityScore}%`}</div>
                   <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">{punctualityRank}</p>
                 </div>
                 <span className="px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-bold uppercase">
@@ -1257,7 +1409,7 @@ export default function MyDeskPage() {
               <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-800 rounded-xl p-4 flex items-center justify-between">
                 <div>
                   <span className="text-xs font-semibold uppercase text-blue-800 dark:text-blue-300">Earned Bonus</span>
-                  <div className="text-3xl font-extrabold text-blue-700 dark:text-blue-200">₹{Number(festiveBonusAmount).toLocaleString('en-IN')}</div>
+                  <div className="text-3xl font-extrabold text-blue-700 dark:text-blue-200">{inr(festiveBonusAmount)}</div>
                   <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">Approved &amp; Scheduled for Oct Payroll</p>
                 </div>
                 <span className="px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-bold uppercase">
@@ -1374,8 +1526,10 @@ export default function MyDeskPage() {
                     <FileText className="w-4 h-4" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Digital Payslip • October 2024</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">BSC Textiles Private Limited • Belagavi</p>
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Digital Payslip • {monthLabel}</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      BSC Textiles Private Limited{employeeProfile?.location?.name ? ` • ${employeeProfile.location.name}` : ''}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -1387,38 +1541,57 @@ export default function MyDeskPage() {
                 </button>
               </div>
 
-              <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-800 rounded-xl p-4 flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-semibold uppercase text-blue-800 dark:text-blue-300">Net Take-Home Salary</span>
-                  <div className="text-3xl font-extrabold text-blue-700 dark:text-blue-200">₹{Number(payslipAmount).toLocaleString('en-IN')}</div>
-                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">Credited to SBI Camp Branch (••••4912)</p>
+              {!payslip ? (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-4">
+                  <p className="text-xs text-amber-900 dark:text-amber-200">
+                    <strong>No payslip returned by the HRMS API</strong> for this payroll item. The amounts below are
+                    therefore shown as “—” rather than as an example figure. Full payroll cycles live under{' '}
+                    <Link href="/payroll/payslips" className="underline font-semibold">
+                      Payroll &amp; Payslips
+                    </Link>
+                    .
+                  </p>
                 </div>
-                <span className="px-3 py-1 rounded-full bg-emerald-600 text-white text-xs font-bold uppercase">
-                  Disbursed
-                </span>
-              </div>
+              ) : (
+                <>
+                  <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-100 dark:border-blue-800 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-semibold uppercase text-blue-800 dark:text-blue-300">Net Take-Home Salary</span>
+                      <div className="text-3xl font-extrabold text-blue-700 dark:text-blue-200">{inr(payslipAmount)}</div>
+                      <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                        Paid to: {payslip?.creditAccount || 'Bank account not on record'}
+                        {payslip?.disbursedAt ? ` • ${payslip.disbursedAt}` : ' • Disbursement date not on record'}
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 rounded-full bg-blue-600 text-white text-xs font-bold uppercase">
+                      {payslip?.status ? String(payslip.status).replace(/_/g, ' ') : 'Status not reported'}
+                    </span>
+                  </div>
+                </>
+              )}
 
-              {/* Earnings & Deductions breakdown */}
+              {/* Earnings & Deductions breakdown — every row is a field of the
+                  payroll item returned by the API; missing values stay "—". */}
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="space-y-1.5 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
                   <span className="font-bold text-slate-900 dark:text-white block border-b pb-1 border-slate-200 dark:border-slate-700">Gross Earnings</span>
-                  <div className="flex justify-between"><span>Basic Salary:</span><span className="font-semibold text-slate-800 dark:text-slate-200">₹32,000</span></div>
-                  <div className="flex justify-between"><span>HRA:</span><span className="font-semibold text-slate-800 dark:text-slate-200">₹16,000</span></div>
-                  <div className="flex justify-between"><span>Sales Incentive:</span><span className="font-semibold text-slate-800 dark:text-slate-200">₹4,250</span></div>
-                  <div className="flex justify-between"><span>Special Allowance:</span><span className="font-semibold text-slate-800 dark:text-slate-200">₹5,950</span></div>
+                  <div className="flex justify-between"><span>Basic Salary:</span><span className="font-semibold text-slate-800 dark:text-slate-200">{inr(payslip?.basicSalary)}</span></div>
+                  <div className="flex justify-between"><span>Early Login Incentive:</span><span className="font-semibold text-slate-800 dark:text-slate-200">{inr(payslip?.earlyIncentive)}</span></div>
+                  <div className="flex justify-between"><span>Attendance Incentive:</span><span className="font-semibold text-slate-800 dark:text-slate-200">{inr(payslip?.attendanceIncentive)}</span></div>
+                  <div className="flex justify-between"><span>Performance Incentive:</span><span className="font-semibold text-slate-800 dark:text-slate-200">{inr(payslip?.performanceIncentive)}</span></div>
+                  <div className="flex justify-between"><span>Sales Incentive:</span><span className="font-semibold text-slate-800 dark:text-slate-200">{inr(payslip?.salesIncentive)}</span></div>
+                  <div className="flex justify-between"><span>Overtime:</span><span className="font-semibold text-slate-800 dark:text-slate-200">{inr(payslip?.overtimePay)}</span></div>
                   <div className="flex justify-between pt-1 border-t border-slate-200 dark:border-slate-700 font-bold text-slate-900 dark:text-white">
-                    <span>Total Gross:</span><span>₹58,200</span>
+                    <span>Total Gross:</span><span>{inr(payslip?.grossSalary)}</span>
                   </div>
                 </div>
 
                 <div className="space-y-1.5 p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl">
                   <span className="font-bold text-slate-900 dark:text-white block border-b pb-1 border-slate-200 dark:border-slate-700">Deductions</span>
-                  <div className="flex justify-between"><span>EPF (Employee):</span><span className="font-semibold text-slate-800 dark:text-slate-200">₹3,840</span></div>
-                  <div className="flex justify-between"><span>ESI Contribution:</span><span className="font-semibold text-slate-800 dark:text-slate-200">₹420</span></div>
-                  <div className="flex justify-between"><span>Professional Tax:</span><span className="font-semibold text-slate-800 dark:text-slate-200">₹200</span></div>
-                  <div className="flex justify-between"><span>TDS Income Tax:</span><span className="font-semibold text-slate-800 dark:text-slate-200">₹2,800</span></div>
+                  <div className="flex justify-between"><span>Deductions:</span><span className="font-semibold text-slate-800 dark:text-slate-200">{inr(payslip?.deductions)}</span></div>
+                  <div className="flex justify-between"><span>Late / Penalties:</span><span className="font-semibold text-slate-800 dark:text-slate-200">{inr(payslip?.penalties)}</span></div>
                   <div className="flex justify-between pt-1 border-t border-slate-200 dark:border-slate-700 font-bold text-rose-600 dark:text-rose-400">
-                    <span>Total Deductions:</span><span>₹7,260</span>
+                    <span>Total Deductions:</span><span>{inr(payslipTotalDeductions)}</span>
                   </div>
                 </div>
               </div>
@@ -1446,8 +1619,10 @@ export default function MyDeskPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => toast.success('Downloaded Oct 2024 signed payslip PDF (₹50,940)!')}
-                    className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
+                    onClick={() => handleDownloadPayslip(payslipId, payslipLabel)}
+                    disabled={!payslipId}
+                    title={payslipId ? 'Download the signed payslip PDF' : 'No payslip PDF available'}
+                    className="px-4 py-2 text-xs bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl font-semibold shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     Download PDF

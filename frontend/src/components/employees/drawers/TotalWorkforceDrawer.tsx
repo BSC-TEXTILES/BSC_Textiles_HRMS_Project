@@ -65,18 +65,17 @@ export function TotalWorkforceDrawer({
     return parts.join(' • ');
   }, [activeLocationObj, activeDeptObj]);
 
-  // "+3 MTD" definition: newest 3 employees or created in the current month (October 2026)
+  // "New this month" is derived from the employee's own joining/creation date
+  // compared with the current calendar month — no hardcoded employee codes and no
+  // hardcoded year.
   const isNewMtd = (emp: any) => {
     if (!emp) return false;
-    // Test personas TEST-EMP-033, 034, 035 or created in October 2026
-    const code = emp.employeeCode || '';
-    if (['TEST-EMP-033', 'TEST-EMP-034', 'TEST-EMP-035'].includes(code)) return true;
-    if (emp.joiningDate && new Date(emp.joiningDate).getFullYear() === 2026) return true;
-    if (emp.createdAt) {
-      const d = new Date(emp.createdAt);
-      return d.getMonth() === 9 && d.getFullYear() === 2026; // Oct 2026
-    }
-    return false;
+    const reference = emp.joiningDate || emp.createdAt;
+    if (!reference) return false;
+    const d = new Date(reference);
+    if (Number.isNaN(d.getTime())) return false;
+    const now = new Date();
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
   };
 
   // Base dataset filtered by drawer location/dept
@@ -96,6 +95,7 @@ export function TotalWorkforceDrawer({
   const totalCount = scopedEmployees.length;
   const fullTimeCount = scopedEmployees.filter((e) => e.status === 'ACTIVE').length;
   const newMtdCount = scopedEmployees.filter(isNewMtd).length;
+  const currentMonthLabel = new Date().toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
   const traineeCount = 0;
   const contractCount = 0;
 
@@ -103,7 +103,7 @@ export function TotalWorkforceDrawer({
   const deptBreakdown = useMemo(() => {
     const counts: Record<string, number> = {};
     scopedEmployees.forEach((e) => {
-      const name = e.department?.name || 'Retail Sales';
+      const name = e.department?.name || 'Unassigned department';
       counts[name] = (counts[name] || 0) + 1;
     });
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
@@ -112,8 +112,8 @@ export function TotalWorkforceDrawer({
   const storeBreakdown = useMemo(() => {
     const counts: Record<string, { name: string; count: number; code: string }> = {};
     scopedEmployees.forEach((e) => {
-      const locName = e.location?.name || 'Karnataka Store';
-      const locCode = e.location?.code || 'BEL';
+      const locName = e.location?.name || 'Unassigned store';
+      const locCode = e.location?.code || '—';
       if (!counts[locName]) {
         counts[locName] = { name: locName, count: 0, code: locCode };
       }
@@ -224,7 +224,7 @@ export function TotalWorkforceDrawer({
             </span>
             <span className="text-[10px] font-bold text-[#1346a1] uppercase">MTD</span>
           </div>
-          <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Joined Oct 2026</span>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">Joined {currentMonthLabel}</span>
         </div>
 
         <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 flex flex-col justify-between">
@@ -365,7 +365,7 @@ export function TotalWorkforceDrawer({
                 : 'bg-[#1346a1]/10 text-[#1346a1] hover:bg-[#1346a1]/20 border border-[#1346a1]/20'
             }`}
           >
-            <span>New this month (+3 MTD)</span>
+            <span>New this month (+{newMtdCount} MTD)</span>
             <span className="w-1.5 h-1.5 rounded-full bg-[#1346a1] dark:bg-rose-400" />
           </button>
           <button

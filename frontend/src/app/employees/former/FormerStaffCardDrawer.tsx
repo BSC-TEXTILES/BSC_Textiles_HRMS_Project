@@ -612,36 +612,36 @@ export function FormerStaffCardDrawer({
                           <div className="flex justify-between">
                             <span className="text-slate-500">Unpaid Worked Days Salary:</span>
                             <span className="font-semibold text-slate-800 dark:text-slate-200">
-                              ₹{Number(item.unpaid_salary_amount || 13548.39).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                              {item.unpaid_salary_amount != null ? `₹${Number(item.unpaid_salary_amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—'}
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-500">Leave Encashment (Earned Leave):</span>
                             <span className="font-semibold text-slate-800 dark:text-slate-200">
-                              ₹{Number(item.leave_encashment_amount || 5419.35).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                              {item.leave_encashment_amount != null ? `₹${Number(item.leave_encashment_amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—'}
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-500">Special Floor Bonus / Allowance:</span>
                             <span className="font-semibold text-slate-800 dark:text-slate-200">
-                              ₹{Number(item.bonus_incentive_amount || 1200.00).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                              {item.bonus_incentive_amount != null ? `₹${Number(item.bonus_incentive_amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—'}
                             </span>
                           </div>
                           <div className="flex justify-between text-red-600 dark:text-red-400">
                             <span>Statutory Deductions (PF / PT):</span>
-                            <span>-₹{Number(item.total_deductions || 1400.00).toLocaleString('en-IN', { maximumFractionDigits: 2 })}</span>
+                            <span>{item.total_deductions != null ? `-₹${Number(item.total_deductions).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—'}</span>
                           </div>
                           <div className="border-t border-slate-100 dark:border-slate-800 pt-1.5 flex justify-between font-bold text-sm text-emerald-600 dark:text-emerald-400">
                             <span>Net Payable Amount:</span>
                             <span className="font-mono">
-                              ₹{Number(netAmount || 18767.74).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {netAmount != null ? `₹${Number(netAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
                             </span>
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between text-slate-500 pt-1">
-                          <span>Bank Account: <strong className="font-mono text-slate-700 dark:text-slate-300">HDFC ••••4912</strong></span>
-                          <span className="text-emerald-600 font-semibold">Approved by Super Admin</span>
+                          <span>Bank Account: <strong className="font-mono text-slate-700 dark:text-slate-300">{item.bank_account || 'Not on file'}</strong></span>
+                          <span className="text-emerald-600 font-semibold">{settlementStatus || 'Pending'}</span>
                         </div>
                       </div>
                     )}
@@ -653,26 +653,26 @@ export function FormerStaffCardDrawer({
                           <div className="flex justify-between items-center">
                             <span className="text-slate-500">Disbursed Net Amount:</span>
                             <span className="font-bold text-slate-900 dark:text-white font-mono text-sm">
-                              ₹{Number(netAmount || 45566.67).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {netAmount != null ? `₹${Number(netAmount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-500">Disbursement Date:</span>
                             <span className="font-medium text-slate-800 dark:text-slate-200">
-                              {item.payment_date ? new Date(item.payment_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '05 Sep 2026'}
+                              {item.payment_date ? new Date(item.payment_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Not recorded'}
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-500">Bank UTR Reference:</span>
                             <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">
-                              {paymentRef || 'NEFT-BSC-20260905-091244'}
+                              {paymentRef || 'Not recorded'}
                             </span>
                           </div>
                           <div className="flex justify-between items-center pt-1 border-t border-slate-100 dark:border-slate-800">
                             <span className="text-slate-500">Settlement Document:</span>
                             <span className="font-semibold text-emerald-600 flex items-center gap-1">
                               <BadgeCheck className="w-3.5 h-3.5" />
-                              Karnataka Form B Certified
+                              Statement PDF
                             </span>
                           </div>
                         </div>
@@ -705,8 +705,9 @@ export function FormerStaffCardDrawer({
 
                         {type === 'COMPLETED_PAID' && (
                           <button
-                            onClick={() => onDownloadPdf(item.settlement_id || 'fnf_001', empCode)}
-                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-semibold text-xs flex items-center gap-1"
+                            onClick={() => item.settlement_id && onDownloadPdf(item.settlement_id, empCode)}
+                            disabled={!item.settlement_id}
+                            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-lg font-semibold text-xs flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Download className="w-3.5 h-3.5 text-red-500" />
                             Statement PDF

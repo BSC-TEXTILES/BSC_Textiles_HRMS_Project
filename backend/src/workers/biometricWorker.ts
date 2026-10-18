@@ -42,6 +42,7 @@ import {
   readLiveDeviceInfo,
 } from '../services/biometricService.js';
 import { runFullMismatchScan } from '../services/biometric/mismatch.js';
+import { deviceIntegrationConfig } from '../config/deviceConfig.js';
 
 interface DeviceRuntime {
   deviceId: string;
@@ -148,10 +149,9 @@ async function pollDevice(device: DeviceConfig): Promise<void> {
   if (!runtime) return;
   if (Date.now() < runtime.nextAllowedPollAt) return;
 
-  // ADMS_PUSH terminals push their records over HTTP; socket polling is bypassed
-  if (device.protocol === 'ADMS_PUSH') {
+  // In cloud_push mode, direct TCP socket polling to private LAN IPs is bypassed
+  if (!deviceIntegrationConfig.shouldPollDevice(device.ipAddress)) {
     runtime.nextAllowedPollAt = Date.now() + 60_000;
-    runtime.wasConnected = true;
     return;
   }
 
@@ -302,6 +302,7 @@ export async function startWorker(options: { once?: boolean } = {}): Promise<voi
   const settings = await loadGlobalSettings();
   log({
     msg: 'biometric worker starting',
+    syncMode: deviceIntegrationConfig.syncMode,
     pollIntervalMs: settings.pollIntervalMs,
     heartbeatTimeoutSeconds: settings.heartbeatTimeoutSeconds,
     defaultTimezone: settings.defaultTimezone,

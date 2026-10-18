@@ -6,7 +6,6 @@ import toast from 'react-hot-toast';
 import api from '@/lib/api';
 import { Modal } from '@/components/ui/Modal';
 import { fetchScope, empOf, ROSTER_LIMIT, type DrillFilters, type Scope } from '@/lib/dashboardScope';
-import { CORRECTION_RECORDS } from '@/lib/correctionRecords';
 import {
   Pill,
   EmpCell,
@@ -117,17 +116,9 @@ function classifyPunch(a: any, isPastDate: boolean): PunchException {
   return { text: 'On time', tone: 'green', isException: false };
 }
 
-/** Regularization request exception labels (client-side correction records). */
-const CORRECTION_EXC: Record<string, { text: string; tone: Tone }> = {
-  MISSED_OUT: { text: 'Missed OUT punch', tone: 'red' },
-  LATE_GRACE: { text: 'Late arrival (grace)', tone: 'amber' },
-  ON_DUTY: { text: 'On-duty transfer', tone: 'blue' },
-  SENSOR_GLITCH: { text: 'Sensor glitch', tone: 'slate' },
-};
-
+/** Tones for attendancecorrection.status, the only values the API can return. */
 const CORRECTION_STATUS_TONE: Record<string, Tone> = {
   PENDING: 'amber',
-  SUPERVISOR_OK: 'blue',
   APPROVED: 'green',
   REJECTED: 'red',
 };
@@ -522,20 +513,6 @@ export function DetailDrillDownModal({
     setPage(1);
   }, [metric, locationId, departmentId, shiftId, status, date, month]);
 
-  /** Resolve the location code (BEL/DAV/SHI…) used by client-side records. */
-  const getLocationCode = useCallback(async (): Promise<string> => {
-    if (!hubScoped) return '';
-    const pre = preloaded?.locations?.find((l) => l.id === locationId);
-    if (pre) return pre.code || '';
-    try {
-      const res = await api.get('/locations/all');
-      const found = (res.data || []).find((l: any) => l.id === locationId);
-      return found?.code || '';
-    } catch {
-      return '';
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hubScoped, locationId]);
 
   /** Build query params for the shift-board endpoints. */
   const boardParams = useCallback(
@@ -608,7 +585,6 @@ export function DetailDrillDownModal({
       }
       const codeToEmp = new Map<string, any>();
       for (const e of scope.employees) codeToEmp.set(e.employeeCode, e);
-      const corrByCode = new Map(CORRECTION_RECORDS.map((c) => [c.empCode, c]));
 
       if (metric === 'shift-configs') {
         let list: any[] = preloaded?.shifts && preloaded.shifts.length > 0 ? preloaded.shifts : [];
@@ -728,12 +704,23 @@ export function DetailDrillDownModal({
           }));
           cols = complianceCols();
 
-          // Regularization queue + latest payroll run as rollup chips.
-          const locCode = await getLocationCode();
-          const scopedCorrections = CORRECTION_RECORDS.filter(
-            (c) => !hubScoped || !locCode || c.hub.toUpperCase().startsWith(locCode.toUpperCase())
-          );
-          const count = (s: string) => scopedCorrections.filter((c) => c.status === s).length;
+          // Regularization queue read from GET /attendance/corrections, plus the
+          // latest payroll run. Nothing here comes from a client-side dataset.
+          let queue: { total: number; pending: number; approved: number; rejected: number } | null = null;
+          try {
+            const cq = new URLSearchParams();
+            if (hubScoped) cq.set('locationId', String(locationId));
+            const corrRes = await api.get(`/attendance/corrections?${cq.toString()}`).catch(() => null);
+            const list: any[] = corrRes?.data?.corrections || [];
+            queue = {
+              total: list.length,
+              pending: list.filter((c) => c.status === 'PENDING').length,
+              approved: list.filter((c) => c.status === 'APPROVED').length,
+              rejected: list.filter((c) => c.status === 'REJECTED').length,
+            };
+          } catch {
+            queue = null;
+          }
           let payroll = 'No runs';
           try {
             const runRes = await api.get('/payroll/runs?limit=1');
@@ -750,11 +737,10 @@ export function DetailDrillDownModal({
             payroll = 'Unavailable';
           }
           summaryChips = [
-            { label: 'Punch Corrections', value: String(scopedCorrections.length) },
-            { label: 'Pending Regularizations', value: String(count('PENDING')) },
-            { label: 'Supervisor Reviewed', value: String(count('SUPERVISOR_OK')) },
-            { label: 'Approved', value: String(count('APPROVED')) },
-            { label: 'Rejected', value: String(count('REJECTED')) },
+            { label: 'Punch Corrections', value: queue ? String(queue.total) : 'Unavailable' },
+            { label: 'Pending Regularizations', value: queue ? String(queue.pending) : '—' },
+            { label: 'Approved', value: queue ? String(queue.approved) : '—' },
+            { label: 'Rejected', value: queue ? String(queue.rejected) : '—' },
             { label: 'Latest Payroll Run', value: payroll },
           ];
         }

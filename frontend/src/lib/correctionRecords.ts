@@ -1,214 +1,105 @@
 /**
- * Shared shift-correction / regularization records.
+ * Punch-correction (regularization) records.
  *
- * Client-side source of truth for regularization requests (pending, supervisor
- * reviewed, approved, rejected). Used by the Attendance Corrections workflow
- * and surfaced in the Floor Shift Regularization drill-down views.
+ * The queue is the server's `attendancecorrection` table, read through
+ * GET /attendance/corrections. This module only types and normalises those rows —
+ * no correction request, employee, store, shift or punch is ever seeded here.
  */
 
+/** The only statuses `attendancecorrection.status` can hold. */
+export type CorrectionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+/**
+ * A regularization request exactly as GET /attendance/corrections returns it
+ * (the `attendancecorrection` columns joined with the employee, location and
+ * department names). Fields the API does not send are absent by design.
+ */
 export interface CorrectionRecord {
   id: string;
+  employeeId: string | null;
+  /** Real employee code from the join; '' when the row carries none. */
   empCode: string;
   name: string;
   role: string;
-  hub: string;
-  floor?: string;
   dept: string;
-  avatar: string;
-  shift: string;
-  rawIn: string;
-  rawOut: string;
-  terminal: string;
-  overrideOut: string;
-  overrideIn?: string;
-  totalHours: string;
-  otHours: string;
+  hub: string;
+  attendanceDate: string;
+  originalLogin: string | null;
+  originalLogout: string | null;
+  requestedLogin: string | null;
+  requestedLogout: string | null;
   reason: string;
-  evidence: string;
-  invoiceOrDoc?: string;
-  supervisor: string;
-  pipelineStep: string;
-  pipelineTotal: string;
-  status: 'PENDING' | 'SUPERVISOR_OK' | 'APPROVED' | 'REJECTED';
-  type: 'MISSED_OUT' | 'LATE_GRACE' | 'ON_DUTY' | 'SENSOR_GLITCH';
-  notes: string;
+  status: CorrectionStatus;
+  reviewNote: string;
+  reviewedById: string | null;
+  appliedAt: string | null;
+  createdAt: string;
 }
 
-export const STORE_SECTIONS = [
-  'Bridal Silk & Atelier',
-  'Suiting & Shirting',
-  'Tailoring & Alterations',
-  'Finished Goods Depot',
-  'Cashiering & POS',
-  'Jacquard Loom Yard',
-  'Visual Merchandising',
-] as const;
+function isValidStatus(value: unknown): value is CorrectionStatus {
+  return value === 'PENDING' || value === 'APPROVED' || value === 'REJECTED';
+}
 
-export const STORE_FLOORS = [
-  'Ground Floor (Atelier & Heritage Sarees)',
-  '1st Floor (Menswear & Fabrics)',
-  '2nd Floor (Ready-to-Wear & Weaving Yard)',
-  '3rd Floor (Master Tailoring & Alterations)',
-  'Basement (Finished Goods Depot & Transit)',
-] as const;
+/** `YYYY-MM-DD` in local time from a Date / ISO string / DATE column. */
+export function correctionDateKey(value: unknown): string {
+  if (!value) return '';
+  const d = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(d.getTime())) return String(value).slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
-export const CORRECTION_RECORDS: CorrectionRecord[] = [
-  {
-    id: 'CORR-4029',
-    empCode: 'BSC-EMP-0042',
-    name: 'Rajeshwari V. Patil',
-    role: 'Senior Floor Specialist',
-    hub: 'BEL-01 Flagship',
-    floor: 'Ground Floor (Atelier & Heritage Sarees)',
-    dept: 'Bridal Silk & Atelier',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80',
-    shift: 'Shift A (09:30 - 18:30)',
-    rawIn: '09:28 IN',
-    rawOut: 'Missed OUT',
-    terminal: 'BEL-IN-02',
-    overrideOut: '19:15 OUT',
-    totalHours: '9h 47m Total',
-    otHours: '+1h 15m Overtime (1.25x)',
-    reason: 'VIP Bridal Kanjeevaram Showcase extended handover for royal wedding party.',
-    evidence: 'Bill #SLK-8819 (₹3.4L) & CCTV CAM-04 Bridal Vault confirmed presence.',
-    invoiceOrDoc: 'Invoice #SLK-8819',
-    supervisor: 'Anand Kulkarni (Store Lead)',
-    pipelineStep: '2',
-    pipelineTotal: '3',
-    status: 'PENDING',
-    type: 'MISSED_OUT',
-    notes: 'Rajeshwari was actively presenting heritage Kanjeevaram sarees to the royal wedding party until 19:10 IST. Card tap missed due to vault register lockdown protocol.',
-  },
-  {
-    id: 'CORR-4030',
-    empCode: 'BSC-EMP-0089',
-    name: 'Amit Deshpande',
-    role: 'Master Tailor',
-    hub: 'SHI-03 Apex',
-    floor: '3rd Floor (Master Tailoring & Alterations)',
-    dept: 'Tailoring & Alterations',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-    shift: 'Shift B (11:30 - 20:30)',
-    rawIn: '14:02 IN (Late 2h 32m)',
-    rawOut: '20:38 OUT',
-    terminal: 'SHI-GATE-01',
-    overrideOut: '20:38 OUT',
-    overrideIn: 'Half-Day Credit 6.5h',
-    totalHours: '6.5h Credited',
-    otHours: '0.5 Casual Leave applied',
-    reason: 'KSRTC Shivamogga regional bus strike stranded inter-district transit.',
-    evidence: 'Official KSRTC Transit Strike Press Release attached.',
-    invoiceOrDoc: 'News Bulletin Ref #NB-442',
-    supervisor: 'V. Hiremath (Floor Lead)',
-    pipelineStep: '2',
-    pipelineTotal: '3',
-    status: 'SUPERVISOR_OK',
-    type: 'LATE_GRACE',
-    notes: 'District bus depot strike confirmed by district magistrate notice. Staff communicated delay by telephone at 10:15 AM.',
-  },
-  {
-    id: 'CORR-4031',
-    empCode: 'BSC-MGR-0021',
-    name: 'Veeranna Pattar',
-    role: 'Jacquard Loom Master',
-    hub: 'DAV-02 Hub',
-    floor: '2nd Floor (Ready-to-Wear & Weaving Yard)',
-    dept: 'Jacquard Loom Yard',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
-    shift: 'Shift C Night (20:30 - 05:30)',
-    rawIn: 'Sensor Glitch IN',
-    rawOut: '05:32 OUT',
-    terminal: 'DAV-GATE-01',
-    overrideOut: '05:32 OUT',
-    overrideIn: '20:25 IN Logged',
-    totalHours: '9h 07m Full Shift',
-    otHours: '100% Shift Paid',
-    reason: 'Terminal turnstile DAV-GATE-01 rebooted during shift transition due to power fluctuation.',
-    evidence: 'Security Gate Physical Logbook Entry #318 signed by Sub-Inspector.',
-    invoiceOrDoc: 'Gate Pass #GP-882',
-    supervisor: 'Security Inspector Patil',
-    pipelineStep: '3',
-    pipelineTotal: '3',
-    status: 'SUPERVISOR_OK',
-    type: 'SENSOR_GLITCH',
-    notes: 'Optical glass scanner cleaned & system re-initialized at 20:28. Security ledger verifies physical entry timestamp of 20:25 IST.',
-  },
-  {
-    id: 'CORR-4032',
-    empCode: 'BSC-EMP-0144',
-    name: 'Kavita M.',
-    role: 'Cashier & POS Lead',
-    hub: 'BEL-01 Flagship',
-    floor: 'Ground Floor (Atelier & Heritage Sarees)',
-    dept: 'Cashiering & POS',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80',
-    shift: 'Shift A (09:30 - 18:30)',
-    rawIn: '09:34 IN',
-    rawOut: '13:45 OUT (Premature Tag)',
-    terminal: 'BEL-POS-01',
-    overrideOut: '18:32 OUT',
-    totalHours: '8h 58m Total Shift',
-    otHours: 'Break swipe error corrected',
-    reason: 'Accidentally scanned exit turnstile reader during lunch interval instead of cafeteria terminal.',
-    evidence: 'Vault Cash Handover Register signed at 18:30 IST.',
-    invoiceOrDoc: 'Vault Handover #V-102',
-    supervisor: 'R. Deshmukh (Cash Head)',
-    pipelineStep: '2',
-    pipelineTotal: '3',
-    status: 'SUPERVISOR_OK',
-    type: 'MISSED_OUT',
-    notes: 'Cash counter register verifies cash drawer settlement completed at 18:25 PM with zero variance.',
-  },
-  {
-    id: 'CORR-4033',
-    empCode: 'BSC-EMP-0094',
-    name: 'Rekha Naik',
-    role: 'Saree Depot Associate',
-    hub: 'BEL-01 Flagship',
-    floor: 'Basement (Finished Goods Depot & Transit)',
-    dept: 'Finished Goods Depot',
-    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=200&q=80',
-    shift: 'General (09:00 - 18:00)',
-    rawIn: '08:58 IN',
-    rawOut: 'On-Duty Slip (15:00-19:30)',
-    terminal: 'BEL-LOG-01',
-    overrideOut: '19:35 OUT DAV',
-    totalHours: '10h 37m Net Shift',
-    otHours: '+1h 35m Inter-store transfer',
-    reason: 'Urgent stock dispatch to Davanagere Mega Store via company transit van.',
-    evidence: 'E-Way Bill #EWB-9041 and Gate Delivery Receipt confirmed.',
-    invoiceOrDoc: 'Transit Waybill #EWB-9041',
-    supervisor: 'G. Kulkarni (Logistics Lead)',
-    pipelineStep: '2',
-    pipelineTotal: '3',
-    status: 'PENDING',
-    type: 'ON_DUTY',
-    notes: 'Inter-hub saree bundle transfer initiated for festival inventory replenishment. Returned via Davanagere transit corridor.',
-  },
-  {
-    id: 'CORR-4034',
-    empCode: 'BSC-EMP-0112',
-    name: 'Manjunath Swamy',
-    role: 'Visual Merchandiser',
-    hub: 'SHI-03 Apex',
-    floor: '1st Floor (Menswear & Fabrics)',
-    dept: 'Visual Merchandising',
-    avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?auto=format&fit=crop&w=200&q=80',
-    shift: 'Shift B (11:30 - 20:30)',
-    rawIn: '11:42 IN (Grace 12m)',
-    rawOut: '21:10 OUT',
-    terminal: 'SHI-VM-01',
-    overrideOut: '21:10 OUT',
-    totalHours: '9h 28m Total',
-    otHours: '+40m Floor Overtime',
-    reason: 'Diwali showcase mannequin styling window rearrangement beyond store hours.',
-    evidence: 'Store Manager signoff note & CCTV Front Glass feed verified.',
-    invoiceOrDoc: 'VM Window Slip #VM-77',
-    supervisor: 'V. Hiremath (Floor Lead)',
-    pipelineStep: '3',
-    pipelineTotal: '3',
-    status: 'APPROVED',
-    type: 'LATE_GRACE',
-    notes: 'Visual merchandising team required extended window after mall shutter closure at 20:30.',
-  },
-];
+/** Wall-clock text for a stored datetime, or null when nothing was recorded. */
+export function correctionTimeText(value: unknown): string | null {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+/** Full date + time text for a stored datetime, or null when absent. */
+export function correctionStampText(value: unknown): string | null {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+/** Maps one API row to the view model. Unknown values stay empty, never guessed. */
+export function mapCorrectionRow(c: any): CorrectionRecord {
+  return {
+    id: String(c?.id ?? ''),
+    employeeId: c?.employeeId ? String(c.employeeId) : null,
+    empCode: c?.employeeCode || '',
+    name: c?.employeeName || '',
+    role: c?.designation || '',
+    dept: c?.departmentName || '',
+    hub: c?.locationName || '',
+    attendanceDate: correctionDateKey(c?.attendanceDate),
+    originalLogin: correctionTimeText(c?.originalLogin),
+    originalLogout: correctionTimeText(c?.originalLogout),
+    requestedLogin: correctionTimeText(c?.requestedLogin),
+    requestedLogout: correctionTimeText(c?.requestedLogout),
+    reason: c?.reason || '',
+    status: isValidStatus(c?.status) ? c.status : 'PENDING',
+    reviewNote: c?.reviewNote || '',
+    reviewedById: c?.reviewedById ? String(c.reviewedById) : null,
+    appliedAt: correctionStampText(c?.appliedAt),
+    createdAt: c?.createdAt ? String(c.createdAt) : '',
+  };
+}
+
+/** Raw datetime values kept for the edit form's datetime-local inputs. */
+export function correctionInputValue(value: unknown): string {
+  if (!value) return '';
+  const d = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}

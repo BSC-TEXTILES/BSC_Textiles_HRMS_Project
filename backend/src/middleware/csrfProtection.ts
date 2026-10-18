@@ -58,7 +58,19 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction) 
   // session, and both are already unreachable cross-site because the cookies
   // are SameSite=Strict. Exempting them avoids a dead end when the readable
   // CSRF cookie expires before the session does.
+  //
+  // Sign-in belongs here too. The skip above only fires when no session cookie
+  // is present, but a browser can arrive at the login page still holding an
+  // unexpired access cookie — from a session that was invalidated server-side,
+  // or simply from having signed in earlier in the tab. The form has no CSRF
+  // header to send yet (there is no session to bind one to), so every attempt
+  // was rejected with 403 and the user could not sign in again until they
+  // cleared cookies. Login CSRF is covered by SameSite=Strict on the session
+  // cookies, which is the layer this middleware documents up front.
   const csrfExempt = [
+  '/api/session/login',
+  '/api/auth/session/login',
+  '/api/auth/login',
   '/api/session/refresh',
   '/api/session/logout',
   '/api/auth/session/refresh',

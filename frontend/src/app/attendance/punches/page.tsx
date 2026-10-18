@@ -73,11 +73,13 @@ export default function BiometricPunchesPage() {
 
   // Manual Punch Override Modal State
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
+  // The match field starts empty: an operator-recorded punch is not a face
+  // verification, and the backend stores null unless a real device score arrives.
   const [manualForm, setManualForm] = useState({
     employeeId: '',
     punchType: 'IN',
     timestamp: new Date().toISOString().slice(0, 16),
-    faceMatchPercentage: 98.2,
+    faceMatchPercentage: '',
     reason: 'Biometric device offline backup entry',
   });
 
@@ -187,12 +189,22 @@ export default function BiometricPunchesPage() {
       return;
     }
     try {
-      await api.post('/attendance/punch', {
+      // Only forward a match value the operator actually typed from a device
+      // readout; an absent value is stored as null by the backend, and a punch
+      // must never carry an invented face-match percentage.
+      const reportedMatch = manualForm.faceMatchPercentage.trim() === ''
+        ? null
+        : Number(manualForm.faceMatchPercentage);
+      const payload: Record<string, unknown> = {
         employeeId: manualForm.employeeId,
         punchType: manualForm.punchType,
-        faceMatchPercentage: manualForm.faceMatchPercentage,
         reason: manualForm.reason,
-      });
+      };
+      if (reportedMatch !== null && Number.isFinite(reportedMatch)) {
+        payload.faceMatchPercentage = reportedMatch;
+      }
+
+      await api.post('/attendance/punch', payload);
       toast.success(`Manual ${manualForm.punchType} punch recorded successfully!`);
       setIsManualModalOpen(false);
       fetchData();
@@ -243,20 +255,29 @@ export default function BiometricPunchesPage() {
     return matchSearch && matchStatus && matchTerminal;
   });
 
-  // Computed values for the 4 Essential Management KPI Cards
-  const totalEmployeesCount = stats?.totalEmployees ?? (employees.length || 35);
-  const presentEmployeesCount = stats?.present ?? (punches.filter(p => ['PRESENT', 'EARLY', 'LATE', 'OVERTIME', 'FACE_VERIFIED'].includes(p.status)).length || 10);
+  // Computed values for the 4 Essential Management KPI Cards.
+  // Every number here is either the backend summary or counted from the rows
+  // actually loaded — never a demonstration constant when the real count is 0.
+  const totalEmployeesCount = stats?.totalEmployees ?? employees.length;
+  const presentEmployeesCount =
+    stats?.present ?? punches.filter(p => ['PRESENT', 'EARLY', 'LATE', 'OVERTIME', 'FACE_VERIFIED'].includes(p.status)).length;
   const absentEmployeesCount = stats?.absent ?? Math.max(totalEmployeesCount - presentEmployeesCount, 0);
   const lateEmployeesCount = stats?.late ?? punches.filter(p => p.status === 'LATE').length;
 
-  const verifiedPunchesCount = (stats?.faceVerified ?? 0) + (stats?.qrScans ? Math.max((stats.qrScans - (stats?.failedQrScans ?? 0)), 0) : 0) || (punches.filter(p => p.faceVerified || p.status === 'PRESENT').length || 20);
+  const verifiedPunchesCount =
+    (stats?.faceVerified ?? 0) +
+      (stats?.qrScans ? Math.max((stats.qrScans - (stats?.failedQrScans ?? 0)), 0) : 0) ||
+    punches.filter(p => p.faceVerified || p.status === 'PRESENT').length;
   const failedPunchesCount = (stats?.faceFailed ?? 0) + (stats?.failedQrScans ?? 0);
-  const totalPunchesTodayCount = (stats?.faceVerified !== undefined || stats?.qrScans !== undefined) 
-    ? (verifiedPunchesCount + failedPunchesCount)
-    : (punches.length || 20);
+  const totalPunchesTodayCount =
+    stats?.faceVerified !== undefined || stats?.qrScans !== undefined
+      ? verifiedPunchesCount + failedPunchesCount
+      : punches.length;
 
-  const totalIncentivesEarned = stats?.incentiveToday ?? (punches.reduce((acc, p) => acc + (Number(p.earlyLoginIncentive) || 0), 0) || 2300);
-  const totalLateDeductions = stats?.penaltyToday ?? (punches.reduce((acc, p) => acc + (Number(p.lateLoginPenalty) || 0), 0) || 0);
+  const totalIncentivesEarned =
+    stats?.incentiveToday ?? punches.reduce((acc, p) => acc + (Number(p.earlyLoginIncentive) || 0), 0);
+  const totalLateDeductions =
+    stats?.penaltyToday ?? punches.reduce((acc, p) => acc + (Number(p.lateLoginPenalty) || 0), 0);
 
   return (
     <DashboardLayout>
@@ -536,15 +557,13 @@ export default function BiometricPunchesPage() {
                     const emp = punch.employee || {};
                     const isEarly = Number(punch.earlyLoginIncentive) > 0;
                     const isLate = Number(punch.lateLoginPenalty) > 0;
-                    const loginDate = punch.actualLogin
-                      ? new Date(punch.actualLogin)
-                      : punch.attendanceDate
-                      ? new Date(punch.attendanceDate)
-                      : new Date();
-                    const dateFormatted = loginDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+                    // A missing clock-in stays missing: it is never shown as a
+                    // plausible 09:12 AM arrival.
                     const timeFormatted = punch.actualLogin
                       ? new Date(punch.actualLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
-                      : '09:12 AM';
+                      : null;
+                    const verifyMethodLabel =
+                      punch.verifyMethod && punch.verifyMethod !== 'Unknown' ? punch.verifyMethod : null;
 
                     return (
                       <tr 
@@ -554,30 +573,33 @@ export default function BiometricPunchesPage() {
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2.5">
                             <div className="w-7 h-7 rounded-full bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 flex items-center justify-center font-bold text-[11px]">
-                              {emp.fullName ? emp.fullName[0] : 'E'}
+                              {emp.fullName ? emp.fullName[0] : '—'}
                             </div>
                             <div>
                               <div className="font-bold text-[#0b1c30] dark:text-slate-100">
-                                {emp.fullName || 'Employee'}
+                                {emp.fullName || 'Unmatched device ID'}
                               </div>
                               <div className="text-[10px] text-slate-400 font-mono">
-                                {emp.employeeCode || punch.employeeId}
+                                {emp.employeeCode || punch.employeeId || '—'}
                               </div>
                             </div>
                           </div>
                         </td>
                         <td className="py-3 px-4">
                           <span className="font-medium text-slate-700 dark:text-slate-300">
-                            {punch.location?.name || 'Belagavi Head Store'}
+                            {punch.location?.name || punch.location?.code || '—'}
                           </span>
                         </td>
-                        <td className="py-3 px-4">
-                          <div className="font-bold text-slate-800 dark:text-slate-200 text-xs">{dateFormatted}</div>
-                          <div className="font-mono text-slate-500 dark:text-slate-400 text-[11px] font-medium">{timeFormatted}</div>
+                        <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-300 font-medium">
+                          {timeFormatted || '—'}
                         </td>
                         <td className="py-3 px-4">
                           <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 border border-[#dce9ff] dark:border-blue-900">
-                            VERIFIED (PASS)
+                            {punch.faceVerified
+                              ? 'FACE VERIFIED'
+                              : verifyMethodLabel
+                                ? String(verifyMethodLabel).toUpperCase()
+                                : 'METHOD UNKNOWN'}
                           </span>
                         </td>
                         <td className="py-3 px-4">
@@ -695,7 +717,7 @@ export default function BiometricPunchesPage() {
                       Biometric Punch Telemetry Dossier
                     </h3>
                     <p className="text-xs text-slate-400 font-mono">
-                      Log ID: {selectedPunch.id || 'PUNCH-EDGE-SYNC'} • Edge Verified
+                      Log ID: {selectedPunch.id || '—'} • Stored Attendance Row
                     </p>
                   </div>
                 </div>
@@ -717,16 +739,20 @@ export default function BiometricPunchesPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-sm text-slate-900 dark:text-white">
-                        {selectedPunch.employee?.fullName || 'Registered Staff Member'}
+                        {selectedPunch.employee?.fullName || 'Unmatched device ID'}
                       </span>
                       <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                        {selectedPunch.employee?.employeeCode || 'BSC-EMP'}
+                        {selectedPunch.employee?.employeeCode || '—'}
                       </span>
                     </div>
                     <div className="text-slate-500 dark:text-slate-400 mt-0.5 flex items-center gap-2">
-                      <span>Sales & Retail Floor</span>
+                      <span>
+                        {selectedPunch.employee?.designation
+                          || selectedPunch.employee?.department?.name
+                          || 'Designation not recorded'}
+                      </span>
                       <span>•</span>
-                      <span>{selectedPunch.location?.name || 'Belagavi Head Store (BEL-01)'}</span>
+                      <span>{selectedPunch.location?.name || selectedPunch.location?.code || '—'}</span>
                     </div>
                   </div>
                 </div>
@@ -738,10 +764,10 @@ export default function BiometricPunchesPage() {
                     <span className="font-mono font-bold text-slate-900 dark:text-white text-sm">
                       {selectedPunch.actualLogin
                         ? new Date(selectedPunch.actualLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
-                        : '09:12:34 AM'}
+                        : 'No clock-in recorded'}
                     </span>
                     <span className="text-[10px] text-slate-400 block">
-                      Date: {selectedPunch.attendanceDate || new Date().toISOString().slice(0, 10)}
+                      Date: {selectedPunch.attendanceDate || '—'}
                     </span>
                   </div>
 
@@ -749,20 +775,26 @@ export default function BiometricPunchesPage() {
                     <span className="text-slate-400 block font-medium">Punch Direction</span>
                     <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-white text-sm">
                       <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                      <span>IN-PUNCH (CLOCK IN)</span>
+                      <span>
+                        {selectedPunch.actualLogout
+                          ? 'OUT-PUNCH (CLOCK OUT)'
+                          : selectedPunch.actualLogin
+                            ? 'IN-PUNCH (CLOCK IN)'
+                            : 'Not reported'}
+                      </span>
                     </div>
                     <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-semibold">
-                      Shift Attendance Registered
+                      {selectedPunch.status || 'Status not reported'}
                     </span>
                   </div>
 
                   <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1">
-                    <span className="text-slate-400 block font-medium">IoT Edge Terminal</span>
+                    <span className="text-slate-400 block font-medium">Recording Terminal</span>
                     <span className="font-semibold text-slate-900 dark:text-white block">
-                      BEL-T1 (Belagavi Tablet A)
+                      {selectedPunch.deviceName || 'Terminal not identified'}
                     </span>
                     <span className="font-mono text-[10px] text-slate-400 block">
-                      Gateway: Showroom Edge LAN • 14ms
+                      Gateway: {selectedPunch.serialNumber || 'Serial not reported'}
                     </span>
                   </div>
 
@@ -781,39 +813,51 @@ export default function BiometricPunchesPage() {
                   </div>
                 </div>
 
-                {/* AI Facial Liveness Verification Card */}
+                {/* Facial Verification Card — only what the row actually carries */}
                 <div className="p-4 rounded-xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 space-y-2.5">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
                       <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                      AI Facial Liveness & Anti-Spoofing Audit
+                      Facial Verification Audit
                     </span>
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-200/80 dark:bg-emerald-800 text-emerald-900 dark:text-emerald-100">
-                      CONFIRMED (PASS)
+                      {selectedPunch.faceVerified
+                        ? 'FACE MATCH RECORDED'
+                        : selectedPunch.verifyMethod && selectedPunch.verifyMethod !== 'Unknown'
+                          ? `${String(selectedPunch.verifyMethod).toUpperCase()} PUNCH`
+                          : 'METHOD UNKNOWN'}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-3 gap-2 text-[11px] pt-1">
                     <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-emerald-100 dark:border-emerald-900/40">
+                      <span className="text-slate-400 block">Verification Method</span>
+                      <span className="font-bold text-slate-900 dark:text-white">
+                        {selectedPunch.verifyMethod && selectedPunch.verifyMethod !== 'Unknown'
+                          ? selectedPunch.verifyMethod
+                          : 'Unknown'}
+                      </span>
+                    </div>
+                    <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-emerald-100 dark:border-emerald-900/40">
                       <span className="text-slate-400 block">Face Match</span>
-                      <span className="font-bold text-slate-900 dark:text-white">98.4% Match</span>
+                      <span className="font-bold text-slate-900 dark:text-white">
+                        {typeof selectedPunch.faceMatchPercentage === 'number'
+                          ? `${selectedPunch.faceMatchPercentage}%`
+                          : 'Not reported by device'}
+                      </span>
                     </div>
                     <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-emerald-100 dark:border-emerald-900/40">
-                      <span className="text-slate-400 block">Skin Texture</span>
-                      <span className="font-bold text-emerald-600">PASS (0.97)</span>
-                    </div>
-                    <div className="p-2 bg-white dark:bg-slate-900 rounded-lg border border-emerald-100 dark:border-emerald-900/40">
-                      <span className="text-slate-400 block">Depth Parallax</span>
-                      <span className="font-bold text-emerald-600">PASS (0.99)</span>
+                      <span className="text-slate-400 block">Anti-Spoof Metrics</span>
+                      <span className="font-bold text-slate-600 dark:text-slate-300">Not reported by device</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Technical Audit Hash */}
+                {/* Audit Reference */}
                 <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-1 font-mono text-[11px]">
-                  <span className="text-slate-400 block">Cryptographic Hash Verification:</span>
+                  <span className="text-slate-400 block">Attendance Row Reference:</span>
                   <span className="text-slate-600 dark:text-slate-300 break-all">
-                    sha256:7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069
+                    {selectedPunch.id || 'No stored reference'}
                   </span>
                 </div>
               </div>
@@ -896,16 +940,17 @@ export default function BiometricPunchesPage() {
 
                   <div>
                     <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                      Simulated Match %
+                      Device-Reported Match % (optional)
                     </label>
                     <input
                       type="number"
                       step="0.1"
                       min="0"
                       max="100"
+                      placeholder="Only if the terminal printed a score"
                       value={manualForm.faceMatchPercentage}
-                      onChange={(e) => setManualForm({ ...manualForm, faceMatchPercentage: Number(e.target.value) })}
-                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+                      onChange={(e) => setManualForm({ ...manualForm, faceMatchPercentage: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg text-xs bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
                     />
                   </div>
                 </div>

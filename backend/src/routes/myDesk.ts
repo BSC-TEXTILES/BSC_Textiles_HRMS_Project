@@ -1,10 +1,64 @@
 import { Router } from 'express';
 import crypto from 'node:crypto';
 import { pool } from '../nativeDb.js';
-import { authenticate, AuthRequest } from '../middleware/auth.js';
+import { authenticate, isElevatedRole, AuthRequest } from '../middleware/auth.js';
 import { dbDate } from '../utils/dates.js';
+import { formatWallString } from '../services/biometric/timeCodec.js';
+import { computeShiftWindow } from '../core/services/AttendanceCalculationService.js';
 
 export const myDeskRouter = Router();
+
+/**
+ * Which employee a self-service write belongs to.
+ *
+ * This used to fall back to `SELECT id FROM employee LIMIT 1`, so an account
+ * without a linked employee record could clock in, clock out or record a tea
+ * break for whichever employee happened to sort first — attendance attributed to
+ * someone who was not there. There is now no substitution: it is your record,
+ * or an explicit one for staff whose role may edit attendance.
+ */
+function resolveDeskEmployee(req: AuthRequest, requested?: unknown): string | null {
+  const own = req.user?.employeeId ? String(req.user.employeeId) : null;
+  const wanted = requested ? String(requested).trim() : '';
+  if (!wanted) return own;
+  if (own && wanted === own) return wanted;
+  return isElevatedRole(req.user?.role) ? wanted : null;
+}
+
+/** TIME column → "HH:MM" in the store timezone, whatever shape the driver returned. */
+function timeToHHMM(value: unknown, timeZone = 'Asia/Kolkata'): string | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return formatWallString(value, timeZone, false).slice(11, 16);
+  }
+  const m = /(\d{1,2}):(\d{2})/.exec(String(value));
+  return m ? `${m[1].padStart(2, '0')}:${m[2]}` : null;
+}
+
+/** Share of elapsed calendar days in the period that carry a real attendance record. */
+function adherenceOf(rows: any[]): { percent: number | null; presentDays: number; recordedDays: number } {
+  const presentDays = rows.filter((r: any) => r.actualLogin || r.status === 'PRESENT' || r.status === 'LATE' || r.status === 'OVERTIME').length;
+  if (rows.length === 0) return { percent: null, presentDays: 0, recordedDays: 0 };
+  return {
+    percent: Math.round((presentDays / rows.length) * 1000) / 10,
+    presentDays,
+    recordedDays: rows.length,
+  };
+}
+
+/** Rostered length in minutes from TIME columns, or null when the shift is unknown. */
+function shiftMinutesOf(start: unknown, end: unknown): number | null {
+  const toMin = (v: unknown): number | null => {
+    const text = timeToHHMM(v);
+    if (!text) return null;
+    const [h, m] = text.split(':').map(Number);
+    return h * 60 + m;
+  };
+  const from = toMin(start);
+  const until = toMin(end);
+  if (from === null || until === null) return null;
+  return until > from ? until - from : 24 * 60 - from + until;
+}
 
 myDeskRouter.use(authenticate);
 
@@ -20,33 +74,37 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
       employeeId = req.user.employeeId;
     }
 
+    // Never fall back to "some employee": showing another person's attendance,
+    // balances or F&F to a caller is an identity leak, not a convenience.
+    // Elevated callers may preview a specific record with ?employeeId= above.
     if (!employeeId) {
-      // For Super Admin or users without an employeeId attached, fetch first active employee
-      const [firstEmp]: any = await pool.query(
-        'SELECT id FROM employee WHERE status = "ACTIVE" ORDER BY employeeCode ASC LIMIT 1'
-      );
-      if (firstEmp.length > 0) {
-        employeeId = firstEmp[0].id;
-      }
-    }
-
-    if (!employeeId) {
-      return res.status(404).json({ error: 'No employee record found' });
+      return res.status(404).json({
+        error: 'NO_EMPLOYEE_LINK',
+        message: 'This login is not linked to an employee record, so there is no self-service desk to show. An administrator can link it from Users & Assignments.',
+      });
     }
 
     // 2. Fetch employee details with joins
     const [empRows]: any = await pool.query(
       `SELECT e.id, e.employeeCode, e.fullName, e.firstName, e.lastName, e.email, e.phone, e.gender,
               e.designation, e.role, e.status, e.joiningDate,
+              e.panNumber, e.uanNo, e.bankAccount, e.bankIfsc, e.aadhaarVerificationStatus,
               l.id as locationId, l.name as locationName, l.code as locationCode,
               f.name as floorName,
               d.name as departmentName,
-              s.id as shiftId, s.name as shiftName, s.startTime as shiftStartTime, s.endTime as shiftEndTime, s.gracePeriod
+              s.id as shiftId, s.name as shiftName, s.startTime as shiftStartTime, s.endTime as shiftEndTime, s.gracePeriod,
+              rm.fullName as reportsToName, rm.employeeCode as reportsToCode,
+              (SELECT wo.dayOfWeek FROM weeklyoffrule wo
+                 WHERE (wo.employeeId = e.id OR (wo.locationId = e.locationId AND wo.employeeId IS NULL))
+                 ORDER BY wo.employeeId IS NOT NULL DESC LIMIT 1) as weeklyOffDay,
+              (SELECT m.enrollmentNumber FROM biometric_employee_mappings m
+                 WHERE m.employeeId = e.id ORDER BY m.updatedAt DESC LIMIT 1) as enrollmentNumber
        FROM employee e
        LEFT JOIN location l ON e.locationId = l.id
        LEFT JOIN floor f ON e.floorId = f.id
        LEFT JOIN department d ON e.departmentId = d.id
        LEFT JOIN shift s ON e.shiftId = s.id
+       LEFT JOIN employee rm ON rm.id = e.reportingManagerId
        WHERE e.id = ?`,
       [employeeId]
     );
@@ -67,13 +125,17 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
     );
     const todayAtt = todayAttRows[0] || null;
 
+    // Every one of these starts as "unknown" and is filled only from the day's
+    // attendance row. They used to carry invented defaults (09:28 AM, 4h 54m,
+    // 61.25%, "2m Early"), so a screen could show a plausible working day for
+    // someone who never punched.
     let isClockedIn = false;
-    let clockInTime = '09:28 AM';
+    let clockInTime: string | null = null;
     let clockOutTime: string | null = null;
-    let elapsedMinutes = 294; // 4h 54m default
-    let shiftPercent = 61.25;
-    let earlyLateStatus = '2m Early';
-    let onSchedule = true;
+    let elapsedMinutes: number | null = null;
+    let shiftPercent: number | null = null;
+    let earlyLateStatus: string | null = null;
+    let onSchedule: boolean | null = null;
 
     if (todayAtt) {
       if (todayAtt.actualLogin && !todayAtt.actualLogout) {
@@ -99,14 +161,19 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
         earlyLateStatus = `${earlyMin}m Early`;
       }
     } else {
-      // No record for today yet
+      // No record for today yet — the absence is the answer.
       isClockedIn = false;
-      clockInTime = 'Not Active';
     }
 
-    const shiftTotalMinutes = 480; // 8 hours standard
-    shiftPercent = Math.min(100, Math.round((elapsedMinutes / shiftTotalMinutes) * 1000) / 10);
-    const shiftHoursFormatted = `${Math.floor(elapsedMinutes / 60)}h ${elapsedMinutes % 60}m`;
+    // Percentage of the employee's own rostered shift, when the shift master
+    // defines one. No shift times means no percentage — not an 8-hour guess.
+    const shiftTotalMinutes = shiftMinutesOf(emp.shiftStartTime, emp.shiftEndTime);
+    if (elapsedMinutes !== null && shiftTotalMinutes) {
+      shiftPercent = Math.min(100, Math.round((elapsedMinutes / shiftTotalMinutes) * 1000) / 10);
+    }
+    const shiftHoursFormatted = elapsedMinutes === null
+      ? null
+      : `${Math.floor(elapsedMinutes / 60)}h ${elapsedMinutes % 60}m`;
 
     // 4. Monthly Velocity & Performance Dossier
     const reqYear = Number(req.query.year) || now.getFullYear();
@@ -168,23 +235,23 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
         weekOffCount++;
       } else if (att) {
         totalScheduledWorkingDays++;
-        if (att.status === 'PRESENT' || att.actualLogin) {
+        if (att.status === 'PRESENT' || att.status === 'LATE' || att.actualLogin) {
           status = 'PRESENT';
           type = isCurrentDay ? 'TODAY' : 'P';
           presentCount++;
-          const workSec = att.totalWorkingSeconds || (att.effectiveWorkingSeconds || 28800 + (day % 4) * 900);
+          // Only the ledger's own working time — never a simulated 8h+ day.
+          const workSec = Number(att.totalWorkingSeconds || att.effectiveWorkingSeconds || 0);
           rawHours = Math.round((workSec / 3600) * 10) / 10;
-          hours = `${rawHours}h`;
-          if (isCurrentDay && isClockedIn) {
-            hours = 'Today';
-          }
+          hours = workSec > 0
+            ? `${rawHours}h`
+            : (isCurrentDay && isClockedIn ? 'Today' : '—');
           if (att.lateLoginSeconds && att.lateLoginSeconds > 300) {
             lateArrivals++;
           } else {
             onTimeArrivals++;
           }
-          if (att.overtimeMinutes) {
-            totalOvertimeMinutes += att.overtimeMinutes;
+          if (att.overtimeSeconds) {
+            totalOvertimeMinutes += Math.round(Number(att.overtimeSeconds) / 60);
           }
         } else if (att.status === 'LEAVE' || att.status === 'EARNED_LEAVE') {
           status = 'EARNED_LEAVE';
@@ -199,29 +266,17 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
         }
       } else if (isPastDay) {
         totalScheduledWorkingDays++;
-        // If day 7 of Oct, mark Earned Leave
-        if (day === 7) {
-          status = 'EARNED_LEAVE';
-          type = 'EL';
-          hours = 'EL';
-          leaveCount++;
-        } else {
-          // Standard present day with realistic high variance
-          status = 'PRESENT';
-          type = 'P';
-          presentCount++;
-          const simulatedHours = (8.5 + ((day * 7) % 8) * 0.1).toFixed(1);
-          hours = `${simulatedHours}h`;
-          rawHours = parseFloat(simulatedHours);
-          onTimeArrivals++;
-          totalOvertimeMinutes += (day % 3 === 0 ? 30 : 0);
-        }
+        // No record means no record: report the gap instead of inventing a
+        // present day with simulated hours and overtime.
+        status = 'NO_RECORD';
+        type = 'NR';
+        hours = '—';
       } else if (isCurrentDay) {
+        // No punch today yet: scheduled, not an on-time arrival.
         status = isClockedIn ? 'PRESENT' : 'SCHEDULED';
         type = 'TODAY';
-        hours = 'Today';
+        hours = isClockedIn ? 'Today' : '—';
         totalScheduledWorkingDays++;
-        onTimeArrivals++;
       } else {
         status = 'UPCOMING';
         type = 'UPCOMING';
@@ -239,14 +294,16 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
         isToday: isCurrentDay,
         isPast: isPastDay,
         isFuture: isFutureDay,
-        actualLogin: att?.actualLogin ? new Date(att.actualLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : (isPastDay && !isWeeklyOff && day !== 7 ? '09:28 AM' : null),
-        actualLogout: att?.actualLogout ? new Date(att.actualLogout).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : (isPastDay && !isWeeklyOff && day !== 7 ? '18:30 PM' : null),
+        actualLogin: att?.actualLogin ? new Date(att.actualLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null,
+        actualLogout: att?.actualLogout ? new Date(att.actualLogout).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null,
       });
     }
 
-    // 5. Punctuality Score Calculation
-    const eligibleRecords = Math.max(1, onTimeArrivals + lateArrivals);
-    const punctualityScore = Math.min(100, Math.round((onTimeArrivals / eligibleRecords) * 1000) / 10);
+    // 5. Punctuality Score Calculation — null when the ledger has no records.
+    const eligibleRecords = onTimeArrivals + lateArrivals;
+    const punctualityScore = eligibleRecords > 0
+      ? Math.min(100, Math.round((onTimeArrivals / eligibleRecords) * 1000) / 10)
+      : null;
 
     // 6. Festive Sales Bonus / Incentives
     const [incentiveRows]: any = await pool.query(
@@ -258,22 +315,17 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
       [employeeId]
     );
 
-    let festiveBonusAmount = 4250;
-    let festiveTarget = 250000;
-    let festiveAchieved = 280000;
-    let achievementPercent = 112;
+    // Real incentive rows only. No row means the card shows nothing, not a
+    // made-up ₹4,250 bonus with a 112% achievement figure.
+    const latestIncentive = incentiveRows[0] || null;
+    const festiveBonusAmount = latestIncentive ? Number(latestIncentive.calculatedAmount) : null;
+    const festiveTarget = latestIncentive?.targetAmount ? Number(latestIncentive.targetAmount) : null;
+    const festiveBonusRuleName = latestIncentive?.ruleName ? String(latestIncentive.ruleName) : null;
+    const festiveBonusStatus = latestIncentive?.status ? String(latestIncentive.status) : null;
 
-    if (incentiveRows.length > 0) {
-      festiveBonusAmount = Number(incentiveRows[0].calculatedAmount) || 4250;
-      if (incentiveRows[0].targetAmount) {
-        festiveTarget = Number(incentiveRows[0].targetAmount);
-        festiveAchieved = Math.round(festiveTarget * (achievementPercent / 100));
-      }
-    }
-
-    // 7. Overtime Logged
-    const otHours = Math.floor(totalOvertimeMinutes / 60) || 6;
-    const otMins = totalOvertimeMinutes % 60 || 30;
+    // 7. Overtime Logged — zero overtime stays zero.
+    const otHours = Math.floor(totalOvertimeMinutes / 60);
+    const otMins = totalOvertimeMinutes % 60;
     const otFormatted = `${otHours}h ${String(otMins).padStart(2, '0')}m`;
 
     // 8. Breaks & Well-being
@@ -285,10 +337,18 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
     );
 
     const activeTeaBreak = todayBreaks.find((b: any) => b.breakType === 'TEA' && b.status === 'ACTIVE');
-    let teaBreakRemainingSeconds = 900;
+    const lunchBreak = todayBreaks.find((b: any) => b.breakType === 'LUNCH') || null;
+    const clockOf = (v: unknown): string | null =>
+      v ? new Date(v as string).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null;
+    const lunchLoggedTime = lunchBreak?.startTime
+      ? `${clockOf(lunchBreak.startTime)}${lunchBreak.endTime ? ` – ${clockOf(lunchBreak.endTime)}` : ' – in progress'}` +
+        (lunchBreak.actualDuration != null ? ` (${Number(lunchBreak.actualDuration)} mins)` : '')
+      : null;
+    const teaQuotaSeconds = activeTeaBreak?.allowedDuration ? Number(activeTeaBreak.allowedDuration) * 60 : 900;
+    let teaBreakRemainingSeconds: number | null = null;
     if (activeTeaBreak && activeTeaBreak.startTime) {
       const elapsedSec = Math.floor((now.getTime() - new Date(activeTeaBreak.startTime).getTime()) / 1000);
-      teaBreakRemainingSeconds = Math.max(0, 900 - elapsedSec);
+      teaBreakRemainingSeconds = Math.max(0, teaQuotaSeconds - elapsedSec);
     }
 
     // 9. Floor Shortcuts Data
@@ -300,25 +360,15 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
 
     // Payslip
     const [payrollRows]: any = await pool.query(
-      `SELECT p.*, r.periodStart, r.periodEnd 
+      `SELECT p.*, r.periodStart, r.periodEnd, r.processedAt
        FROM payrollitem p
        LEFT JOIN payrollrun r ON p.payrollRunId = r.id
        WHERE p.employeeId = ?
        ORDER BY p.createdAt DESC LIMIT 1`,
       [employeeId]
     );
-    const latestPayroll = payrollRows[0] || {
-      netPay: 50940,
-      basicSalary: 32000,
-      hra: 16000,
-      salesIncentive: 4250,
-      deductions: 4260,
-      pfDeduction: 3840,
-      taxDeduction: 3000,
-      status: 'DISBURSED',
-      month: 10,
-      year: reqYear,
-    };
+    // No payroll item means no payslip yet — never a fabricated ₹50,940 credit.
+    const latestPayroll = payrollRows[0] || null;
 
     // 10. Leave Balances
     const [leaveBalances]: any = await pool.query(
@@ -330,93 +380,68 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
       [employeeId]
     );
 
-    const statutoryLeaves = [
-      {
-        title: 'Earned Leave (EL)',
-        desc: 'Accumulated balance',
-        code: 'EL',
-        used: 14,
-        total: 15,
-        color: 'bg-blue-600',
-        textColor: 'text-blue-700',
-      },
-      {
-        title: 'Casual Leave (CL)',
-        desc: 'Non-cumulative entitlement',
-        code: 'CL',
-        used: 8,
-        total: 12,
-        color: 'bg-emerald-600',
-        textColor: 'text-emerald-700',
-      },
-      {
-        title: 'Medical / Sick Leave (SL)',
-        desc: 'Supported by clinic prescription',
-        code: 'SL',
-        used: 5,
-        total: 7,
-        color: 'bg-indigo-600',
-        textColor: 'text-indigo-700',
-      },
-      {
-        title: 'Optional Festive Holiday',
-        desc: 'Karnataka state list',
-        code: 'OPT',
-        used: 2,
-        total: 2,
-        color: 'bg-amber-600',
-        textColor: 'text-amber-700',
-      },
-    ];
+    // Leave balances come from the ledger only. `used` carries the available
+    // balance because that is what the My Desk cards display; no row means the
+    // employee sees an empty list, not invented quotas.
+    const leavePalette: Record<string, { color: string; textColor: string }> = {
+      EL: { color: 'bg-blue-600', textColor: 'text-blue-700' },
+      CL: { color: 'bg-emerald-600', textColor: 'text-emerald-700' },
+      SL: { color: 'bg-indigo-600', textColor: 'text-indigo-700' },
+      OPT: { color: 'bg-amber-600', textColor: 'text-amber-700' },
+    };
+    const statutoryLeaves = leaveBalances.map((b: any) => {
+      const palette = leavePalette[String(b.code)] || { color: 'bg-slate-600', textColor: 'text-slate-700' };
+      return {
+        title: String(b.name || b.code),
+        desc: b.annual_quota != null ? `Annual quota ${Number(b.annual_quota)}` : 'From the leave ledger',
+        code: String(b.code),
+        used: Number(b.balance),
+        total: Number(b.total_credited),
+        color: palette.color,
+        textColor: palette.textColor,
+      };
+    });
 
-    // If leave balances table has records for this employee, map them
-    if (leaveBalances.length > 0) {
-      for (const item of statutoryLeaves) {
-        const found = leaveBalances.find((b: any) => b.code === item.code);
-        if (found) {
-          item.total = found.total_credited || item.total;
-          item.used = found.balance || (item.total - found.used);
-        }
-      }
-    }
+    const keycard = assets.find((a: any) => String(a.assetType || '').toUpperCase() === 'RFID_SECURITY_CARD') || null;
 
     res.json({
       employee: {
         id: emp.id,
-        employeeCode: emp.employeeCode || 'BSC-EMP-0042',
+        employeeCode: emp.employeeCode || null,
         fullName: emp.fullName,
         firstName: emp.firstName,
         lastName: emp.lastName,
-        designation: emp.designation || 'Bridal & Silk Atelier • Level 1 Lead',
-        department: emp.departmentName || 'Customer Retail',
+        designation: emp.designation || null,
+        department: emp.departmentName || null,
         location: {
           id: emp.locationId,
-          name: emp.locationName || 'Belagavi Flagship',
-          code: emp.locationCode || 'BEL-01',
+          name: emp.locationName || null,
+          code: emp.locationCode || null,
         },
-        floor: emp.floorName || 'Ground Floor Flagship',
+        floor: emp.floorName || null,
         shift: {
-          name: emp.shiftName || 'Retail A (09:30 – 18:30)',
-          startTime: emp.shiftStartTime || '09:30',
-          endTime: emp.shiftEndTime || '18:30',
-          gracePeriod: emp.gracePeriod || 15,
+          name: emp.shiftName || null,
+          startTime: timeToHHMM(emp.shiftStartTime),
+          endTime: timeToHHMM(emp.shiftEndTime),
+          gracePeriod: emp.gracePeriod === null || emp.gracePeriod === undefined ? null : Number(emp.gracePeriod),
         },
-        reportsTo: 'Anand Kulkarni (Floor Manager)',
-        weeklyOff: 'Tuesday',
-        biometricToken: 'BEL-RFID-99',
+        reportsTo: emp.reportsToName ? `${emp.reportsToName}${emp.reportsToCode ? ` (${emp.reportsToCode})` : ''}` : null,
+        weeklyOff: emp.weeklyOffDay ? String(emp.weeklyOffDay).toLowerCase().replace(/^\w/, (c: string) => c.toUpperCase()) : null,
+        biometricToken: emp.enrollmentNumber || null,
       },
       today: {
         date: targetDate,
         isClockedIn,
         clockInTime,
         clockOutTime,
-        targetOutTime: '18:30 PM',
+        targetOutTime: timeToHHMM(emp.shiftEndTime),
         elapsedMinutes,
         shiftHoursFormatted,
         shiftPercent,
         earlyLateStatus,
         onSchedule,
-        adherence: '100% Adherence',
+        // Computed from the days the ledger actually has, never asserted.
+        adherence: adherenceOf(monthAttRows),
       },
       monthlyVelocity: {
         year: reqYear,
@@ -432,60 +457,79 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
       },
       punctuality: {
         score: punctualityScore,
-        rank: 'Rank 1 in Belagavi Flagship',
+        // Rank and location benchmark are peer comparisons the API does not
+        // compute; showing a fixed "Rank 1 / 96.2%" would be an invention.
+        rank: null,
         scheduledDays: totalScheduledWorkingDays,
         eligibleRecords,
         onTimeArrivals,
         lateArrivals,
-        benchmark: '96.2%',
+        benchmark: null,
       },
       festiveBonus: {
-        name: 'Festive Sales Bonus',
-        targetLabel: 'Bridal Kanjeevaram Target 112%',
+        name: festiveBonusRuleName || 'Incentives',
+        targetLabel: festiveBonusRuleName,
         amount: festiveBonusAmount,
         currency: '₹',
         targetAmount: festiveTarget,
-        achievedAmount: festiveAchieved,
-        achievementPercent,
-        status: 'APPROVED',
+        achievedAmount: null,
+        achievementPercent: null,
+        status: festiveBonusStatus,
       },
       overtime: {
         hoursFormatted: otFormatted,
-        totalMinutes: totalOvertimeMinutes || 390,
-        rateLabel: 'Payable at 1.25x Statutory Rate',
-        payableAmount: Math.round(((totalOvertimeMinutes || 390) / 60) * 480),
-        status: 'APPROVED',
+        totalMinutes: totalOvertimeMinutes,
+        rateLabel: null,
+        payableAmount: null,
+        status: null,
       },
       breaks: {
         lunch: {
-          label: 'Lunch Quota (45m Statutory)',
-          loggedTime: '13:15 – 13:57 (42 mins)',
-          status: 'COMPLETED',
-          quotaSaved: '3m Quota Saved',
+          label: 'Lunch Break',
+          loggedTime: lunchLoggedTime,
+          status: lunchBreak?.status || null,
+          quotaSaved: null,
         },
         tea: {
-          label: 'Afternoon Tea Quota (15m)',
-          scheduled: 'Scheduled: 16:30 – 16:45 IST',
+          label: 'Afternoon Tea (15m)',
+          scheduled: null,
           isActive: Boolean(activeTeaBreak),
           breakId: activeTeaBreak?.id || null,
           remainingSeconds: teaBreakRemainingSeconds,
-          coverageLead: 'P. Nayak on stand-by',
+          coverageLead: null,
         },
       },
       shortcuts: {
         payslip: {
+          id: latestPayroll?.id || null,
           label: `${monthShort} Payslip`,
-          subtext: `₹${Number(latestPayroll.netPay).toLocaleString('en-IN')} Disbursed`,
-          netPay: Number(latestPayroll.netPay),
-          grossSalary: Number(latestPayroll.basicSalary) + Number(latestPayroll.hra) + Number(latestPayroll.salesIncentive),
-          basicSalary: Number(latestPayroll.basicSalary),
-          hra: Number(latestPayroll.hra),
-          salesIncentive: Number(latestPayroll.salesIncentive),
-          epf: Number(latestPayroll.pfDeduction || 3840),
-          esi: 420,
-          tds: Number(latestPayroll.taxDeduction || 3000),
-          status: latestPayroll.status || 'DISBURSED',
-          disbursedAt: '01 Nov 2024',
+          subtext: latestPayroll
+            ? `₹${Number(latestPayroll.netPay).toLocaleString('en-IN')}${latestPayroll.status ? ` • ${String(latestPayroll.status)}` : ''}`
+            : 'No payslip generated yet',
+          netPay: latestPayroll ? Number(latestPayroll.netPay) : null,
+          grossSalary: latestPayroll
+            ? Number(latestPayroll.basicSalary) +
+              Number(latestPayroll.earlyIncentive || 0) +
+              Number(latestPayroll.attendanceIncentive || 0) +
+              Number(latestPayroll.performanceIncentive || 0) +
+              Number(latestPayroll.salesIncentive || 0) +
+              Number(latestPayroll.overtime || 0)
+            : null,
+          basicSalary: latestPayroll ? Number(latestPayroll.basicSalary) : null,
+          earlyIncentive: latestPayroll ? Number(latestPayroll.earlyIncentive || 0) : null,
+          attendanceIncentive: latestPayroll ? Number(latestPayroll.attendanceIncentive || 0) : null,
+          performanceIncentive: latestPayroll ? Number(latestPayroll.performanceIncentive || 0) : null,
+          salesIncentive: latestPayroll ? Number(latestPayroll.salesIncentive || 0) : null,
+          overtimePay: latestPayroll ? Number(latestPayroll.overtime || 0) : null,
+          deductions: latestPayroll ? Number(latestPayroll.deductions || 0) : null,
+          penalties: latestPayroll ? Number(latestPayroll.penalties || 0) : null,
+          status: latestPayroll?.status || null,
+          periodStart: latestPayroll?.periodStart || null,
+          periodEnd: latestPayroll?.periodEnd || null,
+          disbursedAt: latestPayroll?.processedAt
+            ? new Date(latestPayroll.processedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+            : null,
+          creditAccount: emp.bankAccount ? `••••${String(emp.bankAccount).slice(-4)}` : null,
         },
         punchCorrection: {
           label: 'Punch Correction',
@@ -493,19 +537,23 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
         },
         custodyAssets: {
           label: 'Custody Assets',
-          subtext: 'Handheld • Locker',
-          securityKeycard: '#BEL-VLT-12',
-          keycardStatus: 'ACTIVE',
+          subtext: assets.length
+            ? `${assets.length} item${assets.length === 1 ? '' : 's'} issued`
+            : 'No assets issued',
+          securityKeycard: keycard ? String(keycard.serialNumber) : null,
+          keycardStatus: keycard?.status ? String(keycard.status) : null,
           items: assets,
         },
         dossier: {
           label: 'ID & Dossier',
           subtext: 'Aadhaar • ESIC • PF',
-          aadhaar: '•••• •••• 8821 (e-KYC Done)',
-          pan: 'ABZPP4912K',
-          uan: '101294821039',
-          esic: '3109284719',
-          bank: 'SBI Belagavi Camp (••••4912)',
+          aadhaar: emp.aadhaarVerificationStatus ? `Verification: ${emp.aadhaarVerificationStatus}` : null,
+          pan: emp.panNumber ? String(emp.panNumber) : null,
+          uan: emp.uanNo ? String(emp.uanNo) : null,
+          esic: null,
+          bank: emp.bankAccount
+            ? `${emp.bankIfsc ? `${emp.bankIfsc} • ` : ''}••••${String(emp.bankAccount).slice(-4)}`
+            : null,
         },
       },
       leaveBalances: statutoryLeaves,
@@ -522,10 +570,12 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
  */
 myDeskRouter.post('/punch', async (req: AuthRequest, res) => {
   try {
-    let employeeId = req.body.employeeId || req.user?.employeeId;
+    const employeeId = resolveDeskEmployee(req, req.body.employeeId);
     if (!employeeId) {
-      const [firstEmp]: any = await pool.query('SELECT id FROM employee LIMIT 1');
-      employeeId = firstEmp[0]?.id;
+      return res.status(403).json({
+        error: 'NO_EMPLOYEE_LINK',
+        message: 'This login is not linked to an employee record, so no punch can be recorded. Ask an administrator to link it.',
+      });
     }
 
     const [empRows]: any = await pool.query('SELECT * FROM employee WHERE id = ?', [employeeId]);
@@ -536,6 +586,12 @@ myDeskRouter.post('/punch', async (req: AuthRequest, res) => {
 
     const todayStr = new Date().toISOString().slice(0, 10);
     const now = new Date();
+
+    // Re-anchor the employee's shift to today instead of hard-coding 09:30.
+    const [shiftRows]: any = emp.shiftId
+      ? await pool.query('SELECT startTime, endTime FROM shift WHERE id = ?', [emp.shiftId])
+      : [[]];
+    const shiftWindow = computeShiftWindow(shiftRows[0] || null, todayStr);
 
     const [existing]: any = await pool.query(
       'SELECT * FROM attendance WHERE employeeId = ? AND DATE(attendanceDate) = ?',
@@ -550,9 +606,9 @@ myDeskRouter.post('/punch', async (req: AuthRequest, res) => {
       const id = 'att_' + Date.now().toString(36) + crypto.randomBytes(6).toString('hex');
       await pool.query(
         `INSERT INTO attendance 
-         (id, employeeId, locationId, shiftId, attendanceDate, scheduledLogin, actualLogin, status, notes, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'PRESENT', 'Clock in via My Desk', NOW(3), NOW(3))`,
-        [id, employeeId, emp.locationId, emp.shiftId, todayStr, `${todayStr} 09:30:00`, now]
+         (id, employeeId, locationId, shiftId, attendanceDate, scheduledLogin, scheduledLogout, actualLogin, status, notes, createdAt, updatedAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PRESENT', 'Clock in via My Desk', NOW(3), NOW(3))`,
+        [id, employeeId, emp.locationId, emp.shiftId, todayStr, shiftWindow?.start ?? null, shiftWindow?.end ?? null, now]
       );
       isNowClockedIn = true;
       message = `Clock In recorded at ${now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}! Biometric token active.`;
@@ -605,10 +661,12 @@ myDeskRouter.post('/punch', async (req: AuthRequest, res) => {
  */
 myDeskRouter.post('/breaks/tea', async (req: AuthRequest, res) => {
   try {
-    let employeeId = req.body.employeeId || req.user?.employeeId;
+    const employeeId = resolveDeskEmployee(req, req.body.employeeId);
     if (!employeeId) {
-      const [firstEmp]: any = await pool.query('SELECT id FROM employee LIMIT 1');
-      employeeId = firstEmp[0]?.id;
+      return res.status(403).json({
+        error: 'NO_EMPLOYEE_LINK',
+        message: 'This login is not linked to an employee record, so no break can be recorded.',
+      });
     }
 
     const todayStr = new Date().toISOString().slice(0, 10);
@@ -674,12 +732,29 @@ myDeskRouter.post('/custody-acknowledge', async (req: AuthRequest, res) => {
     }
 
     const newStatus = action === 'RETURN' ? 'RETURN_REQUESTED' : 'ACKNOWLEDGED';
-    await pool.query(
+    const ownerEmployeeId = resolveDeskEmployee(req, req.body.employeeId);
+    if (!ownerEmployeeId && !isElevatedRole(req.user?.role)) {
+      return res.status(403).json({
+        error: 'NO_EMPLOYEE_LINK',
+        message: 'Custody items can only be acknowledged by the staff member they are issued to.',
+      });
+    }
+    // Object-level check: an employee may only touch their own custody record.
+    const ownership = isElevatedRole(req.user?.role) && !req.body.employeeId
+      ? { sql: '', params: [] as any[] }
+      : { sql: 'AND employeeId = ?', params: [ownerEmployeeId] };
+    const [updated]: any = await pool.query(
       `UPDATE employee_custody_assets 
        SET status = ?, acknowledgedAt = NOW(3), updatedAt = NOW(3)
-       WHERE id = ?`,
-      [newStatus, assetId]
+       WHERE id = ? ` + ownership.sql,
+      [newStatus, assetId, ...ownership.params]
     );
+    if (Number((updated as any)?.affectedRows ?? 0) === 0) {
+      return res.status(404).json({
+        error: 'ASSET_NOT_FOUND_OR_NOT_YOURS',
+        message: 'No custody item with that id is assigned to you.',
+      });
+    }
 
     res.json({
       success: true,

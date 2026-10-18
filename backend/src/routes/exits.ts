@@ -192,6 +192,40 @@ router.post('/settlement/:id/approve', authorize('APPROVE'), async (req: AuthReq
 });
 
 /**
+ * POST /api/exits/settlement/:id/submit-approval
+ * Move an HR-review settlement into the management sign-off queue
+ */
+router.post('/settlement/:id/submit-approval', authorize('EDIT'), async (req: AuthRequest, res) => {
+  try {
+    const submitted = await container.fnfSettlementService.submitForApproval(
+      req.params.id,
+      req.user?.id || 'system'
+    );
+    res.json(submitted);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || 'Failed to submit settlement for approval' });
+  }
+});
+
+/**
+ * POST /api/exits/settlement/:id/reject
+ * Return a pending/approved settlement to HR review with a documented reason
+ */
+router.post('/settlement/:id/reject', authorize('APPROVE'), async (req: AuthRequest, res) => {
+  try {
+    const { remarks } = req.body;
+    const rejected = await container.fnfSettlementService.rejectSettlement(
+      req.params.id,
+      req.user?.id || 'system',
+      String(remarks || '')
+    );
+    res.json(rejected);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || 'Failed to reject settlement' });
+  }
+});
+
+/**
  * POST /api/exits/settlement/:id/pay
  * Record disbursement payment reference and date
  */

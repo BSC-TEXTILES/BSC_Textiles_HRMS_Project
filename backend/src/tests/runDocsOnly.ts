@@ -1,19 +1,10 @@
 import { runEmployeeDocumentsTests } from './employeeDocuments.test.js';
+import { loginWithRetry } from './testAuth.js';
 
 const BASE_URL = (process.env.API_URL || 'http://localhost:4000').replace(/\/api\/?$/, '');
 
 async function loginUser(email: string, password = 'password123'): Promise<string> {
-  const res = await fetch(`${BASE_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Login failed for ${email} (${res.status}): ${text}`);
-  }
-  const data: any = await res.json();
-  return data.token;
+  return loginWithRetry(email, password, { baseUrl: BASE_URL });
 }
 
 async function main() {

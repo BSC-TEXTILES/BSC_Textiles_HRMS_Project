@@ -58,7 +58,7 @@ export class LeaveRepository extends BaseRepository<LeaveApplicationEntity> {
     );
   }
 
-  public async getBalancesByEmployee(employeeId: string, year = 2026): Promise<LeaveBalanceEntity[]> {
+  public async getBalancesByEmployee(employeeId: string, year = new Date().getFullYear()): Promise<LeaveBalanceEntity[]> {
     const sql = `
       SELECT lb.*, lt.code as leave_type_code, lt.name as leave_type_name, lt.is_paid
       FROM leave_balances lb
@@ -69,7 +69,7 @@ export class LeaveRepository extends BaseRepository<LeaveApplicationEntity> {
     return this.query<LeaveBalanceEntity>(sql, [employeeId, year]);
   }
 
-  public async getBalanceForType(employeeId: string, leaveTypeId: string, year = 2026): Promise<LeaveBalanceEntity | null> {
+  public async getBalanceForType(employeeId: string, leaveTypeId: string, year = new Date().getFullYear()): Promise<LeaveBalanceEntity | null> {
     const sql = `
       SELECT lb.*, lt.code as leave_type_code, lt.name as leave_type_name, lt.is_paid
       FROM leave_balances lb

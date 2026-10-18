@@ -20,21 +20,14 @@ import { runBiometricIntegrationTests } from './biometricIntegration.test.js';
 import { runHiringValidatorTests } from './hiringValidators.test.js';
 import { runHiringApiTests } from './hiringApi.test.js';
 import { runBiometricOpsTests } from './biometricOps.test.js';
+import { runDualModeBiometricTests } from './dualModeBiometricSync.test.js';
+
+import { loginWithRetry } from './testAuth.js';
 
 const BASE_URL = (process.env.API_URL || 'http://localhost:4000').replace(/\/api\/?$/, '');
 
 async function loginUser(email: string, password = 'password123'): Promise<string> {
-  const res = await fetch(`${BASE_URL}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Login failed for ${email} (${res.status}): ${text}`);
-  }
-  const data: any = await res.json();
-  return data.token;
+  return loginWithRetry(email, password, { baseUrl: BASE_URL });
 }
 
 async function main() {
@@ -218,6 +211,11 @@ async function main() {
   console.log('▶ Executing Suite 21: Biometric Device Ops (registry, mismatch queue, resolution, exports)...');
   const bioOpsResults = await runBiometricOpsTests(BASE_URL, adminToken, belagaviHrToken, salesToken);
   allResults.push(...bioOpsResults.map((r) => ({ ...r, suite: 'biometric-device-ops' })));
+
+  // 22. Dual-Mode Biometric Sync Suite (Local LAN vs Cloud Push, ADMS parser, deduplication)
+  console.log('▶ Executing Suite 22: Dual-Mode Biometric Sync (Local LAN vs Cloud Push, ADMS push, SHA256 dedup)...');
+  const dualModeResults = await runDualModeBiometricTests();
+  allResults.push(...dualModeResults);
 
   // Print Summary Table
   console.log('\n================================================================');

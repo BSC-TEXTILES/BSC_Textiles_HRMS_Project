@@ -51,81 +51,6 @@ interface QrPassItem {
   rawEmployee: EmployeeData;
 }
 
-const FALLBACK_EMPLOYEES: EmployeeData[] = [
-  {
-    id: 'emp-001',
-    employeeCode: 'BSC-001',
-    fullName: 'Priya Sharma',
-    department: 'Retail Sales & Operations',
-    location: 'Belagavi Flagship (BEL-01)',
-    shift: 'General Shift (09:30 - 18:30)',
-    designation: 'Senior Sales Consultant',
-  },
-  {
-    id: 'emp-002',
-    employeeCode: 'BSC-002',
-    fullName: 'Rajesh Rao',
-    department: 'Silk & Saree Department',
-    location: 'Belagavi Flagship (BEL-01)',
-    shift: 'Morning Shift (08:30 - 17:30)',
-    designation: 'Department Specialist',
-  },
-  {
-    id: 'emp-003',
-    employeeCode: 'BSC-003',
-    fullName: 'Anita Desai',
-    department: 'Billing & Cash Desk',
-    location: 'Davanagere Showroom (DAV-02)',
-    shift: 'General Shift (09:30 - 18:30)',
-    designation: 'Senior Cashier',
-  },
-  {
-    id: 'emp-004',
-    employeeCode: 'BSC-004',
-    fullName: 'Suresh Patil',
-    department: 'Men\'s Ethnic & Suiting',
-    location: 'Shivamogga Showroom (SHV-03)',
-    shift: 'General Shift (09:30 - 18:30)',
-    designation: 'Floor Executive',
-  },
-  {
-    id: 'emp-005',
-    employeeCode: 'BSC-005',
-    fullName: 'Vikram Nayak',
-    department: 'Logistics & Dispatch',
-    location: 'Wholesale Depot (DEP-04)',
-    shift: 'Early Shift (07:30 - 16:30)',
-    designation: 'Inventory Supervisor',
-  },
-  {
-    id: 'emp-006',
-    employeeCode: 'BSC-006',
-    fullName: 'Sneha Kulkarni',
-    department: 'Customer Relations',
-    location: 'Belagavi Flagship (BEL-01)',
-    shift: 'General Shift (09:30 - 18:30)',
-    designation: 'Relations Lead',
-  },
-  {
-    id: 'emp-007',
-    employeeCode: 'BSC-007',
-    fullName: 'Karthik Gowda',
-    department: 'Weaving & Quality Control',
-    location: 'Wholesale Depot (DEP-04)',
-    shift: 'General Shift (09:30 - 18:30)',
-    designation: 'Quality Inspector',
-  },
-  {
-    id: 'emp-008',
-    employeeCode: 'BSC-008',
-    fullName: 'Meena Hegde',
-    department: 'Bridal Atelier',
-    location: 'Davanagere Showroom (DAV-02)',
-    shift: 'Morning Shift (08:30 - 17:30)',
-    designation: 'Consultant Lead',
-  },
-];
-
 export default function DigitalQrCodesPage() {
   const [loading, setLoading] = useState(true);
   const [passes, setPasses] = useState<QrPassItem[]>([]);
@@ -157,10 +82,9 @@ export default function DigitalQrCodesPage() {
         api.get('/attendance?limit=50').catch(() => ({ data: { attendances: [] } })),
       ]);
 
-      const rawEmployees: EmployeeData[] =
-        empRes.data?.employees && empRes.data.employees.length > 0
-          ? empRes.data.employees
-          : FALLBACK_EMPLOYEES;
+      // Only real employees from GET /employees. When the roster is empty the page
+      // shows its empty state instead of a demonstration staff list.
+      const rawEmployees: EmployeeData[] = empRes.data?.employees ?? [];
 
       const attendances = attRes.data?.attendances || attRes.data?.attendance || [];
       const punchMap: Record<string, string> = {};
@@ -180,29 +104,26 @@ export default function DigitalQrCodesPage() {
         }
       });
 
-      // Default Priya Sharma to already punched at 09:12 AM for demonstration if no server records
-      if (Object.keys(punchMap).length === 0) {
-        punchMap['emp-001'] = '09:12 AM';
-        punchMap['BSC-001'] = '09:12 AM';
-      }
 
       // Generate QR codes for all employees
       const generatedPasses: QrPassItem[] = await Promise.all(
         rawEmployees.map(async (emp) => {
-          const code = emp.employeeCode || `BSC-${emp.id}`;
-          const token = `DAILY-${code}-${todayIsoDate}`;
+          // No synthetic employee code: an employee row without an employeeCode is
+          // shown without one rather than as "BSC-<id>".
+          const code = emp.employeeCode || '';
+          const token = code ? `DAILY-${code}-${todayIsoDate}` : '';
           const deptName =
             typeof emp.department === 'string'
               ? emp.department
-              : emp.department?.name || 'Retail Operations';
+              : emp.department?.name || 'Not recorded';
           const locName =
             typeof emp.location === 'string'
               ? emp.location
-              : emp.location?.name || 'Belagavi Flagship (BEL-01)';
+              : emp.location?.name || 'Not recorded';
           const shiftName =
             typeof emp.shift === 'string'
               ? emp.shift
-              : emp.shift?.name || 'General Shift (09:30 - 18:30)';
+              : emp.shift?.name || 'Not recorded';
 
           let qrDataUrl = '';
           try {
@@ -271,7 +192,7 @@ export default function DigitalQrCodesPage() {
         .post('/qr-codes/scan', {
           token: pass.token,
           purpose: 'ATTENDANCE_CHECK_IN',
-          deviceInfo: { terminal: 'BEL-T1', reader: 'Contactless HD Scanner' },
+          deviceInfo: { terminal: 'HRMS-WEB-CONSOLE', reader: 'Browser QR pass read' },
         })
         .catch(() => null);
 
@@ -421,7 +342,7 @@ export default function DigitalQrCodesPage() {
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search by Employee name, code (e.g. BSC-001) or department..."
+              placeholder="Search by employee name, employee code or department..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-[#0058be]"
@@ -438,11 +359,10 @@ export default function DigitalQrCodesPage() {
                 onChange={(e) => setSelectedLocation(e.target.value)}
                 className="bg-transparent text-slate-800 dark:text-slate-200 focus:outline-none font-medium text-xs cursor-pointer"
               >
-                <option value="ALL">All Store Hubs & Depots</option>
-                <option value="Belagavi">Belagavi Flagship (BEL-01)</option>
-                <option value="Davanagere">Davanagere Showroom (DAV-02)</option>
-                <option value="Shivamogga">Shivamogga Showroom (SHV-03)</option>
-                <option value="Depot">Wholesale Depot (DEP-04)</option>
+                <option value="ALL">All Store Hubs</option>
+                <option value="Belagavi">Belagavi Head Store (BEL)</option>
+                <option value="Davanagere">Davanagere Mega Store (DAV)</option>
+                <option value="Shivamogga">Shivamogga Flagship (SHI)</option>
               </select>
             </div>
 
@@ -497,10 +417,12 @@ export default function DigitalQrCodesPage() {
           <div className="py-16 p-8 text-center bg-white dark:bg-[#070c18] rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-3">
             <QrCode className="w-12 h-12 text-slate-300 mx-auto" />
             <h3 className="text-base font-bold text-slate-700 dark:text-slate-300">
-              No QR passes match your filter criteria
+              {passes.length === 0 ? 'No employee QR passes available' : 'No QR passes match your filter criteria'}
             </h3>
             <p className="text-xs text-slate-400 max-w-sm mx-auto">
-              Try adjusting your search query or reset the location and status filters to view all active passes.
+              {passes.length === 0
+                ? 'GET /employees returned no employee rows for your scope, so there is nothing to issue a pass for. Adjust the filters or check back once the roster is loaded.'
+                : 'Try adjusting your search query or reset the location and status filters to view all active passes.'}
             </p>
             <button
               type="button"

@@ -53,20 +53,35 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
     }
   };
 
-  // Safe fallback metrics matching the canonical screenshot
-  const totalEmployees = stats?.totalEmployees ?? 35;
-  const present = stats?.present ?? 10;
-  const late = stats?.late ?? 0;
-  const weeklyOff = stats?.weeklyOff ?? 25;
-  const biometricPunches = stats?.qrScans !== undefined || stats?.faceVerified !== undefined
+  // Every figure below comes from /reports/dashboard-summary. When the backend
+  // has not reported a metric the card shows an em-dash rather than a placeholder
+  // number, so an empty day never looks like a measured one.
+  const NO_DATA = '—';
+  const num = (value: unknown): number | null =>
+    typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+  const totalEmployees = num(stats?.totalEmployees);
+  const present = num(stats?.present);
+  const absent = num(stats?.absent);
+  const late = num(stats?.late);
+  const weeklyOff = num(stats?.weeklyOff);
+  const hasPunchStats = stats?.qrScans !== undefined || stats?.faceVerified !== undefined;
+  const biometricPunches = hasPunchStats
     ? (stats?.qrScans ?? 0) + (stats?.faceVerified ?? 0)
-    : 20;
-  const avgFaceMatch = stats?.avgFaceMatch ?? 96.4;
-  const qrScans = stats?.qrScans ?? 20;
-  const lunchBreaks = stats?.onLunch ?? 0;
-  const teaBreaks = stats?.onTeaBreak ?? 0;
-  const totalBreaks = lunchBreaks + teaBreaks;
-  const incentiveToday = stats?.incentiveToday ?? 6000;
+    : null;
+  // Only ever the mean of match values the terminals themselves reported; the
+  // backend returns 0 when no face verification row exists, which is no data.
+  const avgFaceMatch = num(stats?.avgFaceMatch);
+  const qrScans = num(stats?.qrScans);
+  const lunchBreaks = num(stats?.onLunch);
+  const teaBreaks = num(stats?.onTeaBreak);
+  const totalBreaks =
+    lunchBreaks === null && teaBreaks === null ? null : (lunchBreaks ?? 0) + (teaBreaks ?? 0);
+  const incentiveToday = num(stats?.incentiveToday);
+  const presentPct =
+    present !== null && totalEmployees !== null && totalEmployees > 0
+      ? `${((present / totalEmployees) * 100).toFixed(1)}% Present`
+      : `${NO_DATA} Present`;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 w-full">
@@ -88,7 +103,7 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
                 WORKFORCE REGISTER
               </span>
               <div className="text-3xl font-extrabold text-[#0b1c30] dark:text-slate-100 tracking-tight mt-1">
-                {totalEmployees}
+                {totalEmployees ?? NO_DATA}
               </div>
             </div>
             <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 flex items-center justify-center text-[#0058be] dark:text-blue-400 shrink-0 shadow-xs group-hover:bg-[#0058be] group-hover:text-white transition-colors">
@@ -99,11 +114,11 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
           <div className="mt-3 space-y-1">
             <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300 font-medium">
               <span>Active On Floor:</span>
-              <span className="font-bold text-[#0b1c30] dark:text-slate-100">{present}</span>
+              <span className="font-bold text-[#0b1c30] dark:text-slate-100">{present ?? NO_DATA}</span>
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-              <span>Probation: 4 • Off: {weeklyOff}</span>
-              <span className="text-[#0058be] dark:text-blue-400 font-bold">+3 MTD</span>
+              <span>Probation: {NO_DATA} • Off: {weeklyOff ?? NO_DATA}</span>
+              <span className="text-[#0058be] dark:text-blue-400 font-bold">MTD: {NO_DATA}</span>
             </div>
           </div>
         </div>
@@ -130,10 +145,10 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
               </span>
               <div className="flex items-baseline gap-1 mt-1">
                 <span className="text-3xl font-extrabold text-[#0b1c30] dark:text-slate-100 tracking-tight">
-                  {present}
+                  {present ?? NO_DATA}
                 </span>
                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  / {totalEmployees}
+                  / {totalEmployees ?? NO_DATA}
                 </span>
               </div>
             </div>
@@ -146,15 +161,15 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
             <div className="flex items-center justify-between">
               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0058be] dark:text-blue-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#0058be] dark:bg-blue-400" />
-                94.0% Present
+                {presentPct}
               </span>
               <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-500 dark:text-slate-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                {late} Late
+                {late ?? NO_DATA} Late
               </span>
             </div>
             <div className="text-[11px] text-slate-500 dark:text-slate-400">
-              {weeklyOff} Off/Leave • 0 Unexcused
+              {weeklyOff ?? NO_DATA} Weekly Off • {absent ?? NO_DATA} Absent
             </div>
           </div>
         </div>
@@ -180,7 +195,7 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
                 BIOMETRIC PUNCHES
               </span>
               <div className="text-3xl font-extrabold text-[#0b1c30] dark:text-slate-100 tracking-tight mt-1">
-                {biometricPunches}
+                {biometricPunches ?? NO_DATA}
               </div>
             </div>
             <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 flex items-center justify-center text-[#0058be] dark:text-blue-400 shrink-0 shadow-xs group-hover:bg-[#0058be] group-hover:text-white transition-colors">
@@ -191,11 +206,15 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
           <div className="mt-3 space-y-1 text-xs">
             <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 font-medium">
               <span>Face Verified:</span>
-              <span className="font-bold text-[#0b1c30] dark:text-slate-100">{avgFaceMatch}% Avg</span>
+              <span className="font-bold text-[#0b1c30] dark:text-slate-100">
+                {avgFaceMatch === null ? 'Not reported by device' : `${avgFaceMatch.toFixed(1)}% Avg`}
+              </span>
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
               <span>RFID & QR Scans:</span>
-              <span className="font-semibold text-slate-500 dark:text-slate-400">{qrScans} scans</span>
+              <span className="font-semibold text-slate-500 dark:text-slate-400">
+                {qrScans === null ? NO_DATA : `${qrScans} scans`}
+              </span>
             </div>
           </div>
         </div>
@@ -221,7 +240,7 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
                 ACTIVE FLOOR BREAKS
               </span>
               <div className="text-3xl font-extrabold text-[#0b1c30] dark:text-slate-100 tracking-tight mt-1">
-                {totalBreaks}
+                {totalBreaks ?? NO_DATA}
               </div>
             </div>
             <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 flex items-center justify-center text-[#0058be] dark:text-blue-400 shrink-0 shadow-xs group-hover:bg-[#0058be] group-hover:text-white transition-colors">
@@ -231,12 +250,12 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
 
           <div className="mt-3 space-y-1 text-xs">
             <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 font-medium">
-              <span>Lunch: {lunchBreaks}</span>
-              <span>Tea: {teaBreaks}</span>
+              <span>Lunch: {lunchBreaks ?? NO_DATA}</span>
+              <span>Tea: {teaBreaks ?? NO_DATA}</span>
             </div>
             <div className="flex items-center justify-between text-[11px]">
-              <span className="text-[#0058be] dark:text-blue-400 font-semibold">Policy Compliant</span>
-              <span className="text-slate-500 dark:text-slate-400">0 Overruns</span>
+              <span className="text-[#0058be] dark:text-blue-400 font-semibold">Break overrun check</span>
+              <span className="text-slate-500 dark:text-slate-400">Not reported</span>
             </div>
           </div>
         </div>
@@ -262,7 +281,7 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
                 INCENTIVES TODAY
               </span>
               <div className="text-3xl font-extrabold text-[#0058be] dark:text-blue-400 tracking-tight mt-1">
-                ₹{incentiveToday.toLocaleString('en-IN')}
+                {incentiveToday === null ? NO_DATA : `₹${incentiveToday.toLocaleString('en-IN')}`}
               </div>
             </div>
             <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 flex items-center justify-center text-[#0058be] dark:text-blue-400 shrink-0 shadow-xs group-hover:bg-[#0058be] group-hover:text-white transition-colors">
@@ -272,12 +291,12 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
 
           <div className="mt-3 space-y-1 text-xs">
             <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 font-medium">
-              <span>Early Login ₹1/min:</span>
-              <span className="font-bold text-[#0b1c30] dark:text-slate-100">₹2,300</span>
+              <span>Early Login:</span>
+              <span className="font-bold text-[#0b1c30] dark:text-slate-100">{NO_DATA}</span>
             </div>
             <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
               <span>Sales & Overtime:</span>
-              <span className="font-semibold text-slate-500 dark:text-slate-400">₹3,700</span>
+              <span className="font-semibold text-slate-500 dark:text-slate-400">{NO_DATA}</span>
             </div>
           </div>
         </div>

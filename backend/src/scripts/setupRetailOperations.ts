@@ -5,7 +5,7 @@ function genId(prefix = 'c') {
   return prefix + Date.now().toString(36) + crypto.randomBytes(6).toString('hex');
 }
 
-export async function setupRetailOperations() {
+export async function setupRetailOperations(options?: { schemaOnly?: boolean }) {
   const conn = pool;
   console.log('Connected to MySQL via pool for retail operations...');
 
@@ -104,6 +104,10 @@ export async function setupRetailOperations() {
     }
   }
 
+  if (options?.schemaOnly) {
+    console.log('setupRetailOperations: schema/reference shaping complete; the salesman assignments, today’s attendance rows, billing sessions and sales transactions were not seeded (boot fixtures disabled).');
+    return;
+  }
   // 3. Assign at least 3 salesmen to each selling point
   for (let sIdx = 0; sIdx < sellingPoints.length; sIdx++) {
     const sp = sellingPoints[sIdx];

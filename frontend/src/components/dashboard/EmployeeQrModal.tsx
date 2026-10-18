@@ -54,37 +54,49 @@ export function EmployeeQrModal({
   const [token, setToken] = useState<string>('');
   const [isConsumed, setIsConsumed] = useState<boolean>(initialIsConsumed || false);
   const [scanTime, setScanTime] = useState<string | null>(initialScanTime || null);
-  const [terminalName, setTerminalName] = useState<string>('Entrance Biometric Tablet A (BEL-T1)');
+  // No invented identity here: every value below comes from the employee row the
+  // caller passed in or from GET /qr-codes/daily/:employeeId. A value the server
+  // never supplied renders as '—' / 'Not recorded', never a demonstration person.
+  const [terminalName, setTerminalName] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const [apiEmployee, setApiEmployee] = useState<{ code?: string; name?: string; location?: string } | null>(null);
 
-  const empId = employee?.id || employee?.employeeId || employee?.code || employee?.employeeCode || 'TEST-EMP-001';
-  const empCode = employee?.code || employee?.employeeCode || employee?.employeeId || empId;
-  const empName = employee?.name || employee?.fullName || 'Priya Sharma';
-  const empDept = employee?.department || 'Retail Sales & Operations';
-  const empHub = employee?.hub || employee?.location || 'Belagavi Flagship (BEL-01)';
-  const empShift = employee?.shift || 'General Shift (09:30 - 18:30)';
+  const empId = employee?.id || employee?.employeeId || employee?.code || employee?.employeeCode || '';
+  const empCode = employee?.code || employee?.employeeCode || employee?.employeeId || apiEmployee?.code || empId || '—';
+  const empName = employee?.name || employee?.fullName || apiEmployee?.name || '—';
+  const empDept = employee?.department || 'Not recorded';
+  const empHub = employee?.hub || employee?.location || apiEmployee?.location || 'Not recorded';
+  const empShift = employee?.shift || 'Not recorded';
 
   const fetchDailyQr = useCallback(async () => {
     if (!open || !empId) return;
     try {
       setLoading(true);
+      setApiEmployee(null);
       const res = await api.get(`/qr-codes/daily/${encodeURIComponent(empId)}`).catch(() => null);
       if (res?.data?.success) {
         setQrDataUrl(res.data.dataUrl || null);
         const qr = res.data.qrCode || {};
-        setToken(qr.token || `DAILY-${empCode}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`);
+        // Only the stored daily QR row's own token is shown.
+        setToken(typeof qr.token === 'string' ? qr.token : '');
+        setApiEmployee(res.data.employee || null);
         if (qr.isConsumed || employee?.punchTime) {
           setIsConsumed(true);
-          const t = qr.consumedAt || employee?.punchTime || new Date().toISOString();
-          setScanTime(new Date(t).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }));
+          const t = qr.consumedAt || employee?.punchTime;
+          setScanTime(
+            t
+              ? new Date(t).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
+              : null
+          );
         } else {
           setIsConsumed(false);
           setScanTime(null);
         }
       } else {
-        // Fallback realistic daily token for smooth presentation
-        const mockToken = `DAILY-${empCode}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-7a29e4`;
-        setToken(mockToken);
+        // The server issued no pass — show that instead of a token that could
+        // never match a stored QR code row.
+        setToken('');
+        setQrDataUrl(null);
         if (employee?.punchTime) {
           setIsConsumed(true);
           setScanTime(employee.punchTime);
@@ -95,7 +107,7 @@ export function EmployeeQrModal({
     } finally {
       setLoading(false);
     }
-  }, [open, empId, empCode, employee?.punchTime]);
+  }, [open, empId, employee?.punchTime]);
 
   useEffect(() => {
     if (open) {
@@ -125,20 +137,32 @@ export function EmployeeQrModal({
       });
 
       // Attempt backend scan recording
+      if (!token) {
+        toast.error('No daily QR pass is issued for this employee yet.');
+        return;
+      }
+
       const scanPayload = {
-        token: token || `DAILY-${empCode}-${now.toISOString().slice(0, 10).replace(/-/g, '')}`,
+        token,
         purpose: 'ATTENDANCE_CHECK_IN',
-        deviceInfo: { terminal: 'BEL-T1', reader: 'Contactless HD Scanner' },
+        // This read happens in the browser, so that is what is reported — no
+        // invented gate terminal behind the scan.
+        deviceInfo: { terminal: 'HRMS-WEB-CONSOLE', reader: 'Browser QR pass read' },
       };
 
       const res = await api.post('/qr-codes/scan', scanPayload).catch(() => null);
 
+      if (!res?.data?.success) {
+        toast.error(res?.data?.reason || res?.data?.error || 'Scan was not recorded by the server.');
+        return;
+      }
+
       setIsConsumed(true);
       setScanTime(formattedTime);
-      setTerminalName('Entrance Biometric Tablet A (BEL-T1)');
+      setTerminalName(typeof res.data.scanRecord?.deviceInfo?.terminal === 'string' ? res.data.scanRecord.deviceInfo.terminal : '');
 
       toast.success(
-        `✓ One-Time Scan Recorded Successfully!\nTime: ${formattedTime}\nEmployee: ${empName} (${empCode})`,
+        `✓ One-Time Scan Recorded\nTime: ${formattedTime}\nEmployee: ${empName} (${empCode})`,
         { duration: 5000 }
       );
     } catch (err: any) {
@@ -242,7 +266,7 @@ export function EmployeeQrModal({
           <div className="w-full max-w-sm mt-4">
             <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
               <span className="font-mono text-[10px] text-slate-600 dark:text-slate-400 truncate flex-1">
-                {token || `DAILY-${empCode}-${new Date().toISOString().slice(0, 10)}`}
+                {token || 'No daily token issued'}
               </span>
               <button
                 type="button"
@@ -294,7 +318,7 @@ export function EmployeeQrModal({
                         Scan Time: <span className="font-mono font-bold">{scanTime || 'Recorded'}</span>
                       </p>
                       <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        Device: {terminalName}
+                        Device: {terminalName || 'Not reported by the scanning device'}
                       </p>
                       <p className="text-[10px] text-slate-400 dark:text-slate-500 italic mt-1">
                         Policy Enforced: Each employee QR is strictly valid for one scan time only.

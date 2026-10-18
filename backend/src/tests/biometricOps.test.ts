@@ -333,7 +333,9 @@ export async function runBiometricOpsTests(
   });
 
   await recordTest('API: queue contains the deliberate seeded problems', async () => {
-    const res = await api('/api/devices/mismatches?status=OPEN&limit=200', { token: adminToken });
+    // 500 is the endpoint's cap and comfortably exceeds the OPEN queue, so the
+    // assertions below do not depend on where the seeded rows happen to sort.
+    const res = await api('/api/devices/mismatches?status=OPEN&limit=500', { token: adminToken });
     expect(res.status === 200 && Array.isArray(res.json.mismatches), `Queue unavailable: HTTP ${res.status}`);
     const rows: any[] = res.json.mismatches;
 
@@ -514,10 +516,35 @@ export async function runBiometricOpsTests(
     const filtered = await api('/api/devices/attendance-log?serialNumber=SIMMB160DEMO01&limit=3', { token: adminToken });
     expect(filtered.json.rows.every((r: any) => r.serialNumber === 'SIMMB160DEMO01'), 'Serial filter leaked other terminals');
 
-    const unsynced = await api('/api/devices/attendance-log?status=unsynced&limit=5', { token: adminToken });
-    expect(unsynced.json.total >= 1, 'Expected at least one unsynced punch');
-    expect(unsynced.json.rows.every((r: any) => r.status !== 'MATCHED'), 'Unsynced filter returned matched rows');
-    return { total: res.json.total, unsynced: unsynced.json.total };
+    // The unsynced view must be proven against a row this test controls. It used
+    // to assert "there is at least one unsynced punch in the database", which
+    // passed only while some earlier run happened to leave residue behind — a
+    // fully processed ledger failed it, and a ledger polluted with another
+    // suite's fake rows passed it for the wrong reason.
+    const scratchId = `opslog-${Date.now().toString(36)}`;
+    const scratchEnrollment = `opslog-pin-${scratchId}`;
+    try {
+      await pool.query(
+        `INSERT INTO biometric_raw_punches
+           (id, deviceId, serialNumber, enrollmentNumber, normalizedId, punchTime, punchTimeUtc,
+            rawVerifyType, rawPunchState, verifyMode, verifyModeLabel, punchType,
+            syncStatus, isProcessed, dedupHash, mappingStatus, source)
+         SELECT ?, d.id, 'SIMMB160DEMO01', ?, ?, '2026-10-18 09:15:00', '2026-10-18 03:45:00',
+                1, 0, 1, 'Fingerprint', 'AUTO_PAIR',
+                'QUEUED', 0, SHA2(CONCAT('opslog|', ?, '|', ?), 256), 'UNMAPPED', 'ADMS_PUSH'
+           FROM biometric_devices d WHERE d.serialNumber = 'SIMMB160DEMO01' LIMIT 1`,
+        [scratchId, scratchEnrollment, scratchEnrollment, scratchEnrollment, '2026-10-18 09:15:00']
+      );
+
+      const unsynced = await api('/api/devices/attendance-log?status=unsynced&limit=200', { token: adminToken });
+      expect(unsynced.json.total >= 1, 'Expected at least one unsynced punch');
+      expect(unsynced.json.rows.every((r: any) => r.status !== 'MATCHED'), 'Unsynced filter returned matched rows');
+      expect(unsynced.json.rows.some((r: any) => r.enrollmentNumber === scratchEnrollment),
+        'The punch this test queued must appear in the unsynced view');
+      return { total: res.json.total, unsynced: unsynced.json.total };
+    } finally {
+      await pool.query('DELETE FROM biometric_raw_punches WHERE id = ?', [scratchId]);
+    }
   });
 
   await recordTest('API: location scoping on ops endpoints', async () => {

@@ -86,8 +86,6 @@ export default function FormerEmployeesPage() {
   const [initiateModalOpen, setInitiateModalOpen] = useState(false);
   const [clearanceModalOpen, setClearanceModalOpen] = useState(false);
   const [calcModalOpen, setCalcModalOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [approvalModalOpen, setApprovalModalOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
   // Selected item states
@@ -104,17 +102,6 @@ export default function FormerEmployeesPage() {
     reason: '',
   });
 
-  const [editForm, setEditForm] = useState({
-    unpaidSalaryDays: 0,
-    noticeRecoveryDays: 0,
-    leaveEncashmentDays: 0,
-    gratuityAmount: 0,
-    otherEarnings: 0,
-    otherDeductions: 0,
-    remarks: '',
-  });
-
-  const [approvalRemarks, setApprovalRemarks] = useState('');
   const [paymentForm, setPaymentForm] = useState({
     paymentReference: '',
     paymentDate: new Date().toISOString().split('T')[0],
@@ -303,70 +290,15 @@ export default function FormerEmployeesPage() {
   const handleCalculateSettlement = async (item: any) => {
     try {
       const exitId = item.exit_id || item.id;
-      const res = await api.post(`/exits/${exitId}/calculate-settlement`);
+      // Backend contract: POST /exits/:id/calculate-fnf returns the settlement entity.
+      const res = await api.post(`/exits/${exitId}/calculate-fnf`);
       toast.success('Final pay calculated successfully');
-      setSelectedSettlement(res.data?.settlement);
+      setSelectedSettlement(res.data?.settlement || res.data);
       setCalcModalOpen(true);
       fetchStats();
       fetchExits();
     } catch (e: any) {
       toast.error(e.response?.data?.error || 'Failed to calculate final pay');
-    }
-  };
-
-  const handleOpenEdit = (settlement: any) => {
-    setSelectedSettlement(settlement);
-    setEditForm({
-      unpaidSalaryDays: settlement.unpaid_salary_days || 0,
-      noticeRecoveryDays: settlement.notice_recovery_days || 0,
-      leaveEncashmentDays: settlement.leave_encashment_days || 0,
-      gratuityAmount: Number(settlement.gratuity_amount || 0),
-      otherEarnings: Number(settlement.other_earnings || 0),
-      otherDeductions: Number(settlement.other_deductions || 0),
-      remarks: '',
-    });
-    setEditModalOpen(true);
-  };
-
-  const handleSaveEdit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedSettlement) return;
-    try {
-      await api.put(`/exits/settlement/${selectedSettlement.id}/review`, editForm);
-      toast.success('Final pay adjustments saved');
-      setEditModalOpen(false);
-      fetchStats();
-      fetchExits();
-    } catch (e: any) {
-      toast.error(e.response?.data?.error || 'Failed to update settlement');
-    }
-  };
-
-  const handleSubmitApproval = async (settlementId: string) => {
-    try {
-      await api.post(`/exits/settlement/${settlementId}/submit-approval`);
-      toast.success('Submitted for management sign-off');
-      fetchStats();
-      fetchExits();
-    } catch (e: any) {
-      toast.error(e.response?.data?.error || 'Failed to submit for approval');
-    }
-  };
-
-  const handleApprove = async (action: 'APPROVED' | 'REJECTED') => {
-    if (!selectedSettlement) return;
-    try {
-      await api.put(`/exits/settlement/${selectedSettlement.id}/approve`, {
-        action,
-        remarks: approvalRemarks,
-      });
-      toast.success(`Settlement ${action === 'APPROVED' ? 'Approved for Payment' : 'Rejected back to draft'}`);
-      setApprovalModalOpen(false);
-      setApprovalRemarks('');
-      fetchStats();
-      fetchExits();
-    } catch (e: any) {
-      toast.error(e.response?.data?.error || 'Approval action failed');
     }
   };
 
@@ -378,7 +310,7 @@ export default function FormerEmployeesPage() {
       return;
     }
     try {
-      await api.post(`/exits/settlement/${selectedSettlement.id}/record-payment`, paymentForm);
+      await api.post(`/exits/settlement/${selectedSettlement.id}/pay`, paymentForm);
       toast.success('Payment recorded! Final settlement is now closed.');
       setPaymentModalOpen(false);
       fetchStats();
@@ -390,7 +322,7 @@ export default function FormerEmployeesPage() {
 
   const handleDownloadPdf = async (settlementId: string, employeeCode: string) => {
     try {
-      const res = await api.get(`/exits/settlement/${settlementId}/statement-pdf`, {
+      const res = await api.get(`/exits/settlement/${settlementId}/pdf`, {
         responseType: 'blob',
       });
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
@@ -407,20 +339,31 @@ export default function FormerEmployeesPage() {
   };
 
   // Drawer Action Callbacks
+  // Fetch the real settlement record; the summary row only carries a subset of
+  // fields, so never fabricate a breakdown from the net amount alone.
+  const openBreakdownWithRealSettlement = async (item: any, fallback: any) => {
+    const exitId = item.exit_id || item.id;
+    setSelectedSettlement(fallback);
+    setCalcModalOpen(true);
+    try {
+      const res = await api.get(`/exits/${exitId}/settlement`);
+      if (res.data) {
+        setSelectedSettlement(res.data);
+      }
+    } catch {
+      // Keep the summary-card fallback; the modal shows whatever is known.
+    }
+  };
+
   const handleOpenBreakdownFromDrawer = (item: any) => {
     const netAmount = item.settlement_amount ?? item.settlement?.net_payable ?? 0;
-    setSelectedSettlement(
+    openBreakdownWithRealSettlement(
+      item,
       item.settlement || {
         id: item.settlement_id || item.id,
         net_payable: netAmount,
-        unpaid_salary_amount: item.settlement?.unpaid_salary_amount || netAmount,
-        total_earnings: item.settlement?.total_earnings || netAmount,
-        total_deductions: item.settlement?.total_deductions || 0,
-        gratuity_amount: item.settlement?.gratuity_amount || 0,
-        leave_encashment_amount: item.settlement?.leave_encashment_amount || 0,
       }
     );
-    setCalcModalOpen(true);
   };
 
   const handleOpenPaymentFromDrawer = (item: any) => {
@@ -932,16 +875,13 @@ export default function FormerEmployeesPage() {
                           const target = e.target as HTMLElement;
                           if (target.closest('button, a, input, select')) return;
                           if (netAmount !== null || item.settlement_id) {
-                            setSelectedSettlement(
+                            openBreakdownWithRealSettlement(
+                              item,
                               settlement || {
                                 id: item.settlement_id || item.id,
                                 net_payable: netAmount,
-                                unpaid_salary_amount: netAmount,
-                                total_earnings: netAmount,
-                                total_deductions: 0,
                               }
                             );
-                            setCalcModalOpen(true);
                           } else {
                             handleOpenClearance(item);
                           }
@@ -1094,16 +1034,13 @@ export default function FormerEmployeesPage() {
                             {netAmount !== null && (
                               <button
                                 onClick={() => {
-                                  setSelectedSettlement(
+                                  openBreakdownWithRealSettlement(
+                                    item,
                                     settlement || {
                                       id: item.settlement_id,
                                       net_payable: netAmount,
-                                      unpaid_salary_amount: netAmount,
-                                      total_earnings: netAmount,
-                                      total_deductions: 0,
                                     }
                                   );
-                                  setCalcModalOpen(true);
                                 }}
                                 className="p-2 rounded-xl text-slate-500 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                                 title="View detailed salary & deduction breakdown"

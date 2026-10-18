@@ -16,6 +16,7 @@ import {
   type ShiftWindow,
 } from '../core/services/AttendanceCalculationService.js';
 import { TestResult } from './attendance.test.js';
+import { loginWithRetry } from './testAuth.js';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 const PAST_DATE = '2026-10-08'; // A Thursday
@@ -703,15 +704,7 @@ export async function runAttendanceBoardTests(
 /** Standalone entry: `npx tsx src/tests/attendanceBoard.test.ts` */
 async function main() {
   const BASE_URL = (process.env.API_URL || 'http://localhost:4000').replace(/\/api\/?$/, '');
-  const login = async (email: string) => {
-    const res = await fetch(`${BASE_URL}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password: 'password123' }),
-    });
-    if (!res.ok) throw new Error(`Login failed for ${email}: ${res.status}`);
-    return ((await res.json()) as any).token;
-  };
+  const login = async (email: string) => loginWithRetry(email, 'password123', { baseUrl: BASE_URL });
   const adminToken = await login('admin@bsctextiles.com');
   const belagaviHrToken = await login('rbac.hr@bsctextiles.com');
   const results = await runAttendanceBoardTests(BASE_URL, adminToken, belagaviHrToken);

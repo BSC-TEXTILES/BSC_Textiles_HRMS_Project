@@ -1696,6 +1696,8 @@ export class AnalysisService {
 
       const rowsSql = `
         SELECT a.id as attendanceId, a.attendanceDate, a.actualLogin, a.actualLogout, a.status, a.faceVerified,
+               (SELECT GROUP_CONCAT(DISTINCT r.verifyModeLabel ORDER BY r.verifyModeLabel SEPARATOR ' / ')
+                  FROM biometric_raw_punches r WHERE r.attendanceId = a.id) as deviceVerifyModes,
                e.id as id, e.employeeCode, e.fullName,
                loc.name as locationName, loc.code as locationCode,
                sh.name as shiftName
@@ -1736,7 +1738,7 @@ export class AnalysisService {
           shiftName: r.shiftName || 'General Shift',
           punchIn: r.actualLogin ? formatTime(r.actualLogin) : '—',
           punchOut: r.actualLogout ? formatTime(r.actualLogout) : '—',
-          source: Number(r.faceVerified) === 1 ? 'Face Terminal' : 'Biometric Terminal',
+          source: r.deviceVerifyModes || 'No terminal event recorded',
           status: r.status,
         })),
       };
@@ -2017,7 +2019,7 @@ export class AnalysisService {
       const [presSum]: any = await pool.query(`
         SELECT COUNT(*) as presentCount,
                SUM(CASE WHEN a.faceVerified = 1 THEN 1 ELSE 0 END) as faceCount,
-               SUM(CASE WHEN a.faceVerified = 0 THEN 1 ELSE 0 END) as biometricCount
+               SUM(CASE WHEN a.faceVerified = 0 THEN 1 ELSE 0 END) as nonFaceCount
         FROM attendance a
         INNER JOIN employee e ON a.employeeId = e.id
         WHERE a.attendanceDate >= ? AND a.attendanceDate <= ?
@@ -2025,13 +2027,30 @@ export class AnalysisService {
           AND ${empScope.sql}
       `, [targetStartDate, targetEndDate, ...empScope.params]);
 
+      // Which verify method actually produced those punches is whatever the
+      // terminal reported; an unlabelled punch is shown as such, never as RFID.
+      const [labelRows]: any = await pool.query(`
+        SELECT COALESCE(NULLIF(r.verifyModeLabel, ''), 'Unknown') as label,
+               COUNT(DISTINCT r.attendanceId) as punchCount
+        FROM biometric_raw_punches r
+        INNER JOIN attendance a ON a.id = r.attendanceId
+        INNER JOIN employee e ON e.id = a.employeeId
+        WHERE a.attendanceDate >= ? AND a.attendanceDate <= ?
+          AND (a.status IN ('PRESENT', 'FACE_VERIFIED', 'OVERTIME') OR (a.actualLogin IS NOT NULL AND a.status != 'ABSENT'))
+          AND ${empScope.sql}
+        GROUP BY label
+        ORDER BY punchCount DESC
+      `, [targetStartDate, targetEndDate, ...empScope.params]);
+
       summary = {
         presentCount: Number(presSum[0]?.presentCount || 0),
         verificationMethods: {
-          Face: Number(presSum[0]?.faceCount || 0),
-          RFID: Number(presSum[0]?.biometricCount || 0),
-          QR: 0,
-          Manual: 0,
+          face: Number(presSum[0]?.faceCount || 0),
+          nonFaceConfirmed: Number(presSum[0]?.nonFaceCount || 0),
+          byDeviceLabel: labelRows.reduce((acc: Record<string, number>, row: any) => {
+            acc[row.label] = Number(row.punchCount || 0);
+            return acc;
+          }, {}),
         },
       };
     } else if (category === 'late' || category === 'late_today' || category === 'late_date') {
@@ -2065,6 +2084,8 @@ export class AnalysisService {
              sh.name as shiftName,
              att.status as attendanceStatus,
              att.actualLogin, att.actualLogout, att.lateLoginSeconds, att.faceVerified, att.scheduledLogin,
+             (SELECT GROUP_CONCAT(DISTINCT r.verifyModeLabel ORDER BY r.verifyModeLabel SEPARATOR ' / ')
+                FROM biometric_raw_punches r WHERE r.attendanceId = att.id) as deviceVerifyModes,
              (SELECT COUNT(*) FROM user u WHERE u.employeeId = e.id) as userAccountCount,
              (SELECT MIN(la.createdAt) FROM login_attempt la LEFT JOIN user u ON la.userId = u.id
               WHERE (u.employeeId = e.id OR la.email = e.email) AND la.success = 1
@@ -2167,7 +2188,7 @@ export class AnalysisService {
           actualLogin: r.actualLogin ? formatTime(r.actualLogin) : null,
           punchInTime: r.actualLogin ? formatTime(r.actualLogin) : '—',
           actualLogout: r.actualLogout ? formatTime(r.actualLogout) : null,
-          verificationMethod: Number(r.faceVerified) === 1 ? 'Face Recognition' : 'RFID / Biometric',
+          verificationMethod: r.deviceVerifyModes || 'No terminal event recorded',
           attendanceStatus: r.attendanceStatus || 'UNRECORDED',
           isLate: Number(r.lateLoginSeconds || 0) > 0 || r.attendanceStatus === 'LATE',
           minutesLate: Math.round(Number(r.lateLoginSeconds || 0) / 60),

@@ -130,6 +130,14 @@ export interface ZkConnectionResult {
   sessionId: number;
   protocol: 'TCP' | 'UDP';
   error?: string;
+  /**
+   * Why a handshake failed, as a tag `classifyDeviceError` understands
+   * (`ECONNREFUSED`, `ETIMEDOUT`, `EHOSTUNREACH`, `ENETUNREACH`, `ENOTFOUND`,
+   * `ZK_UNAUTHORIZED`, `ZK_HANDSHAKE_INVALID_REPLY`, `ZK_HANDSHAKE_CLOSED`).
+   * The free-text `error` is for operators; this is for the diagnostics that have
+   * to tell a refused port apart from a terminal that refused our credentials.
+   */
+  code?: string;
 }
 
 const TCP_MAGIC = 0x5050;
@@ -327,6 +335,14 @@ export class ZkProtocolClient {
     const started = Date.now();
     return new Promise<ZkConnectionResult>((resolve) => {
       let settled = false;
+      /**
+       * True once the AUTH reply has been written. After that point a rejection
+       * means the terminal is alive and said "no" — an authentication failure —
+       * whereas before it the session never got that far, which is a protocol
+       * or transport failure. The two are diagnosed completely differently, so the
+       * handshake has to remember which side of AUTH it failed on.
+       */
+      let authSent = false;
       const sock = new net.Socket();
       this.socket = sock;
       sock.setTimeout(this.connectTimeoutMs);
@@ -348,6 +364,7 @@ export class ZkProtocolClient {
         latencyMs: Date.now() - started,
         sessionId: this.sessionId,
         protocol: 'TCP',
+        code: 'ETIMEDOUT',
         error: `Timed out after ${this.connectTimeoutMs}ms waiting for the terminal at ${this.ip}:${this.port}`,
       }));
 
@@ -356,6 +373,7 @@ export class ZkProtocolClient {
         latencyMs: Date.now() - started,
         sessionId: this.sessionId,
         protocol: 'TCP',
+        code: err?.code || 'SOCKET_ERROR',
         error: err?.code === 'ECONNREFUSED'
           ? `Connection refused by ${this.ip}:${this.port} — nothing is listening there`
           : `Socket error (${err?.code || 'ERR'}): ${err?.message}`,
@@ -363,7 +381,14 @@ export class ZkProtocolClient {
 
       sock.on('close', () => {
         if (!this.authenticated) {
-          finish({ connected: false, latencyMs: Date.now() - started, sessionId: this.sessionId, protocol: 'TCP', error: 'Terminal closed the connection during handshake' });
+          finish({
+            connected: false,
+            latencyMs: Date.now() - started,
+            sessionId: this.sessionId,
+            protocol: 'TCP',
+            code: 'ZK_HANDSHAKE_CLOSED',
+            error: 'Terminal closed the connection during handshake',
+          });
         }
       });
 
@@ -375,6 +400,7 @@ export class ZkProtocolClient {
           if (code === ZK.ACK_UNAUTH) {
             this.sessionId = sessionId;
             const auth = createZkPacket(ZK.AUTH, this.sessionId, ++this.replyId & 0xffff, makeCommKey(this.commKey, this.sessionId));
+            authSent = true;
             sock.write(wrapTcpZkPacket(auth));
             return;
           }
@@ -389,7 +415,10 @@ export class ZkProtocolClient {
             latencyMs: Date.now() - started,
             sessionId,
             protocol: 'TCP',
-            error: `Unexpected handshake reply code ${code} from ${this.ip}:${this.port}`,
+            code: authSent ? 'ZK_UNAUTHORIZED' : 'ZK_HANDSHAKE_INVALID_REPLY',
+            error: authSent
+              ? `The terminal refused our credentials (reply code ${code} after AUTH) at ${this.ip}:${this.port}`
+              : `Unexpected handshake reply code ${code} from ${this.ip}:${this.port}`,
           });
           return;
         }
@@ -723,7 +752,7 @@ export async function probeZkTerminal(
   port = 4370,
   timeoutMs = 1500,
   commKey = 0
-): Promise<{ online: boolean; latency: number; latencyMs: number; error?: string; protocol: 'TCP' | 'UDP' }> {
+): Promise<{ online: boolean; latency: number; latencyMs: number; error?: string; code?: string; protocol: 'TCP' | 'UDP' }> {
   const client = new ZkProtocolClient(ip, port, timeoutMs, commKey);
   try {
     const result = await client.connect();
@@ -735,8 +764,15 @@ export async function probeZkTerminal(
     if (udp.online) {
       return { online: true, latency: udp.latencyMs, latencyMs: udp.latencyMs, protocol: 'UDP' };
     }
-    return { online: false, latency: 999, latencyMs: result.latencyMs, error: result.error || udp.error, protocol: 'TCP' };
+    return {
+      online: false,
+      latency: 999,
+      latencyMs: result.latencyMs,
+      error: result.error || udp.error,
+      code: result.code,
+      protocol: 'TCP',
+    };
   } catch (err: any) {
-    return { online: false, latency: 999, latencyMs: 999, error: err?.message, protocol: 'TCP' };
+    return { online: false, latency: 999, latencyMs: 999, error: err?.message, code: err?.code, protocol: 'TCP' };
   }
 }

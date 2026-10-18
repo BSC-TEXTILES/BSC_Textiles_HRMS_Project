@@ -15,7 +15,7 @@ import { apiV1Router } from './api/v1/index.js';
 import { docsRouter } from './api/docs/index.js';
 import { securityHeaders } from './middleware/securityHeaders.js';
 import { csrfProtection } from './middleware/csrfProtection.js';
-import { globalRateLimit, ipRuleGuard, clientIpOf } from './middleware/securityGuards.js';
+import { globalRateLimit, admsRateLimit, ipRuleGuard, clientIpOf } from './middleware/securityGuards.js';
 import { securityConfig, auditSecurityConfig, IS_PROD } from './config/security.js';
 import { ensureActiveKey, signingKeyHealth } from './services/signingKeys.js';
 import { redisHealth } from './services/redisStore.js';
@@ -28,7 +28,8 @@ import { errorHandler } from './middleware/errorHandler.js';
 import { setupViews } from './scripts/setupViews.js';
 import { setupCustodyAssets } from './scripts/setupCustodyAssets.js';
 import { setupKycSchema } from './scripts/setupKycSchema.js';
-import { setupEmployeeDocuments } from './scripts/setupEmployeeDocuments.js';
+import { seedDocumentReferenceConfig, seedDocumentDossierFixtures } from './scripts/setupEmployeeDocuments.js';
+import { bootFixturesAllowed } from './config/bootFixtures.js';
 import { setupFormerEmployees } from './scripts/setupFormerEmployees.js';
 import { setupOrganizationHubs } from './scripts/setupOrganizationHubs.js';
 import { ensureEmployeeImportSchema } from './scripts/setupEmployeeImportSchema.js';
@@ -132,7 +133,7 @@ app.use(csrfProtection);
 // 5. IP allow/deny list, then the global sliding-window limiter (Redis-backed,
 //    so the limit holds across processes instead of resetting on every restart).
 app.use('/api/', ipRuleGuard, globalRateLimit);
-app.use('/iclock', ipRuleGuard);
+app.use('/iclock', ipRuleGuard, admsRateLimit);
 
 // Public key set for token verification by other services. Also served at
 // /api/.well-known/jwks.json for clients that only speak the API prefix.
@@ -318,17 +319,33 @@ if (!process.env.VERCEL) {
         if (process.env.HIRING_OUTBOX_DISABLED !== 'true') startHiringOutboxWorker();
       })
       .catch((err) => console.error('[ShardManager init warning]:', err.message));
+    // Two different jobs were happening here on every boot:
+    //   (a) idempotent schema/reference shaping — tables, views, the document-type
+    //       catalogue, salary cadres, store topology. That must always run.
+    //   (b) demo fixture seeding — invented former employees with resignation and
+    //       F&F amounts, sample late fines and attendance, break sessions, retail
+    //       sales, custody assets, document dossiers. That is development data and
+    //       must never be created by a production boot (see config/bootFixtures.ts).
+    // The document dossier seeder also used to open with
+    // `DELETE FROM employee_documents`, discarding every real upload on each start.
+    const fixtureDecision = bootFixturesAllowed();
+    const schemaOnly = !fixtureDecision.allowed;
+    console.log(`[bootFixtures] ${fixtureDecision.allowed ? 'ENABLED' : 'DISABLED'} — ${fixtureDecision.reason}`);
+
     setupViews().catch((err) => console.warn('[setupViews warning]:', err.message));
-    setupCustodyAssets().catch((err) => console.warn('[setupCustodyAssets warning]:', err.message));
+    setupCustodyAssets({ schemaOnly }).catch((err) => console.warn('[setupCustodyAssets warning]:', err.message));
     setupKycSchema().catch((err) => console.warn('[setupKycSchema warning]:', err.message));
-    setupEmployeeDocuments().catch((err) => console.warn('[setupEmployeeDocuments warning]:', err.message));
-    setupFormerEmployees().catch((err) => console.warn('[setupFormerEmployees warning]:', err.message));
+    seedDocumentReferenceConfig().catch((err) => console.warn('[seedDocumentReferenceConfig warning]:', err.message));
+    if (!schemaOnly) {
+      seedDocumentDossierFixtures().catch((err) => console.warn('[seedDocumentDossierFixtures warning]:', err.message));
+    }
+    setupFormerEmployees({ schemaOnly }).catch((err) => console.warn('[setupFormerEmployees warning]:', err.message));
     setupOrganizationHubs().catch((err) => console.warn('[setupOrganizationHubs warning]:', err.message));
     ensureEmployeeImportSchema().catch((err) => console.warn('[setupEmployeeImportSchema warning]:', err.message));
     setupPayrollSchema().catch((err) => console.warn('[setupPayrollSchema warning]:', err.message));
-    setupLateFines().catch((err) => console.warn('[setupLateFines warning]:', err.message));
-    setupRetailOperations().catch((err) => console.warn('[setupRetailOperations warning]:', err.message));
-    setupBreaks().catch((err) => console.warn('[setupBreaks warning]:', err.message));
+    setupLateFines({ schemaOnly }).catch((err) => console.warn('[setupLateFines warning]:', err.message));
+    setupRetailOperations({ schemaOnly }).catch((err) => console.warn('[setupRetailOperations warning]:', err.message));
+    setupBreaks({ schemaOnly }).catch((err) => console.warn('[setupBreaks warning]:', err.message));
     UserUploadService.syncAllUserFolders().catch((err) => console.warn('[UserUploadService warning]:', err.message));
     registerLocationRegistryRefresh()
       .then(() => console.log('📍 Location registry loaded'))

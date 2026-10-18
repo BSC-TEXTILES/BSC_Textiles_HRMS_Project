@@ -20,6 +20,7 @@ import { changeOwnPassword } from '../services/credentials.js';
 import {
   clearAuthCookies,
   issueCsrfToken,
+  readAccessToken,
   readRefreshToken,
   setAccessCookie,
   setRefreshCookie,
@@ -465,25 +466,38 @@ router.post('/sessions/:id/revoke', authenticate, async (req: AuthRequest, res) 
  */
 router.post('/logout', async (req: AuthRequest, res) => {
   try {
-    const sessionId = req.user?.sessionId || null;
-    if (sessionId) await SessionService.revokeSession(sessionId, 'LOGOUT');
-    if (req.user?.id) await revokeAllUserTokens(req.user.id, 'LOGOUT').catch(() => undefined);
+    // This route is intentionally not behind `authenticate` so logout stays
+    // idempotent (an expired token must still clear cookies instead of 401ing
+    // the user into a loop). The token is therefore verified best-effort here:
+    // without it `req.user` is undefined and the session, the access token and
+    // every refresh token would silently survive a "successful" logout.
+    let userId = req.user?.id || null;
+    let sessionId = req.user?.sessionId || null;
+    let jti: string | null = null;
     const bearer = req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null;
-    if (bearer) {
+    const token = bearer || readAccessToken(req);
+    if (token && (!userId || !sessionId)) {
       try {
-        const claims = await verifyAccessToken(bearer);
-        await revokeAccessToken(claims.jti, claims.sub, 'LOGOUT', securityConfig.tokens.accessTtlSeconds);
+        const claims = await verifyAccessToken(token);
+        userId = userId || claims.sub || null;
+        sessionId = sessionId || claims.sid || null;
+        jti = claims.jti ?? null;
       } catch {
-        /* already invalid */
+        /* already invalid — cookies still get cleared below */
       }
+    }
+    if (sessionId) await SessionService.revokeSession(sessionId, 'LOGOUT').catch(() => undefined);
+    if (userId) await revokeAllUserTokens(userId, 'LOGOUT').catch(() => undefined);
+    if (userId && jti) {
+      await revokeAccessToken(jti, userId, 'LOGOUT', securityConfig.tokens.accessTtlSeconds).catch(() => undefined);
     }
     clearAuthCookies(res);
     await AuditService.log({
-      userId: req.user?.id,
+      userId: userId || undefined,
       locationId: req.user?.locationId,
       action: 'LOGOUT',
       entityType: 'User',
-      entityId: req.user?.id,
+      entityId: userId || undefined,
       ipAddress: clientIpOf(req),
       userAgent: String(req.headers['user-agent'] || 'Client'),
       sessionId: sessionId || undefined,

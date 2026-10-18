@@ -16,6 +16,8 @@ npm run typecheck                 # all workspaces
 npm run test:security             # lockout, rate limit, rotation, policy, cookie, CSRF
 npm run test:rbac                 # action-level permission ladder
 npm run test:biometric            # attendance pipeline regressions
+npm run test:live                 # workforce event journal (idempotency, scoping)
+npm run test:export               # attendance workbooks: content, formats, injection guard
 curl -s localhost:4000/api/health | python -m json.tool | sed -n '/security/,$p'
 ```
 
@@ -257,7 +259,13 @@ can make it permanent until an Admin unlocks.
   every unsafe method that presents a session cookie. A bearer-token request
   (mobile, connector) is exempt because it cannot be forged by a browser form.
   `POST /api/auth/session/{refresh,logout}` are exempt so a stuck client can
-  always recover.
+  always recover. The three **sign-in** paths (`/api/session/login`,
+  `/api/auth/login`, `/api/auth/session/login`) are exempt as well: a browser can
+  reach the login page still holding an unexpired access cookie, and it has no
+  session to bind a token to yet, so requiring the header locked users out until
+  they cleared cookies. Login CSRF stays covered by `SameSite=Strict`.
+  Regression-tested in `securityControls.test.ts` →
+  *"a cookie-bearing POST needs the header, except at sign-in"*.
 - NextAuth is used only as the UI's identity marker. It receives a short-lived
   one-time **ticket** exchanged at `/api/session/exchange`; it never holds
   the access token. Deleting `frontend/src/app/api/auth/login/route.ts` removed
@@ -321,7 +329,7 @@ button is never the control; the API is.
 | Mass assignment | Explicit field lists in every create/update; the ORM shim has no `.create(data)` passthrough | service layer |
 | XSS | React escaping, no `dangerouslySetInnerHTML` on user input, CSP restricts where a script can talk to | components, `next.config.ts` |
 | CSRF | §9 | `csrfProtection.ts` |
-| IDOR | Ownership/scope check on every object fetch | `rbac.ts` + routes |
+| IDOR | Ownership/scope check on every object fetch and every object **write** | `rbac.ts` + routes |
 | SSRF | No user-controlled URL is fetched; device and connector endpoints take IDs, not targets | `credentials`, device routes |
 | Path traversal | Uploads are renamed to random IDs, stored outside any web root, served by an authenticated route; the static mount is pinned to one subdirectory | `index.ts` (`/uploads/attendance` only) |
 | Open redirect | Login and 403 destinations are allowlisted paths, never raw query values | `frontend/src/middleware.ts` |
@@ -714,6 +722,27 @@ account signs in successfully from two networks, a correct Admin password
 refused from outside `privileged_login_cidrs` with a
 `PRIVILEGED_LOGIN_BLOCKED` event, and the deliberate fail-open when the
 allowlist is enabled with no entries.
+
+`backend/src/tests/attendanceExport.test.ts` (`npm run test:export`, 10 cases)
+covers the attendance workbooks: the download is a real openable `.xlsx` with the
+documented sheets, frozen header row and autofilter range; first/last punch and
+punch count come from `biometric_raw_punches` rather than a default; punch times
+stay on the store-timezone calendar day; the verification cell is the device's own
+label and **no face-match percentage may appear anywhere in the file**; weekly off,
+holiday and absent are never inferred from the weekday; a period with no records
+says so instead of filling rows; an employee designation beginning with `=` is
+neutralised (formula-injection guard) and no exported cell starts with a formula
+trigger; the month summary equals the sum of its day rows; the annual sheet splits
+by month; and a store-scoped export cannot leak another store's employees. Its
+fixtures are created and removed by the suite itself (`exp-test-%` ids on dates with
+no production data).
+
+The export routes themselves (`GET /api/attendance/exports/monthly|annual|punches`)
+require the `ATTENDANCE` + `export` action server-side — verified live: a
+`FLOOR_MANAGER` token receives `403 Your role does not allow export on attendance`,
+an unauthenticated request receives `401`, and an invalid period receives `400`
+with a reason. Every download writes `ATTENDANCE_EXPORT_DOWNLOAD` to the audit log
+with the filters and the row count, and above 5,000 rows raises `MASS_EXPORT`.
 
 What is **not** automated: the Nginx/Redis/Docker layer (no runner available
 here — section 15 item 16), the browser session-timeout modal, and the cookie

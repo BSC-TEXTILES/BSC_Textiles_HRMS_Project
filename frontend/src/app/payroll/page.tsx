@@ -97,11 +97,17 @@ export default function PayrollPage() {
     toast.success('Exported Bank NEFT/Salary CSV!');
   };
 
-  const totalPayout = selectedRun?.totalPayout || 1085800;
-  const totalBasic = selectedRun?.totalBasic || 1190000;
-  const totalIncentives = selectedRun?.totalIncentives || 41000;
-  const totalDeductions = selectedRun?.totalDeductions || 145200;
-  const coveredCount = selectedRun?.employeeCount || runItems.length || 35;
+  // Every rupee figure and headcount below is the value the selected payroll run
+  // actually carries. When the server has no value the card shows '—' instead of
+  // an invented amount.
+  const num = (val: unknown): number | null =>
+    val === null || val === undefined || val === '' || !Number.isFinite(Number(val)) ? null : Number(val);
+  const totalPayout = num(selectedRun?.totalPayout);
+  const totalBasic = num(selectedRun?.totalBasic);
+  const totalIncentives = num(selectedRun?.totalIncentives);
+  const totalDeductions = num(selectedRun?.totalDeductions);
+  const coveredCount = num(selectedRun?.employeeCount) ?? (runItems.length > 0 ? runItems.length : null);
+  const inr = (val: number | null, prefix = '') => (val === null ? '—' : `${prefix}₹${val.toLocaleString('en-IN')}`);
 
   return (
     <DashboardLayout>
@@ -184,11 +190,11 @@ export default function PayrollPage() {
               </div>
             </div>
             <div className="my-1">
-              <div className="text-2xl font-bold text-[#18181B]">₹{totalPayout.toLocaleString()}</div>
-              <div className="text-[11px] text-slate-400 truncate">Current Month Payout</div>
+              <div className="text-2xl font-bold text-[#18181B]">{inr(totalPayout)}</div>
+              <div className="text-[11px] text-slate-400 truncate">Total payout of the selected run</div>
             </div>
             <div className="pt-2 border-t border-slate-100 text-[11px] text-[#1346a1] font-semibold">
-              <span>Audited & Approved</span>
+              <span>{selectedRun?.status ? `Run status: ${selectedRun.status}` : 'No run selected'}</span>
             </div>
           </div>
 
@@ -200,7 +206,7 @@ export default function PayrollPage() {
               </div>
             </div>
             <div className="my-1">
-              <div className="text-2xl font-bold text-[#18181B]">₹{totalBasic.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-[#18181B]">{inr(totalBasic)}</div>
               <div className="text-[11px] text-slate-400 truncate">Contractual Fixed Pay</div>
             </div>
             <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500">
@@ -216,7 +222,7 @@ export default function PayrollPage() {
               </div>
             </div>
             <div className="my-1">
-              <div className="text-2xl font-bold text-emerald-700">+₹{totalIncentives.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-emerald-700">{inr(totalIncentives, '+')}</div>
               <div className="text-[11px] text-slate-400 truncate">Punctuality & Floor Sales</div>
             </div>
             <div className="pt-2 border-t border-slate-100 text-[11px] text-emerald-700 font-semibold">
@@ -232,7 +238,7 @@ export default function PayrollPage() {
               </div>
             </div>
             <div className="my-1">
-              <div className="text-2xl font-bold text-red-700">-₹{totalDeductions.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-red-700">{inr(totalDeductions, '-')}</div>
               <div className="text-[11px] text-slate-400 truncate">PF, ESI & Professional Tax</div>
             </div>
             <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500">
@@ -248,11 +254,11 @@ export default function PayrollPage() {
               </div>
             </div>
             <div className="my-1">
-              <div className="text-2xl font-bold text-[#18181B]">{coveredCount} / {coveredCount}</div>
-              <div className="text-[11px] text-slate-400 truncate">100% Payroll Processed</div>
+              <div className="text-2xl font-bold text-[#18181B]">{coveredCount ?? '—'}</div>
+              <div className="text-[11px] text-slate-400 truncate">Employees in the selected run</div>
             </div>
             <div className="pt-2 border-t border-slate-100 text-[11px] text-[#1346a1] font-semibold">
-              <span>Zero Pending Claims</span>
+              <span>{runItems.length} payslip rows loaded</span>
             </div>
           </div>
         </div>
@@ -265,7 +271,14 @@ export default function PayrollPage() {
             </div>
             <div>
               <div className="text-xs font-bold text-[#18181B]">
-                Active Cycle: {selectedRun ? `Oct 2024 (${selectedRun.status})` : 'Monthly Wage Run'}
+                Active Cycle:{' '}
+                {selectedRun
+                  ? `${
+                      selectedRun.periodStart
+                        ? new Date(selectedRun.periodStart).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+                        : 'Period not recorded'
+                    } (${selectedRun.status})`
+                  : 'No payroll run loaded'}
               </div>
               <div className="text-[11px] text-slate-500">
                 Direct NEFT / Bank Transfer Batch • Karnataka Retail Network
@@ -286,7 +299,7 @@ export default function PayrollPage() {
               ))}
             </select>
             <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
-              Status: APPROVED
+              Status: {selectedRun?.status || 'No run selected'}
             </span>
           </div>
         </div>
@@ -332,14 +345,14 @@ export default function PayrollPage() {
                               {emp.fullName?.[0] || 'E'}
                             </div>
                             <div>
-                              <div className="font-bold text-[#18181B]">{emp.fullName || 'Employee'}</div>
-                              <div className="text-[10px] font-mono text-slate-400">{emp.employeeCode || `TEST-EMP-${idx + 1}`}</div>
+                              <div className="font-bold text-[#18181B]">{emp.fullName || '—'}</div>
+                              <div className="text-[10px] font-mono text-slate-400">{emp.employeeCode || '—'}</div>
                             </div>
                           </div>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="font-medium text-[#18181B]">{emp.location?.name || 'Belagavi Flagship'}</div>
-                          <div className="text-[10px] text-slate-400">{emp.department?.name || 'Retail Sales'}</div>
+                          <div className="font-medium text-[#18181B]">{emp.location?.name || '—'}</div>
+                          <div className="text-[10px] text-slate-400">{emp.department?.name || 'Not recorded'}</div>
                         </td>
                         <td className="py-3 px-4 font-mono font-semibold text-[#18181B]">
                           ₹{Number(item.basicSalary).toLocaleString()}
@@ -355,7 +368,7 @@ export default function PayrollPage() {
                         </td>
                         <td className="py-3 px-4">
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            {item.status || 'PAID'}
+                            {item.status || '—'}
                           </span>
                         </td>
                         <td className="py-3 px-4 text-right">

@@ -5,7 +5,7 @@ function genId(prefix = 'lar') {
   return prefix + Date.now().toString(36) + crypto.randomBytes(6).toString('hex');
 }
 
-export async function setupLateFines() {
+export async function setupLateFines(options?: { schemaOnly?: boolean }) {
   const conn = pool;
   console.log('Connected to MySQL database via pool...');
 
@@ -105,6 +105,10 @@ export async function setupLateFines() {
     const isMidWeek = dateStr > '2026-10-06' && dateStr <= '2026-10-09';
     const isRecent = dateStr >= '2026-10-10';
 
+  if (options?.schemaOnly) {
+    console.log('setupLateFines: schema/reference shaping complete; the sample late-attendance and fine rows were not seeded (boot fixtures disabled).');
+    return;
+  }
     for (let i = 0; i < employees.length; i++) {
       const emp = employees[i];
       const shiftId = emp.shiftId || shifts[0]?.id;

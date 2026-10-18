@@ -570,17 +570,25 @@ export function AnalysisKpiDrawer({
                     <div className="text-base font-bold text-emerald-700 dark:text-emerald-300">{summary.presentCount ?? total}</div>
                   </div>
                   <div className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700">
-                    <div className="text-[11px] text-slate-400 font-medium">Face Biometric</div>
-                    <div className="text-base font-bold text-slate-800 dark:text-slate-100">{summary.verificationMethods?.Face ?? 0}</div>
+                    <div className="text-[11px] text-emerald-600 font-medium">Face-confirmed by terminal</div>
+                    <div className="text-base font-bold text-emerald-700 dark:text-emerald-300">{summary.verificationMethods?.face ?? 0}</div>
                   </div>
                   <div className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700">
-                    <div className="text-[11px] text-slate-400 font-medium">RFID / Terminal</div>
-                    <div className="text-base font-bold text-slate-800 dark:text-slate-100">{summary.verificationMethods?.RFID ?? 0}</div>
+                    <div className="text-[11px] text-slate-400 font-medium">Not face-confirmed</div>
+                    <div className="text-base font-bold text-slate-800 dark:text-slate-100">{summary.verificationMethods?.nonFaceConfirmed ?? 0}</div>
                   </div>
-                  <div className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700">
-                    <div className="text-[11px] text-slate-400 font-medium">Verification Mode</div>
-                    <div className="text-xs text-blue-600 dark:text-blue-400 font-bold">Multi-modal Biometric</div>
-                  </div>
+                  {Object.entries((summary.verificationMethods?.byDeviceLabel || {}) as Record<string, number>).map(([label, count]) => (
+                    <div key={label} className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700">
+                      <div className="text-[11px] text-slate-400 font-medium">{label} · reported by device</div>
+                      <div className="text-base font-bold text-slate-800 dark:text-slate-100">{count}</div>
+                    </div>
+                  ))}
+                  {Object.keys((summary.verificationMethods?.byDeviceLabel || {}) as Record<string, number>).length === 0 && (
+                    <div className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700">
+                      <div className="text-[11px] text-slate-400 font-medium">Device verification labels</div>
+                      <div className="text-xs text-slate-500 font-bold">No terminal events linked to these days</div>
+                    </div>
+                  )}
                 </>
               )}
 

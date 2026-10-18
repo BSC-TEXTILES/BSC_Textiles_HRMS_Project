@@ -5,7 +5,7 @@ function genId(prefix = 'brk_') {
   return prefix + Date.now().toString(36) + crypto.randomBytes(4).toString('hex');
 }
 
-export async function setupBreaks() {
+export async function setupBreaks(options?: { schemaOnly?: boolean }) {
   const conn = pool;
 
   // 1. Ensure table and columns exist in database
@@ -301,6 +301,10 @@ export async function setupBreaks() {
     return val.replace('T', ' ').replace('Z', '').slice(0, 19);
   };
 
+  if (options?.schemaOnly) {
+    console.log('setupBreaks: schema/reference shaping complete; the demo break sessions were not seeded (boot fixtures disabled).');
+    return;
+  }
   // Insert records into employeebreak table
   for (const r of recordsToInsert) {
     await conn.query(

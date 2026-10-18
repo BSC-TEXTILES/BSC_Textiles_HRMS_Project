@@ -1,391 +1,388 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
 
 import {
-  CORRECTION_RECORDS,
-  STORE_SECTIONS,
-  STORE_FLOORS,
+  mapCorrectionRow,
+  correctionInputValue,
+  correctionStampText,
   type CorrectionRecord,
+  type CorrectionStatus,
 } from '@/lib/correctionRecords';
 
-interface EditFormData {
+/**
+ * Punch Corrections & Attendance Regularization.
+ *
+ * The queue is the server's attendancecorrection table and nothing else
+ * (GET /attendance/corrections). Every name, code, store, department, date and
+ * punch rendered here comes from that response; a value the API does not return
+ * shows as 'Not recorded' instead of a plausible stand-in.
+ */
+
+interface EditFormState {
   id: string;
-  name: string;
+  employeeName: string;
   empCode: string;
-  role: string;
   hub: string;
-  dept: string;
-  floor: string;
-  avatar: string;
-  shift: string;
-  rawIn: string;
-  rawOut: string;
-  terminal: string;
-  overrideIn: string;
-  overrideOut: string;
-  totalHours: string;
-  otHours: string;
+  attendanceDate: string;
+  requestedLogin: string;
+  requestedLogout: string;
   reason: string;
-  evidence: string;
-  invoiceOrDoc: string;
-  supervisor: string;
-  status: 'PENDING' | 'SUPERVISOR_OK' | 'APPROVED' | 'REJECTED';
-  type: 'MISSED_OUT' | 'LATE_GRACE' | 'ON_DUTY' | 'SENSOR_GLITCH';
-  notes: string;
+  status: CorrectionStatus;
+  reviewNote: string;
 }
 
-const SHIFT_OPTIONS = [
-  'General (09:00 - 18:00)',
-  'Shift A (09:30 - 18:30)',
-  'Shift B (11:30 - 20:30)',
-  'Shift C Night (20:30 - 05:30)',
-  'Overnight (16:30 - 01:30)',
-];
+interface NewRequestState {
+  employeeId: string;
+  attendanceDate: string;
+  requestedLogin: string;
+  requestedLogout: string;
+  reason: string;
+}
+
+const EMPTY_EDIT_FORM: EditFormState = {
+  id: '',
+  employeeName: '',
+  empCode: '',
+  hub: '',
+  attendanceDate: '',
+  requestedLogin: '',
+  requestedLogout: '',
+  reason: '',
+  status: 'PENDING',
+  reviewNote: '',
+};
+
+const EMPTY_NEW_REQUEST: NewRequestState = {
+  employeeId: '',
+  attendanceDate: new Date().toISOString().slice(0, 10),
+  requestedLogin: '',
+  requestedLogout: '',
+  reason: '',
+};
+
+const statusPillClass = (status: CorrectionStatus) =>
+  status === 'APPROVED'
+    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+    : status === 'REJECTED'
+    ? 'bg-rose-100 text-rose-800 border border-rose-200'
+    : 'bg-blue-50 text-[#1346a1] border border-blue-200';
+
+const TAB_KEYS = ['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const;
+
+const tabLabel = (key: (typeof TAB_KEYS)[number]) =>
+  key === 'ALL' ? 'All Requests' : key.charAt(0) + key.slice(1).toLowerCase();
 
 export default function AttendanceCorrectionsPage() {
-  const [records, setRecords] = useState<CorrectionRecord[]>(CORRECTION_RECORDS);
-  const [activeTab, setActiveTab] = useState<'ALL' | 'MISSED_OUT' | 'LATE_GRACE' | 'ON_DUTY' | 'SENSOR_GLITCH'>('ALL');
+  const [records, setRecords] = useState<CorrectionRecord[]>([]);
+  const [rawRowsById, setRawRowsById] = useState<Record<string, any>>({});
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [lastLoadedAt, setLastLoadedAt] = useState<string | null>(null);
+
+  const [activeTab, setActiveTab] = useState<'ALL' | CorrectionStatus>('ALL');
   const [hubFilter, setHubFilter] = useState('ALL');
   const [deptFilter, setDeptFilter] = useState('ALL');
-  const [floorFilter, setFloorFilter] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRecordId, setSelectedRecordId] = useState<string>('CORR-4029');
-  
-  // Modals state
+  const [selectedRecordId, setSelectedRecordId] = useState('');
+
+  const [locations, setLocations] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [staffOptions, setStaffOptions] = useState<Array<{ id: string; code: string; name: string }>>([]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editStep, setEditStep] = useState<1 | 2 | 3>(1);
+  const [editForm, setEditForm] = useState<EditFormState>(EMPTY_EDIT_FORM);
+  const [newRequest, setNewRequest] = useState<NewRequestState>(EMPTY_NEW_REQUEST);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  // Edit Form State
-  const [editForm, setEditForm] = useState<EditFormData>({
-    id: '',
-    name: '',
-    empCode: '',
-    role: 'Floor Associate',
-    hub: 'BEL-01 Flagship',
-    dept: STORE_SECTIONS[0],
-    floor: STORE_FLOORS[0],
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-    shift: 'Shift A (09:30 - 18:30)',
-    rawIn: '09:30 IN',
-    rawOut: 'Missed OUT',
-    terminal: 'BEL-IN-02',
-    overrideIn: '09:30 AM',
-    overrideOut: '18:30 PM',
-    totalHours: '8h 00m Total',
-    otHours: 'Standard Rate',
-    reason: '',
-    evidence: 'Biometric System Sync',
-    invoiceOrDoc: '',
-    supervisor: 'Floor Manager',
-    status: 'PENDING',
-    type: 'MISSED_OUT',
-    notes: '',
-  });
-
-  useEffect(() => {
-    // Optionally fetch backend corrections
-    api.get('/attendance/corrections')
-      .then((res) => {
-        if (res.data?.corrections && res.data.corrections.length > 0) {
-          const mapped: CorrectionRecord[] = res.data.corrections.map((c: any) => ({
-            id: c.id,
-            empCode: c.employeeCode || 'BSC-4029',
-            name: c.employeeName || 'Staff Member',
-            role: c.designation || 'Floor Associate',
-            hub: c.locationName || 'BEL-01 Flagship',
-            dept: c.departmentName || 'Bridal Silk & Atelier',
-            floor: 'Ground Floor (Atelier & Heritage Sarees)',
-            avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-            shift: 'Shift A (09:30 - 18:30)',
-            rawIn: c.requestedLogin ? new Date(c.requestedLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '09:30 AM',
-            rawOut: c.requestedLogout ? new Date(c.requestedLogout).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '18:30 PM',
-            terminal: 'MANUAL-OVERRIDE',
-            overrideOut: '18:30 PM',
-            totalHours: '8h 00m Shift',
-            otHours: 'Standard Rate',
-            reason: c.reason,
-            evidence: 'Biometric System Sync',
-            supervisor: 'Floor Manager',
-            pipelineStep: c.status === 'APPROVED' ? '3' : '2',
-            pipelineTotal: '3',
-            status: c.status || 'PENDING',
-            type: 'MISSED_OUT',
-            notes: c.reviewNote || c.reason,
-          }));
-          setRecords((prev) => {
-            const seen = new Set<string>();
-            const merged: CorrectionRecord[] = [];
-            for (const item of [...mapped, ...prev]) {
-              if (item.id && !seen.has(item.id)) {
-                seen.add(item.id);
-                merged.push(item);
-              }
-            }
-            return merged;
-          });
-        }
-      })
-      .catch(() => {});
+  /** The queue itself: GET /attendance/corrections, mapped field for field. */
+  const fetchCorrections = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/attendance/corrections');
+      const rows: any[] = res.data?.corrections || [];
+      const mapped = rows.map((row) => mapCorrectionRow(row));
+      const raw: Record<string, any> = {};
+      rows.forEach((row) => {
+        if (row?.id) raw[String(row.id)] = row;
+      });
+      setRecords(mapped);
+      setRawRowsById(raw);
+      setLoadError(null);
+      setLastLoadedAt(new Date().toLocaleString('en-IN', { hour12: false }));
+      setSelectedRecordId((prev) => (mapped.some((m) => m.id === prev) ? prev : mapped[0]?.id || ''));
+    } catch (err: any) {
+      setRecords([]);
+      setRawRowsById({});
+      setLoadError(
+        err?.response?.data?.error ||
+          err?.response?.data?.message ||
+          'Could not load the punch correction queue from the server.'
+      );
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const [newRequest, setNewRequest] = useState({
-    name: '',
-    empCode: '',
-    hub: 'BEL-01 Flagship',
-    shift: 'Shift A (09:30 – 18:30)',
-    overrideIn: '09:30 AM',
-    overrideOut: '18:30 PM',
-    reason: '',
-  });
-
-  const selectedRecord = records.find((r) => r.id === selectedRecordId) || records[0];
-
-  const filteredRecords = records.filter((r, idx, arr) => {
-    if (arr.findIndex((item) => item.id === r.id) !== idx) {
-      return false;
+  /** Real store hubs, departments and employee options behind the filters and forms. */
+  const fetchFilterOptions = useCallback(async () => {
+    try {
+      const res = await api.get('/locations/all');
+      setLocations(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setLocations([]);
     }
-    const matchesTab = activeTab === 'ALL' || r.type === activeTab;
-    const matchesHub = hubFilter === 'ALL' || r.hub.toLowerCase().includes(hubFilter.toLowerCase());
-    const matchesDept = deptFilter === 'ALL' || r.dept.toLowerCase() === deptFilter.toLowerCase();
-    const matchesFloor = floorFilter === 'ALL' || (r.floor && r.floor.toLowerCase().includes(floorFilter.toLowerCase()));
-    const matchesSearch =
-      searchQuery === '' ||
-      r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.empCode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.dept.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (r.floor && r.floor.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesTab && matchesHub && matchesDept && matchesFloor && matchesSearch;
-  });
+    try {
+      const res = await api.get('/departments');
+      setDepartments(res.data?.departments || []);
+    } catch {
+      setDepartments([]);
+    }
+    try {
+      const res = await api.get('/employees/lookup');
+      const list: any[] = Array.isArray(res.data) ? res.data : res.data?.employees || [];
+      setStaffOptions(
+        list
+          .filter((e) => e && e.id)
+          .map((e) => ({ id: String(e.id), code: String(e.employeeCode || ''), name: String(e.fullName || '') }))
+      );
+    } catch {
+      setStaffOptions([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCorrections();
+    fetchFilterOptions();
+  }, [fetchCorrections, fetchFilterOptions]);
+
+  const counts = useMemo(() => {
+    const byStatus: Record<CorrectionStatus, number> = { PENDING: 0, APPROVED: 0, REJECTED: 0 };
+    for (const r of records) byStatus[r.status] += 1;
+    return byStatus;
+  }, [records]);
+
+  /** Average hours from request to approval, over the loaded rows that carry both stamps. */
+  const resolution = useMemo(() => {
+    let total = 0;
+    let sampleSize = 0;
+    for (const r of records) {
+      const applied = rawRowsById[r.id]?.appliedAt;
+      if (!applied || !r.createdAt) continue;
+      const from = new Date(r.createdAt).getTime();
+      const to = new Date(applied).getTime();
+      if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) continue;
+      total += (to - from) / 3600000;
+      sampleSize += 1;
+    }
+    return sampleSize > 0 ? { avg: total / sampleSize, sampleSize } : null;
+  }, [records, rawRowsById]);
+
+  const filteredRecords = useMemo(
+    () =>
+      records.filter((r) => {
+        const matchesTab = activeTab === 'ALL' || r.status === activeTab;
+        const matchesHub = hubFilter === 'ALL' || r.hub === hubFilter;
+        const matchesDept = deptFilter === 'ALL' || r.dept === deptFilter;
+        const q = searchQuery.trim().toLowerCase();
+        const matchesSearch =
+          q === '' ||
+          r.name.toLowerCase().includes(q) ||
+          r.empCode.toLowerCase().includes(q) ||
+          r.dept.toLowerCase().includes(q) ||
+          r.hub.toLowerCase().includes(q) ||
+          r.id.toLowerCase().includes(q) ||
+          r.reason.toLowerCase().includes(q);
+        return matchesTab && matchesHub && matchesDept && matchesSearch;
+      }),
+    [records, activeTab, hubFilter, deptFilter, searchQuery]
+  );
+
+  const selectedRecord = useMemo(
+    () => records.find((r) => r.id === selectedRecordId) || filteredRecords[0] || records[0] || null,
+    [records, filteredRecords, selectedRecordId]
+  );
+
+  const approveOne = useCallback(async (id: string) => {
+    await api.post(`/attendance/corrections/${id}/approve`, { reviewNote: 'Approved via HRMS console' });
+  }, []);
 
   const handleApprove = async (id: string) => {
+    setBusyId(id);
     try {
-      await api.post(`/attendance/corrections/${id}/approve`, { reviewNote: 'Approved via Console' });
-    } catch {}
-    setRecords((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: 'APPROVED', pipelineStep: '3' } : r))
-    );
-    toast.success(`Punch correction #${id} approved & cryptographically committed to payroll!`);
+      await approveOne(id);
+      toast.success(`Correction ${id} approved and the attendance row regularized.`);
+      await fetchCorrections();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'The server rejected the approval.');
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const handleReject = async (id: string) => {
+    setBusyId(id);
     try {
       await api.post(`/attendance/corrections/${id}/reject`, { reviewNote: 'Rejected per policy' });
-    } catch {}
-    setRecords((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, status: 'REJECTED' } : r))
-    );
-    toast.error(`Punch correction #${id} rejected. LOP applied per policy.`);
+      toast.success(`Correction ${id} rejected.`);
+      await fetchCorrections();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'The server rejected the refusal.');
+    } finally {
+      setBusyId(null);
+    }
   };
 
-  // Open Edit for an existing record
-  const handleOpenEditRecord = (record: CorrectionRecord) => {
-    setEditForm({
-      id: record.id,
-      name: record.name,
-      empCode: record.empCode,
-      role: record.role,
-      hub: record.hub,
-      dept: record.dept,
-      floor: record.floor || STORE_FLOORS[0],
-      avatar: record.avatar,
-      shift: record.shift,
-      rawIn: record.rawIn,
-      rawOut: record.rawOut,
-      terminal: record.terminal,
-      overrideIn: record.overrideIn || record.rawIn,
-      overrideOut: record.overrideOut,
-      totalHours: record.totalHours,
-      otHours: record.otHours,
-      reason: record.reason,
-      evidence: record.evidence,
-      invoiceOrDoc: record.invoiceOrDoc || '',
-      supervisor: record.supervisor,
-      status: record.status,
-      type: record.type,
-      notes: record.notes,
-    });
-    setEditStep(3); // jump directly to editing details when opened from row
-    setIsEditModalOpen(true);
-  };
-
-  // Open Edit flow from top button (starts at Step 1: Section & Floor)
-  const handleOpenGuidedEdit = () => {
-    const target = selectedRecord || records[0];
-    setEditForm({
-      id: target.id,
-      name: target.name,
-      empCode: target.empCode,
-      role: target.role,
-      hub: target.hub,
-      dept: target.dept,
-      floor: target.floor || STORE_FLOORS[0],
-      avatar: target.avatar,
-      shift: target.shift,
-      rawIn: target.rawIn,
-      rawOut: target.rawOut,
-      terminal: target.terminal,
-      overrideIn: target.overrideIn || target.rawIn,
-      overrideOut: target.overrideOut,
-      totalHours: target.totalHours,
-      otHours: target.otHours,
-      reason: target.reason,
-      evidence: target.evidence,
-      invoiceOrDoc: target.invoiceOrDoc || '',
-      supervisor: target.supervisor,
-      status: target.status,
-      type: target.type,
-      notes: target.notes,
-    });
-    setEditStep(1); // start by selecting section and floor
-    setIsEditModalOpen(true);
-  };
-
-  // Select employee in guided edit flow
-  const handleSelectEmployeeInEdit = (rec: CorrectionRecord) => {
-    setEditForm((prev) => ({
-      ...prev,
-      id: rec.id,
-      name: rec.name,
-      empCode: rec.empCode,
-      role: rec.role,
-      hub: rec.hub,
-      dept: rec.dept,
-      floor: rec.floor || prev.floor,
-      avatar: rec.avatar,
-      shift: rec.shift,
-      rawIn: rec.rawIn,
-      rawOut: rec.rawOut,
-      terminal: rec.terminal,
-      overrideIn: rec.overrideIn || rec.rawIn,
-      overrideOut: rec.overrideOut,
-      totalHours: rec.totalHours,
-      otHours: rec.otHours,
-      reason: rec.reason,
-      evidence: rec.evidence,
-      invoiceOrDoc: rec.invoiceOrDoc || '',
-      supervisor: rec.supervisor,
-      status: rec.status,
-      type: rec.type,
-      notes: rec.notes,
-    }));
-    setEditStep(3);
-  };
-
-  // Save the Edited Correction
-  const handleSaveEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editForm.name || !editForm.empCode || !editForm.reason) {
-      toast.error('Employee name, code, and justification are required');
+  const handleBatchApprovePending = async () => {
+    const pending = records.filter((r) => r.status === 'PENDING');
+    if (pending.length === 0) {
+      toast('There are no pending requests in the loaded queue.');
       return;
     }
+    setBusyId('batch');
+    let ok = 0;
+    let failed = 0;
+    for (const r of pending) {
+      try {
+        await approveOne(r.id);
+        ok += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+    toast.success(`${ok} of ${pending.length} request(s) approved${failed ? `, ${failed} rejected by the server` : ''}.`);
+    await fetchCorrections();
+    setBusyId(null);
+  };
 
+  const handleOpenEdit = (record: CorrectionRecord) => {
+    const raw = rawRowsById[record.id] || {};
+    setEditForm({
+      id: record.id,
+      employeeName: record.name,
+      empCode: record.empCode,
+      hub: record.hub,
+      attendanceDate: record.attendanceDate,
+      requestedLogin: correctionInputValue(raw.requestedLogin),
+      requestedLogout: correctionInputValue(raw.requestedLogout),
+      reason: record.reason,
+      status: record.status,
+      reviewNote: record.reviewNote,
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm.id) {
+      toast.error('No correction request is selected.');
+      return;
+    }
+    if (!editForm.reason.trim()) {
+      toast.error('The justification is mandatory.');
+      return;
+    }
     try {
       await api.put(`/attendance/corrections/${editForm.id}`, {
-        requestedLogin: editForm.overrideIn,
-        requestedLogout: editForm.overrideOut,
-        reason: editForm.reason,
+        requestedLogin: editForm.requestedLogin ? new Date(editForm.requestedLogin).toISOString() : null,
+        requestedLogout: editForm.requestedLogout ? new Date(editForm.requestedLogout).toISOString() : null,
+        reason: editForm.reason.trim(),
         status: editForm.status,
-        reviewNote: editForm.notes,
+        reviewNote: editForm.reviewNote.trim() || null,
       });
-    } catch {}
-
-    const updatedRec: CorrectionRecord = {
-      id: editForm.id,
-      empCode: editForm.empCode,
-      name: editForm.name,
-      role: editForm.role,
-      hub: editForm.hub,
-      dept: editForm.dept,
-      floor: editForm.floor,
-      avatar: editForm.avatar,
-      shift: editForm.shift,
-      rawIn: editForm.rawIn,
-      rawOut: editForm.rawOut,
-      terminal: editForm.terminal,
-      overrideIn: editForm.overrideIn,
-      overrideOut: editForm.overrideOut,
-      totalHours: editForm.totalHours,
-      otHours: editForm.otHours,
-      reason: editForm.reason,
-      evidence: editForm.evidence,
-      invoiceOrDoc: editForm.invoiceOrDoc,
-      supervisor: editForm.supervisor,
-      pipelineStep: editForm.status === 'APPROVED' ? '3' : '2',
-      pipelineTotal: '3',
-      status: editForm.status,
-      type: editForm.type,
-      notes: editForm.notes,
-    };
-
-    setRecords((prev) =>
-      prev.map((r) => (r.id === editForm.id ? updatedRec : r))
-    );
-    setSelectedRecordId(updatedRec.id);
-    setIsEditModalOpen(false);
-    toast.success(`Regularization record for ${editForm.name} updated & ledger synced!`);
+      setIsEditModalOpen(false);
+      toast.success(`Correction ${editForm.id} updated on the server.`);
+      await fetchCorrections();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'The server rejected the update.');
+    }
   };
 
   const handleCreateRequest = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newRequest.name || !newRequest.empCode || !newRequest.reason) {
-      toast.error('Please fill in all mandatory fields');
+    if (!newRequest.employeeId) {
+      toast.error('Select the employee this correction belongs to.');
+      return;
+    }
+    if (!newRequest.reason.trim()) {
+      toast.error('A reason for the punch correction is mandatory.');
       return;
     }
     try {
       await api.post('/attendance/corrections', {
-        employeeId: newRequest.empCode,
-        reason: newRequest.reason,
-        requestedLogin: newRequest.overrideIn,
-        requestedLogout: newRequest.overrideOut,
+        employeeId: newRequest.employeeId,
+        attendanceDate: newRequest.attendanceDate,
+        requestedLogin: newRequest.requestedLogin ? new Date(newRequest.requestedLogin).toISOString() : null,
+        requestedLogout: newRequest.requestedLogout ? new Date(newRequest.requestedLogout).toISOString() : null,
+        reason: newRequest.reason.trim(),
       });
-    } catch {}
-    const newRec: CorrectionRecord = {
-      id: `CORR-${4035 + records.length}`,
-      empCode: newRequest.empCode,
-      name: newRequest.name,
-      role: 'Floor Associate',
-      hub: newRequest.hub,
-      dept: 'Customer Retail',
-      floor: 'Ground Floor (Atelier & Heritage Sarees)',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-      shift: newRequest.shift,
-      rawIn: newRequest.overrideIn,
-      rawOut: 'Manual Correction',
-      terminal: 'MANUAL-OVERRIDE',
-      overrideOut: newRequest.overrideOut,
-      totalHours: '8h 00m Shift',
-      otHours: 'Standard Rate',
-      reason: newRequest.reason,
-      evidence: 'Submitted via Web HRMS Console',
-      supervisor: 'Current HR Admin',
-      pipelineStep: '2',
-      pipelineTotal: '3',
-      status: 'PENDING',
-      type: 'MISSED_OUT',
-      notes: newRequest.reason,
-    };
-    setRecords((prev) => [newRec, ...prev.filter((r) => r.id !== newRec.id)]);
-    setSelectedRecordId(newRec.id);
-    setIsModalOpen(false);
-    toast.success('Manual punch correction request logged!');
+      setIsModalOpen(false);
+      setNewRequest({ ...EMPTY_NEW_REQUEST, attendanceDate: new Date().toISOString().slice(0, 10) });
+      toast.success('Correction request submitted to the queue.');
+      await fetchCorrections();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'The server rejected the request.');
+    }
   };
 
-  // Filter candidates for guided selection
-  const candidateStaff = records.filter(
-    (r) =>
-      (editForm.dept === 'ALL' || r.dept.toLowerCase() === editForm.dept.toLowerCase()) &&
-      (!editForm.floor || !r.floor || r.floor.toLowerCase().includes(editForm.floor.toLowerCase()))
-  );
+  /** Downloads the rows actually loaded from GET /attendance/corrections. */
+  const handleExportCSV = () => {
+    if (records.length === 0) {
+      toast.error('No correction requests loaded, so there is nothing to export.');
+      return;
+    }
+    const header =
+      'Request ID,Employee Code,Employee Name,Designation,Department,Store Hub,Attendance Date,Recorded IN,Recorded OUT,Requested IN,Requested OUT,Status,Reason,Review Note,Applied At,Requested At\n';
+    const esc = (val: unknown) => `"${String(val ?? '').replace(/"/g, '""')}"`;
+    const body = records
+      .map((r) =>
+        [
+          r.id,
+          r.empCode,
+          r.name,
+          r.role,
+          r.dept,
+          r.hub,
+          r.attendanceDate,
+          r.originalLogin || '',
+          r.originalLogout || '',
+          r.requestedLogin || '',
+          r.requestedLogout || '',
+          r.status,
+          r.reason,
+          r.reviewNote,
+          r.appliedAt || '',
+          correctionStampText(rawRowsById[r.id]?.createdAt) || '',
+        ]
+          .map(esc)
+          .join(',')
+      )
+      .join('\n');
+    const blob = new Blob([header + body], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `BSC_Punch_Corrections_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+    toast.success(`Exported ${records.length} correction request(s) to CSV.`);
+  };
+
+  const hubNames = useMemo(() => Array.from(new Set(records.map((r) => r.hub).filter(Boolean))), [records]);
+  const deptNames = useMemo(() => Array.from(new Set(records.map((r) => r.dept).filter(Boolean))), [records]);
+  const hubOptions = locations.length ? locations.map((l) => l.name).filter(Boolean) : hubNames;
+  const deptOptions = departments.length ? departments.map((d) => d.name).filter(Boolean) : deptNames;
 
   return (
     <DashboardLayout>
       <div className="flex flex-col w-full gap-6 pb-12">
-        {/* TOP OPERATIONAL BREADCRUMB & CONTEXT HEADER */}
+        {/* TOP BREADCRUMB & CONTEXT HEADER */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-xs text-slate-500 font-semibold tracking-wider uppercase">
@@ -397,16 +394,13 @@ export default function AttendanceCorrectionsPage() {
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
                 Punch Corrections &amp; Attendance Regularization
               </h1>
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F8F4F1] text-[#1346a1] text-xs font-semibold border border-[#E5D5D7]">
-                <span className="flex h-2 w-2 relative">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#1346a1] opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#1346a1]"></span>
-                </span>
-                Active Pay Cycle: 11 Oct - 17 Oct 2026
-              </div>
               <div className="inline-flex items-center gap-1.5 text-slate-600 text-xs bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/60 font-medium">
                 <span className="material-symbols-outlined text-[15px] text-[#1346a1]">verified_user</span>
                 Karnataka Factories Act Form T
+              </div>
+              <div className="inline-flex items-center gap-1.5 text-slate-600 text-xs bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/60 font-medium">
+                <span className="material-symbols-outlined text-[15px] text-[#1346a1]">sync</span>
+                {lastLoadedAt ? `Queue loaded ${lastLoadedAt}` : 'Queue not loaded yet'}
               </div>
             </div>
           </div>
@@ -414,34 +408,22 @@ export default function AttendanceCorrectionsPage() {
           {/* SCREEN ACTION SUITE */}
           <div className="flex items-center gap-2.5 flex-wrap self-start lg:self-center">
             <button
-              onClick={() => toast.success('Muster roll audit exported (.xlsx)')}
+              onClick={handleExportCSV}
               className="inline-flex items-center gap-1.5 px-3 py-2 bg-white text-slate-700 hover:bg-slate-50 transition-colors rounded-xl text-xs font-semibold shadow-xs border border-slate-200"
               type="button"
+              title="Download the loaded correction requests as a CSV file"
             >
               <span className="material-symbols-outlined text-[17px] text-slate-500">file_download</span>
-              Export Audit (XLSX)
+              Export Queue (CSV)
             </button>
             <button
-              onClick={() => {
-                setRecords((prev) =>
-                  prev.map((r) => (r.status === 'PENDING' ? { ...r, status: 'APPROVED' } : r))
-                );
-                toast.success('Batch approved all pending requests!');
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white text-slate-700 hover:bg-slate-50 transition-colors rounded-xl text-xs font-semibold shadow-xs border border-slate-200"
+              onClick={handleBatchApprovePending}
+              disabled={busyId !== null || counts.PENDING === 0}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-white text-slate-700 hover:bg-slate-50 transition-colors rounded-xl text-xs font-semibold shadow-xs border border-slate-200 disabled:opacity-50"
               type="button"
             >
               <span className="material-symbols-outlined text-[17px] text-[#1346a1]">checklist_rtl</span>
-              Batch Approve All Pending
-            </button>
-            <button
-              onClick={handleOpenGuidedEdit}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#1346a1]/10 text-[#1346a1] hover:bg-[#1346a1]/20 border border-[#1346a1]/30 transition-colors rounded-xl text-xs font-bold"
-              type="button"
-              title="Select Section, Floor and Employee to Edit"
-            >
-              <span className="material-symbols-outlined text-[17px]">edit_note</span>
-              Edit Employee Regularization
+              Approve {counts.PENDING} Pending
             </button>
             <button
               onClick={() => setIsModalOpen(true)}
@@ -454,11 +436,32 @@ export default function AttendanceCorrectionsPage() {
           </div>
         </div>
 
-        {/* STRATEGIC KPI METRIC HORIZON (5 CARDS) */}
+        {/* QUEUE METRICS — every figure counted from the loaded rows */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="bg-white rounded-xl p-4 shadow-xs border border-slate-200/90 flex flex-col justify-between hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-3">
               <div className="w-9 h-9 rounded-lg bg-blue-50 flex items-center justify-center text-[#1346a1]">
+                <span className="material-symbols-outlined text-[20px]">assignment</span>
+              </div>
+              <span className="text-[10px] text-slate-500 font-bold px-2 py-0.5 rounded-full bg-slate-100">Server queue</span>
+            </div>
+            <div>
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
+                Requests Loaded
+              </span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-black text-slate-900 tracking-tight">{records.length}</span>
+                <span className="text-xs font-semibold text-slate-500">Rows</span>
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500">
+              GET /attendance/corrections keeps the latest 100
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-4 shadow-xs border border-slate-200/90 flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-9 h-9 rounded-lg bg-rose-50 flex items-center justify-center text-rose-600">
                 <span className="material-symbols-outlined text-[20px]">pending_actions</span>
               </div>
               <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200">
@@ -470,314 +473,227 @@ export default function AttendanceCorrectionsPage() {
                 Pending Regularizations
               </span>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-slate-900 tracking-tight">
-                  {records.filter((r) => r.status === 'PENDING').length}
-                </span>
+                <span className="text-2xl font-black text-slate-900 tracking-tight">{counts.PENDING}</span>
                 <span className="text-xs font-semibold text-slate-500">Requests</span>
               </div>
             </div>
-            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px] text-[#1346a1]">subdirectory_arrow_right</span>
-              4 Floor Approved • 2 with HR
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 shadow-xs border border-slate-200/90 flex flex-col justify-between hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
-                <span className="material-symbols-outlined text-[20px]">warning</span>
-              </div>
-              <span className="text-[10px] text-slate-500 font-bold px-2 py-0.5 rounded-full bg-slate-100">Today</span>
-            </div>
-            <div>
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
-                Auto-Detected Anomalies
-              </span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-slate-900 tracking-tight">24</span>
-                <span className="text-xs font-semibold text-slate-500">Flagged</span>
-              </div>
-            </div>
-            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 truncate">
-              14 Single Punches • 6 Grace Breaches
+            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500">
+              status = PENDING in attendancecorrection
             </div>
           </div>
 
           <div className="bg-white rounded-xl p-4 shadow-xs border border-slate-200/90 flex flex-col justify-between hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-3">
               <div className="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                <span className="material-symbols-outlined text-[20px]">speed</span>
+                <span className="material-symbols-outlined text-[20px]">check_circle</span>
               </div>
-              <span className="text-[10px] text-emerald-700 font-bold px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
-                94.2% SLA
-              </span>
+              <span className="text-[10px] text-slate-500 font-bold px-2 py-0.5 rounded-full bg-slate-100">Loaded rows</span>
             </div>
             <div>
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
-                Avg Resolution Time
-              </span>
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">Approved</span>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-slate-900 tracking-tight">2.4</span>
-                <span className="text-xs font-semibold text-slate-500">Hours</span>
+                <span className="text-2xl font-black text-emerald-700 tracking-tight">{counts.APPROVED}</span>
+                <span className="text-xs font-semibold text-slate-500">Written back to attendance</span>
               </div>
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500">
-              Target &lt; 4.0 hrs before 20:00 lock
+              Approval applies the requested punches
             </div>
+          </div>
+
+          <div className="bg-white rounded-xl p-4 shadow-xs border border-slate-200/90 flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div className="flex items-center justify-between mb-3">
+              <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+                <span className="material-symbols-outlined text-[20px]">block</span>
+              </div>
+              <span className="text-[10px] text-slate-500 font-bold px-2 py-0.5 rounded-full bg-slate-100">Loaded rows</span>
+            </div>
+            <div>
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">Rejected</span>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-black text-rose-600 tracking-tight">{counts.REJECTED}</span>
+                <span className="text-xs font-semibold text-slate-500">Declined requests</span>
+              </div>
+            </div>
+            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500">Each keeps its review note</div>
           </div>
 
           <div className="bg-white rounded-xl p-4 shadow-xs border border-slate-200/90 flex flex-col justify-between hover:shadow-md transition-shadow">
             <div className="flex items-center justify-between mb-3">
               <div className="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
-                <span className="material-symbols-outlined text-[20px]">fingerprint</span>
+                <span className="material-symbols-outlined text-[20px]">speed</span>
               </div>
               <span className="text-[10px] text-slate-500 font-bold px-2 py-0.5 rounded-full bg-slate-100">
-                -0.4% MoM
+                Sample: {resolution ? resolution.sampleSize : 0}
               </span>
             </div>
             <div>
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
-                Biometric Discrepancy
+                Avg Time To Approval
               </span>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-slate-900 tracking-tight">1.8%</span>
-                <span className="text-xs font-semibold text-slate-500">Error Rate</span>
+                <span className="text-2xl font-black text-slate-900 tracking-tight">
+                  {resolution ? resolution.avg.toFixed(1) : '—'}
+                </span>
+                <span className="text-xs font-semibold text-slate-500">{resolution ? 'Hours' : 'No approved rows'}</span>
               </div>
             </div>
             <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500">
-              Across 792 daily terminal punches
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl p-4 shadow-xs border border-slate-200/90 flex flex-col justify-between hover:shadow-md transition-shadow">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-9 h-9 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600">
-                <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
-              </div>
-              <span className="text-[10px] text-teal-700 font-bold px-2 py-0.5 rounded-full bg-teal-50 border border-teal-200">
-                Live Safeguard
-              </span>
-            </div>
-            <div>
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-400 block mb-1">
-                Payroll Impact Saved
-              </span>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-slate-900 tracking-tight">₹18,420</span>
-              </div>
-            </div>
-            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 truncate">
-              Protected from wrongful LOP deductions
+              createdAt → appliedAt of the loaded requests
             </div>
           </div>
         </div>
 
-        {/* WORKSTREAM FILTER TABS & SEARCH CONTROLS */}
+        {/* STATUS TABS & FILTERS */}
         <div className="bg-white rounded-2xl p-4 shadow-xs border border-slate-200/90 flex flex-col gap-4">
-          {/* Category Tabs */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-            <button
-              onClick={() => setActiveTab('ALL')}
-              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${
-                activeTab === 'ALL'
-                  ? 'bg-[#F8F4F1] text-[#1346a1] font-bold border border-[#E5D5D7]'
-                  : 'text-slate-600 hover:bg-slate-50'
-              }`}
-              type="button"
-            >
-              <span>All Requests</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                activeTab === 'ALL' ? 'bg-[#1346a1] text-white' : 'bg-slate-200 text-slate-700'
-              }`}>
-                {records.length}
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('MISSED_OUT')}
-              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${
-                activeTab === 'MISSED_OUT'
-                  ? 'bg-[#F8F4F1] text-[#1346a1] font-bold border border-[#E5D5D7]'
-                  : 'text-slate-600 hover:bg-slate-50'
-              }`}
-              type="button"
-            >
-              <span>Missed Out-Punches</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                activeTab === 'MISSED_OUT' ? 'bg-[#1346a1] text-white' : 'bg-slate-200 text-slate-700'
-              }`}>
-                {records.filter((r) => r.type === 'MISSED_OUT').length}
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('LATE_GRACE')}
-              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${
-                activeTab === 'LATE_GRACE'
-                  ? 'bg-[#F8F4F1] text-[#1346a1] font-bold border border-[#E5D5D7]'
-                  : 'text-slate-600 hover:bg-slate-50'
-              }`}
-              type="button"
-            >
-              <span>Late In-Punch Grace Breach</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                activeTab === 'LATE_GRACE' ? 'bg-[#1346a1] text-white' : 'bg-slate-200 text-slate-700'
-              }`}>
-                {records.filter((r) => r.type === 'LATE_GRACE').length}
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('ON_DUTY')}
-              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${
-                activeTab === 'ON_DUTY'
-                  ? 'bg-[#F8F4F1] text-[#1346a1] font-bold border border-[#E5D5D7]'
-                  : 'text-slate-600 hover:bg-slate-50'
-              }`}
-              type="button"
-            >
-              <span>On-Duty &amp; Mill Out-Slip</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                activeTab === 'ON_DUTY' ? 'bg-[#1346a1] text-white' : 'bg-slate-200 text-slate-700'
-              }`}>
-                {records.filter((r) => r.type === 'ON_DUTY').length}
-              </span>
-            </button>
-            <button
-              onClick={() => setActiveTab('SENSOR_GLITCH')}
-              className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${
-                activeTab === 'SENSOR_GLITCH'
-                  ? 'bg-[#F8F4F1] text-[#1346a1] font-bold border border-[#E5D5D7]'
-                  : 'text-slate-600 hover:bg-slate-50'
-              }`}
-              type="button"
-            >
-              <span>Biometric Optical Failure</span>
-              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                activeTab === 'SENSOR_GLITCH' ? 'bg-[#1346a1] text-white' : 'bg-slate-200 text-slate-700'
-              }`}>
-                {records.filter((r) => r.type === 'SENSOR_GLITCH').length}
-              </span>
-            </button>
+            {TAB_KEYS.map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs whitespace-nowrap transition-all ${
+                  activeTab === tab
+                    ? 'bg-[#F8F4F1] text-[#1346a1] font-bold border border-[#E5D5D7]'
+                    : 'text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <span>{tabLabel(tab)}</span>
+                <span
+                  className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                    activeTab === tab ? 'bg-[#1346a1] text-white' : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {tab === 'ALL' ? records.length : counts[tab]}
+                </span>
+              </button>
+            ))}
           </div>
 
-          {/* Filter Fields Bar (Hub, Section, Floor, Search) */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center pt-1 border-t border-slate-100">
-            {/* Search */}
             <div className="md:col-span-4 relative flex items-center bg-slate-50 rounded-xl px-3 py-2 border border-slate-200/80">
               <span className="material-symbols-outlined text-[18px] text-slate-400 mr-2 shrink-0">search</span>
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-transparent text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none"
-                placeholder="Search staff, ID (BSC-EMP-0094), supervisor, floor..."
+                placeholder="Search employee name, code, store, request ID or reason..."
                 type="text"
               />
             </div>
 
-            {/* Store Hub Filter */}
-            <div className="md:col-span-3 relative flex items-center bg-slate-50 rounded-xl px-3 py-2 border border-slate-200/80">
+            <div className="md:col-span-4 relative flex items-center bg-slate-50 rounded-xl px-3 py-2 border border-slate-200/80">
               <span className="material-symbols-outlined text-[16px] text-[#1346a1] mr-2 shrink-0">store</span>
               <select
                 value={hubFilter}
                 onChange={(e) => setHubFilter(e.target.value)}
                 className="w-full bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer"
               >
-                <option value="ALL">All Hubs (Karnataka)</option>
-                <option value="BEL">BEL-01 Flagship Belagavi</option>
-                <option value="DAV">DAV-02 Weaving Davanagere</option>
-                <option value="SHI">SHI-03 Retail Apex Shivamogga</option>
+                <option value="ALL">All store hubs</option>
+                {hubOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
               </select>
             </div>
 
-            {/* Section / Dept Filter */}
-            <div className="md:col-span-3 relative flex items-center bg-slate-50 rounded-xl px-3 py-2 border border-slate-200/80">
+            <div className="md:col-span-4 relative flex items-center bg-slate-50 rounded-xl px-3 py-2 border border-slate-200/80">
               <span className="material-symbols-outlined text-[16px] text-slate-500 mr-2 shrink-0">category</span>
               <select
                 value={deptFilter}
                 onChange={(e) => setDeptFilter(e.target.value)}
                 className="w-full bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer truncate"
               >
-                <option value="ALL">All Sections / Depts</option>
-                {STORE_SECTIONS.map((sec) => (
-                  <option key={sec} value={sec}>
-                    {sec}
+                <option value="ALL">All departments</option>
+                {deptOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
                   </option>
                 ))}
-              </select>
-            </div>
-
-            {/* Floor Filter */}
-            <div className="md:col-span-2 relative flex items-center bg-slate-50 rounded-xl px-3 py-2 border border-slate-200/80">
-              <span className="material-symbols-outlined text-[16px] text-slate-500 mr-2 shrink-0">layers</span>
-              <select
-                value={floorFilter}
-                onChange={(e) => setFloorFilter(e.target.value)}
-                className="w-full bg-transparent text-xs font-semibold text-slate-800 focus:outline-none cursor-pointer truncate"
-              >
-                <option value="ALL">All Floors</option>
-                <option value="Ground">Ground Floor</option>
-                <option value="1st">1st Floor</option>
-                <option value="2nd">2nd Floor</option>
-                <option value="3rd">3rd Floor</option>
-                <option value="Basement">Basement Depot</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* MAIN WORK SURFACE: 12-COLUMN LEDGER & INSPECTOR */}
+        {loadError && (
+          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center justify-between gap-3 text-xs">
+            <span className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px]">error</span>
+              {loadError}
+            </span>
+            <button
+              type="button"
+              onClick={fetchCorrections}
+              className="px-3 py-1 rounded bg-rose-600 hover:bg-rose-700 text-white font-bold"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* MAIN WORK SURFACE: LEDGER & INSPECTOR */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-          {/* LEFT COLUMN (Table Ledger): xl:col-span-7 2xl:col-span-8 */}
           <div className="xl:col-span-7 2xl:col-span-8 min-w-0 flex flex-col gap-6">
             <div className="bg-white rounded-2xl shadow-xs border border-slate-200/90 overflow-hidden flex flex-col">
-              {/* Table Control Top Banner */}
               <div className="px-5 py-3.5 bg-slate-50/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-bold text-slate-900">Discrepancy Investigation Matrix</span>
+                  <span className="text-xs font-bold text-slate-900">Regularization Request Ledger</span>
                   <span className="px-2 py-0.5 rounded-full bg-blue-50 text-[#1346a1] text-[11px] font-semibold border border-blue-200">
-                    {records.filter((r) => r.status === 'PENDING').length} Pending Signoffs
+                    {counts.PENDING} Awaiting Review
                   </span>
-                  {(deptFilter !== 'ALL' || floorFilter !== 'ALL') && (
-                    <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 text-[10px] font-semibold border border-amber-200">
-                      Filtered: {deptFilter !== 'ALL' ? deptFilter : ''} {floorFilter !== 'ALL' ? `• ${floorFilter}` : ''}
-                    </span>
-                  )}
                 </div>
                 <div className="flex items-center gap-3 text-slate-500 text-[11px]">
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-[#1346a1]"></span> Auto-Verified Sync
+                    <span className="w-2 h-2 rounded-full bg-[#1346a1]"></span> PENDING
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-rose-500"></span> Missing Biometric Token
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span> APPROVED
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-rose-500"></span> REJECTED
                   </span>
                 </div>
               </div>
 
-              {/* Tabular Ledger Content */}
               <div className="overflow-x-auto w-full">
                 <table className="w-full text-left text-xs whitespace-normal min-w-[720px]">
                   <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
                     <tr>
                       <th className="py-3 px-4 font-bold">Staff &amp; Unit</th>
-                      <th className="py-3 px-4 font-bold">Shift &amp; Raw Punches</th>
-                      <th className="py-3 px-4 font-bold">Proposed Ledger</th>
-                      <th className="py-3 px-4 font-bold">Attestation &amp; Evidence</th>
-                      <th className="py-3 px-4 font-bold text-center">Pipeline</th>
+                      <th className="py-3 px-4 font-bold">Attendance Date &amp; Recorded Punches</th>
+                      <th className="py-3 px-4 font-bold">Requested Regularization</th>
+                      <th className="py-3 px-4 font-bold">Justification &amp; Review</th>
+                      <th className="py-3 px-4 font-bold text-center">Status</th>
                       <th className="py-3 px-4 font-bold text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {filteredRecords.length === 0 ? (
+                    {loading && records.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="py-12 text-center text-slate-400">
-                          <p className="font-semibold text-slate-600">No punch correction records found</p>
-                          <p className="text-[11px] mt-1">Try adjusting your Section, Floor, or Hub filters.</p>
+                          Loading the correction queue…
+                        </td>
+                      </tr>
+                    ) : filteredRecords.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-12 text-center text-slate-400">
+                          <p className="font-semibold text-slate-600">
+                            {records.length === 0 ? 'No punch correction requests exist' : 'No correction requests match these filters'}
+                          </p>
+                          <p className="text-[11px] mt-1">
+                            {records.length === 0
+                              ? 'The attendancecorrection table returned no rows for your scope.'
+                              : 'Try adjusting the store hub, department, status or search filter.'}
+                          </p>
                         </td>
                       </tr>
                     ) : (
-                      filteredRecords.map((r, idx) => {
-                        const isSelected = r.id === selectedRecordId;
+                      filteredRecords.map((r) => {
+                        const isSelected = r.id === selectedRecord?.id;
                         return (
                           <tr
-                            key={`${r.id}-${idx}`}
+                            key={r.id}
                             onClick={() => setSelectedRecordId(r.id)}
                             className={`cursor-pointer transition-colors ${
                               isSelected ? 'bg-blue-50/60 border-l-4 border-l-[#1346a1]' : 'hover:bg-slate-50/70'
@@ -785,97 +701,63 @@ export default function AttendanceCorrectionsPage() {
                           >
                             <td className="py-3 px-4 align-top">
                               <div className="flex items-start gap-2.5">
-                                <img
-                                  className="w-8 h-8 rounded-full object-cover shrink-0 shadow-xs border border-slate-200"
-                                  src={r.avatar}
-                                  alt={r.name}
-                                />
+                                <div className="w-8 h-8 rounded-full bg-[#1346a1] text-white flex items-center justify-center font-bold text-[10px] shrink-0">
+                                  {(r.name || '?').slice(0, 1).toUpperCase()}
+                                </div>
                                 <div className="flex flex-col min-w-0">
                                   <span className="font-bold text-slate-900 truncate">
-                                    {r.name}
+                                    {r.name || 'Employee not returned by the API'}
                                   </span>
-                                  <span className="text-[10px] text-slate-400 font-mono">
-                                    {r.empCode}
+                                  <span className="text-[10px] text-slate-400 font-mono">{r.empCode || 'No employee code'}</span>
+                                  <span className="inline-flex mt-1 items-center px-1.5 py-0.5 rounded text-[10px] font-semibold text-[#1346a1] bg-[#F8F4F1] border border-[#E5D5D7] w-max truncate">
+                                    {r.hub || 'Store not recorded'}
+                                    {r.dept ? ` • ${r.dept}` : ''}
                                   </span>
-                                  <span className="inline-flex mt-1 items-center px-1.5 py-0.5 rounded text-[10px] font-semibold text-[#1346a1] bg-[#F8F4F1] border border-[#E5D5D7] w-max">
-                                    {r.hub} • {r.dept}
-                                  </span>
-                                  {r.floor && (
-                                    <span className="text-[10px] text-slate-500 mt-0.5 truncate" title={r.floor}>
-                                      {r.floor}
-                                    </span>
-                                  )}
                                 </div>
                               </div>
                             </td>
 
                             <td className="py-3 px-4 align-top">
                               <div className="flex flex-col">
-                                <span className="font-semibold text-slate-800">
-                                  {r.shift}
-                                </span>
+                                <span className="font-semibold text-slate-800">{r.attendanceDate || 'Date not recorded'}</span>
                                 <div className="flex items-center gap-1 text-slate-500 mt-0.5">
-                                  <span className="font-mono text-slate-900">{r.rawIn}</span>
+                                  <span className="font-mono text-slate-900">{r.originalLogin || 'No IN punch'}</span>
                                   <span>•</span>
                                   <span className="px-1 py-0.2 rounded bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200">
-                                    {r.rawOut}
+                                    {r.originalLogout || 'No OUT punch'}
                                   </span>
                                 </div>
-                                <span className="text-[10px] text-slate-400 mt-0.5">
-                                  Terminal: {r.terminal}
-                                </span>
+                                <span className="text-[10px] text-slate-400 mt-0.5">Designation: {r.role || 'Not recorded'}</span>
                               </div>
                             </td>
 
                             <td className="py-3 px-4 align-top">
                               <div className="flex flex-col">
-                                <div className="flex items-center gap-1">
-                                  <span className="font-mono font-bold text-[#1346a1]">{r.overrideOut}</span>
-                                  <span className="text-[10px] text-slate-400">(Override)</span>
-                                </div>
-                                <span className="font-semibold text-slate-800 mt-0.5">
-                                  {r.totalHours}
+                                <span className="font-mono font-bold text-[#1346a1]">
+                                  {r.requestedLogin || '—'} → {r.requestedLogout || '—'}
                                 </span>
-                                <span className="text-[10px] text-amber-700 font-semibold">
-                                  {r.otHours}
+                                <span className="text-[10px] text-slate-500 mt-0.5">Requested IN / OUT on this row</span>
+                                <span className="text-[10px] text-slate-400 mt-0.5">
+                                  {r.appliedAt ? `Applied ${r.appliedAt}` : 'Not applied yet'}
                                 </span>
                               </div>
                             </td>
 
-                            <td className="py-3 px-4 align-top max-w-[180px]">
+                            <td className="py-3 px-4 align-top max-w-[220px]">
                               <div className="flex flex-col">
-                                <span className="text-slate-800 font-medium truncate block" title={r.reason}>
-                                  {r.reason}
+                                <span className="text-slate-800 font-medium" title={r.reason}>
+                                  {r.reason || 'No reason stored on the request'}
                                 </span>
-                                <span className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-1">
-                                  <span className="material-symbols-outlined text-[13px] text-[#1346a1]">verified</span>
-                                  Sup: {r.supervisor}
+                                <span className="text-[11px] text-slate-500 mt-0.5">
+                                  Review note: {r.reviewNote || 'None recorded'}
                                 </span>
-                                {r.invoiceOrDoc && (
-                                  <span className="text-[11px] text-[#1346a1] underline cursor-pointer mt-0.5">
-                                    {r.invoiceOrDoc} attached
-                                  </span>
-                                )}
                               </div>
                             </td>
 
                             <td className="py-3 px-4 align-top text-center">
-                              <div className="inline-flex flex-col items-center">
-                                <span
-                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                    r.status === 'APPROVED'
-                                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                      : r.status === 'REJECTED'
-                                      ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                                      : 'bg-blue-50 text-[#1346a1] border border-blue-200'
-                                  }`}
-                                >
-                                  {r.status}
-                                </span>
-                                <span className="text-[10px] text-slate-400 mt-0.5">
-                                  Step {r.pipelineStep} of {r.pipelineTotal}
-                                </span>
-                              </div>
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusPillClass(r.status)}`}>
+                                {r.status}
+                              </span>
                             </td>
 
                             <td className="py-3 px-4 align-top text-right">
@@ -887,8 +769,9 @@ export default function AttendanceCorrectionsPage() {
                                         e.stopPropagation();
                                         handleApprove(r.id);
                                       }}
-                                      className="p-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-xs"
-                                      title="Quick Approve"
+                                      disabled={busyId !== null}
+                                      className="p-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-xs disabled:opacity-50"
+                                      title="Approve this request"
                                       type="button"
                                     >
                                       <span className="material-symbols-outlined text-[16px]">check</span>
@@ -898,23 +781,23 @@ export default function AttendanceCorrectionsPage() {
                                         e.stopPropagation();
                                         handleReject(r.id);
                                       }}
-                                      className="p-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                                      title="Reject or Flag"
+                                      disabled={busyId !== null}
+                                      className="p-1 rounded-lg bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-colors disabled:opacity-50"
+                                      title="Reject this request"
                                       type="button"
                                     >
                                       <span className="material-symbols-outlined text-[16px]">close</span>
                                     </button>
                                   </>
                                 )}
-                                
-                                {/* EDIT BUTTON ON EVERY ROW */}
+
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleOpenEditRecord(r);
+                                    handleOpenEdit(r);
                                   }}
                                   className="p-1 rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200 transition-colors"
-                                  title="Edit Regularization & Times"
+                                  title="Edit requested punches, reason, status and review note"
                                   type="button"
                                 >
                                   <span className="material-symbols-outlined text-[16px]">edit</span>
@@ -926,7 +809,7 @@ export default function AttendanceCorrectionsPage() {
                                     setSelectedRecordId(r.id);
                                   }}
                                   className="p-1 rounded-lg bg-blue-50 text-[#1346a1] hover:bg-blue-100 transition-colors"
-                                  title="Inspect Record"
+                                  title="Inspect request"
                                   type="button"
                                 >
                                   <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
@@ -941,223 +824,209 @@ export default function AttendanceCorrectionsPage() {
                 </table>
               </div>
 
-              {/* Table Footer Pagination & Ledger Health */}
               <div className="p-4 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-500 border-t border-slate-100">
-                <div className="flex items-center gap-3">
-                  <span>
-                    Showing <strong>{filteredRecords.length}</strong> of <strong>{records.length}</strong> regularization requests
-                  </span>
-                  <span className="hidden sm:inline">•</span>
-                  <span className="hidden sm:inline">428 Active Floor Staff Registered</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="px-2.5 py-0.5 rounded-md bg-[#1346a1] text-white text-xs font-bold">1</span>
-                </div>
+                <span>
+                  Showing <strong>{filteredRecords.length}</strong> of <strong>{records.length}</strong> regularization requests
+                </span>
+                <button
+                  type="button"
+                  onClick={fetchCorrections}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 font-semibold"
+                >
+                  <span className={`material-symbols-outlined text-[15px] ${loading ? 'animate-spin' : ''}`}>refresh</span>
+                  Reload queue
+                </button>
               </div>
             </div>
 
-            {/* REAL-TIME OPTICAL SENSOR DIAGNOSTICS */}
+            {/* QUEUE SHAPE — counted from the loaded rows only */}
             <div className="bg-white rounded-2xl p-5 shadow-xs border border-slate-200/90 flex flex-col gap-3">
               <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#1346a1] text-[20px]">find_replace</span>
-                  <span className="text-xs font-bold text-slate-900">
-                    Live Biometric Ingestion &amp; Optical Sensor Diagnostics
-                  </span>
+                  <span className="material-symbols-outlined text-[#1346a1] text-[20px]">find_in_page</span>
+                  <span className="text-xs font-bold text-slate-900">Loaded Requests by Store Hub</span>
                 </div>
-                <span className="font-mono text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 font-bold">
-                  SHA-256 HASH VERIFIED
+                <span className="font-mono text-[10px] text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                  {records.length} row(s)
                 </span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 flex flex-col">
-                  <div className="flex items-center justify-between font-bold mb-1">
-                    <span className="text-slate-800">Terminal BEL-GATE-04</span>
-                    <span className="text-[#1346a1]">OK 99.8%</span>
-                  </div>
-                  <span className="text-slate-400 font-mono text-[10px]">Synced: 14:22:01 IST</span>
-                  <span className="text-slate-500 text-[11px] mt-1">Optical scan match: 0.18s latency</span>
+              {hubNames.length === 0 ? (
+                <p className="text-xs text-slate-400">No correction requests are loaded, so there is nothing to break down yet.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  {hubNames.map((hub) => {
+                    const inHub = records.filter((r) => r.hub === hub);
+                    return (
+                      <div key={hub} className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 flex flex-col">
+                        <div className="flex items-center justify-between font-bold mb-1">
+                          <span className="text-slate-800 truncate">{hub}</span>
+                          <span className="text-[#1346a1]">{inHub.length}</span>
+                        </div>
+                        <span className="text-slate-500 text-[11px]">
+                          {inHub.filter((r) => r.status === 'PENDING').length} pending •{' '}
+                          {inHub.filter((r) => r.status === 'APPROVED').length} approved •{' '}
+                          {inHub.filter((r) => r.status === 'REJECTED').length} rejected
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 flex flex-col">
-                  <div className="flex items-center justify-between font-bold mb-1">
-                    <span className="text-slate-800">Terminal DAV-GATE-01</span>
-                    <span className="text-amber-600">RECALIBRATED</span>
-                  </div>
-                  <span className="text-slate-400 font-mono text-[10px]">Last event: 20:28:11 IST</span>
-                  <span className="text-slate-500 text-[11px] mt-1">Optical glass cleaned &amp; rebooted</span>
-                </div>
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 flex flex-col">
-                  <div className="flex items-center justify-between font-bold mb-1">
-                    <span className="text-slate-800">Terminal SHI-RETAIL-01</span>
-                    <span className="text-[#1346a1]">OK 100%</span>
-                  </div>
-                  <span className="text-slate-400 font-mono text-[10px]">Synced: 14:21:49 IST</span>
-                  <span className="text-slate-500 text-[11px] mt-1">Direct LAN sync to HQ Cloud</span>
-                </div>
-              </div>
+              )}
             </div>
           </div>
 
-          {/* RIGHT COLUMN (Detailed Inspection Drawer): xl:col-span-5 2xl:col-span-4 */}
+          {/* RIGHT COLUMN: SELECTED REQUEST INSPECTOR */}
           <div className="xl:col-span-5 2xl:col-span-4 min-w-0 flex flex-col gap-6 xl:sticky xl:top-6">
-            {/* Detailed Inspection Card (Pinned for Selected Record) */}
-            <div className="bg-white rounded-2xl shadow-xs border border-slate-200/90 p-5 flex flex-col gap-4">
-              <div className="flex items-start justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <img
-                      className="w-12 h-12 rounded-xl object-cover shadow-xs border border-slate-200"
-                      src={selectedRecord.avatar}
-                      alt={selectedRecord.name}
-                    />
-                    <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white"></span>
-                  </div>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-1">
+            {selectedRecord ? (
+              <div className="bg-white rounded-2xl shadow-xs border border-slate-200/90 p-5 flex flex-col gap-4">
+                <div className="flex items-start justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-[#1346a1] text-white flex items-center justify-center font-bold text-base shadow-xs">
+                      {(selectedRecord.name || '?').slice(0, 1).toUpperCase()}
+                    </div>
+                    <div className="flex flex-col">
                       <span className="text-sm font-bold text-slate-900">
-                        {selectedRecord.name}
+                        {selectedRecord.name || 'Employee not returned by the API'}
                       </span>
-                      <span className="material-symbols-outlined text-[#1346a1] text-[16px]">verified</span>
+                      <span className="text-[11px] text-slate-500 font-mono">
+                        {selectedRecord.empCode || 'No code'} • {selectedRecord.role || 'Designation not recorded'}
+                      </span>
+                      <span className="text-[11px] text-slate-400 mt-0.5">
+                        {selectedRecord.hub || 'Store not recorded'}
+                        {selectedRecord.dept ? ` • ${selectedRecord.dept}` : ''}
+                      </span>
                     </div>
-                    <span className="text-[11px] text-slate-500 font-mono">
-                      {selectedRecord.empCode} • {selectedRecord.role}
-                    </span>
-                    <span className="text-[11px] text-slate-400 mt-0.5">
-                      {selectedRecord.hub} • {selectedRecord.dept}
-                    </span>
-                    {selectedRecord.floor && (
-                      <span className="text-[10px] text-[#1346a1] font-semibold mt-0.5">
-                        Floor: {selectedRecord.floor}
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-blue-50 text-[#1346a1] text-xs font-bold border border-blue-200">
+                    {selectedRecord.id}
+                  </span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70 flex flex-col gap-3">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Punch Comparison</span>
+
+                  <div className="p-3 rounded-xl bg-white flex items-center justify-between border border-slate-200/60">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Recorded Punches</span>
+                      <span className="font-mono text-xs text-slate-800 font-bold mt-0.5">
+                        {selectedRecord.originalLogin || 'No IN'} →{' '}
+                        <span className="text-rose-600 font-bold">{selectedRecord.originalLogout || 'No OUT'}</span>
                       </span>
-                    )}
-                  </div>
-                </div>
-                <span className="px-2 py-0.5 rounded-full bg-blue-50 text-[#1346a1] text-xs font-bold border border-blue-200">
-                  {selectedRecord.id}
-                </span>
-              </div>
-
-              {/* Punch Visual Comparison Box */}
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200/70 flex flex-col gap-3">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                  Punch Override Comparison
-                </span>
-                
-                <div className="p-3 rounded-xl bg-white flex items-center justify-between border border-slate-200/60 shadow-2xs">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Raw Ingestion</span>
-                    <span className="font-mono text-xs text-slate-800 font-bold mt-0.5">
-                      {selectedRecord.rawIn} → <span className="text-rose-600 font-bold">{selectedRecord.rawOut}</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500 font-semibold">
+                      {selectedRecord.attendanceDate || 'Date not recorded'}
                     </span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 text-[10px] font-bold border border-rose-200">
-                    Anomaly
-                  </span>
-                </div>
 
-                <div className="p-3 rounded-xl bg-[#F8F4F1] flex items-center justify-between border border-[#E5D5D7]">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-[#1346a1] uppercase">Proposed Approved Ledger</span>
-                    <span className="font-mono text-xs text-slate-900 font-bold mt-0.5">
-                      {selectedRecord.rawIn} → <span className="text-[#1346a1] font-bold">{selectedRecord.overrideOut}</span>
+                  <div className="p-3 rounded-xl bg-[#F8F4F1] flex items-center justify-between border border-[#E5D5D7]">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold text-[#1346a1] uppercase">Requested Regularization</span>
+                      <span className="font-mono text-xs text-slate-900 font-bold mt-0.5">
+                        {selectedRecord.requestedLogin || '—'} → {selectedRecord.requestedLogout || '—'}
+                      </span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${statusPillClass(selectedRecord.status)}`}>
+                      {selectedRecord.status}
                     </span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-full bg-[#1346a1] text-white text-[10px] font-bold">
-                    Verified
-                  </span>
-                </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
-                  <div className="flex flex-col p-2.5 bg-white rounded-lg border border-slate-200/60">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Payable Net Hours</span>
-                    <span className="text-sm font-bold text-slate-900 mt-0.5">
-                      {selectedRecord.totalHours}
-                    </span>
+                  <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
+                    <div className="flex flex-col p-2.5 bg-white rounded-lg border border-slate-200/60">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Applied At</span>
+                      <span className="text-sm font-bold text-slate-900 mt-0.5">{selectedRecord.appliedAt || 'Not applied yet'}</span>
+                    </div>
+                    <div className="flex flex-col p-2.5 bg-white rounded-lg border border-slate-200/60">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">Reviewed By</span>
+                      <span className="text-sm font-bold text-slate-900 mt-0.5 break-all">
+                        {selectedRecord.reviewedById || 'No reviewer recorded'}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex flex-col p-2.5 bg-white rounded-lg border border-slate-200/60">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">Overtime / Grace</span>
-                    <span className="text-sm font-bold text-amber-600 mt-0.5">
-                      {selectedRecord.otHours}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Supervisor Attestation Evidence */}
-              <div className="flex flex-col gap-2">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
-                  Supervisor Endorsement &amp; Evidence
-                </span>
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 flex flex-col gap-1.5">
-                  <p className="text-xs text-slate-700 italic leading-relaxed">
-                    &ldquo;{selectedRecord.notes}&rdquo;
+                  <p className="text-[10px] text-slate-400">
+                    Shift timing, terminal ID, overtime hours and payroll impact are not returned by
+                    /attendance/corrections, so they are not shown here.
                   </p>
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-[11px] text-slate-500">
-                    <span className="font-bold text-slate-800">— {selectedRecord.supervisor}</span>
-                    <span className="font-mono">24 Oct 19:40 IST</span>
-                  </div>
                 </div>
-                {selectedRecord.invoiceOrDoc && (
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <div className="flex-1 p-2 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center gap-1.5 text-xs font-semibold text-[#1346a1]">
-                      <span className="material-symbols-outlined text-[16px]">receipt_long</span>
-                      {selectedRecord.invoiceOrDoc}
+
+                <div className="flex flex-col gap-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+                    Justification &amp; Review Note
+                  </span>
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 flex flex-col gap-1.5">
+                    <p className="text-xs text-slate-700 italic leading-relaxed">
+                      &ldquo;{selectedRecord.reason || 'No justification stored on this request.'}&rdquo;
+                    </p>
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-[11px] text-slate-500 gap-2">
+                      <span className="font-bold text-slate-800 truncate">
+                        Note: {selectedRecord.reviewNote || 'None recorded'}
+                      </span>
+                      <span className="font-mono shrink-0">
+                        {correctionStampText(rawRowsById[selectedRecord.id]?.createdAt) || 'Requested date unavailable'}
+                      </span>
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
 
-              {/* Action Execution Strip with Edit Button */}
-              <div className="flex flex-col gap-2 pt-1 border-t border-slate-100">
-                {selectedRecord.status === 'PENDING' ? (
-                  <>
-                    <button
-                      onClick={() => handleApprove(selectedRecord.id)}
-                      className="w-full py-2.5 px-4 rounded-xl bg-[#1346a1] text-white hover:bg-[#0e3882] transition-colors text-xs font-bold flex items-center justify-center gap-2 shadow-sm active:scale-98"
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">verified</span>
-                      Approve &amp; Commit to Payroll Ledger
-                    </button>
-                    <div className="grid grid-cols-2 gap-2">
+                <div className="flex flex-col gap-2 pt-1 border-t border-slate-100">
+                  {selectedRecord.status === 'PENDING' ? (
+                    <>
                       <button
-                        onClick={() => handleOpenEditRecord(selectedRecord)}
-                        className="py-2 px-3 rounded-xl bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors text-xs font-bold flex items-center justify-center gap-1.5 border border-amber-200"
+                        onClick={() => handleApprove(selectedRecord.id)}
+                        disabled={busyId !== null}
+                        className="w-full py-2.5 px-4 rounded-xl bg-[#1346a1] text-white hover:bg-[#0e3882] transition-colors text-xs font-bold flex items-center justify-center gap-2 shadow-sm disabled:opacity-60"
+                        type="button"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">verified</span>
+                        Approve &amp; Regularize Attendance
+                      </button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => handleOpenEdit(selectedRecord)}
+                          className="py-2 px-3 rounded-xl bg-amber-50 text-amber-800 hover:bg-amber-100 transition-colors text-xs font-bold flex items-center justify-center gap-1.5 border border-amber-200"
+                          type="button"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">edit</span>
+                          Edit Request
+                        </button>
+                        <button
+                          onClick={() => handleReject(selectedRecord.id)}
+                          disabled={busyId !== null}
+                          className="py-2 px-3 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors text-xs font-semibold flex items-center justify-center gap-1 border border-rose-200 disabled:opacity-60"
+                          type="button"
+                        >
+                          <span className="material-symbols-outlined text-[16px]">cancel</span>
+                          Reject
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <div className="p-3 bg-emerald-50 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2 border border-emerald-200">
+                        <span className="material-symbols-outlined text-[18px] text-emerald-600">check_circle</span>
+                        {selectedRecord.appliedAt
+                          ? `Resolved ${selectedRecord.appliedAt}`
+                          : `Closed as ${selectedRecord.status}`}
+                      </div>
+                      <button
+                        onClick={() => handleOpenEdit(selectedRecord)}
+                        className="py-2 px-3 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-200"
                         type="button"
                       >
                         <span className="material-symbols-outlined text-[16px]">edit</span>
-                        Edit Record
-                      </button>
-                      <button
-                        onClick={() => handleReject(selectedRecord.id)}
-                        className="py-2 px-3 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 transition-colors text-xs font-semibold flex items-center justify-center gap-1 border border-rose-200"
-                        type="button"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">cancel</span>
-                        Reject &amp; LOP
+                        Edit Regularization Details
                       </button>
                     </div>
-                  </>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <div className="p-3 bg-emerald-50 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-2 border border-emerald-200">
-                      <span className="material-symbols-outlined text-[18px] text-emerald-600">check_circle</span>
-                      Resolution Audited &amp; Synchronized with Karnataka Factories Act Form T
-                    </div>
-                    <button
-                      onClick={() => handleOpenEditRecord(selectedRecord)}
-                      className="py-2 px-3 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors text-xs font-semibold flex items-center justify-center gap-1.5 border border-slate-200"
-                      type="button"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">edit</span>
-                      Edit Regularization Details
-                    </button>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-white rounded-2xl shadow-xs border border-slate-200/90 p-6 text-center text-xs text-slate-400">
+                <span className="material-symbols-outlined text-[28px] text-slate-300">receipt_long</span>
+                <p className="font-semibold text-slate-600 mt-2">No request selected</p>
+                <p className="mt-1">{loading ? 'Loading the correction queue…' : 'No rows were returned for your scope.'}</p>
+              </div>
+            )}
 
-            {/* Karnataka Statutory Compliance Box */}
             <div className="bg-white rounded-2xl shadow-xs border border-slate-200/90 p-5 flex flex-col gap-3">
               <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
                 <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-[#1346a1]">
@@ -1166,488 +1035,170 @@ export default function AttendanceCorrectionsPage() {
                 <span className="text-xs font-bold text-slate-900">Karnataka Statutory Compliance</span>
               </div>
               <p className="text-xs text-slate-600 leading-relaxed">
-                <strong className="text-slate-900">Section 62 - Register of Adult Workers:</strong> Every manual attendance adjustment requires dual attestation (Floor Manager + HR Director) before monthly muster roll seal.
+                <strong className="text-slate-900">Section 62 - Register of Adult Workers:</strong> every manual attendance
+                adjustment keeps its reason, reviewer and applied timestamp on the request row, and writes to the attendance
+                record only when the request is approved.
               </p>
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/60 flex flex-col gap-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-800 font-bold">Muster Roll Lockdown</span>
-                  <span className="text-[#1346a1] font-bold font-mono">422 / 428 Staff (98.6%)</span>
-                </div>
-                <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                  <div className="bg-[#1346a1] h-full rounded-full" style={{ width: '98.6%' }}></div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
 
-        {/* EXECUTIVE AUDIT TRAIL CRYPTOGRAPHIC SEAL */}
-        <div className="p-4 bg-slate-50 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500 border border-slate-200/70">
-          <div className="flex items-center gap-2.5">
-            <span className="material-symbols-outlined text-[#1346a1] text-[20px]">encrypted</span>
-            <span>
-              All punch overrides are cryptographically committed to the BSC Immutable HRMS AuditLog with dual supervisor keys &amp; SHA-256 fingerprint.
-            </span>
-          </div>
-          <div className="flex items-center gap-4 text-[11px] font-mono">
-            <span>Terminal: <strong>Synced 14:22:08 IST</strong></span>
-            <span>Ledger: <strong>4.8.2-PROD</strong></span>
-          </div>
-        </div>
-
-        {/* ------------------------------------------------------------- */}
-        {/* COMPREHENSIVE EDIT REGULARIZATION MODAL                        */}
-        {/* Step 1: Section & Floor                                        */}
-        {/* Step 2: Employee Picker (ID or Name)                           */}
-        {/* Step 3: Full Timing & Punch Edit Form                          */}
-        {/* ------------------------------------------------------------- */}
+        {/* EDIT REGULARIZATION MODAL */}
         {isEditModalOpen && (
           <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
             <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto">
-              {/* Header */}
               <div className="flex items-center justify-between border-b pb-3 border-slate-100">
                 <div className="flex items-center gap-2.5">
                   <div className="w-9 h-9 rounded-xl bg-[#1346a1]/10 flex items-center justify-center text-[#1346a1]">
                     <span className="material-symbols-outlined text-[22px]">edit_calendar</span>
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-900">Edit Employee Regularization &amp; Punches</h3>
+                    <h3 className="text-base font-bold text-slate-900">Edit Punch Regularization Request</h3>
                     <p className="text-[11px] text-slate-500">
-                      Step {editStep} of 3: {editStep === 1 ? 'Select Section & Floor' : editStep === 2 ? 'Select Employee' : 'Edit Punch Override Details'}
+                      Saves requested punches, reason, status and review note through PUT /attendance/corrections/:id
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setIsEditModalOpen(false)}
                   className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100"
+                  type="button"
                 >
                   <span className="material-symbols-outlined">close</span>
                 </button>
               </div>
 
-              {/* Progress Steps Indicator */}
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setEditStep(1)}
-                  className={`p-2 rounded-xl text-center font-bold transition-all border ${
-                    editStep === 1
-                      ? 'bg-[#1346a1] text-white border-[#1346a1]'
-                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  1. Section &amp; Floor
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditStep(2)}
-                  className={`p-2 rounded-xl text-center font-bold transition-all border ${
-                    editStep === 2
-                      ? 'bg-[#1346a1] text-white border-[#1346a1]'
-                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  2. Choose Staff
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditStep(3)}
-                  className={`p-2 rounded-xl text-center font-bold transition-all border ${
-                    editStep === 3
-                      ? 'bg-[#1346a1] text-white border-[#1346a1]'
-                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                  }`}
-                >
-                  3. Edit Punches
-                </button>
-              </div>
-
-              {/* STEP 1: SECTION & FLOOR SELECTION */}
-              {editStep === 1 && (
-                <div className="space-y-4 py-2 text-xs">
-                  <div className="p-3 bg-blue-50 text-[#1346a1] rounded-xl border border-blue-200 flex items-start gap-2">
-                    <span className="material-symbols-outlined text-[18px] shrink-0 mt-0.5">info</span>
-                    <span>
-                      Select the department section and store floor where the attendance anomaly occurred.
+              <form onSubmit={handleSaveEditSubmit} className="space-y-3.5 text-xs">
+                <div className="p-3 bg-[#F8F4F1] border border-[#E5D5D7] rounded-xl">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-slate-900 text-sm">{editForm.employeeName || 'Employee'}</span>
+                    <span className="px-1.5 py-0.2 rounded font-mono text-[10px] font-bold bg-[#1346a1] text-white">
+                      {editForm.empCode || 'No code'}
                     </span>
                   </div>
-
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-slate-700 block">Department / Section</label>
-                    <select
-                      value={editForm.dept}
-                      onChange={(e) => setEditForm({ ...editForm, dept: e.target.value })}
-                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30 text-xs font-semibold text-slate-800"
-                    >
-                      {STORE_SECTIONS.map((sec) => (
-                        <option key={sec} value={sec}>
-                          {sec}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-slate-700 block">Showroom Floor / Operational Unit</label>
-                    <select
-                      value={editForm.floor}
-                      onChange={(e) => setEditForm({ ...editForm, floor: e.target.value })}
-                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30 text-xs font-semibold text-slate-800"
-                    >
-                      {STORE_FLOORS.map((flr) => (
-                        <option key={flr} value={flr}>
-                          {flr}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-slate-700 block">Store Location / Hub</label>
-                    <select
-                      value={editForm.hub}
-                      onChange={(e) => setEditForm({ ...editForm, hub: e.target.value })}
-                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30 text-xs font-semibold text-slate-800"
-                    >
-                      <option value="BEL-01 Flagship">BEL-01 Flagship Belagavi</option>
-                      <option value="DAV-02 Hub">DAV-02 Weaving Davanagere</option>
-                      <option value="SHI-03 Apex">SHI-03 Retail Apex Shivamogga</option>
-                    </select>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => setIsEditModalOpen(false)}
-                      className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditStep(2)}
-                      className="px-5 py-2 bg-[#1346a1] text-white hover:bg-[#0e3882] rounded-xl font-bold flex items-center gap-1.5 shadow-xs"
-                    >
-                      <span>Proceed to Staff Selection</span>
-                      <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                    </button>
-                  </div>
+                  <span className="text-[11px] text-slate-500">
+                    {editForm.hub || 'Store not recorded'} • Attendance date {editForm.attendanceDate || 'not recorded'} •
+                    Request {editForm.id}
+                  </span>
                 </div>
-              )}
 
-              {/* STEP 2: EMPLOYEE SELECTION */}
-              {editStep === 2 && (
-                <div className="space-y-4 py-2 text-xs">
-                  <div className="space-y-1.5">
-                    <label className="font-bold text-slate-700 block">Search by Employee Name or ID</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Rekha Naik, BSC-EMP-0094, Amit Deshpande..."
-                      value={editForm.name}
-                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30 text-xs text-slate-800 font-medium"
-                    />
+                <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                  <div className="space-y-2">
+                    <span className="font-bold text-[#1346a1] uppercase tracking-wider text-[10px] block">
+                      Requested Punches
+                    </span>
+                    <div>
+                      <label className="text-[11px] text-slate-500 block mb-0.5" htmlFor="corr-edit-in">
+                        Requested IN
+                      </label>
+                      <input
+                        id="corr-edit-in"
+                        type="datetime-local"
+                        value={editForm.requestedLogin}
+                        onChange={(e) => setEditForm({ ...editForm, requestedLogin: e.target.value })}
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-[#1346a1]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] text-slate-500 block mb-0.5" htmlFor="corr-edit-out">
+                        Requested OUT
+                      </label>
+                      <input
+                        id="corr-edit-out"
+                        type="datetime-local"
+                        value={editForm.requestedLogout}
+                        onChange={(e) => setEditForm({ ...editForm, requestedLogout: e.target.value })}
+                        className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-[#1346a1]"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-2">
-                    <label className="font-bold text-slate-700 block">
-                      Registered Staff in {editForm.dept} ({candidateStaff.length} matching)
-                    </label>
-                    <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-                      {candidateStaff.length === 0 ? (
-                        <div className="p-4 text-center text-slate-400 bg-slate-50 rounded-xl">
-                          No staff in this specific filter. You can also pick from all staff below or enter name directly.
-                        </div>
-                      ) : (
-                        candidateStaff.map((st) => (
-                          <div
-                            key={st.id}
-                            onClick={() => handleSelectEmployeeInEdit(st)}
-                            className={`p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
-                              editForm.empCode === st.empCode
-                                ? 'bg-[#1346a1]/10 border-[#1346a1] text-[#1346a1]'
-                                : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <img src={st.avatar} alt={st.name} className="w-8 h-8 rounded-full object-cover" />
-                              <div>
-                                <span className="font-bold text-slate-900 block">{st.name}</span>
-                                <span className="text-[10px] text-slate-500 font-mono">
-                                  {st.empCode} • {st.role}
-                                </span>
-                              </div>
-                            </div>
-                            <span className="text-[11px] font-bold text-[#1346a1] flex items-center gap-1">
-                              Select <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Manual Employee Code override */}
-                  <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                    <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px] block">
+                      Recorded Punches (read-only)
+                    </span>
                     <div>
-                      <label className="font-bold text-slate-700 block mb-1">Employee ID / Code</label>
-                      <input
-                        type="text"
-                        value={editForm.empCode}
-                        onChange={(e) => setEditForm({ ...editForm, empCode: e.target.value })}
-                        placeholder="e.g. BSC-EMP-0094"
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold"
-                      />
+                      <label className="text-[11px] text-slate-500 block mb-0.5">Original IN</label>
+                      <div className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-700">
+                        {correctionInputValue(rawRowsById[editForm.id]?.originalLogin) || 'Not recorded'}
+                      </div>
                     </div>
                     <div>
-                      <label className="font-bold text-slate-700 block mb-1">Designation / Role</label>
-                      <input
-                        type="text"
-                        value={editForm.role}
-                        onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium"
-                      />
+                      <label className="text-[11px] text-slate-500 block mb-0.5">Original OUT</label>
+                      <div className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-700">
+                        {correctionInputValue(rawRowsById[editForm.id]?.originalLogout) || 'Not recorded'}
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => setEditStep(1)}
-                      className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold flex items-center gap-1"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-                      Back
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditStep(3)}
-                      className="px-5 py-2 bg-[#1346a1] text-white hover:bg-[#0e3882] rounded-xl font-bold flex items-center gap-1.5 shadow-xs"
-                    >
-                      <span>Next: Edit Punch Timings</span>
-                      <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                    </button>
                   </div>
                 </div>
-              )}
 
-              {/* STEP 3: EDIT PUNCHES & PROPOSED LEDGER */}
-              {editStep === 3 && (
-                <form onSubmit={handleSaveEditSubmit} className="space-y-3.5 py-1 text-xs">
-                  {/* Selected Staff Badge */}
-                  <div className="p-3 bg-[#F8F4F1] border border-[#E5D5D7] rounded-xl flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img src={editForm.avatar} alt={editForm.name} className="w-10 h-10 rounded-xl object-cover border border-white shadow-2xs" />
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-slate-900 text-sm">{editForm.name}</span>
-                          <span className="px-1.5 py-0.2 rounded font-mono text-[10px] font-bold bg-[#1346a1] text-white">
-                            {editForm.empCode}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-slate-500">
-                          {editForm.dept} • {editForm.floor} • {editForm.hub}
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setEditStep(1)}
-                      className="text-xs text-[#1346a1] hover:underline font-bold"
-                    >
-                      Change Staff
-                    </button>
-                  </div>
-
-                  {/* Shift & Anomaly Type */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="font-bold text-slate-700 block mb-1">Shift Schedule</label>
-                      <select
-                        value={editForm.shift}
-                        onChange={(e) => setEditForm({ ...editForm, shift: e.target.value })}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
-                      >
-                        {SHIFT_OPTIONS.map((sh) => (
-                          <option key={sh} value={sh}>
-                            {sh}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="font-bold text-slate-700 block mb-1">Anomaly Regularization Type</label>
-                      <select
-                        value={editForm.type}
-                        onChange={(e) => setEditForm({ ...editForm, type: e.target.value as any })}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none"
-                      >
-                        <option value="MISSED_OUT">Missed Out-Punches</option>
-                        <option value="LATE_GRACE">Late In-Punch Grace Breach</option>
-                        <option value="ON_DUTY">On-Duty &amp; Mill Out-Slip</option>
-                        <option value="SENSOR_GLITCH">Biometric Optical Failure</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Raw Punches vs Proposed Overrides */}
-                  <div className="grid grid-cols-2 gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
-                    <div className="space-y-2">
-                      <div className="font-bold text-rose-700 uppercase tracking-wider text-[10px] flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span> Raw Ingestion (Terminal)
-                      </div>
-                      <div>
-                        <label className="text-[11px] text-slate-500 block mb-0.5">Raw IN</label>
-                        <input
-                          type="text"
-                          value={editForm.rawIn}
-                          onChange={(e) => setEditForm({ ...editForm, rawIn: e.target.value })}
-                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] text-slate-500 block mb-0.5">Raw OUT</label>
-                        <input
-                          type="text"
-                          value={editForm.rawOut}
-                          onChange={(e) => setEditForm({ ...editForm, rawOut: e.target.value })}
-                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono text-rose-600 font-bold"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="font-bold text-[#1346a1] uppercase tracking-wider text-[10px] flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#1346a1]"></span> Proposed Ledger (Approved)
-                      </div>
-                      <div>
-                        <label className="text-[11px] text-slate-500 block mb-0.5">Override IN Punch</label>
-                        <input
-                          type="text"
-                          value={editForm.overrideIn}
-                          onChange={(e) => setEditForm({ ...editForm, overrideIn: e.target.value })}
-                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-[#1346a1]"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] text-slate-500 block mb-0.5">Override OUT Punch</label>
-                        <input
-                          type="text"
-                          value={editForm.overrideOut}
-                          onChange={(e) => setEditForm({ ...editForm, overrideOut: e.target.value })}
-                          className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-[#1346a1]"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Calculated Hours & Status */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="font-bold text-slate-700 block mb-1">Total Net Shift Hours</label>
-                      <input
-                        type="text"
-                        value={editForm.totalHours}
-                        onChange={(e) => setEditForm({ ...editForm, totalHours: e.target.value })}
-                        placeholder="e.g. 8h 00m Shift"
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold"
-                      />
-                    </div>
-                    <div>
-                      <label className="font-bold text-slate-700 block mb-1">Overtime / Grace Adjustment</label>
-                      <input
-                        type="text"
-                        value={editForm.otHours}
-                        onChange={(e) => setEditForm({ ...editForm, otHours: e.target.value })}
-                        placeholder="e.g. Standard Rate or +1h 35m"
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-amber-700"
-                      />
-                    </div>
-                    <div>
-                      <label className="font-bold text-slate-700 block mb-1">Regularization Status</label>
-                      <select
-                        value={editForm.status}
-                        onChange={(e) => setEditForm({ ...editForm, status: e.target.value as any })}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none"
-                      >
-                        <option value="PENDING">PENDING (Floor Review)</option>
-                        <option value="SUPERVISOR_OK">SUPERVISOR_OK (Step 2)</option>
-                        <option value="APPROVED">APPROVED (Committed)</option>
-                        <option value="REJECTED">REJECTED (LOP Applied)</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Reason & Evidence */}
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="font-bold text-slate-700 block mb-1">Operational Justification / Reason</label>
-                    <textarea
-                      rows={2}
-                      required
-                      value={editForm.reason}
-                      onChange={(e) => setEditForm({ ...editForm, reason: e.target.value })}
-                      placeholder="e.g. VIP client bridal showcase, stock transit dispatch, bus depot strike..."
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none"
+                    <label className="font-bold text-slate-700 block mb-1" htmlFor="corr-edit-status">
+                      Status
+                    </label>
+                    <select
+                      id="corr-edit-status"
+                      value={editForm.status}
+                      onChange={(e) => setEditForm({ ...editForm, status: e.target.value as CorrectionStatus })}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none"
+                    >
+                      <option value="PENDING">PENDING (awaiting review)</option>
+                      <option value="APPROVED">APPROVED (regularize punches)</option>
+                      <option value="REJECTED">REJECTED (decline request)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1" htmlFor="corr-edit-review">
+                      Review Note
+                    </label>
+                    <input
+                      id="corr-edit-review"
+                      type="text"
+                      value={editForm.reviewNote}
+                      onChange={(e) => setEditForm({ ...editForm, reviewNote: e.target.value })}
+                      placeholder="Stored in the reviewNote column"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs"
                     />
                   </div>
+                </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="font-bold text-slate-700 block mb-1">Supervisor Attestation</label>
-                      <input
-                        type="text"
-                        value={editForm.supervisor}
-                        onChange={(e) => setEditForm({ ...editForm, supervisor: e.target.value })}
-                        placeholder="e.g. Anand Kulkarni (Store Lead)"
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
-                      />
-                    </div>
-                    <div>
-                      <label className="font-bold text-slate-700 block mb-1">Evidence / Waybill Ref #</label>
-                      <input
-                        type="text"
-                        value={editForm.invoiceOrDoc}
-                        onChange={(e) => setEditForm({ ...editForm, invoiceOrDoc: e.target.value })}
-                        placeholder="e.g. Waybill #EWB-9041, Gate Pass #GP-882"
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold text-[#1346a1]"
-                      />
-                    </div>
-                  </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1" htmlFor="corr-edit-reason">
+                    Operational Justification / Reason
+                  </label>
+                  <textarea
+                    id="corr-edit-reason"
+                    rows={2}
+                    required
+                    value={editForm.reason}
+                    onChange={(e) => setEditForm({ ...editForm, reason: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none"
+                  />
+                </div>
 
-                  {/* Form Footer Actions */}
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => setEditStep(2)}
-                      className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold flex items-center gap-1"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-                      Back
-                    </button>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIsEditModalOpen(false)}
-                        className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-5 py-2 bg-[#1346a1] text-white hover:bg-[#0e3882] rounded-xl font-bold flex items-center gap-1.5 shadow-xs"
-                      >
-                        <span className="material-symbols-outlined text-[16px]">save</span>
-                        Save Regularization Changes
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              )}
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-[#1346a1] text-white hover:bg-[#0e3882] rounded-xl font-bold flex items-center gap-1.5 shadow-xs"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">save</span>
+                    Save Regularization Changes
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}
 
-        {/* MANUAL CORRECTION REQUEST MODAL (EXISTING CREATE FLOW) */}
+        {/* NEW CORRECTION REQUEST MODAL */}
         {isModalOpen && (
           <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-lg p-6 flex flex-col gap-4">
@@ -1656,80 +1207,88 @@ export default function AttendanceCorrectionsPage() {
                   <span className="material-symbols-outlined text-[#1346a1]">add_circle</span>
                   <h3 className="text-base font-bold text-slate-900">Request Manual Correction</h3>
                 </div>
-                <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700">
+                <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-700" type="button">
                   <span className="material-symbols-outlined">close</span>
                 </button>
               </div>
 
               <form onSubmit={handleCreateRequest} className="space-y-4">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Employee Full Name</label>
-                  <input
-                    type="text"
+                  <label className="text-xs font-semibold text-slate-700 block mb-1" htmlFor="corr-new-emp">
+                    Employee (real roster from GET /employees/lookup)
+                  </label>
+                  <select
+                    id="corr-new-emp"
                     required
-                    value={newRequest.name}
-                    onChange={(e) => setNewRequest({ ...newRequest, name: e.target.value })}
-                    placeholder="e.g. Anand R. Kulkarni"
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    value={newRequest.employeeId}
+                    onChange={(e) => setNewRequest({ ...newRequest, employeeId: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
+                  >
+                    <option value="">
+                      {staffOptions.length === 0 ? 'No employees loaded for your scope' : 'Select an employee'}
+                    </option>
+                    {staffOptions.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                        {s.code ? ` (${s.code})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1" htmlFor="corr-new-date">
+                    Attendance Date
+                  </label>
+                  <input
+                    id="corr-new-date"
+                    type="date"
+                    required
+                    value={newRequest.attendanceDate}
+                    onChange={(e) => setNewRequest({ ...newRequest, attendanceDate: e.target.value })}
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 block mb-1">Employee ID</label>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1" htmlFor="corr-new-in">
+                      Requested IN Punch
+                    </label>
                     <input
-                      type="text"
-                      required
-                      value={newRequest.empCode}
-                      onChange={(e) => setNewRequest({ ...newRequest, empCode: e.target.value })}
-                      placeholder="e.g. BSC-EMP-0055"
-                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      id="corr-new-in"
+                      type="datetime-local"
+                      value={newRequest.requestedLogin}
+                      onChange={(e) => setNewRequest({ ...newRequest, requestedLogin: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold text-slate-700 block mb-1">Store Hub</label>
-                    <select
-                      value={newRequest.hub}
-                      onChange={(e) => setNewRequest({ ...newRequest, hub: e.target.value })}
-                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    >
-                      <option value="BEL-01 Flagship">BEL-01 Flagship Belagavi</option>
-                      <option value="DAV-02 Hub">DAV-02 Weaving Davanagere</option>
-                      <option value="SHI-03 Apex">SHI-03 Retail Apex Shivamogga</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700 block mb-1">Requested IN Punch</label>
+                    <label className="text-xs font-semibold text-slate-700 block mb-1" htmlFor="corr-new-out">
+                      Requested OUT Punch
+                    </label>
                     <input
-                      type="text"
-                      value={newRequest.overrideIn}
-                      onChange={(e) => setNewRequest({ ...newRequest, overrideIn: e.target.value })}
-                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700 block mb-1">Requested OUT Punch</label>
-                    <input
-                      type="text"
-                      value={newRequest.overrideOut}
-                      onChange={(e) => setNewRequest({ ...newRequest, overrideOut: e.target.value })}
-                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      id="corr-new-out"
+                      type="datetime-local"
+                      value={newRequest.requestedLogout}
+                      onChange={(e) => setNewRequest({ ...newRequest, requestedLogout: e.target.value })}
+                      className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Operational Justification / Reason</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1" htmlFor="corr-new-reason">
+                    Operational Justification / Reason
+                  </label>
                   <textarea
+                    id="corr-new-reason"
                     rows={3}
                     required
                     value={newRequest.reason}
                     onChange={(e) => setNewRequest({ ...newRequest, reason: e.target.value })}
-                    placeholder="Provide specific floor justification (e.g. VIP client presentation, power failure, logistics dispatch)..."
-                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    placeholder="Explain the missing or incorrect punch for this attendance date..."
+                    className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none"
                   />
                 </div>
 
@@ -1745,7 +1304,7 @@ export default function AttendanceCorrectionsPage() {
                     type="submit"
                     className="px-4 py-2 text-xs bg-[#1346a1] text-white hover:bg-[#0e3882] rounded-xl transition-colors font-bold shadow-xs"
                   >
-                    Submit for Dual Attestation
+                    Submit Correction Request
                   </button>
                 </div>
               </form>

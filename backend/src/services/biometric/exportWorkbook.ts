@@ -34,6 +34,8 @@ export interface OpsExportFilters {
   floorId?: string;
   sectionId?: string;
   departmentId?: string;
+  /** Exact employee row id or employee code — never a partial match. */
+  employeeId?: string;
   employeeQuery?: string;
   status?: 'matched' | 'mismatched' | 'unsynced' | 'all';
   mappingStatus?: string;
@@ -105,7 +107,16 @@ function buildPunchWhere(filters: OpsExportFilters, timeZone: string): { where: 
   if (filters.serialNumber) { where.push('r.serialNumber = ?'); params.push(filters.serialNumber); }
   if (filters.floorId) { where.push('d.floorId = ?'); params.push(filters.floorId); }
   if (filters.sectionId) { where.push('d.sectionId = ?'); params.push(filters.sectionId); }
-  if (filters.departmentId) { where.push('e.departmentId = ?'); params.push(filters.departmentId); }
+  if (filters.departmentId) {
+    // Department row id or department name: the executive filter list is the
+    // company's standard department list, whose entries are names.
+    where.push('e.departmentId IN (SELECT id FROM department WHERE id = ? OR LOWER(name) = LOWER(?))');
+    params.push(filters.departmentId, filters.departmentId);
+  }
+  if (filters.employeeId) {
+    where.push('(r.employeeId = ? OR e.employeeCode = ?)');
+    params.push(filters.employeeId, filters.employeeId);
+  }
   if (filters.employeeQuery) {
     const like = `%${filters.employeeQuery.trim()}%`;
     where.push('(e.employeeCode LIKE ? OR e.fullName LIKE ? OR r.enrollmentNumber LIKE ? OR r.normalizedId LIKE ?)');
@@ -252,6 +263,7 @@ function filterSummary(filters: OpsExportFilters, kind: ExportKind): string {
   if (filters.floorId) parts.push(`floor ${filters.floorId}`);
   if (filters.sectionId) parts.push(`section ${filters.sectionId}`);
   if (filters.departmentId) parts.push(`department ${filters.departmentId}`);
+  if (filters.employeeId) parts.push(`employee ${filters.employeeId}`);
   if (filters.employeeQuery) parts.push(`search "${filters.employeeQuery}"`);
   if (filters.status && filters.status !== 'all') parts.push(`status ${filters.status}`);
   if (filters.mismatchStatus && filters.mismatchStatus !== 'ALL') parts.push(`mismatch status ${filters.mismatchStatus}`);

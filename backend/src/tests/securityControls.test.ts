@@ -25,6 +25,7 @@ import { clearLoginGuard } from '../services/loginProtection.js';
 import { issueTokenPair, rotateRefreshToken, issueFromFamily, RefreshReuseError, revokeAllUserTokens } from '../services/tokenService.js';
 import { createCredential, CredentialError, type CredentialActor } from '../services/credentials.js';
 import { cookieNames } from '../services/authCookies.js';
+import { csrfProtection } from '../middleware/csrfProtection.js';
 import { ipMatches, clientIpOf } from '../middleware/securityGuards.js';
 import { setSetting, invalidateSecuritySettings } from '../services/systemSettings.js';
 
@@ -234,6 +235,39 @@ test('cookies', 'names and flags: HttpOnly session cookies, readable CSRF only',
     assert.ok(names.access.startsWith('__Host-'), 'production must use the __Host- prefix');
   }
   assert.equal(securityConfig.cookies.sameSite, 'strict');
+});
+
+test('csrf', 'a cookie-bearing POST needs the header, except at sign-in', async () => {
+  const names = cookieNames();
+  const req = (path: string) => ({
+    method: 'POST',
+    path,
+    headers: {},
+    cookies: { [names.access]: 'a-session-cookie-still-in-the-jar' },
+  }) as any;
+  const res = () => ({
+    statusCode: 200,
+    body: null as unknown,
+    status(code: number) { this.statusCode = code; return this; },
+    json(b: unknown) { this.body = b; return this; },
+  }) as any;
+
+  // Double-submit still applies to everything that acts on an existing session.
+  let allowed = false;
+  const blocked = res();
+  csrfProtection(req('/api/employees/42'), blocked, () => { allowed = true; });
+  assert.equal(allowed, false, 'a cookie-authenticated POST without a CSRF header must be rejected');
+  assert.equal(blocked.statusCode, 403);
+
+  // Sign-in is the deliberate exception. A browser can reach the login page
+  // while still holding an unexpired access cookie; it has no session to bind a
+  // CSRF token to yet, so requiring the header locked people out of the product
+  // until they cleared cookies. Login CSRF is covered by SameSite=Strict.
+  for (const path of ['/api/session/login', '/api/auth/login', '/api/auth/session/login']) {
+    let reached = false;
+    csrfProtection(req(path), res(), () => { reached = true; });
+    assert.ok(reached, `${path} must be reachable while a stale session cookie exists`);
+  }
 });
 
 // ─── E. Database-backed flows ───────────────────────────────────────────────
