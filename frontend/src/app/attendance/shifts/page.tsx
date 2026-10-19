@@ -7,7 +7,7 @@ import { DetailDrillDownModal, type DetailMetric } from '@/components/dashboard/
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { ADMIN_ROLES } from '@/lib/roles';
-import { SHIFTS_CHANGED_EVENT } from '@/lib/shiftRegistry';
+import { SHIFTS_CHANGED_EVENT, buildShiftRegistry } from '@/lib/shiftRegistry';
 
 /** Attendance statuses selectable from the Status filter (see shift-board API). */
 const STATUS_OPTIONS = [
@@ -268,56 +268,17 @@ export default function ShiftsRosterPage() {
   }, [departments, selectedLocation, deptsLoading]);
 
   const uniqueShiftOptions = useMemo<ShiftOption[]>(() => {
+    const registry = buildShiftRegistry(shifts, selectedLocation);
     const options: ShiftOption[] = [
       { id: 'all', name: 'All Shifts' },
     ];
 
-    // Group shifts by canonical code or name
-    const groups = new Map<string, any[]>();
-    for (const s of shifts) {
-      const key = (s.code?.trim().toUpperCase() || s.name?.trim().toLowerCase());
-      if (!key) continue;
-      if (!groups.has(key)) {
-        groups.set(key, []);
-      }
-      groups.get(key)!.push(s);
-    }
-
-    // Preserve the canonical standard order: MORNING, GENERAL, EVENING, NIGHT, then custom batches
-    const STANDARD_KEYS = ['MORNING', 'GENERAL', 'EVENING', 'NIGHT'];
-    const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
-      const idxA = STANDARD_KEYS.indexOf(a);
-      const idxB = STANDARD_KEYS.indexOf(b);
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
-      return a.localeCompare(b);
-    });
-
-    for (const key of sortedKeys) {
-      const list = groups.get(key) || [];
-      const activeList = list.filter((s) => s.status !== 'INACTIVE');
-      const targetList = activeList.length > 0 ? activeList : list;
-
-      let chosen = targetList.find(
-        (s) => (selectedLocation && selectedLocation !== 'all' ? s.locationId === selectedLocation : true)
-      );
-      const existsInSelectedHub = Boolean(chosen);
-      if (!chosen) {
-        chosen = targetList[0];
-      }
-      if (!chosen) continue;
-
-      const start = hmOf(chosen.startTime);
-      const end = hmOf(chosen.endTime);
-      const timeRange = start !== '—' && end !== '—' ? `${start} – ${end}${chosen.overnight ? ' (+1d)' : ''}` : undefined;
-      const noRosterInHub = Boolean(selectedLocation && selectedLocation !== 'all' && !existsInSelectedHub);
-
+    for (const opt of registry.allOptions) {
       options.push({
-        id: chosen.id,
-        name: chosen.name,
-        timeRange,
-        noRosterInHub,
+        id: opt.id,
+        name: opt.displayName || opt.name,
+        timeRange: opt.timeRange,
+        noRosterInHub: opt.noRosterInHub,
       });
     }
 

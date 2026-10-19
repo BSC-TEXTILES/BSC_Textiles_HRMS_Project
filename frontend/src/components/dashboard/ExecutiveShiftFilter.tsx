@@ -47,7 +47,7 @@ export function ExecutiveShiftFilter({
   const [isOpen, setIsOpen] = useState(false);
   const [activeHoverId, setActiveHoverId] = useState<string | null>(null);
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
-  const [popoverPlacement, setPopoverPlacement] = useState<'right' | 'left'>('right');
+  const [popoverPlacement, setPopoverPlacement] = useState<'right' | 'left'>('left');
 
   const containerRef = useRef<HTMLDivElement>(null);
   const triggerButtonRef = useRef<HTMLButtonElement>(null);
@@ -71,12 +71,12 @@ export function ExecutiveShiftFilter({
   const updatePopoverPlacement = useCallback(() => {
     if (menuRef.current) {
       const rect = menuRef.current.getBoundingClientRect();
-      const popoverWidth = 260;
-      // If menu right edge + popover width exceeds viewport width, flip to left
-      if (rect.right + popoverWidth > window.innerWidth - 16) {
-        setPopoverPlacement('left');
-      } else {
+      const popoverWidth = 270;
+      const spaceOnRight = window.innerWidth - rect.right;
+      if (spaceOnRight >= popoverWidth + 16) {
         setPopoverPlacement('right');
+      } else {
+        setPopoverPlacement('left');
       }
     }
   }, []);
@@ -100,25 +100,15 @@ export function ExecutiveShiftFilter({
       ? 'Shift 2'
       : currentOption?.name || 'Selected Shift';
 
-  // Clear hover timer on unmount
-  useEffect(() => {
-    return () => {
-      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    };
-  }, []);
-
+  // Instant hover handling without frustrating delay
   const handleMouseEnter = (shiftId: string) => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    hoverTimerRef.current = setTimeout(() => {
-      setActiveHoverId(shiftId);
-    }, 250);
+    setActiveHoverId(shiftId);
   };
 
   const handleMouseLeave = () => {
     if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-    hoverTimerRef.current = setTimeout(() => {
-      setActiveHoverId(null);
-    }, 150);
+    setActiveHoverId(null);
   };
 
   // Keyboard navigation for dropdown
@@ -209,14 +199,6 @@ export function ExecutiveShiftFilter({
     ? 'No Tea Break'
     : `${teaMinutes} Min`;
 
-  const lunchMinutes = isShift1
-    ? 100
-    : isShift2
-    ? 45
-    : hoveredOption?.lunchDurationMinutes ?? null;
-
-  const isLunchWarning =
-    lunchMinutes !== null && lunchMinutes > STATUTORY_CAPS.lunchCapMinutes && !isShift1;
   const popoverTitle = isShift1 ? 'Shift 1' : isShift2 ? 'Shift 2' : hoveredOption?.name;
 
   return (
@@ -313,8 +295,12 @@ export function ExecutiveShiftFilter({
                   : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
               }`}
             >
-              <span>All Shifts</span>
-              {selectedShiftId === 'all' && <Check className="w-3.5 h-3.5 text-[#0058be]" />}
+              <div className="flex items-center gap-2">
+                <span className="w-4 h-4 flex items-center justify-center shrink-0 text-[#0058be]">
+                  {selectedShiftId === 'all' && <Check className="w-4 h-4 stroke-[2.5]" />}
+                </span>
+                <span>All Shifts</span>
+              </div>
             </button>
 
             {/* Individual Shifts in exact order: Shift 1, Shift 2, then Custom Shifts */}
@@ -371,10 +357,13 @@ export function ExecutiveShiftFilter({
                         : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
                     }`}
                   >
-                    <div className="min-w-0 pr-2 flex items-center gap-1.5">
+                    <div className="min-w-0 pr-2 flex items-center gap-2">
+                      <span className="w-4 h-4 flex items-center justify-center shrink-0 text-[#0058be]">
+                        {isSelected && <Check className="w-4 h-4 stroke-[2.5]" />}
+                      </span>
                       <span className="truncate">{displayName}</span>
                       {opt.isCustom && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-200 dark:border-purple-800 shrink-0">
                           Custom
                         </span>
                       )}
@@ -386,8 +375,6 @@ export function ExecutiveShiftFilter({
                           {opt.staffCount} staff
                         </span>
                       )}
-
-                      {isSelected && <Check className="w-3.5 h-3.5 text-[#0058be] shrink-0" />}
                     </div>
                   </button>
                 </div>
@@ -419,7 +406,7 @@ export function ExecutiveShiftFilter({
             <div
               id={`exec-shift-popover-${hoveredOption.id}`}
               role="tooltip"
-              className={`exec-shift-popover absolute z-[70] w-64 rounded-xl bg-white dark:bg-[#09101f] border border-slate-200 dark:border-slate-700 shadow-2xl p-3 text-xs pointer-events-none transition-all animate-in fade-in duration-150 ${
+              className={`exec-shift-popover absolute z-[100] w-64 rounded-xl bg-white dark:bg-[#09101f] border border-slate-200 dark:border-slate-700 shadow-2xl p-3.5 text-xs pointer-events-none transition-all animate-in fade-in duration-100 ${
                 popoverPlacement === 'right'
                   ? 'left-full ml-2 top-0'
                   : 'right-full mr-2 top-0'
@@ -430,29 +417,17 @@ export function ExecutiveShiftFilter({
               }}
             >
               {/* Shift name title */}
-              <div className="font-bold text-xs text-[#0b1c30] dark:text-slate-100 pb-1.5 mb-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <div>
-                  <div className="font-bold">{popoverTitle}</div>
-                  {hoveredOption?.isCustom && (
-                    <div className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 mt-0.5">
-                      Custom Shift
-                    </div>
-                  )}
-                </div>
-                {isShift1 && (
-                  <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                    10h 30m
-                  </span>
-                )}
-                {isShift2 && (
-                  <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
-                    10h 00m
-                  </span>
+              <div className="font-bold text-xs text-[#0b1c30] dark:text-slate-100 pb-1.5 mb-2.5 border-b border-slate-100 dark:border-slate-800">
+                <div className="font-bold text-sm tracking-tight">{popoverTitle}</div>
+                {hoveredOption?.isCustom && (
+                  <div className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 mt-0.5">
+                    Custom Shift
+                  </div>
                 )}
               </div>
 
               {/* Content rows in required order */}
-              <div className="space-y-1.5 text-[11px]">
+              <div className="space-y-2 text-[11px]">
                 {/* 1. Punch IN */}
                 <div className="flex items-center justify-between">
                   <span className="text-slate-500 dark:text-slate-400">Punch IN:</span>
@@ -477,19 +452,8 @@ export function ExecutiveShiftFilter({
                   </span>
                 </div>
 
-                {/* Warning badge under lunch row when above statutory cap */}
-                {isLunchWarning && (
-                  <div
-                    role="alert"
-                    className="exec-shift-cap-warning flex items-center gap-1.5 px-2 py-1 rounded bg-amber-50 dark:bg-amber-950/70 border border-amber-200 dark:border-amber-900 text-[10px] font-bold text-amber-800 dark:text-amber-200 mt-1"
-                  >
-                    <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0" />
-                    <span>Above 45 min statutory cap</span>
-                  </div>
-                )}
-
                 {/* 4. Tea Break */}
-                <div className="flex items-center justify-between pt-0.5">
+                <div className="flex items-center justify-between">
                   <span className="text-slate-500 dark:text-slate-400">{teaLabel}</span>
                   <span className="font-semibold text-slate-800 dark:text-slate-200">
                     {teaDisplay}
