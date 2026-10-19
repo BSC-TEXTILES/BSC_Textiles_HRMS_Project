@@ -40,6 +40,8 @@ import { setupBreaks } from './scripts/setupBreaks.js';
 import { registerLocationRegistryRefresh } from './services/locationRegistry.js';
 import { UserUploadService } from './services/userUploadService.js';
 import { EmailNotificationService } from './services/emailNotificationService.js';
+import { ensureRawPunchColumns } from './scripts/ensureRawPunchColumns.js';
+import { ensureHiringShardSchema } from './scripts/ensureHiringShardSchema.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -346,6 +348,8 @@ if (!process.env.VERCEL) {
     setupLateFines({ schemaOnly }).catch((err) => console.warn('[setupLateFines warning]:', err.message));
     setupRetailOperations({ schemaOnly }).catch((err) => console.warn('[setupRetailOperations warning]:', err.message));
     setupBreaks({ schemaOnly }).catch((err) => console.warn('[setupBreaks warning]:', err.message));
+    ensureRawPunchColumns().catch((err) => console.warn('[ensureRawPunchColumns warning]:', err.message));
+    ensureHiringShardSchema().catch((err) => console.warn('[ensureHiringShardSchema warning]:', err.message));
     UserUploadService.syncAllUserFolders().catch((err) => console.warn('[UserUploadService warning]:', err.message));
     registerLocationRegistryRefresh()
       .then(() => console.log('📍 Location registry loaded'))

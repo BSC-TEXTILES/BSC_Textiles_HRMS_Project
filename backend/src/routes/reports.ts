@@ -253,6 +253,18 @@ router.get('/hr-command-center', authorize('VIEW'), async (req: AuthRequest, res
       return rows || [];
     };
 
+    const qSafe = async (sql: string, params: any[] = []): Promise<any[]> => {
+      try {
+        const [rows]: any = await pool.query(sql, params);
+        return rows || [];
+      } catch (err: any) {
+        if (err?.code === 'ER_NO_SUCH_TABLE') {
+          return [];
+        }
+        throw err;
+      }
+    };
+
     const empScope = (alias: string) => {
       const parts: string[] = [];
       const params: any[] = [];
@@ -421,8 +433,8 @@ router.get('/hr-command-center', authorize('VIEW'), async (req: AuthRequest, res
         es.params
       ),
       q(`SELECT id, status, periodStart, periodEnd FROM payrollrun ORDER BY periodStart DESC, createdAt DESC LIMIT 1`),
-      q(`SELECT COUNT(*) c FROM candidate`),
-      q(`SELECT COUNT(*) c FROM interview WHERE DATE(scheduledAt) = ?`, [todayYmd]),
+      qSafe(`SELECT COUNT(*) c FROM candidate`),
+      qSafe(`SELECT COUNT(*) c FROM interview WHERE DATE(scheduledAt) = ?`, [todayYmd]),
       q(
         `SELECT COUNT(*) c FROM employee e WHERE e.status = 'ACTIVE'
          AND MONTH(e.dateOfBirth) = ? AND DAY(e.dateOfBirth) = ?${es.sql}`,
