@@ -38,11 +38,11 @@ function hmOf(iso?: string | null): string {
     const m = Number(parts[1]);
     const d = new Date();
     d.setHours(h, m, 0, 0);
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
   }
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
 /** Canonical list of departments in required exact order */

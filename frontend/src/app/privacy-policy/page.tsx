@@ -60,7 +60,7 @@ export default function PrivacyPolicyPage() {
           body: (
             <p>
               You may request a copy of your data, correction of it, a restriction on processing, or erasure. Raise a
-              request from <em>My privacy</em> or by email. We verify identity before acting, and we explain what
+              request by email. We verify identity before acting, and we explain what
               cannot be deleted and why — statutory payroll, attendance and audit records are retained for the period in
               the Data Retention Policy even after an erasure request, at which point the identifying fields are masked
               so the record can no longer be attributed to you.

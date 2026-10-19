@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import api from '@/lib/api';
 import { Modal } from '@/components/ui/Modal';
 import { fetchScope, empOf, ROSTER_LIMIT, type DrillFilters } from '@/lib/dashboardScope';
-import { EmployeeQrModal } from '@/components/dashboard/EmployeeQrModal';
 import {
   Pill,
   EmpCell,
@@ -102,7 +101,7 @@ function adherenceCols(): DrillColumn[] {
   ];
 }
 
-function punchCols(onOpenQr?: (row: any) => void): DrillColumn[] {
+function punchCols(): DrillColumn[] {
   return [
     { key: 'emp', header: 'Employee', render: (r) => <EmpCell code={r.code} name={r.name} /> },
     { key: 'time', header: 'Punch Time', render: (r) => <span className="font-mono font-bold text-[#0b1c30] dark:text-slate-100">{fmtTime(r.time)}</span> },
@@ -111,15 +110,10 @@ function punchCols(onOpenQr?: (row: any) => void): DrillColumn[] {
       key: 'method',
       header: 'Verification',
       render: (r) => (
-        <button
-          type="button"
-          onClick={() => onOpenQr?.(r)}
-          className="inline-flex items-center gap-1.5 text-[11px] text-[#0058be] dark:text-blue-400 font-semibold bg-[#eff4ff] dark:bg-blue-950/60 hover:bg-[#dce9ff] dark:hover:bg-blue-900/60 px-2 py-0.5 rounded border border-[#dce9ff] dark:border-blue-900/60 whitespace-nowrap cursor-pointer transition-all active:scale-95 shadow-xs"
-          title={`Click to open 1-time daily QR pass for ${r.name || r.code}`}
-        >
+        <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-300 font-semibold px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 whitespace-nowrap">
           <span className="material-symbols-outlined text-[13px]">{r.methodIcon}</span>
           <span>{r.method}</span>
-        </button>
+        </span>
       ),
     },
     { key: 'device', header: 'Terminal / Device', render: (r) => <span className="text-slate-600 dark:text-slate-300">{r.device}</span> },
@@ -184,7 +178,6 @@ export function MetricDrillDownModal({
   const [rows, setRows] = useState<any[]>([]);
   const [columns, setColumns] = useState<DrillColumn[]>([]);
   const [page, setPage] = useState(1);
-  const [selectedQrRow, setSelectedQrRow] = useState<any | null>(null);
   const reqIdRef = useRef(0);
 
   const { locationId, departmentId, shiftId } = filters;
@@ -317,9 +310,8 @@ export function MetricDrillDownModal({
           p.set('endDate', dayEnd);
           return p.toString();
         };
-        const [fvRes, qrRes, attRes] = await Promise.all([
+        const [fvRes, attRes] = await Promise.all([
           api.get(`/face-verification?${mk()}`).catch(() => ({ data: null })),
-          api.get(`/qr-codes/scans?${mk()}`).catch(() => ({ data: null })),
           api.get(`/attendance?limit=50`).catch(() => ({ data: null })),
         ]);
         const fvRows: any[] = (fvRes.data?.verifications || fvRes.data?.rows || []).map((v: any) => {
@@ -338,22 +330,6 @@ export function MetricDrillDownModal({
             hub: v.locationName || emp.hub,
           };
         });
-        const qrRows: any[] = (qrRes.data?.scans || []).map((s: any) => {
-          const emp = empOf(scope, s.employeeId, s.employee);
-          return {
-            id: `qr-${s.id}`,
-            employeeId: s.employeeId,
-            code: s.employee?.employeeCode || emp.code,
-            name: s.employee?.fullName || emp.name,
-            time: s.scannedAt || s.createdAt,
-            type: punchTypeFromPurpose(s.purpose),
-            method: 'QR',
-            methodIcon: 'qr_code_scanner',
-            device: s.sellingPoint?.name || (s.deviceInfo ? String(s.deviceInfo).slice(0, 28) : 'QR Scanner'),
-            ok: String(s.result).toUpperCase() === 'SUCCESS',
-            hub: emp.hub,
-          };
-        });
         const attRows: any[] = (attRes.data?.attendances || attRes.data?.attendance || [])
           .filter((a: any) => a.actualLogin)
           .map((a: any) => {
@@ -365,17 +341,17 @@ export function MetricDrillDownModal({
               name: a.employee?.fullName || emp.name,
               time: a.actualLogin,
               type: 'In',
-              method: a.faceVerified ? 'Face' : 'QR / RFID',
-              methodIcon: a.faceVerified ? 'face' : 'qr_code_scanner',
+              method: a.faceVerified ? 'Face' : 'Device',
+              methodIcon: a.faceVerified ? 'face' : 'fingerprint',
               device: 'Entrance Biometric Tablet A',
               ok: a.status !== 'ABSENT',
               hub: a.location?.name || emp.hub,
             };
           });
-        data = [...fvRows, ...qrRows, ...attRows]
+        data = [...fvRows, ...attRows]
           .filter((r) => !scope.ready || scope.inScope.has(r.employeeId))
           .sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime());
-        cols = punchCols((row) => setSelectedQrRow(row));
+        cols = punchCols();
       } else if (metric === 'breaks') {
         const p = new URLSearchParams();
         p.set('limit', String(METRIC_LIMIT));
@@ -583,22 +559,6 @@ export function MetricDrillDownModal({
           </>
         )}
       </div>
-
-      {selectedQrRow && (
-        <EmployeeQrModal
-          open={!!selectedQrRow}
-          onClose={() => setSelectedQrRow(null)}
-          employee={{
-            id: selectedQrRow.employeeId,
-            code: selectedQrRow.code,
-            name: selectedQrRow.name,
-            hub: selectedQrRow.hub,
-            punchTime: selectedQrRow.time ? fmtTime(selectedQrRow.time) : undefined,
-          }}
-          initialScanTime={selectedQrRow.time ? fmtTime(selectedQrRow.time) : undefined}
-          isConsumed={true}
-        />
-      )}
     </Modal>
   );
 }

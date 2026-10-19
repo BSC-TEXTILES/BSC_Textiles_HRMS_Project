@@ -438,14 +438,22 @@ router.get('/rbac/users', async (req: AuthRequest, res) => {
     const allRoles = await prisma.role.findMany();
     const roleNameById = new Map((allRoles || []).map((r: any) => [r.id, r.name]));
 
+    const unassignedOnly = req.query.unassigned === 'true' || req.query.unassigned === '1';
+
+    let userList = (users || []).map((u: any) => ({
+      ...u,
+      rbacRoles: (userRoles || [])
+        .filter((ur: any) => ur.userId === u.id)
+        .map((ur: any) => ({ roleId: ur.roleId, name: roleNameById.get(ur.roleId) || 'UNKNOWN' })),
+    }));
+
+    if (unassignedOnly) {
+      userList = userList.filter((u: any) => u.rbacRoles.length === 0);
+    }
+
     res.json({
-      users: (users || []).map((u: any) => ({
-        ...u,
-        rbacRoles: (userRoles || [])
-          .filter((ur: any) => ur.userId === u.id)
-          .map((ur: any) => ({ roleId: ur.roleId, name: roleNameById.get(ur.roleId) || 'UNKNOWN' })),
-      })),
-      total: (users || []).length,
+      users: userList,
+      total: userList.length,
     });
   } catch (error) {
     console.error('Search RBAC users error:', error);

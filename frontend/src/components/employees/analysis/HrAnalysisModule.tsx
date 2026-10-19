@@ -215,8 +215,8 @@ export function HrAnalysisModule({
         setStatusBreakdown(historyRes.data?.statusBreakdown || []);
 
         const now = new Date();
-        const time24IST = now.toLocaleTimeString('en-GB', { hour12: false }) + ' IST';
-        setLastUpdated(time24IST);
+        const time12IST = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) + ' IST';
+        setLastUpdated(time12IST);
       } catch (err: any) {
         if (err.name === 'CanceledError' || err.code === 'ERR_CANCELED') {
           return;

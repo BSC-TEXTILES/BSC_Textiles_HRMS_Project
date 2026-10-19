@@ -162,8 +162,6 @@ export const schemas = {
       maleTeaMinutes: z.number().int().min(0).max(120).optional(),
       femaleTeaMinutes: z.number().int().min(0).max(120).optional(),
       faceVerificationThreshold: z.number().min(0).max(100).optional(),
-      qrDailyTokenEnabled: z.boolean().optional(),
-      qrOneTimeScan: z.boolean().optional(),
       scannerRoles: z.array(z.string()).optional(),
     }),
   }),
@@ -200,18 +198,6 @@ export const schemas = {
       matchPercentage: z.number().min(0).max(100),
       threshold: z.number().min(0).max(100),
       purpose: z.string().optional(),
-    }),
-  }),
-
-  qrScan: z.object({
-    body: z.object({
-      token: z.string().min(1),
-      purpose: z.enum(['ATTENDANCE_CHECK_IN', 'ATTENDANCE_CHECK_OUT', 'LUNCH_START', 'LUNCH_END', 'TEA_BREAK_START', 'TEA_BREAK_END', 'BREAK_START', 'BREAK_END', 'SELLING_POINT_CHECK_IN']),
-      locationId: z.string().min(1),
-      sellingPointId: z.string().optional(),
-      scannerId: z.string().min(1),
-      deviceInfo: z.string().optional(),
-      ipAddress: z.string().optional(),
     }),
   }),
 

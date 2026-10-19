@@ -44,7 +44,6 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
         orderBy: { breakDate: 'desc' },
         include: {
           employee: { select: { id: true, employeeCode: true, fullName: true, locationId: true } },
-          qrScan: { select: { id: true, purpose: true, result: true, scannedAt: true } },
         },
       }),
       prisma.employeeBreak.count({ where }),
@@ -126,7 +125,6 @@ router.get('/today', authorize('VIEW'), async (req: AuthRequest, res) => {
       },
       include: {
         employee: { select: { id: true, employeeCode: true, fullName: true } },
-        qrScan: { select: { purpose: true, result: true, scannedAt: true } },
       },
       orderBy: { startTime: 'asc' },
     });

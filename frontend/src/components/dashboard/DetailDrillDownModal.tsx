@@ -30,7 +30,6 @@ export type DetailMetric =
   | 'shift-exceptions'
   | 'muster'
   | 'face'
-  | 'qr'
   | 'incentives'
   | 'compliance';
 
@@ -417,17 +416,6 @@ function faceCols(): DrillColumn[] {
   ];
 }
 
-function qrCols(): DrillColumn[] {
-  return [
-    { key: 'code', header: 'Employee ID', render: (r) => <span className="font-mono text-[11px] text-slate-500">{r.code}</span> },
-    { key: 'emp', header: 'Employee', render: (r) => <EmpCell code={r.code} name={r.name} profileId={r.employeeId} /> },
-    { key: 'purpose', header: 'Purpose', render: (r) => <span className="text-slate-600">{r.purpose}</span> },
-    { key: 'device', header: 'Scanner / Point', render: (r) => <span className="text-slate-600">{r.device}</span> },
-    { key: 'result', header: 'Result', render: (r) => <Pill tone={r.ok ? 'green' : 'red'}>{r.result}</Pill> },
-    { key: 'time', header: 'Scanned At', render: (r) => <span className="text-slate-600 whitespace-nowrap">{fmtDate(r.time)} • {fmtTime(r.time)}</span> },
-  ];
-}
-
 function incentiveCols(): DrillColumn[] {
   return [
     { key: 'code', header: 'Employee ID', render: (r) => <span className="font-mono text-[11px] text-slate-500">{r.code}</span> },
@@ -610,8 +598,8 @@ export function DetailDrillDownModal({
           code: s.code,
           name: s.name,
           hub: locMap.get(s.locationId) || '—',
-          window: `${s.startTime ? new Date(s.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'} – ${
-            s.endTime ? new Date(s.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'
+          window: `${s.startTime ? new Date(s.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '—'} – ${
+            s.endTime ? new Date(s.endTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '—'
           }`,
           grace: s.gracePeriod != null ? `${s.gracePeriod} Mins` : '—',
           late: s.lateThreshold != null ? `${s.lateThreshold} Mins` : '—',
@@ -772,33 +760,6 @@ export function DetailDrillDownModal({
           })
           .sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime());
         cols = faceCols();
-      } else if (metric === 'qr') {
-        const { start, end } = monthRange(month);
-        const p = new URLSearchParams();
-        p.set('limit', String(QUERY_LIMIT));
-        p.set('startDate', start);
-        p.set('endDate', end);
-        if (hubScoped) p.set('locationId', String(locationId));
-        const res = await api.get(`/qr-codes/scans?${p.toString()}`).catch(() => ({ data: null }));
-        const list: any[] = res.data?.scans || [];
-        rows = list
-          .filter((s) => !scope.ready || scope.inScope.has(s.employeeId))
-          .map((s) => {
-            const emp = empOf(scope, s.employeeId, s.employee);
-            return {
-              id: s.id,
-              employeeId: s.employeeId,
-              code: s.employee?.employeeCode || emp.code,
-              name: s.employee?.fullName || emp.name,
-              purpose: prettyEnum(s.purpose) || 'Scan',
-              device: s.sellingPoint?.name || (s.deviceInfo ? String(s.deviceInfo).slice(0, 28) : 'QR Scanner'),
-              result: String(s.result).toUpperCase() === 'SUCCESS' ? 'Success' : prettyEnum(s.result),
-              ok: String(s.result).toUpperCase() === 'SUCCESS',
-              time: s.scannedAt || s.createdAt,
-            };
-          })
-          .sort((a, b) => new Date(b.time || 0).getTime() - new Date(a.time || 0).getTime());
-        cols = qrCols();
       } else if (metric === 'incentives') {
         const { start, end } = monthRange(month);
         const p = new URLSearchParams();

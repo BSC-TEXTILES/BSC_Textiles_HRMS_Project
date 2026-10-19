@@ -125,6 +125,16 @@ export function formatWallString(instant: Date, timeZone: string, withMs = false
   return withMs ? `${base}.${pad(w.ms, 3)}` : base;
 }
 
+export function formatWallString12(instant: Date, timeZone: string, includeDate = true): string {
+  const w = instantToWallParts(instant, timeZone);
+  const hour12 = w.hour % 12 === 0 ? 12 : w.hour % 12;
+  const period = w.hour < 12 ? 'AM' : 'PM';
+  const timeStr = `${pad(hour12)}:${pad(w.minute)}:${pad(w.second)} ${period}`;
+  if (!includeDate) return timeStr;
+  return `${pad(w.year, 4)}-${pad(w.month)}-${pad(w.day)} ${timeStr}`;
+}
+
+
 /**
  * The calendar date the *device* considered it to be when the punch happened.
  * Deriving this from `toISOString()` is the bug that moved early-morning Indian

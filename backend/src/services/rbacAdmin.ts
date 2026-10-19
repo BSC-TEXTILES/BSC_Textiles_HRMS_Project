@@ -683,8 +683,9 @@ export async function getRbacOverview() {
   const activeUsers = users.filter((u: any) => flag(u, 'isActive') && u.status === 'ACTIVE').length;
 
   const [moduleRows]: any = await pool.query(
-    `SELECT rp.\`module\`, COUNT(*) AS rolesWithAccess
+    `SELECT rp.\`module\`, COUNT(DISTINCT rp.\`roleId\`) AS rolesWithAccess
        FROM \`rolepermission\` rp
+       INNER JOIN \`role\` r ON r.\`id\` = rp.\`roleId\`
       WHERE rp.\`enabled\` = 1 AND rp.\`can_view\` = 1
       GROUP BY rp.\`module\``
   );

@@ -113,7 +113,7 @@ export default function AttendanceCorrectionsPage() {
       setRecords(mapped);
       setRawRowsById(raw);
       setLoadError(null);
-      setLastLoadedAt(new Date().toLocaleString('en-IN', { hour12: false }));
+      setLastLoadedAt(new Date().toLocaleString('en-IN', { hour12: true }));
       setSelectedRecordId((prev) => (mapped.some((m) => m.id === prev) ? prev : mapped[0]?.id || ''));
     } catch (err: any) {
       setRecords([]);

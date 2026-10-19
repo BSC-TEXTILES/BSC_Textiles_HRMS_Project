@@ -215,6 +215,19 @@ export function ExecutiveShiftFilter({
     ? 45
     : hoveredOption?.lunchDurationMinutes ?? null;
 
+  // Staggered Girls and Boys lunch timings for Karnataka retail showroom floor coverage
+  const girlsLunchTiming = isShift1
+    ? '01:00 PM – 01:50 PM'
+    : isShift2
+    ? '01:30 PM – 02:15 PM'
+    : '01:00 PM – 01:45 PM';
+
+  const boysLunchTiming = isShift1
+    ? '01:50 PM – 02:40 PM'
+    : isShift2
+    ? '02:15 PM – 03:00 PM'
+    : '02:00 PM – 02:45 PM';
+
   const isLunchWarning =
     lunchMinutes !== null && lunchMinutes > STATUTORY_CAPS.lunchCapMinutes && !isShift1;
   const popoverTitle = isShift1 ? 'Shift 1' : isShift2 ? 'Shift 2' : hoveredOption?.name;
@@ -423,7 +436,7 @@ export function ExecutiveShiftFilter({
             <div
               id={`exec-shift-popover-${hoveredOption.id}`}
               role="tooltip"
-              className={`exec-shift-popover absolute z-[70] w-64 rounded-xl bg-white dark:bg-[#09101f] border border-slate-200 dark:border-slate-700 shadow-2xl p-3 text-xs pointer-events-none transition-all animate-in fade-in duration-150 ${
+              className={`exec-shift-popover absolute z-[70] w-72 rounded-xl bg-white dark:bg-[#09101f] border border-slate-200 dark:border-slate-700 shadow-2xl p-3 text-xs pointer-events-none transition-all animate-in fade-in duration-150 ${
                 popoverPlacement === 'right'
                   ? 'left-full ml-2 top-0'
                   : 'right-full mr-2 top-0'
@@ -472,6 +485,28 @@ export function ExecutiveShiftFilter({
                   <span className="font-semibold text-slate-800 dark:text-slate-200">
                     {lunchDisplay}
                   </span>
+                </div>
+
+                {/* Staggered Girls & Boys Lunch Timings */}
+                <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg p-2 border border-slate-100 dark:border-slate-800 my-1 space-y-1.5">
+                  <div className="flex items-center justify-between text-[10.5px]">
+                    <span className="flex items-center gap-1.5 text-pink-700 dark:text-pink-400 font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-pink-500 shrink-0"></span>
+                      Girls Lunch:
+                    </span>
+                    <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                      {girlsLunchTiming}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10.5px]">
+                    <span className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400 font-medium">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
+                      Boys Lunch:
+                    </span>
+                    <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
+                      {boysLunchTiming}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Warning badge under lunch row when above statutory cap */}

@@ -34,16 +34,24 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    const latestAttendance = await prisma.attendance.findFirst({
-      orderBy: { attendanceDate: 'desc' },
-      select: { attendanceDate: true },
-    });
-    const targetDate = dateParam ? new Date(dateParam) : latestAttendance?.attendanceDate;
+    const latestAttendance = dateParam
+      ? null
+      : await prisma.attendance.findFirst({
+          orderBy: { attendanceDate: 'desc' },
+          select: { attendanceDate: true },
+        });
+
+    const targetDate = dateParam
+      ? String(dateParam).slice(0, 10)
+      : latestAttendance?.attendanceDate
+        ? (typeof latestAttendance.attendanceDate === 'string'
+            ? latestAttendance.attendanceDate.slice(0, 10)
+            : new Date(latestAttendance.attendanceDate).toISOString().slice(0, 10))
+        : undefined;
 
     const employeeWhere: any = { status: 'ACTIVE' };
     const attendanceWhere: any = targetDate ? { attendanceDate: targetDate } : {};
     const faceWhere: any = { verifiedAt: { gte: today, lt: tomorrow } };
-    const qrWhere: any = { scannedAt: { gte: today, lt: tomorrow } };
     const incentiveWhere: any = { transactionDate: { gte: today, lt: tomorrow } };
     const penaltyWhere: any = { transactionDate: { gte: today, lt: tomorrow } };
     const observationWhere: any = { status: { in: ['OPEN', 'IN_PROGRESS'] } };
@@ -54,7 +62,6 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
       employeeWhere.locationId = locationId;
       attendanceWhere.locationId = locationId;
       faceWhere.locationId = locationId;
-      qrWhere.locationId = locationId;
       incentiveWhere.employee = { ...incentiveWhere.employee, locationId };
       penaltyWhere.employee = { ...penaltyWhere.employee, locationId };
       observationWhere.locationId = locationId;
@@ -105,8 +112,6 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
       faceVerified,
       faceFailed,
       faceAvg,
-      qrSuccess,
-      qrFailed,
       incentive,
       penalty,
       attendanceAgg,
@@ -124,8 +129,6 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
       prisma.faceVerification.count({ where: { ...faceWhere, result: 'VERIFIED' } }),
       prisma.faceVerification.count({ where: { ...faceWhere, result: 'FAILED' } }),
       prisma.faceVerification.aggregate({ where: faceWhere, _avg: { matchPercentage: true } }),
-      prisma.qRScanRecord.count({ where: { ...qrWhere, result: 'SUCCESS' } }),
-      prisma.qRScanRecord.count({ where: { ...qrWhere, result: { not: 'SUCCESS' } } }),
       prisma.incentiveTransaction.aggregate({ where: incentiveWhere, _sum: { calculatedAmount: true } }),
       prisma.penaltyTransaction.aggregate({ where: penaltyWhere, _sum: { calculatedAmount: true } }),
       prisma.attendance.aggregate({
@@ -186,8 +189,6 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
       faceVerified,
       faceFailed,
       avgFaceMatch: Number(faceAvg._avg.matchPercentage || 0),
-      qrScans: qrSuccess + qrFailed,
-      failedQrScans: qrFailed,
       incentiveToday: Number(attAgg._sum?.earlyLoginIncentive || 0) + Number(attAgg._sum?.overtimeIncentive || 0) + Number(incentive._sum.calculatedAmount || 0),
       penaltyToday: Number(attAgg._sum?.lateLoginPenalty || 0) + Number(penalty._sum.calculatedAmount || 0),
       openObservations,
@@ -946,58 +947,9 @@ router.get(['/face-verification-stats', '/face-verification-accuracy'], authoriz
   }
 });
 
-router.get(['/qr-scan-analytics', '/qr-scans-summary'], authorize('VIEW'), async (req: AuthRequest, res) => {
-  try {
-    const { locationId, startDate, endDate, purpose } = req.query;
-    
-    const targetLocationId = getScopedLocationId(req.user, locationId);
-    
-    const where: any = targetLocationId ? { locationId: targetLocationId } : {};
-    if (purpose) where.purpose = purpose;
-    if (startDate || endDate) {
-      where.scannedAt = {};
-      if (startDate) where.scannedAt.gte = new Date(String(startDate));
-      if (endDate) where.scannedAt.lte = new Date(String(endDate));
-    }
-    
-    const [success, failed, byPurpose, scanLogs] = await Promise.all([
-      prisma.qRScanRecord.count({ where: { ...where, result: 'SUCCESS' } }),
-      prisma.qRScanRecord.count({ where: { ...where, result: { not: 'SUCCESS' } } }),
-      prisma.qRScanRecord.groupBy({ by: ['purpose'], where, _count: true }),
-      prisma.qRScanRecord.findMany({
-        where,
-        take: 50,
-        orderBy: { scannedAt: 'desc' },
-        include: {
-          employee: { select: { employeeCode: true, fullName: true } },
-        },
-      }),
-    ]);
-
-    const records = scanLogs.map((s: any) => ({
-      employeeCode: s.employee?.employeeCode || '',
-      employeeName: s.employee?.fullName || '',
-      purpose: s.purpose,
-      result: s.result,
-      scannedAt: s.scannedAt ? new Date(s.scannedAt).toLocaleTimeString() : '',
-    }));
-    
-    res.json({
-      success,
-      failed,
-      total: success + failed,
-      successRate: success + failed > 0 ? (success / (success + failed)) * 100 : 0,
-      byPurpose,
-      records,
-      scans: records,
-      rows: records,
-      data: records,
-    });
-  } catch (error) {
-    console.error('QR scan analytics error:', error);
-    res.status(500).json({ error: 'Failed to get QR scan analytics' });
-  }
-});
+// ---------------------------------------------------------------------------
+// Selling point performance
+// ---------------------------------------------------------------------------
 
 router.get('/selling-point-performance', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {

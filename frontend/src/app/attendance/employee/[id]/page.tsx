@@ -579,7 +579,7 @@ export default function EmployeeAttendancePage({ params }: { params: Promise<{ i
                     {dev.status}
                   </span>
                   <div className="text-[10px] text-slate-400 mt-1">
-                    Sync: {new Date(dev.lastSyncAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                    Sync: {new Date(dev.lastSyncAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
                   </div>
                 </div>
               </div>

@@ -43,7 +43,6 @@ interface AttendanceCalculation {
   attendanceStatus: string;
   breaks: Array<{ id: number; breakTypeId: number; startTime: string; endTime: string | null; durationMinutes: number; exceededMinutes: number; status: string }>;
   faceVerifications: Array<{ score: number | null; result: string; threshold: number | null; attemptedAt: string }>;
-  qrScans: Array<{ purpose: string; result: string; scannedAt: string }>;
   events: Array<{ eventType: string; eventSubtype?: string | null; actualTime: string; durationSeconds: number | null; amount: number | null; calculationBasis: string | null; source?: string | null }>;
 }
 
@@ -71,9 +70,6 @@ interface AttendanceRules {
   male_tea_minutes: number;
   female_tea_minutes: number;
   face_verification_threshold: number;
-  qr_daily_token_enabled: boolean;
-  qr_one_time_scan: boolean;
-  scanner_roles: string[];
 }
 
 export default function AttendanceCalculationPage() {
@@ -85,7 +81,7 @@ export default function AttendanceCalculationPage() {
   const [locationId, setLocationId] = useState<string>('');
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [editingRules, setEditingRules] = useState<Partial<AttendanceRules>>({});
-  const [activeTab, setActiveTab] = useState<'overview' | 'timeline' | 'breaks' | 'events' | 'face' | 'qr'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'timeline' | 'breaks' | 'events' | 'face'>('overview');
 
   const fetchCalculation = async () => {
     if (!employeeId || !date) return;
@@ -138,7 +134,7 @@ export default function AttendanceCalculationPage() {
 
   const formatTimeStr = (isoString: string | null) => {
     if (!isoString) return '—';
-    return new Date(isoString).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return new Date(isoString).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
   };
 
   const overviewCards = calculation && rules ? [
@@ -232,7 +228,7 @@ export default function AttendanceCalculationPage() {
             {/* Tabs */}
             <div className="border-b border-gray-200 mb-4">
               <nav className="flex gap-1" aria-label="Attendance detail tabs">
-                {['overview', 'timeline', 'breaks', 'events', 'face', 'qr'].map(tab => (
+                {['overview', 'timeline', 'breaks', 'events', 'face'].map(tab => (
                   <Button
                     key={tab}
                     variant="ghost"
@@ -294,7 +290,7 @@ export default function AttendanceCalculationPage() {
                   {calculation.events.map((event, idx) => (
                     <div key={idx} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border-l-4 border-primary-500">
                       <div className="w-10 text-center text-xs text-gray-500 font-mono">
-                        {new Date(event.actualTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        {new Date(event.actualTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
                       </div>
                       <div className="flex-1">
                         <p className="font-medium capitalize">{event.eventType.replace('_', ' ')}</p>
@@ -328,8 +324,8 @@ export default function AttendanceCalculationPage() {
                       {calculation.breaks.map((br, idx) => (
                         <tr key={idx} className="border-b hover:bg-gray-50">
                           <td className="py-2 capitalize">{br.status === 'active' ? 'Ongoing' : 'Break'}</td>
-                          <td className="py-2">{br.startTime ? new Date(br.startTime).toLocaleTimeString() : '—'}</td>
-                          <td className="py-2">{br.endTime ? new Date(br.endTime).toLocaleTimeString() : 'Ongoing'}</td>
+                          <td className="py-2">{br.startTime ? new Date(br.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '—'}</td>
+                          <td className="py-2">{br.endTime ? new Date(br.endTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'Ongoing'}</td>
                           <td className="py-2">{br.durationMinutes}m</td>
                           <td className="py-2">{br.exceededMinutes > 0 ? br.durationMinutes - br.exceededMinutes : br.durationMinutes}m</td>
                           <td className="py-2">{br.exceededMinutes > 0 ? <span className="text-red-600">+{br.exceededMinutes}m</span> : '—'}</td>
@@ -361,7 +357,7 @@ export default function AttendanceCalculationPage() {
                     <tbody>
                       {calculation.events.map((event, idx) => (
                         <tr key={idx} className="border-b hover:bg-gray-50">
-                          <td className="py-2 font-mono">{new Date(event.actualTime).toLocaleTimeString()}</td>
+                          <td className="py-2 font-mono">{new Date(event.actualTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}</td>
                           <td className="py-2 capitalize">{event.eventType.replace('_', ' ')}</td>
                           <td className="py-2">{event.eventSubtype || '—'}</td>
                           <td className="py-2">{event.durationSeconds ? formatSeconds(event.durationSeconds) : '—'}</td>
@@ -399,31 +395,6 @@ export default function AttendanceCalculationPage() {
                             {fv.score !== null ? `${fv.score.toFixed(2)}%` : 'N/A'}
                           </p>
                           <p className="text-xs text-gray-500">Threshold: {fv.threshold}%</p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </Card>
-            )}
-
-            {activeTab === 'qr' && calculation && (
-              <Card className="p-4">
-                <h3 className="font-semibold text-gray-900 mb-4">QR Scans</h3>
-                <div className="space-y-2">
-                  {calculation.qrScans.length === 0 ? (
-                    <p className="text-gray-500 text-center py-4">No QR scans for this date</p>
-                  ) : (
-                    calculation.qrScans.map((qr, idx) => (
-                      <div key={idx} className="p-3 bg-gray-50 rounded-lg flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Badge variant={qr.result === 'success' ? 'success' : 'danger'} dot>
-                            {qr.result}
-                          </Badge>
-                          <div>
-                            <p className="font-medium capitalize">{qr.purpose.replace('_', ' ')}</p>
-                            <p className="text-xs text-gray-500">{new Date(qr.scannedAt).toLocaleString()}</p>
-                          </div>
                         </div>
                       </div>
                     ))
@@ -505,17 +476,9 @@ export default function AttendanceCalculationPage() {
                     </div>
 
                     <div className="border-t border-slate-200 pt-4">
-                      <h4 className="font-semibold mb-3">Face Verification & QR</h4>
+                      <h4 className="font-semibold mb-3">Face Verification Threshold</h4>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         <Input label="Face Threshold %" type="number" step="0.01" min="0" max="100" value={editingRules.face_verification_threshold ?? rules.face_verification_threshold} onChange={(e) => setEditingRules({...editingRules, face_verification_threshold: Number(e.target.value)})} />
-                        <label className="flex items-center gap-2">
-                          <input type="checkbox" checked={editingRules.qr_daily_token_enabled ?? rules.qr_daily_token_enabled} onChange={(e) => setEditingRules({...editingRules, qr_daily_token_enabled: e.target.checked})} className="h-4 w-4" />
-                          <span>Daily QR Token</span>
-                        </label>
-                        <label className="flex items-center gap-2">
-                          <input type="checkbox" checked={editingRules.qr_one_time_scan ?? rules.qr_one_time_scan} onChange={(e) => setEditingRules({...editingRules, qr_one_time_scan: e.target.checked})} className="h-4 w-4" />
-                          <span>One-Time Scan</span>
-                        </label>
                       </div>
                     </div>
 

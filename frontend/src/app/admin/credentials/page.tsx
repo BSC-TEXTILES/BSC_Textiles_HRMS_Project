@@ -318,7 +318,7 @@ export default function CredentialsPage() {
                               </div>
                               {locked && (
                                 <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-400">
-                                  until {new Date(row.lockedUntil!).toLocaleTimeString()} · {row.failedLoginAttempts} failed
+                                  until {new Date(row.lockedUntil!).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })} · {row.failedLoginAttempts} failed
                                 </p>
                               )}
                             </td>

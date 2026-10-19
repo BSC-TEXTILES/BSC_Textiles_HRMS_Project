@@ -194,7 +194,7 @@ export default function LiveStreamsPage() {
                   <div key={m.id} className="bg-gray-50 p-3 rounded-xl border border-gray-100">
                     <div className="flex items-center justify-between text-[11px] text-gray-500 mb-1">
                       <span className="font-bold text-gray-900">{m.user?.fullName || 'Manager'}</span>
-                      <span>{new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span>{new Date(m.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}</span>
                     </div>
                     <p className="text-gray-800 text-xs leading-relaxed">{m.content}</p>
                   </div>

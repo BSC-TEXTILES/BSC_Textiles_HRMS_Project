@@ -191,7 +191,7 @@ export default function BreaksOperationsPage() {
                         {rem.text}
                       </div>
                       <div className="text-[11px] text-gray-400 mt-0.5">
-                        Started: {new Date(b.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Allowed: {b.allowedDuration}m
+                        Started: {new Date(b.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })} • Allowed: {b.allowedDuration}m
                       </div>
                     </div>
 

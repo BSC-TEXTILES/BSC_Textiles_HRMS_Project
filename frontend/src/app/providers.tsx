@@ -4,6 +4,7 @@ import { SessionProvider } from 'next-auth/react';
 import { ReactNode, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { SocketProvider } from '@/context/SocketContext';
 import { NotificationProvider } from '@/context/NotificationContext';
 
 import { DashboardShellProvider } from '@/context/DashboardShellContext';
@@ -35,13 +36,15 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <SessionProvider refetchOnWindowFocus={false} refetchWhenOffline={false}>
       <ThemeProvider>
-        <NotificationProvider>
-          <DashboardShellProvider>
-            <AppShell>
-              {children}
-            </AppShell>
-          </DashboardShellProvider>
-        </NotificationProvider>
+        <SocketProvider>
+          <NotificationProvider>
+            <DashboardShellProvider>
+              <AppShell>
+                {children}
+              </AppShell>
+            </DashboardShellProvider>
+          </NotificationProvider>
+        </SocketProvider>
         {/* Mounted above the shell so the timeout modal and the consent banner
             also appear on /login, where the shell is intentionally absent. */}
         <SessionGuard />

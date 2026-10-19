@@ -12,7 +12,7 @@ import { Response } from 'express';
 import ExcelJS from 'exceljs';
 import { pool } from '../../nativeDb.js';
 import { loadGlobalSettings } from './settings.js';
-import { fromUtcMysqlString, formatWallString, wallTimeToInstant, deviceCalendarDate } from './timeCodec.js';
+import { fromUtcMysqlString, formatWallString, formatWallString12, wallTimeToInstant, deviceCalendarDate } from './timeCodec.js';
 
 export interface ReportFilters {
   from?: string;            // YYYY-MM-DD, inclusive, in `timeZone`
@@ -35,10 +35,16 @@ export interface ReportRow {
   id: string;
   employeeCode: string | null;
   employeeName: string | null;
+  designation?: string | null;
+  departmentName?: string | null;
+  gender?: string | null;
+  phone?: string | null;
+  avatarUrl?: string | null;
   enrollmentNumber: string;
   deviceName: string;
   serialNumber: string;
   locationCode: string | null;
+  locationName?: string | null;
   punchTimeUtc: string;
   punchTimeLocal: string;
   attendanceDate: string;
@@ -59,6 +65,8 @@ export interface ReportRow {
 const COLUMNS: Array<{ key: keyof ReportRow; header: string }> = [
   { key: 'employeeCode', header: 'Employee Code' },
   { key: 'employeeName', header: 'Employee Name' },
+  { key: 'designation', header: 'Designation' },
+  { key: 'departmentName', header: 'Department' },
   { key: 'enrollmentNumber', header: 'Device User ID' },
   { key: 'attendanceDate', header: 'Date' },
   { key: 'punchTimeLocal', header: 'Time (device zone)' },
@@ -87,11 +95,14 @@ export const ALLOWED_DAV_RANGE_CODES = [
 export const MB160_DAV_1601_1610_COLUMNS: Array<{ key: keyof ReportRow | 'store'; header: string }> = [
   { key: 'employeeCode', header: 'Employee Number' },
   { key: 'employeeName', header: 'Employee Name' },
+  { key: 'designation', header: 'Designation' },
+  { key: 'departmentName', header: 'Department' },
   { key: 'locationCode', header: 'Store' },
   { key: 'deviceName', header: 'Terminal Name' },
   { key: 'serialNumber', header: 'Device Serial Number' },
   { key: 'attendanceDate', header: 'Attendance Date' },
   { key: 'punchTimeLocal', header: 'Attendance Time (IST)' },
+  { key: 'punchType', header: 'Punch Direction' },
   { key: 'verifyMethod', header: 'Verification Mode' },
   { key: 'syncStatus', header: 'Synchronization Status' },
 ];
@@ -181,12 +192,16 @@ export async function buildAttendanceReport(filters: ReportFilters): Promise<{
             r.rawTimezone, r.punchType, r.verifyMode, r.rawVerifyType, r.rawPunchState,
             r.verifyModeLabel, r.workCode, r.matchValue, r.photoPath, r.mappingStatus,
             r.syncStatus, r.source, r.employeeId,
-            e.employeeCode, e.fullName AS employeeName,
+            e.employeeCode, e.fullName AS employeeName, e.designation, e.gender, e.phone, e.photoReference,
+            dept.name AS departmentName,
             COALESCE(d.name, 'Unregistered terminal') AS deviceName,
-            d.locationCode
+            COALESCE(d.locationCode, loc.code, 'DAV') AS locationCode,
+            COALESCE(loc.name, 'Davanagere Mega Store') AS locationName
        FROM biometric_raw_punches r
        LEFT JOIN biometric_devices d ON r.deviceId = d.id
        LEFT JOIN employee e ON e.id = r.employeeId
+       LEFT JOIN department dept ON dept.id = e.departmentId
+       LEFT JOIN location loc ON (loc.id = e.locationId OR loc.code = d.locationCode)
       WHERE ${where.join(' AND ')}
       ORDER BY r.punchTimeUtc DESC
       LIMIT ${limit} OFFSET ${offset}`,
@@ -198,16 +213,34 @@ export async function buildAttendanceReport(filters: ReportFilters): Promise<{
     const instant = fromUtcMysqlString(row.punchTimeUtc)
       ?? (row.punchTime instanceof Date ? row.punchTime : null);
 
+    const avatarUrl = row.photoReference
+      ? (String(row.photoReference).startsWith('http') || String(row.photoReference).startsWith('/')
+          ? String(row.photoReference)
+          : `/${String(row.photoReference).replace(/^\/+/, '')}`)
+      : null;
+
+    const photoUrl = row.photoPath
+      ? (String(row.photoPath).startsWith('http') || String(row.photoPath).startsWith('/')
+          ? String(row.photoPath)
+          : `/${String(row.photoPath).replace(/^\/+/, '')}`)
+      : null;
+
     return {
       id: row.id,
       employeeCode: row.employeeCode ?? null,
       employeeName: row.employeeName ?? null,
+      designation: row.designation ?? null,
+      departmentName: row.departmentName ?? null,
+      gender: row.gender ?? null,
+      phone: row.phone ?? null,
+      avatarUrl,
       enrollmentNumber: row.enrollmentNumber,
       deviceName: row.deviceName,
       serialNumber: row.serialNumber,
       locationCode: row.locationCode ?? null,
+      locationName: row.locationName ?? null,
       punchTimeUtc: instant ? instant.toISOString() : '',
-      punchTimeLocal: instant ? formatWallString(instant, zone, false) : '',
+      punchTimeLocal: instant ? formatWallString12(instant, zone) : '',
       attendanceDate: instant ? deviceCalendarDate(instant, zone) : '',
       timezone: zone,
       punchType: row.punchType,
@@ -216,8 +249,8 @@ export async function buildAttendanceReport(filters: ReportFilters): Promise<{
       rawPunchState: row.rawPunchState === null ? null : Number(row.rawPunchState),
       matchValue: row.matchValue === null ? null : Number(row.matchValue),
       workCode: row.workCode ?? null,
-      photoUrl: row.photoPath ? `/${String(row.photoPath).replace(/^\/+/, '')}` : null,
-      photoMissingReason: row.photoPath ? null : 'No photo available from device',
+      photoUrl,
+      photoMissingReason: photoUrl ? null : 'No photo available from device',
       mappingStatus: row.mappingStatus,
       source: row.source,
       syncStatus: row.syncStatus,
@@ -280,7 +313,13 @@ export async function sendXlsx(res: Response, rows: ReportRow[], filename: strin
   };
 
   for (const row of rows) {
-    sheet.addRow(COLUMNS.map((c) => (row[c.key] === null ? '' : row[c.key])));
+    sheet.addRow(COLUMNS.map((c) => {
+      let val = row[c.key];
+      if (c.key === 'locationCode' && (!val || val === 'DAV')) {
+        val = 'DAV - Davanagere';
+      }
+      return val === null || val === undefined ? '' : val;
+    }));
   }
 
   const notes = workbook.addWorksheet('About');

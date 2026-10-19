@@ -30,6 +30,7 @@ interface AssignUserRoleModalProps {
   roles: AssignableRole[];
   /** Whether the acting user may hand out the SUPER_ADMIN role. */
   actorIsSuperAdmin: boolean;
+  defaultFilterUnassigned?: boolean;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -42,6 +43,7 @@ export function AssignUserRoleModal({
   initialUser,
   roles,
   actorIsSuperAdmin,
+  defaultFilterUnassigned = false,
   onClose,
   onSaved,
 }: AssignUserRoleModalProps) {
@@ -51,25 +53,26 @@ export function AssignUserRoleModal({
   const [selectedUser, setSelectedUser] = useState<RbacUser | null>(initialUser || null);
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [onlyUnassigned, setOnlyUnassigned] = useState(defaultFilterUnassigned);
 
   useEffect(() => {
     if (!open) return;
     setQuery('');
     setSelectedUser(initialUser || null);
     setSelectedRoleIds(initialUser ? initialUser.rbacRoles.map((r) => r.roleId) : []);
-  }, [open, initialUser]);
+    setOnlyUnassigned(defaultFilterUnassigned);
+  }, [open, initialUser, defaultFilterUnassigned]);
 
   useEffect(() => {
     if (!open || selectedUser) return;
     const q = query.trim();
-    if (q.length < 2) {
-      setUsers([]);
-      return;
-    }
     const timer = setTimeout(async () => {
       try {
         setSearching(true);
-        const res = await api.get(`/roles/rbac/users`, { params: { q } });
+        const params: any = {};
+        if (q) params.q = q;
+        if (onlyUnassigned) params.unassigned = 1;
+        const res = await api.get(`/roles/rbac/users`, { params });
         setUsers(res.data?.users || []);
       } catch (err) {
         console.error(err);
@@ -77,9 +80,9 @@ export function AssignUserRoleModal({
       } finally {
         setSearching(false);
       }
-    }, 300);
+    }, q ? 300 : 0);
     return () => clearTimeout(timer);
-  }, [query, open, selectedUser]);
+  }, [query, open, selectedUser, onlyUnassigned]);
 
   if (!open) return null;
 
@@ -138,6 +141,23 @@ export function AssignUserRoleModal({
                 />
               </div>
 
+              <div className="flex items-center justify-between text-xs px-1">
+                <span className="text-gray-500">
+                  {onlyUnassigned ? 'Showing accounts without RBAC roles' : users.length > 0 ? `${users.length} accounts found` : 'Search users'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setOnlyUnassigned(!onlyUnassigned)}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                    onlyUnassigned
+                      ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                      : 'text-gray-600 hover:text-gray-900 bg-gray-100 hover:bg-gray-200'
+                  }`}
+                >
+                  {onlyUnassigned ? '✓ Unassigned accounts only' : 'Filter unassigned'}
+                </button>
+              </div>
+
               {searching && (
                 <div className="flex items-center justify-center py-6 text-gray-400">
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -153,13 +173,13 @@ export function AssignUserRoleModal({
                       setSelectedUser(u);
                       setSelectedRoleIds(u.rbacRoles.map((r) => r.roleId));
                     }}
-                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center justify-between"
+                    className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center justify-between transition-colors"
                   >
                     <div>
                       <div className="text-sm font-semibold text-gray-900">{u.fullName || '—'}</div>
                       <div className="text-xs text-gray-500">{u.email}</div>
                     </div>
-                    <div className="flex flex-wrap gap-1 justify-end max-w-[45%]">
+                    <div className="flex flex-wrap gap-1 justify-end max-w-[48%]">
                       {u.rbacRoles.length > 0 ? (
                         u.rbacRoles.map((r) => (
                           <span key={r.roleId} className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary-50 text-primary-700 border border-primary-200">
@@ -167,16 +187,17 @@ export function AssignUserRoleModal({
                           </span>
                         ))
                       ) : (
-                        <span className="text-[10px] text-gray-400 font-mono">{u.role}</span>
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                          Legacy ({u.role || 'No Role'})
+                        </span>
                       )}
                     </div>
                   </button>
                 ))}
-                {!searching && query.trim().length >= 2 && users.length === 0 && (
-                  <div className="px-4 py-6 text-center text-sm text-gray-400">No users found</div>
-                )}
-                {query.trim().length < 2 && (
-                  <div className="px-4 py-6 text-center text-xs text-gray-400">Type at least 2 characters to search</div>
+                {!searching && users.length === 0 && (
+                  <div className="px-4 py-6 text-center text-sm text-gray-400">
+                    {onlyUnassigned ? 'No unassigned accounts found. All accounts have RBAC roles!' : 'No users found'}
+                  </div>
                 )}
               </div>
             </>

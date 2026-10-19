@@ -384,7 +384,7 @@ edge log → app log → audit row.
 
 ## 14. Privacy and retention
 
-`backend/src/services/privacy.ts`, `frontend/src/app/privacy/**`.
+`backend/src/services/privacy.ts`.
 
 - Privacy Policy, Terms of Use, Cookie Policy and Data Retention Policy are
   reachable from the login screen and the product footer.
@@ -392,12 +392,6 @@ edge log → app log → audit row.
   `cookie_consent` with the policy version; the banner is
   `frontend/src/components/security/CookieConsentBanner.tsx` and re-appears when
   `CONSENT_POLICY_VERSION` changes.
-- Data subject export (`GET /api/privacy/me/export`) and deletion requests
-  (`POST /api/privacy/me/requests`) with an Admin workflow
-  (`.../requests/:id/transition`). Anonymisation masks PII and removes
-  sessions, tokens, password history, MFA secrets, device fingerprints and
-  consent records; **operational HR records are retained** where the law requires
-  it, and the reason is recorded on the request.
 - Sensitive fields are masked in the UI (`maskEmail`, `maskPhone`,
   `maskIdNumber`) and full values are only ever fetched by a route the RBAC
   engine allows.
@@ -406,6 +400,13 @@ edge log → app log → audit row.
   `RETENTION_PURGE_INTERVAL_HOURS`. It is additive-safe: it only ever removes
   rows past their documented retention window (`retention_policy`), never
   employee or payroll records.
+
+Notification surface: system notifications live in the **header bell dropdown**
+only — the `/notifications` page and the sidebar menu entry were removed by
+design. A notification click opens the record its `actionUrl` points to.
+Data-subject self-service ("My privacy") including the DSAR request intake and
+the erasure executor remains removed; requests about personal data are handled
+over email with manual identity verification.
 
 ---
 

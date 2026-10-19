@@ -254,8 +254,8 @@ test('first punch, last punch and punch count come from the device ledger', asyn
   const punchDay = rows.find((row) => cellOf(sheet, row, 'Date').startsWith('2025-05-10'))!;
   assert.ok(punchDay, 'the day with three punches must be exported');
   assert.equal(cellOf(sheet, punchDay, 'Punch Count'), '3');
-  assert.equal(cellOf(sheet, punchDay, 'First Punch'), '09:30:00');
-  assert.equal(cellOf(sheet, punchDay, 'Last Punch'), '18:30:00');
+  assert.equal(cellOf(sheet, punchDay, 'First Punch'), '09:30:00 AM');
+  assert.equal(cellOf(sheet, punchDay, 'Last Punch'), '06:30:00 PM');
   assert.equal(cellOf(sheet, punchDay, 'Total Working (hrs)'), '9');
   assert.equal(cellOf(sheet, punchDay, 'Attendance Status'), 'PRESENT');
 });
@@ -265,7 +265,7 @@ test('punch times are the store-timezone wall clock, not the server timezone', a
   const sheet = workbook.getWorksheet('Daily Attendance')!;
   const may11 = sheetRowCountWith(sheet, '9955001').find((row) => cellOf(sheet, row, 'Date').startsWith('2025-05-11'));
   assert.ok(may11, 'a punch at 09:45 IST on 11 May must land on 11 May, not 10 May');
-  assert.equal(cellOf(sheet, may11!, 'First Punch'), '09:45:00');
+  assert.equal(cellOf(sheet, may11!, 'First Punch'), '09:45:00 AM');
 });
 
 test('verification method is the device label and never an invented score', async () => {

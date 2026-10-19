@@ -250,12 +250,9 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res) => {
         shift: { select: { id: true, name: true, startTime: true, endTime: true, gracePeriod: true } },
         sellingPoints: { include: { sellingPoint: { select: { id: true, name: true, code: true } } } },
         faceProfile: { select: { id: true, enrolledAt: true, isActive: true } },
-        qrCode: { select: { id: true, token: true, validFrom: true, validTo: true, isConsumed: true } },
-        dailyQRCode: { select: { id: true, token: true, validFrom: true, validTo: true, isConsumed: true } },
         attendances: { take: 5, orderBy: { attendanceDate: 'desc' } },
         breaks: { take: 5, orderBy: { breakDate: 'desc' } },
         faceVerifications: { take: 5, orderBy: { verifiedAt: 'desc' } },
-        qrScanRecords: { take: 5, orderBy: { scannedAt: 'desc' } },
         observations: { take: 5, orderBy: { createdAt: 'desc' } },
       },
     });
@@ -477,34 +474,6 @@ router.post('/', authorize('ADD'), validate(employeeCreateSchema), async (req: A
     // Automatically create employee directory in uploads
     UserUploadService.ensureUserFolder(fullName, finalCode);
 
-    // Generate QR codes
-    const empQR = await prisma.qRCode.create({
-      data: {
-        token: `EMP-${finalCode}-${Date.now()}`,
-        type: 'EMPLOYEE',
-        employeeId: employee.id,
-        locationId: resolvedLocationId,
-        validFrom: new Date(),
-        validTo: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-      },
-    });
-    
-    const dailyQR = await prisma.qRCode.create({
-      data: {
-        token: `DAILY-${finalCode}-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`,
-        type: 'DAILY',
-        employeeId: employee.id,
-        locationId: resolvedLocationId,
-        validFrom: new Date(new Date().setHours(0, 0, 0, 0)),
-        validTo: new Date(new Date().setHours(23, 59, 59, 999)),
-      },
-    });
-    
-    await prisma.employee.update({
-      where: { id: employee.id },
-      data: { qrCodeId: empQR.id, dailyQRCodeId: dailyQR.id },
-    });
-    
     // Create the HRMS account in PENDING_APPROVAL state: a new account must be
     // approved by HR (POST /auth/approve/:userId) before it can log in, and the
     // temporary password is random — never a shared default like 'password123'.
@@ -729,53 +698,6 @@ router.patch('/:id/status', authorize('EDIT'), async (req: AuthRequest, res) => 
   } catch (error) {
     console.error('Update employee status error:', error);
     res.status(500).json({ error: 'Failed to update employee status' });
-  }
-});
-
-router.post('/:id/regenerate-qr', authorize('CONFIGURE'), async (req: AuthRequest, res) => {
-  try {
-    const existing = await prisma.employee.findUnique({ where: { id: req.params.id } });
-    if (!existing) {
-      return res.status(404).json({ error: 'Employee not found' });
-    }
-    
-    if (req.user!.role !== 'SUPER_ADMIN' && existing.locationId !== req.user!.locationId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
-    // Regenerate permanent QR
-    const empQR = await prisma.qRCode.create({
-      data: {
-        token: `EMP-${existing.employeeCode}-${Date.now()}`,
-        type: 'EMPLOYEE',
-        employeeId: existing.id,
-        locationId: existing.locationId,
-        validFrom: new Date(),
-        validTo: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-      },
-    });
-    
-    // Regenerate daily QR
-    const dailyQR = await prisma.qRCode.create({
-      data: {
-        token: `DAILY-${existing.employeeCode}-${new Date().toISOString().split('T')[0].replace(/-/g, '')}`,
-        type: 'DAILY',
-        employeeId: existing.id,
-        locationId: existing.locationId,
-        validFrom: new Date(new Date().setHours(0, 0, 0, 0)),
-        validTo: new Date(new Date().setHours(23, 59, 59, 999)),
-      },
-    });
-    
-    await prisma.employee.update({
-      where: { id: existing.id },
-      data: { qrCodeId: empQR.id, dailyQRCodeId: dailyQR.id },
-    });
-    
-    res.json({ empQR, dailyQR });
-  } catch (error) {
-    console.error('Regenerate QR error:', error);
-    res.status(500).json({ error: 'Failed to regenerate QR codes' });
   }
 });
 

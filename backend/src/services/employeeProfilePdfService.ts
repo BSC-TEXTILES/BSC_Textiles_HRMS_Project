@@ -293,7 +293,7 @@ export async function generateEmployeeProfilePdf(data: EmployeeProfilePdfData): 
       const boxW = 523 / 4;
       const perfMetrics = [
         { label: 'AVG CHECK-IN', val: '09:27 AM', sub: '3m Early Buffer' },
-        { label: 'AVG CHECK-OUT', val: '18:34 PM', sub: 'Standard Closure' },
+        { label: 'AVG CHECK-OUT', val: '06:34 PM', sub: 'Standard Closure' },
         { label: 'TOTAL OVERTIME', val: '6.5 Hours', sub: '1.25x Credit Rate' },
         { label: 'BREAK ADHERENCE', val: '100%', sub: 'Zero Overages' },
       ];
@@ -344,11 +344,11 @@ export async function generateEmployeeProfilePdf(data: EmployeeProfilePdfData): 
 
       let curLogY = logTableY + 16;
       const defaultLogs = data.attendanceLogs || [
-        { date: '09 Oct 2026', shift: 'Retail A', in: '09:18:22 AM', out: '18:35:10 PM', terminal: 'BEL-TERM-01', method: 'Face Mesh (99.8%)', status: 'Early Login' },
-        { date: '08 Oct 2026', shift: 'Retail A', in: '09:22:45 AM', out: '18:32:04 PM', terminal: 'BEL-TERM-02', method: 'Face Mesh (99.4%)', status: 'Early Login' },
-        { date: '07 Oct 2026', shift: 'Retail A', in: '09:29:10 AM', out: '18:30:15 PM', terminal: 'BEL-TERM-01', method: 'Face Mesh (99.9%)', status: 'On Time' },
-        { date: '06 Oct 2026', shift: 'Retail A', in: '09:34:00 AM', out: '18:36:50 PM', terminal: 'BEL-TERM-03', method: 'QR + Face Mesh', status: 'Grace Period' },
-        { date: '05 Oct 2026', shift: 'Retail A', in: '09:15:30 AM', out: '18:34:20 PM', terminal: 'BEL-TERM-01', method: 'Face Mesh (99.7%)', status: 'Early Login' },
+        { date: '09 Oct 2026', shift: 'Retail A', in: '09:18:22 AM', out: '06:35:10 PM', terminal: 'BEL-TERM-01', method: 'Face Mesh (99.8%)', status: 'Early Login' },
+        { date: '08 Oct 2026', shift: 'Retail A', in: '09:22:45 AM', out: '06:32:04 PM', terminal: 'BEL-TERM-02', method: 'Face Mesh (99.4%)', status: 'Early Login' },
+        { date: '07 Oct 2026', shift: 'Retail A', in: '09:29:10 AM', out: '06:30:15 PM', terminal: 'BEL-TERM-01', method: 'Face Mesh (99.9%)', status: 'On Time' },
+        { date: '06 Oct 2026', shift: 'Retail A', in: '09:34:00 AM', out: '06:36:50 PM', terminal: 'BEL-TERM-03', method: 'QR + Face Mesh', status: 'Grace Period' },
+        { date: '05 Oct 2026', shift: 'Retail A', in: '09:15:30 AM', out: '06:34:20 PM', terminal: 'BEL-TERM-01', method: 'Face Mesh (99.7%)', status: 'Early Login' },
       ];
 
       defaultLogs.forEach((row, i) => {

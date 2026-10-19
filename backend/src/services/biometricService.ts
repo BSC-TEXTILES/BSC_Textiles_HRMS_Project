@@ -51,6 +51,7 @@ import {
 import {
   wallTimeToInstant,
   formatWallString,
+  formatWallString12,
   deviceCalendarDate,
   clockDriftSeconds,
   fromUtcMysqlString,
@@ -347,7 +348,7 @@ export async function getDeviceStatusSnapshot(deviceIdOrSerial?: string): Promis
       port: device.port,
       clockDriftSeconds: drift,
       clockDriftWarning: drift !== null && Math.abs(drift) > settings.clockDriftWarnSeconds,
-      deviceTimeLocal: device.deviceClockAt ? formatWallString(new Date(device.deviceClockAt), device.timezone, false) : null,
+      deviceTimeLocal: device.deviceClockAt ? formatWallString12(new Date(device.deviceClockAt), device.timezone) : null,
       lastError: stored.message || device.lastError,
       lastErrorCode: device.isActive ? stored.rawCode : 'DEVICE_DEACTIVATED',
       failureCode,
@@ -581,7 +582,7 @@ export async function readLiveDeviceInfo(deviceIdOrSerial: string): Promise<Live
     const wall = await client.getDeviceTime();
     const deviceInstant = wallTimeToInstant(wall, device.timezone);
     base.deviceTimeUtc = deviceInstant.toISOString();
-    base.deviceTimeLocal = formatWallString(deviceInstant, device.timezone, false);
+    base.deviceTimeLocal = formatWallString12(deviceInstant, device.timezone);
     base.driftSeconds = clockDriftSeconds(wall, device.timezone, new Date());
     base.driftWarning = Math.abs(base.driftSeconds) > settings.clockDriftWarnSeconds;
 
@@ -1462,7 +1463,7 @@ export async function listDeviceAttendanceLog(filters: AttendanceLogFilters): Pr
       sectionName: row.sectionName ?? null,
       departmentName: row.departmentName ?? null,
       punchTimeUtc: instant ? instant.toISOString() : null,
-      punchTimeLocal: instant ? formatWallString(instant, zone, false) : null,
+      punchTimeLocal: instant ? formatWallString12(instant, zone) : null,
       attendanceDate: instant ? deviceCalendarDate(instant, zone) : null,
       timezoneUsed: zone,
       direction: directionLabel,
@@ -1485,7 +1486,7 @@ export function decoratePunchRow(row: any, defaultTimeZone: string): any {
   return {
     ...row,
     punchTimeUtc: instant ? instant.toISOString() : null,
-    punchTimeLocal: instant ? formatWallString(instant, zone, false) : null,
+    punchTimeLocal: instant ? formatWallString12(instant, zone) : null,
     /** The calendar day the terminal was in — what HR groups a punch under. */
     attendanceDate: instant ? deviceCalendarDate(instant, zone) : null,
     timezoneUsed: zone,

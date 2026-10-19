@@ -37,17 +37,31 @@ export function formatPunchTime12(timeVal: any): string {
 
   if (typeof timeVal === 'string') {
     // If it's already in 12-hour AM/PM format:
-    if (/^\d{1,2}:\d{2}\s*(AM|PM)$/i.test(timeVal.trim())) {
+    if (/^\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)$/i.test(timeVal.trim())) {
       return timeVal.trim().toUpperCase();
     }
+    const dt12 = timeVal.trim().match(/^\d{4}-\d{2}-\d{2}\s+(\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM))$/i);
+    if (dt12) return dt12[1].toUpperCase();
+
     // If it's "HH:MM" or "HH:MM:SS" (24-hour)
-    const match = timeVal.match(/^(\d{1,2}):(\d{2})/);
+    const match = timeVal.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
     if (match && !timeVal.includes('T')) {
       const h24 = Number.parseInt(match[1], 10);
       const min = match[2];
+      const sec = match[3];
       const period = h24 >= 12 ? 'PM' : 'AM';
       const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
-      return `${h12}:${min} ${period}`;
+      return sec ? `${h12}:${min}:${sec} ${period}` : `${h12}:${min} ${period}`;
+    }
+
+    const dtMatch = timeVal.match(/^(\d{4}-\d{2}-\d{2})[ ](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (dtMatch) {
+      const h24 = Number.parseInt(dtMatch[2], 10);
+      const min = dtMatch[3];
+      const sec = dtMatch[4];
+      const period = h24 >= 12 ? 'PM' : 'AM';
+      const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+      return sec ? `${h12}:${min}:${sec} ${period}` : `${h12}:${min} ${period}`;
     }
   }
 

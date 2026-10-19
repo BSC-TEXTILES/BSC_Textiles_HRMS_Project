@@ -18,7 +18,7 @@ import { deviceLog } from './logger.js';
 import { ingestPunches, findExactCandidates, findSuffixCandidates } from './ingest.js';
 import { loadVerifyModeMap, invalidateSettingsCache, getDeviceConfig } from './settings.js';
 import { decoratePunchRow } from '../biometricService.js';
-import { fromUtcMysqlString, formatWallString } from './timeCodec.js';
+import { fromUtcMysqlString, formatWallString, formatWallString12 } from './timeCodec.js';
 import { loadGlobalSettings } from './settings.js';
 import type { MethodFamily } from './verifyMode.js';
 
@@ -125,7 +125,7 @@ export async function listUnmappedPunches(options: {
       enrollmentNumber: row.enrollmentNumber,
       normalizedId: row.normalizedId ?? null,
       punchTimeUtc: instant ? instant.toISOString() : null,
-      punchTimeLocal: instant ? formatWallString(instant, zone, false) : null,
+      punchTimeLocal: instant ? formatWallString12(instant, zone) : null,
       verifyModeLabel: row.verifyModeLabel ?? null,
       rawVerifyType: row.rawVerifyType === null ? null : Number(row.rawVerifyType),
       mappingStatus: row.mappingStatus,
@@ -383,7 +383,7 @@ export async function getCalibrationSession(id: string): Promise<CalibrationSess
       currentLabel: row.currentLabel ?? null,
       sampleEnrollment: row.sampleEnrollment ?? null,
       samplePhotoUrl: row.samplePhotoPath ? `/${String(row.samplePhotoPath).replace(/^\/+/, '')}` : null,
-      localTimeExample: firstSeen ? formatWallString(firstSeen, zone, false) : null,
+      localTimeExample: firstSeen ? formatWallString12(firstSeen, zone) : null,
     };
   });
 

@@ -188,9 +188,16 @@ export class EmployeeRepository extends BaseRepository<EmployeeEntity> {
   }
 
   public async updateStatus(id: string, status: string): Promise<void> {
-    await this.execute(
-      `UPDATE ${this.tableName} SET status = ?, updated_at = NOW() WHERE id = ?`,
-      [status, id]
-    );
+    try {
+      await this.execute(
+        `UPDATE employee SET status = ?, updatedAt = NOW() WHERE id = ?`,
+        [status, id]
+      );
+    } catch {
+      await this.execute(
+        `UPDATE ${this.tableName} SET status = ?, updated_at = NOW() WHERE id = ?`,
+        [status, id]
+      );
+    }
   }
 }

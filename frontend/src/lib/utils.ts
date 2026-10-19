@@ -62,22 +62,96 @@ export function toCalendarDateIST(value: Date | string | null | undefined, fallb
   }).format(date);
 }
 
-export function formatTime(date: Date | string): string {
-  return new Intl.DateTimeFormat('en-IN', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(date));
+export function formatTime(date: Date | string | null | undefined, includeSeconds = false): string {
+  if (!date) return '—';
+  try {
+    const d = typeof date === 'string' && /^\d{1,2}:\d{2}(:\d{2})?$/.test(date.trim())
+      ? new Date(`1970-01-01T${date.trim().padStart(8, '0')}`)
+      : new Date(date);
+    if (isNaN(d.getTime())) return String(date);
+    return new Intl.DateTimeFormat('en-IN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: includeSeconds ? '2-digit' : undefined,
+      hour12: true,
+    }).format(d);
+  } catch {
+    return String(date);
+  }
 }
 
-export function formatDateTime(date: Date | string): string {
-  return new Intl.DateTimeFormat('en-IN', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(date));
+export function formatDateTime(date: Date | string | null | undefined): string {
+  if (!date) return '—';
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return String(date);
+    return new Intl.DateTimeFormat('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+    }).format(d);
+  } catch {
+    return String(date);
+  }
 }
+
+export function formatTime12(val: Date | string | null | undefined, includeSeconds = false): string {
+  if (!val) return '—';
+  if (typeof val === 'string') {
+    const s = val.trim();
+    if (!s) return '—';
+    // Already in 12h: e.g. "09:49:35 AM" or "9:30 PM"
+    if (/^\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM)$/i.test(s)) {
+      return s.toUpperCase();
+    }
+    // Date + 12h: e.g. "2026-10-17 09:49:35 AM"
+    const dt12Match = s.match(/^\d{4}-\d{2}-\d{2}\s+(\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM))$/i);
+    if (dt12Match) {
+      return dt12Match[1].toUpperCase();
+    }
+    // "HH:MM" or "HH:MM:SS" (24-hour)
+    const timeMatch = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+    if (timeMatch) {
+      const h24 = parseInt(timeMatch[1], 10);
+      const min = timeMatch[2];
+      const sec = timeMatch[3];
+      const period = h24 >= 12 ? 'PM' : 'AM';
+      const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+      const hStr = String(h12).padStart(2, '0');
+      return includeSeconds && sec ? `${hStr}:${min}:${sec} ${period}` : `${hStr}:${min} ${period}`;
+    }
+    // "YYYY-MM-DD HH:MM:SS"
+    const dtMatch = s.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+    if (dtMatch) {
+      const h24 = parseInt(dtMatch[2], 10);
+      const min = dtMatch[3];
+      const sec = dtMatch[4] || '00';
+      const period = h24 >= 12 ? 'PM' : 'AM';
+      const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+      const hStr = String(h12).padStart(2, '0');
+      return includeSeconds ? `${hStr}:${min}:${sec} ${period}` : `${hStr}:${min} ${period}`;
+    }
+  }
+
+  try {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) {
+      return new Intl.DateTimeFormat('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: includeSeconds ? '2-digit' : undefined,
+        hour12: true,
+      }).format(d);
+    }
+  } catch {}
+
+  return String(val);
+}
+
 
 export function calculateDuration(start: Date | string, end: Date | string): string {
   const diff = new Date(end).getTime() - new Date(start).getTime();

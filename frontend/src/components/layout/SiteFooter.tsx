@@ -23,9 +23,6 @@ export function SiteFooter() {
           <Link href="/data-retention" className="hover:text-[#1346a1] hover:underline dark:hover:text-blue-300">
             Data Retention
           </Link>
-          <Link href="/privacy" className="font-medium hover:underline">
-            My privacy
-          </Link>
         </nav>
         <span>© {new Date().getFullYear()} BSC Textiles Pvt. Ltd.</span>
       </div>

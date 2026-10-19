@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { Search, Fingerprint, ScanFace, QrCode, Radio, X, AlertCircle } from 'lucide-react';
+import { Search, Fingerprint, ScanFace, Radio, X, AlertCircle } from 'lucide-react';
 import { EmployeeDrawerWrapper } from './EmployeeDrawerWrapper';
 import { formatDateTimeSafe } from '@/lib/utils';
 
@@ -40,7 +40,7 @@ export function BiometricProfilesDrawer({
   onRetry,
 }: BiometricProfilesDrawerProps) {
   const [search, setSearch] = useState('');
-  const [filterChip, setFilterChip] = useState<'ALL' | 'FACE_ENROLLED' | 'QR_READY' | 'MISSING_FAILED'>('ALL');
+  const [filterChip, setFilterChip] = useState<'ALL' | 'FACE_ENROLLED' | 'MISSING_FAILED'>('ALL');
   const [drawerLocId, setDrawerLocId] = useState<string>(currentLocationId || '');
   const [drawerDeptId, setDrawerDeptId] = useState<string>(currentDeptId || '');
 
@@ -82,13 +82,11 @@ export function BiometricProfilesDrawer({
   const biometricProfiles = useMemo(() => {
     return scopedEmployees.map((emp) => {
       const hasFace = Boolean(emp.faceProfileId || emp.faceEnrolled || emp.faceEnrollmentUrl);
-      const hasQr = Boolean(emp.qrCodeId || emp.dailyQRCodeId);
       const storeCode = emp.location?.code || '—';
 
       return {
         ...emp,
         faceStatus: hasFace ? 'Enrolled' : 'Not enrolled',
-        qrStatus: hasQr ? 'QR Ready' : 'No QR pass',
         rfidStatus: 'Not configured',
         lastSync: emp.biometricLastSyncAt || emp.faceProfile?.enrolledAt || null,
         biometricDeviceEmployeeId: emp.biometricDeviceEmployeeId || null,
@@ -96,21 +94,19 @@ export function BiometricProfilesDrawer({
         notes: emp.biometricDeviceEmployeeId
           ? `Terminal PIN ${emp.biometricDeviceEmployeeId}`
           : 'Not mapped on any biometric terminal',
-        isFailedOrMissing: !hasFace && !hasQr,
+        isFailedOrMissing: !hasFace,
       };
     });
   }, [scopedEmployees]);
 
   const totalCount = biometricProfiles.length;
   const faceCount = biometricProfiles.filter((b) => b.faceStatus === 'Enrolled').length;
-  const qrCount = biometricProfiles.filter((b) => b.qrStatus === 'QR Ready').length;
   const rfidCount = biometricProfiles.filter((b) => b.rfidStatus === 'Linked').length;
   const failedMissingCount = biometricProfiles.filter((b) => b.isFailedOrMissing).length;
 
   const filteredList = useMemo(() => {
     return biometricProfiles.filter((emp) => {
       if (filterChip === 'FACE_ENROLLED' && emp.faceStatus !== 'Enrolled') return false;
-      if (filterChip === 'QR_READY' && emp.qrStatus !== 'QR Ready') return false;
       if (filterChip === 'MISSING_FAILED' && !emp.isFailedOrMissing) return false;
 
       if (search.trim()) {
@@ -167,7 +163,7 @@ export function BiometricProfilesDrawer({
       }
     >
       {/* 1. TOP SUMMARY STRIP */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
         <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 flex flex-col justify-between">
           <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
             Face Enrolled
@@ -178,16 +174,6 @@ export function BiometricProfilesDrawer({
           <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
             {totalCount === 0 ? 'No roster loaded' : `${totalCount - faceCount} without a face profile`}
           </span>
-        </div>
-
-        <div className="p-3 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800 flex flex-col justify-between">
-          <span className="text-[10px] font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider">
-            QR Ready
-          </span>
-          <div className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300 mt-1">
-            {qrCount}
-          </div>
-          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5">Encrypted Passes</span>
         </div>
 
         <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700 flex flex-col justify-between">
@@ -259,17 +245,6 @@ export function BiometricProfilesDrawer({
           </button>
           <button
             type="button"
-            onClick={() => setFilterChip('QR_READY')}
-            className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all ${
-              filterChip === 'QR_READY'
-                ? 'bg-[#1346a1] text-white shadow-2xs'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
-            }`}
-          >
-            QR Ready ({qrCount})
-          </button>
-          <button
-            type="button"
             onClick={() => setFilterChip('MISSING_FAILED')}
             className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all ${
               filterChip === 'MISSING_FAILED'
@@ -335,7 +310,6 @@ export function BiometricProfilesDrawer({
                   <th className="py-2.5 px-3">Staff Name</th>
                   <th className="py-2.5 px-3">Store</th>
                   <th className="py-2.5 px-3">Face Enrollment Status</th>
-                  <th className="py-2.5 px-3">QR Status</th>
                   <th className="py-2.5 px-3">RFID Status</th>
                   <th className="py-2.5 px-3">Last Biometric Sync</th>
                   <th className="py-2.5 px-3">Assigned Terminal or Device</th>
@@ -390,18 +364,6 @@ export function BiometricProfilesDrawer({
                         >
                           <ScanFace className="w-3 h-3" />
                           <span>{emp.faceStatus}</span>
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${
-                            emp.qrStatus === 'QR Ready'
-                              ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800'
-                              : 'bg-slate-50 text-slate-500 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700'
-                          }`}
-                        >
-                          <QrCode className="w-3 h-3" />
-                          <span>{emp.qrStatus}</span>
                         </span>
                       </td>
                       <td className="py-2.5 px-3 whitespace-nowrap">

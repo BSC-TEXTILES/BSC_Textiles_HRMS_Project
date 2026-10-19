@@ -8,7 +8,7 @@ import { MetricDrillDownModal, MetricKey } from '@/components/dashboard/MetricDr
 import { KpiDetailContainer, MetricDetailType } from '@/components/dashboard/KpiDetailContainer';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
-import { useNotifications } from '@/context/NotificationContext';
+import { useSocket } from '@/context/SocketContext';
 import {
   Fingerprint,
   Download,
@@ -37,10 +37,8 @@ import {
   Terminal,
   Radio,
   ScanFace,
-  Coins,
-  QrCode
+  Coins
 } from 'lucide-react';
-import { EmployeeQrModal } from '@/components/dashboard/EmployeeQrModal';
 
 const METRIC_TITLES: Record<MetricKey, string> = {
   workforce: 'Workforce Register',
@@ -67,9 +65,6 @@ export default function BiometricPunchesPage() {
 
   // Selected Individual Punch Audit Dossier modal state
   const [selectedPunch, setSelectedPunch] = useState<any | null>(null);
-
-  // Selected Employee One-Time QR Pass modal state
-  const [selectedQrEmployee, setSelectedQrEmployee] = useState<any | null>(null);
 
   // Manual Punch Override Modal State
   const [isManualModalOpen, setIsManualModalOpen] = useState(false);
@@ -105,7 +100,7 @@ export default function BiometricPunchesPage() {
     }
   }, []);
 
-  const { socket } = useNotifications();
+  const { socket } = useSocket();
 
   useEffect(() => {
     fetchData();
@@ -224,7 +219,7 @@ export default function BiometricPunchesPage() {
       // A missing punch must export as blank, not as a plausible time, and the
       // terminal column has to say which device reported the row.
       const timeStr = p.actualLogin
-        ? new Date(p.actualLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+        ? new Date(p.actualLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
         : '';
       return `"${emp.employeeCode || ''}","${emp.fullName || ''}","${p.location?.name || p.location?.code || ''}","${timeStr}","${p.status}","${p.faceVerified ? 'YES' : 'NO'}","${p.earlyLoginIncentive || 0}","${p.deviceName || ''}"`;
     }).join('\n');
@@ -265,12 +260,11 @@ export default function BiometricPunchesPage() {
   const lateEmployeesCount = stats?.late ?? punches.filter(p => p.status === 'LATE').length;
 
   const verifiedPunchesCount =
-    (stats?.faceVerified ?? 0) +
-      (stats?.qrScans ? Math.max((stats.qrScans - (stats?.failedQrScans ?? 0)), 0) : 0) ||
+    stats?.faceVerified ||
     punches.filter(p => p.faceVerified || p.status === 'PRESENT').length;
-  const failedPunchesCount = (stats?.faceFailed ?? 0) + (stats?.failedQrScans ?? 0);
+  const failedPunchesCount = stats?.faceFailed ?? 0;
   const totalPunchesTodayCount =
-    stats?.faceVerified !== undefined || stats?.qrScans !== undefined
+    stats?.faceVerified !== undefined
       ? verifiedPunchesCount + failedPunchesCount
       : punches.length;
 
@@ -603,25 +597,6 @@ export default function BiometricPunchesPage() {
                           </span>
                         </td>
                         <td className="py-3 px-4">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedQrEmployee({
-                              id: punch.employeeId || emp.id,
-                              code: emp.employeeCode || punch.employeeId,
-                              name: emp.fullName,
-                              department: emp.department?.name,
-                              hub: punch.location?.name,
-                              shift: punch.shift?.name,
-                              punchTime: timeFormatted,
-                            })}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-[#eff4ff] dark:bg-blue-950/60 hover:bg-[#dce9ff] dark:hover:bg-blue-900/60 text-[#0058be] dark:text-blue-300 border border-[#dce9ff] dark:border-blue-900 transition-all cursor-pointer shadow-2xs active:scale-95"
-                            title="Click to view & scan One-Time QR Pass"
-                          >
-                            <QrCode className="w-3.5 h-3.5 text-[#0058be] dark:text-blue-400" />
-                            <span>{punch.faceVerified ? 'Face + QR' : '1-Time QR Pass'}</span>
-                          </button>
-                        </td>
-                        <td className="py-3 px-4">
                           {isEarly ? (
                             <span className="text-[11px] font-bold text-[#0058be] dark:text-blue-400 bg-[#eff4ff] dark:bg-blue-950/60 px-2 py-0.5 rounded border border-[#dce9ff] dark:border-blue-900">
                               +₹{Number(punch.earlyLoginIncentive)} (₹1/s)
@@ -636,23 +611,6 @@ export default function BiometricPunchesPage() {
                         </td>
                         <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => setSelectedQrEmployee({
-                                id: punch.employeeId || emp.id,
-                                code: emp.employeeCode || punch.employeeId,
-                                name: emp.fullName,
-                                department: emp.department?.name,
-                                hub: punch.location?.name,
-                                shift: punch.shift?.name,
-                                punchTime: timeFormatted,
-                              })}
-                              className="px-2 py-1 rounded-md text-xs font-bold text-[#0058be] dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900 border border-blue-200 dark:border-blue-900 transition-colors flex items-center gap-1"
-                              title="View & Scan Employee One-Time QR Pass"
-                            >
-                              <QrCode className="w-3.5 h-3.5" />
-                              <span>QR</span>
-                            </button>
                             <button
                               onClick={() => setSelectedPunch(punch)}
                               className="px-2.5 py-1 rounded-md text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -989,18 +947,6 @@ export default function BiometricPunchesPage() {
           </div>
         )}
 
-        {/* ========================================================================= */}
-        {/* MODAL 5: EMPLOYEE ONE-TIME QR PASS & SCAN TIMESTAMP MODAL                 */}
-        {/* ========================================================================= */}
-        {selectedQrEmployee && (
-          <EmployeeQrModal
-            open={!!selectedQrEmployee}
-            onClose={() => setSelectedQrEmployee(null)}
-            employee={selectedQrEmployee}
-            initialScanTime={selectedQrEmployee.punchTime}
-            isConsumed={!!selectedQrEmployee.punchTime}
-          />
-        )}
       </div>
     </DashboardLayout>
   );

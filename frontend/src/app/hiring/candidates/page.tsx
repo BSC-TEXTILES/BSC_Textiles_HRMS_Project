@@ -14,7 +14,7 @@ import { Select } from '@/components/ui/Input';
 import { DataTable } from '@/components/ui/DataTable';
 import { api } from '@/lib/api';
 import { canAction, useAccessSnapshot } from '@/lib/rbac';
-import { useNotifications } from '@/context/NotificationContext';
+import { useSocket } from '@/context/SocketContext';
 import { HireError } from '@/components/hiring/HireError';
 import { StageBadge } from '@/components/hiring/StageBadge';
 import {
@@ -26,7 +26,7 @@ import { formatDate } from '@/lib/utils';
 export default function CandidatePipelinePage() {
   const router = useRouter();
   const access = useAccessSnapshot();
-  const { socket } = useNotifications();
+  const { socket } = useSocket();
   const canUpdate = canAction(access, 'RECRUITMENT', 'update');
   const canExport = canAction(access, 'RECRUITMENT', 'export');
 

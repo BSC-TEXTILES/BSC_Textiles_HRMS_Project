@@ -213,8 +213,6 @@ export async function provisionAllShards() {
         'payrollrun',
         'payrollitem',
         'faceverification',
-        'qrcode',
-        'qrscanrecord',
         'observation',
         'observationattachment',
         'observationcomment',

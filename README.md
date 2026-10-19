@@ -80,8 +80,7 @@ npm run db:migrate-to-sqlite
 16. [Employee Flow](#16-employee-flow)
 17. [Attendance Flow](#17-attendance-flow)
 18. [Break Management Flow](#18-break-management-flow)
-19. [QR Flow](#19-qr-flow)
-20. [Face Verification Flow](#20-face-verification-flow)
+19. [Face Verification Flow](#19-face-verification-flow)
 21. [Incentive Flow](#21-incentive-flow)
 22. [Payroll Flow](#22-payroll-flow)
 23. [Observation Flow](#23-observation-flow)
@@ -121,7 +120,7 @@ Retail textile operations face unique workforce dynamics: high floor-staff count
 
 BSC Textiles HRMS solves these operational bottlenecks by providing:
 - **Centralized Administrative Governance with Rigid Multi-Branch Isolation:** Super Administrators control all corporate policies, whereas branch managers (e.g., Belagavi, Davanagere, Shivamogga) only access their local personnel and roster records.
-- **Biometric & Cryptographic Fraud Prevention:** Combines daily dynamic QR token badges with server-validated face verification (thresholding at $\ge 85.0\%$).
+- **Biometric & Cryptographic Fraud Prevention:** Server-validated face verification with a configurable match threshold (default $\ge 85.0\%$).
 - **Sub-Second Precision Incentive Engine:** Calculates on-time and early-arrival incentives at an authoritative ₹1.00/minute rate with mathematical explainability.
 - **Real-Time Break & Occupancy Oversight:** Sub-second WebSocket break countdowns with strict gendered duration allowances and automated overrun penalties.
 - **Supervisory Live Streaming & Floor Observations:** Live in-store stream broadcasts with timecoded performance feedback notes and incident tags.
@@ -146,7 +145,6 @@ The long-term vision of BSC Textiles HRMS is to serve as the unified operating s
 |---|---|---|
 | **Multi-Location Hierarchy** | 6-Tier Hierarchy: Location $\rightarrow$ Floor $\rightarrow$ Department $\rightarrow$ Section $\rightarrow$ Selling Point $\rightarrow$ Staff | Eliminates branch data leakage while allowing cross-store analytics |
 | **Biometric Face Verification** | Canvas capture matched against enrolled profile baseline ($\ge 85.0\%$ threshold) | Eliminates buddy punching and proxy card swapping |
-| **Dynamic Daily QR Badges** | Ephemeral $\ge 24$-char cryptographically random tokens valid only for current date | Prevents static barcode photocopying or badge reuse |
 | **Early Login Incentives** | Configurable per-minute calculation (e.g., ₹1/min before scheduled shift start) | Drives prompt showroom readiness and opening compliance |
 | **Grace & Late Penalties** | Configurable grace windows (e.g., 5 min) with second-level penalty accruals | Standardizes punctuality enforcement transparently |
 | **Gendered Break Countdown** | Dynamic DB rules (Male Lunch: 100m, Female Lunch: 40m, Male Tea: 20m, Female Tea: 15m) | Accommodates operational retail realities while halting floor abandonment |
@@ -167,7 +165,6 @@ graph TB
         UI_DESK["Employee Self-Service (My Desk)"]:::cBlue
         UI_MGR["Manager & Floor Portals"]:::cBlue
         UI_ADMIN["Super Admin Central Dashboard"]:::cBlue
-        UI_SCAN["T-Shop QR Scanner Terminal"]:::cBlue
     end
 
     subgraph GATEWAY["Security & Ingress Gateway"]
@@ -198,7 +195,6 @@ graph TB
     UI_DESK --> HELMET
     UI_MGR --> HELMET
     UI_ADMIN --> HELMET
-    UI_SCAN --> HELMET
 
     HELMET --> CORS --> RATELIMIT --> AUTH_MW
     AUTH_MW --> API_ROUTER
@@ -270,8 +266,8 @@ BSC-Textiles-HRMS/
 │   │   │   ├── incentives/       # Incentives and penalty management
 │   │   │   ├── leaves/           # Leave requests, balances, approvals
 │   │   │   ├── login/            # Authentication with 1-click test personas
-│   │   │   ├── my-desk/          # Employee self-service workspace & QR badge
-│   │   │   ├── operations/       # QR scanners, floor live streams, observations
+│   │   │   ├── my-desk/          # Employee self-service workspace
+│   │   │   ├── operations/       # Break & shift policy ops, floor live streams, observations
 │   │   │   ├── organization/     # Locations, floors, sections, selling points
 │   │   │   ├── payroll/          # Salary batches, payslips, draft calculations
 │   │   │   ├── reports/          # Multi-branch exportable business intelligence
@@ -316,7 +312,6 @@ BSC-Textiles-HRMS/
 │   │   │   ├── observations.ts   # Floor observation notes and tags
 │   │   │   ├── payroll.ts        # Payroll runs, salary computation, slips
 │   │   │   ├── penalties.ts      # Punctuality and behavioral deductions
-│   │   │   ├── qrCodes.ts        # Daily tokens, scan validation, counters
 │   │   │   ├── reports.ts        # Aggregated attendance, payroll & HR reports
 │   │   │   ├── roles.ts          # Role configurations & permission matrices
 │   │   │   ├── sections.ts       # Retail sections within departments
@@ -331,8 +326,7 @@ BSC-Textiles-HRMS/
 │   │   │   ├── faceVerification.test.ts
 │   │   │   ├── incentives.test.ts
 │   │   │   ├── permissionsAndLocation.test.ts
-│   │   │   ├── qr.test.ts
-│   │   │   ├── runAllTests.ts    # Master runner executing all 7 test suites
+│   │   │   ├── runAllTests.ts    # Master runner executing all test suites
 │   │   │   └── security.test.ts
 │   │   └── index.ts              # Express HTTP + Socket.IO server initialization
 │   ├── package.json
@@ -381,8 +375,6 @@ graph LR
 
     subgraph VERIFY["4. Identity & Verification"]
         M14["Face Match Engine"]:::cTeal
-        M15["Dynamic QR Tokens"]:::cTeal
-        M16["T-Shop Scanners"]:::cTeal
     end
 
     subgraph COMP["5. Compensation & Operations"]
@@ -423,8 +415,8 @@ All pre-configured testing personas use the uniform password: `password123`.
 | `FLOOR_MANAGER` | `amit.patel@bsctextiles.com` | Ground Floor (`BEL`) | Live floor staff occupancy, selling point assignments, live stream observation notes. |
 | `DEPARTMENT_MANAGER`| `dept.mens@bsctextiles.com` | Men's Wear Dept | Departmental staff scheduling, target monitoring, sales incentive approvals. |
 | `TEAM_LEAD` | `lead.sarees@bsctextiles.com`| Saree Section | Shift attendance verification, break discipline, counter coaching. |
-| `SALES_EMPLOYEE` | `rajesh.kumar@bsctextiles.com`| Ground Floor Counter | Self-service My Desk portal, punch check-in, daily QR token display, payslip view. |
-| `T_SHOP_OWNER` | `ramesh.gowda@bsctextiles.com` | Refreshment Area | Daily QR token scanning terminal for authorized tea and lunch break tokens. |
+| `SALES_EMPLOYEE` | `rajesh.kumar@bsctextiles.com`| Ground Floor Counter | Self-service My Desk portal, punch check-in, payslip view. |
+| `T_SHOP_OWNER` | `ramesh.gowda@bsctextiles.com` | Refreshment Area | Refreshment zone operations and break token supervision. |
 | `TEA_BREAK_MANAGER` | `break.mgr@bsctextiles.com` | Refreshment Area | Refreshment zone queue monitoring, overrun verification, manual break adjustments. |
 | `HR_AUDITOR` | `auditor@bsctextiles.com` | Assigned Branch | Read-only compliance auditor access for labor muster records and incentive audit logs. |
 
@@ -490,16 +482,15 @@ sequenceDiagram
     API->>Sock: Emit 'attendance.updated'
     Sock-->>Mgr: Update Floor Presence Widget
 
-    Staff->>App: Display Daily QR Code Badge
-    Staff->>Scanner: Present QR Badge at Refreshment Zone
-    Scanner->>API: POST /api/qr-codes/scan {token, breakType: 'TEA'}
-    API->>DB: Validate Token & Start Break Clock
+    Staff->>App: Start Break at Refreshment Zone
+    App->>API: POST /api/breaks/start {employeeId, breakType: 'TEA'}
+    API->>DB: Lookup Policy & Start Break Clock
     API->>Sock: Emit 'break.started' {duration: 1200s}
     Sock-->>Staff: Launch My Desk Countdown Timer
 
-    Note over Staff,Scanner: 20 Minutes Pass...
-    Staff->>Scanner: Present QR Badge upon Break Return
-    Scanner->>API: POST /api/breaks/end {breakId}
+    Note over Staff,App: 20 Minutes Pass...
+    Staff->>App: End Break upon Return
+    App->>API: POST /api/breaks/end {breakId}
     API->>Engine: Calculate Elapsed Duration & Overrun
     Engine-->>API: 0s Overrun -> Status: COMPLETED
     API->>DB: UPDATE Break Record (COMPLETED)
@@ -563,7 +554,6 @@ erDiagram
 
     EMPLOYEE ||--o{ ATTENDANCE : logs
     EMPLOYEE ||--o{ BREAK : takes
-    EMPLOYEE ||--o{ QR_SCAN : records
     EMPLOYEE ||--o{ FACE_LOG : submits
     EMPLOYEE ||--o{ INCENTIVE_GRANT : earns
     EMPLOYEE ||--o{ PENALTY_RECORD : incurs
@@ -613,14 +603,13 @@ The backend exposes 26 RESTful resource domains grouped under the `/api` root:
 | **Shifts** | `/api/shifts` | `GET /`, `POST /`, `PATCH /:id` | Shift templates, start/end times, grace windows. |
 | **Attendance** | `/api/attendance` | `GET /muster`, `POST /check-in`, `POST /check-out` | Muster roll and punch calculations. |
 | **Breaks** | `/api/breaks` | `GET /active`, `POST /start`, `POST /end` | Real-time break timers and overrun records. |
-| **QR Codes** | `/api/qr-codes` | `GET /my-daily`, `POST /scan`, `GET /verify` | Daily token distribution and scanner validation. |
 | **Face Verification**| `/api/face-verification` | `POST /verify`, `GET /logs` | Biometric image comparison and match logs. |
 | **Incentives** | `/api/incentives` | `GET /rules`, `POST /calculate`, `GET /summary` | Sub-second early login & target bonus calculations. |
 | **Penalties** | `/api/penalties` | `GET /`, `POST /record`, `PATCH /:id/waive` | Late arrival and break overage deductions. |
 | **Payroll** | `/api/payroll` | `GET /runs`, `POST /generate`, `POST /publish` | Batch payroll calculation and payslip generation. |
 | **Observations** | `/api/observations` | `GET /`, `POST /`, `POST /:id/reactions` | Supervisory floor feedback, video notes, tags. |
 | **Live Streams** | `/api/live-streams` | `GET /active`, `POST /start`, `POST /messages` | In-store stream channels, chat, and observations. |
-| **Notifications** | `/api/notifications`| `GET /`, `PATCH /:id/read`, `POST /broadcast` | Real-time push alerts and system announcements. |
+| **Notifications** | `/api/notifications`| `GET /`, `PATCH /:id/read`, `POST /mark-all-read` | Bell feed in the top header; realtime socket push. |
 | **Audit Logs** | `/api/audit` | `GET /`, `GET /export` | Immutable audit trail query and CSV export. |
 | **Reports** | `/api/reports` | `GET /attendance`, `GET /payroll`, `GET /performance`| Business intelligence reports with PDF/Excel export. |
 
@@ -844,7 +833,7 @@ The complete staff lifecycle is tracked in a unified pipeline:
 flowchart LR
     ONBOARD["1. Onboarding & Registration"]:::cBlue --> ENROLL["2. Biometric Photo Enrollment"]:::cTeal
     ENROLL --> ASSIGN["3. Branch, Floor & Selling Point Assignment"]:::cBlue
-    ASSIGN --> ACTIVE["4. Active Duty (Daily Attendance & QR Badges)"]:::cGreen
+    ASSIGN --> ACTIVE["4. Active Duty (Daily Attendance)"]:::cGreen
     ACTIVE --> PERF["5. Performance & Observation Feedback"]:::cPurple
     PERF --> PAY["6. Monthly Payroll Disbursement"]:::cOrange
     ACTIVE --> SEPARATION["7. Resignation / Separation"]:::cDark
@@ -902,7 +891,7 @@ flowchart TD
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
 flowchart TD
-    START_REQ["Start Break (QR Scan at Refreshment Terminal)"]:::cBlue --> GET_POLICY["Lookup Gender & Break Type Policy"]:::cOrange
+    START_REQ["Start Break (Refreshment Zone Check-In)"]:::cBlue --> GET_POLICY["Lookup Gender & Break Type Policy"]:::cOrange
 
     GET_POLICY --> CHECK_TYPE{"Break Type & Gender"}:::cOrange
     CHECK_TYPE -- "Male Lunch" --> M_LUNCH["Allowed: 100 Minutes (6,000s)"]:::cBlue
@@ -918,7 +907,7 @@ flowchart TD
     CREATE_BRK --> LIVE_WS["Broadcast 'break.started' with Allocated Duration"]:::cPurple
     LIVE_WS --> COUNTDOWN["Real-Time Browser Countdown Timer Running"]:::cPurple
 
-    COUNTDOWN --> END_REQ["End Break (Return QR Scan)"]:::cBlue
+    COUNTDOWN --> END_REQ["End Break (Return Check-In)"]:::cBlue
     END_REQ --> CALC_DIFF{"Actual Seconds <= Allowed Seconds?"}:::cOrange
 
     CALC_DIFF -- "YES (Within Policy)" --> COMPLETE["Status: COMPLETED (0 Overrun)"]:::cGreen
@@ -938,47 +927,7 @@ flowchart TD
 
 ---
 
-## 19. QR Flow
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-sequenceDiagram
-    autonumber
-    actor Staff as Sales Employee
-    actor Scanner as T-Shop Scanner
-    participant Client as Web App
-    participant API as /api/qr-codes
-    participant DB as MySQL DB
-
-    Staff->>Client: Open "My Daily QR Badge"
-    Client->>API: GET /api/qr-codes/my-daily
-    API->>DB: Find active token for employeeId & CURDATE()
-    alt No active token for today
-        API->>API: Generate 32-char cryptographically secure token
-        API->>DB: INSERT INTO QRCode (token, validDate, isActive=true)
-    end
-    DB-->>API: Active QR Record
-    API-->>Client: SVG/DataURL QR Code
-    Client-->>Staff: Renders Dynamic QR on Screen
-
-    Staff->>Scanner: Present QR Badge
-    Scanner->>API: POST /api/qr-codes/scan {token, scannerLocationId}
-    API->>DB: Query token record
-    alt Token Date != Today
-        API-->>Scanner: 400 Bad Request ("QR token expired")
-    else Token Inactive or Already Used
-        API-->>Scanner: 400 Bad Request ("Duplicate scan / Token invalid")
-    else Scanner Location != Employee Location
-        API-->>Scanner: 403 Forbidden ("Cross-location scan rejected")
-    else Valid QR
-        API->>DB: INSERT QRScanRecord & Process Break/Attendance
-        API-->>Scanner: 200 OK {success: true, employee: {...}}
-    end
-```
-
----
-
-## 20. Face Verification Flow
+## 19. Face Verification Flow
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
@@ -1010,7 +959,7 @@ flowchart TD
 
 ---
 
-## 21. Incentive Flow
+## 20. Incentive Flow
 
 Incentives in BSC Textiles HRMS provide transparent mathematical explainability:
 
@@ -1040,7 +989,7 @@ flowchart TD
 
 ---
 
-## 22. Payroll Flow & Digital Payslip Generation
+## 21. Payroll Flow & Digital Payslip Generation
 
 The BSC Textiles HRMS Payroll module provides a complete end-to-end statutory wage ledger adhering to the **Karnataka Shops & Commercial Establishments Act (Form T)**:
 
@@ -1086,17 +1035,17 @@ sequenceDiagram
     API-->>Emp: Downloads Certified Form T Payslip PDF
 ```
 
-### 22.1 RBAC Enforcement in Payroll
+### -1.1 RBAC Enforcement in Payroll
 - **Admin (`SUPER_ADMIN`, `ADMIN`)**: Full global access to all branches, master wage runs, salary cadre configurations, and statutory reports.
 - **HR (`HR_MANAGER`, `HR_EXECUTIVE`, `PAYROLL_MANAGER`)**: Can generate wage cycles for assigned stores, edit payslip line items, add reusable custom sections, finalize payslips, download PDFs, and manually resend emails.
 - **Employee (`EMPLOYEE`, `SALES_EMPLOYEE`)**: Strictly self-service access to view and download their own Form T payslips. Cross-employee payslip access is blocked via IDOR middleware.
 
-### 22.2 Net Pay Derivation Formula
+### -1.2 Net Pay Derivation Formula
 $$\text{Gross Earnings} = \text{Base Salary} + \text{HRA} + \text{Allowances} + \text{Performance Bonus} + \text{Early Login Incentives} + \text{Sales Incentives} + \text{Overtime} + \sum \text{Custom Section Earnings}$$
 $$\text{Total Deductions} = \text{PF (12\%)} + \text{TDS / Income Tax} + \text{Loss of Pay (LOP)} + \text{Late Penalties} + \sum \text{Custom Section Deductions}$$
 $$\mathbf{\text{Net Salary}} = \mathbf{\text{Gross Earnings}} - \mathbf{\text{Total Deductions}}$$
 
-### 22.3 SMTP & Email Configuration
+### -1.3 SMTP & Email Configuration
 Configure standard SMTP credentials in `.env` for production email dispatch:
 ```env
 SMTP_HOST="smtp.gmail.com"
@@ -1110,7 +1059,7 @@ SMTP_FROM="BSC Textiles Payroll <payroll@bsctextiles.com>"
 
 ---
 
-## 23. Observation Flow
+## 22. Observation Flow
 
 Floor Managers record timecoded observation notes and coaching feedback during showroom hours:
 
@@ -1131,7 +1080,7 @@ flowchart LR
 
 ---
 
-## 24. Live Streaming Flow
+## 23. Live Streaming Flow
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
@@ -1151,16 +1100,16 @@ flowchart TD
 
 ---
 
-## 25. Notification Flow
+## 24. Notification Flow
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
 flowchart TD
-    EVENT["System Trigger (Break Overrun / Shift Alert / Approval)"]:::cBlue --> CREATE_NOTIF["POST /api/notifications"]:::cDark
-    CREATE_NOTIF --> DB_NOTIF["INSERT INTO Notification (read=false)"]:::cDb
+    EVENT["System Trigger (Break Overrun / Shift Alert / Approval)"]:::cBlue --> PUBLISH["publishEvent (backend service)"]:::cDark
+    PUBLISH --> DB_NOTIF["INSERT INTO Notification (read=false)"]:::cDb
     DB_NOTIF --> WS_DISPATCH["Socket.IO Emit to target user / location channel"]:::cPurple
-    WS_DISPATCH --> TOAST["In-App Dynamic Toast Alert"]:::cPurple
-    TOAST --> MARK_READ["User Clicks & Acknowledges (PATCH /:id/read)"]:::cGreen
+    WS_DISPATCH --> BELL["Header Bell Dropdown (top bar)"]:::cPurple
+    BELL --> MARK_READ["User Clicks → Opens Record & Acknowledges"]:::cGreen
 
     classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
     classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
@@ -1171,7 +1120,7 @@ flowchart TD
 
 ---
 
-## 26. Realtime Architecture
+## 25. Realtime Architecture
 
 Real-time communication is established over WebSocket connections via Socket.IO:
 
@@ -1180,9 +1129,8 @@ Real-time communication is established over WebSocket connections via Socket.IO:
 | `join-location` | Client $\rightarrow$ Server | `locationId: string` | Client joins branch room upon authenticated mount. |
 | `join-stream` | Client $\rightarrow$ Server | `streamId: string` | Client enters a specific showroom live stream channel. |
 | `attendance.updated` | Server $\rightarrow$ Location Room | `{employeeId, status, punchTime, incentive}` | Real-time punch in/out execution. |
-| `break.started` | Server $\rightarrow$ Location Room | `{employeeId, type, allocatedSeconds, startTime}` | Staff scans QR at break station. |
-| `break.ended` | Server $\rightarrow$ Location Room | `{employeeId, durationSeconds, overrunSeconds}` | Staff completes break scan. |
-| `qr.scanned` | Server $\rightarrow$ Location Room | `{employeeId, scannerId, locationId, scanType}` | Scanner confirms QR verification. |
+| `break.started` | Server $\rightarrow$ Location Room | `{employeeId, type, allocatedSeconds, startTime}` | Staff starts a break at the refreshment zone. |
+| `break.ended` | Server $\rightarrow$ Location Room | `{employeeId, durationSeconds, overrunSeconds}` | Staff returns and ends the break. |
 | `face.verified` | Server $\rightarrow$ Location Room | `{employeeId, confidenceScore, status}` | Biometric evaluation completion. |
 | `stream.message` | Bi-Directional | `{streamId, senderName, text, timestamp}` | Broadcast chat message. |
 | `stream.observation` | Bi-Directional | `{streamId, employeeId, note, timestampSeconds}` | Manager logs timecoded observation. |
@@ -1190,17 +1138,16 @@ Real-time communication is established over WebSocket connections via Socket.IO:
 
 ---
 
-## 27. Background Jobs
+## 26. Background Jobs
 
 Automated background jobs and cron workers maintain system consistency:
-1. **Daily Ephemeral QR Rotation (Midnight 00:00:01):** Marks previous-day QR tokens as expired and invalidates stale browser sessions.
-2. **Break Overrun Auto-Flagging:** Scans active breaks exceeding maximum thresholds by $> 15$ minutes and flags managerial alerts.
-3. **Daily Muster Roll Finalization (Nightly 23:59:00):** Identifies rostered employees with zero punches and marks them as `ABSENT`.
-4. **Shift Transition Reconciliation:** Automatically closes lingering active shifts and checks for scheduled weekly offs.
+1. **Break Overrun Auto-Flagging:** Scans active breaks exceeding maximum thresholds by $> 15$ minutes and flags managerial alerts.
+2. **Daily Muster Roll Finalization (Nightly 23:59:00):** Identifies rostered employees with zero punches and marks them as `ABSENT`.
+3. **Shift Transition Reconciliation:** Automatically closes lingering active shifts and checks for scheduled weekly offs.
 
 ---
 
-## 28. File & Media Processing
+## 27. File & Media Processing
 
 - **Storage Location:** Configured via `UPLOAD_DIR` (`./uploads`) with per-location directory isolation.
 - **Allowed MIME Types:** `image/jpeg`, `image/png`, `image/webp`, `video/mp4`, `application/pdf`.
@@ -1209,7 +1156,7 @@ Automated background jobs and cron workers maintain system consistency:
 
 ---
 
-## 29. Security Architecture
+## 28. Security Architecture
 
 ```mermaid
 %%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#263238', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
@@ -1248,7 +1195,7 @@ flowchart TD
 
 ---
 
-## 30. Error Handling
+## 29. Error Handling
 
 Errors follow a uniform, standardized JSON error contract:
 
@@ -1272,7 +1219,7 @@ Errors follow a uniform, standardized JSON error contract:
 
 ---
 
-## 31. Logging & Audit
+## 30. Logging & Audit
 
 Every significant action generates an append-only `AuditLog` database entry:
 - **Recorded Properties:** `userId`, `action` (`CREATE`, `UPDATE`, `DELETE`, `LOGIN`, `OVERRIDE`, `SCAN`), `tableName`, `recordId`, `ipAddress`, `userAgent`, `timestamp`.
@@ -1280,7 +1227,7 @@ Every significant action generates an append-only `AuditLog` database entry:
 
 ---
 
-## 32. Reporting Architecture
+## 31. Reporting Architecture
 
 The reporting module provides aggregated business intelligence across corporate and branch operations:
 - **Attendance Muster Reports:** Monthly cross-tabulated present, late, absent, and holiday statistics.
@@ -1290,7 +1237,7 @@ The reporting module provides aggregated business intelligence across corporate 
 
 ---
 
-## 33. Environment Configuration
+## 32. Environment Configuration
 
 The application requires configuration across three primary tiers. Store these in `.env`:
 
@@ -1324,7 +1271,7 @@ MAX_FILE_SIZE=10485760
 
 ---
 
-## 34. Local Development
+## 33. Local Development
 
 ### System Prerequisites
 - **Node.js:** v20 LTS or higher. **v22 LTS is the recommended version** and is what `.nvmrc` pins — prebuilt native modules (`@node-rs/argon2`) are published against LTS ABIs.
@@ -1375,7 +1322,7 @@ Open `http://localhost:3000` in your web browser.
 
 ---
 
-## 35. Database Setup
+## 34. Database Setup
 
 Ensure MySQL 8.0 is running locally or accessible via network:
 
@@ -1387,7 +1334,7 @@ CREATE DATABASE IF NOT EXISTS bsc_textiles_hrms
 
 ---
 
-## 36. Database Migrations & Native MySQL Setup
+## 35. Database Migrations & Native MySQL Setup
 
 The data persistence layer operates purely on **Native MySQL 8.0** using connection pooling via `mysql2/promise`.
 
@@ -1410,7 +1357,7 @@ npm run db:seed
 
 ---
 
-## 37. Seed Data & Test Personas
+## 36. Seed Data & Test Personas
 
 The seed script provisions complete synthetic store locations, departments, selling points, employee rosters, and test accounts:
 
@@ -1436,7 +1383,7 @@ This provisions:
 
 ---
 
-## 38. Testing
+## 37. Testing
 
 The repository contains an automated integration test runner compliant with **PRD Section 60**:
 
@@ -1444,31 +1391,30 @@ The repository contains an automated integration test runner compliant with **PR
 npm run test --workspace=backend
 ```
 
-### Verified Test Categories (20 Suites — 212 / 212 Passed — 100% Pass Rate):
+### Verified Test Categories (19 Suites — 207 / 207 Passed — 100% Pass Rate):
 1. **Attendance Suite:** On-time calculation, ₹1/min early incentive formula, 5-minute grace protection, late penalties, overtime accumulation.
 2. **Breaks Suite:** Gendered break durations (100m, 40m, 20m, 15m), countdown timer calculations, break overrun penalties.
-3. **QR System Suite:** Cryptographic token entropy ($\ge 24$ chars), single-use badge retrieval, invalidation of expired tokens, duplicate scan rejection, cross-location scan rejection.
-4. **Face Verification Suite:** Match score thresholding ($\ge 85.0\% \rightarrow \text{VERIFIED}$, $< 85.0\% \rightarrow \text{FAILED}$), boundary compliance, non-fabricated score validation.
-5. **Permissions & Location Isolation Suite:** Super Admin global visibility, Belagavi HR data isolation, Shivamogga HR isolation, URL tampering interception, role privilege gating.
-6. **Incentives & Penalties Suite:** Per-second, milestone, and target calculations with formula explainability metadata against seeded rules.
-7. **Security & Auth Suite:** Bcrypt salt verification, invalid credential rejection, forged JWT signature blocking, Zod request body validation.
-8. **Enterprise Security Core Suite:** Argon2id hashing, password policy/history, enumeration defense, registration workflow, MFA backup codes, session revocation, CSRF tokens, security headers, malware magic-byte checks, tamper-evident audit chain.
-9. **KYC & DigiLocker Suite:** Aadhaar masking, consent lifecycle, PKCE OAuth URL generation, verified fetch, manual fallback review, location-scoped HR review.
-10. **Full & Final / Leaves / Mobile Suite:** Leave types and balances, ex-employee settlement dashboard, mobile profile and geofenced punching.
-11. **Floor Operations Suite:** Floor hierarchy metrics, salesmen directory, billing reconciliation, staff assignment, transaction audit, showroom scoping.
-12. **Late Attendance & Fine Management Suite:** Dashboard KPIs, grace periods, ₹1/min formulas, waiver/approval lifecycle, payroll idempotence, employee history.
-13. **Employee Document Management Suite:** Dashboard metrics, dossier checklist, upload validation, secure streaming, rejection/verification, versioning, location security, verification queue.
-14. **Attendance & Shifts Board Suite:** Shift-window math (including overnight), display status derivation, filters, pagination, export CSV, department/shift scoping (unit + API).
-15. **My Desk Self-Service Suite:** Summary metrics, monthly velocity, punch in/out, tea-break cycles, asset acknowledgement, corrections.
-16. **HR Analytics Suite:** Date-range presets, summary/timeline/hourly distributions, location and punctuality analysis, drilldown pagination.
-17. **Bulk Employee Import Suite:** 49-column template contract, BSC-EMP-XXXX ID allocation, data-quality audit, preview matching, export and history endpoints.
-18. **Biometric IoT Suite:** Device registry and IP subnets, SDK status reporting, SHA-256 dedupe idempotence, connector-key auth, unmapped enrollment preservation, sync audit history.
-19. **Hiring Validators Suite:** Phone/email/pincode/PAN/Aadhaar (Verhoeff) formats, file type and magic-byte rules, conditional logic, submission sanitization, stage transition rules.
-20. **Candidate Hiring API Suite:** Scoped dashboard, draft/publish/versioning, share links, captcha + consent, public submission and duplicate handling, pipeline stage moves, interviews, masked dossier aggregation, link analytics, CSV export, shard registry and outbox stats.
+3. **Face Verification Suite:** Match score thresholding ($\ge 85.0\% \rightarrow \text{VERIFIED}$, $< 85.0\% \rightarrow \text{FAILED}$), boundary compliance, non-fabricated score validation.
+4. **Permissions & Location Isolation Suite:** Super Admin global visibility, Belagavi HR data isolation, Shivamogga HR isolation, URL tampering interception, role privilege gating.
+5. **Incentives & Penalties Suite:** Per-second, milestone, and target calculations with formula explainability metadata against seeded rules.
+6. **Security & Auth Suite:** Bcrypt salt verification, invalid credential rejection, forged JWT signature blocking, Zod request body validation.
+7. **Enterprise Security Core Suite:** Argon2id hashing, password policy/history, enumeration defense, registration workflow, MFA backup codes, session revocation, CSRF tokens, security headers, malware magic-byte checks, tamper-evident audit chain.
+8. **KYC & DigiLocker Suite:** Aadhaar masking, consent lifecycle, PKCE OAuth URL generation, verified fetch, manual fallback review, location-scoped HR review.
+9. **Full & Final / Leaves / Mobile Suite:** Leave types and balances, ex-employee settlement dashboard, mobile profile and geofenced punching.
+10. **Floor Operations Suite:** Floor hierarchy metrics, salesmen directory, billing reconciliation, staff assignment, transaction audit, showroom scoping.
+11. **Late Attendance & Fine Management Suite:** Dashboard KPIs, grace periods, ₹1/min formulas, waiver/approval lifecycle, payroll idempotence, employee history.
+12. **Employee Document Management Suite:** Dashboard metrics, dossier checklist, upload validation, secure streaming, rejection/verification, versioning, location security, verification queue.
+13. **Attendance & Shifts Board Suite:** Shift-window math (including overnight), display status derivation, filters, pagination, export CSV, department/shift scoping (unit + API).
+14. **My Desk Self-Service Suite:** Summary metrics, monthly velocity, punch in/out, tea-break cycles, asset acknowledgement, corrections.
+15. **HR Analytics Suite:** Date-range presets, summary/timeline/hourly distributions, location and punctuality analysis, drilldown pagination.
+16. **Bulk Employee Import Suite:** 49-column template contract, BSC-EMP-XXXX ID allocation, data-quality audit, preview matching, export and history endpoints.
+17. **Biometric IoT Suite:** Device registry and IP subnets, SDK status reporting, SHA-256 dedupe idempotence, connector-key auth, unmapped enrollment preservation, sync audit history.
+18. **Hiring Validators Suite:** Phone/email/pincode/PAN/Aadhaar (Verhoeff) formats, file type and magic-byte rules, conditional logic, submission sanitization, stage transition rules.
+19. **Candidate Hiring API Suite:** Scoped dashboard, draft/publish/versioning, share links, captcha + consent, public submission and duplicate handling, pipeline stage moves, interviews, masked dossier aggregation, link analytics, CSV export, shard registry and outbox stats.
 
 ---
 
-## 39. Deployment
+## 38. Deployment
 
 ### Production Build Steps
 
@@ -1516,7 +1462,7 @@ module.exports = {
 
 ---
 
-## 40. Production Checklist
+## 39. Production Checklist
 
 - [ ] `NODE_ENV` is set to `production` in all production environments.
 - [ ] `JWT_SECRET` is generated using a secure random generator with length $\ge 48$ characters.
@@ -1529,7 +1475,7 @@ module.exports = {
 
 ---
 
-## 41. Backup & Recovery
+## 40. Backup & Recovery
 
 ### Automated Daily MySQL Dump
 ```bash
@@ -1549,7 +1495,7 @@ mysql -u bsc_admin -p bsc_textiles_hrms < /var/backups/bsc_hrms_20261008_120000.
 
 ---
 
-## 42. Troubleshooting
+## 41. Troubleshooting
 
 | Symptom | Root Cause | Remediation Step |
 |---|---|---|
@@ -1561,15 +1507,15 @@ mysql -u bsc_admin -p bsc_textiles_hrms < /var/backups/bsc_hrms_20261008_120000.
 
 ---
 
-## 43. Maintenance
+## 42. Maintenance
 
 - **Log Rotation:** Configure `logrotate` for PM2 log outputs (`/root/.pm2/logs/*.log`) retaining 14 days of logs.
 - **Database Migrations:** Always execute schema updates via `npm run db:migrate` in production environments.
-- **Index Optimization:** Monitor high-frequency query indexes on `Attendance(employeeId, attendanceDate)` and `QRCode(token)`.
+- **Index Optimization:** Monitor high-frequency query indexes on `Attendance(employeeId, attendanceDate)`.
 
 ---
 
-## 44. Scalability
+## 43. Scalability
 
 - **Horizontal API Scaling:** Stateless Express REST APIs allow horizontal scaling behind an Nginx or AWS Application Load Balancer.
 - **Socket.IO Redis Adapter:** When clustering backend instances across multiple servers, attach `@socket.io/redis-adapter` for inter-node room message synchronization.
@@ -1577,7 +1523,7 @@ mysql -u bsc_admin -p bsc_textiles_hrms < /var/backups/bsc_hrms_20261008_120000.
 
 ---
 
-## 45. Future Modules
+## 44. Future Modules
 
 The system's modular architecture is designed to integrate seamlessly with future BSC Textiles enterprise systems:
 1. **Wedding CRM:** Customer bridal registry, VIP shopping appointments, and commission linking.
@@ -1587,7 +1533,7 @@ The system's modular architecture is designed to integrate seamlessly with futur
 
 ---
 
-## 46. Contribution Guidelines
+## 45. Contribution Guidelines
 
 1. **Branching Model:** Branch off `main` using descriptive prefixes (`feature/`, `fix/`, `docs/`, `refactor/`).
 2. **Code Conventions:** Adhere to strict TypeScript typing. Do not bypass types with `any` without documented architectural rationale.
@@ -1596,7 +1542,7 @@ The system's modular architecture is designed to integrate seamlessly with futur
 
 ---
 
-## 47. Support & Ownership
+## 46. Support & Ownership
 
 **Platform Engineering Team**  
 **BSC Textiles Pvt Ltd**  
@@ -1607,7 +1553,7 @@ The system's modular architecture is designed to integrate seamlessly with futur
 
 ---
 
-## 49. Employee Aadhaar e-KYC & DigiLocker Document Management
+## 48. Employee Aadhaar e-KYC & DigiLocker Document Management
 
 ### 49.1 Architecture & Regulatory Compliance
 BSC Textiles HRMS integrates an enterprise-grade **Employee KYC and DigiLocker Document Management module** fully compliant with:
@@ -1644,7 +1590,7 @@ BSC Textiles HRMS integrates an enterprise-grade **Employee KYC and DigiLocker D
 
 ---
 
-## 50. OOP Architecture & Service Container
+## 49. OOP Architecture & Service Container
 
 The BSC Textiles HRMS business logic is structured on pure **Object-Oriented Programming (OOP)** principles:
 - **Encapsulation:** All business state, calculation rules, and database access are strictly encapsulated in typed service and repository classes.
@@ -1662,15 +1608,15 @@ The BSC Textiles HRMS business logic is structured on pure **Object-Oriented Pro
 
 ---
 
-## 51. Full & Final Settlement (F&F) Module
+## 50. Full & Final Settlement (F&F) Module
 
 A complete exit management lifecycle designed for compliance with the Karnataka Shops & Commercial Establishments Act and Payment of Gratuity Act:
 
-### 51.1 Former Employees Dashboard (`/employees/former`)
+### -1.1 Former Employees Dashboard (`/employees/former`)
 - **10 Aggregated KPI Cards:** Total Former Employees, Resigned, Terminated, Retired, Awaiting Clearance, Awaiting Calculation, Pending HR Review, Pending Approval, Ready for Payment, Closed & Paid, Overdue (>30d).
 - **Searchable & Filterable Table:** Filter by Location, Department, Exit Type, and Clearance Status.
 
-### 51.2 Exit Clearance Workflow
+### -1.2 Exit Clearance Workflow
 1. **Initiation:** HR records resignation or termination with notice period (default 30 days) and approved last working day (LWD).
 2. **Department Clearance Tasks:** 5 multi-department checklists:
    - `IT`: Email & biometric revocation, POS credentials disabled.
@@ -1688,7 +1634,7 @@ A complete exit management lifecycle designed for compliance with the Karnataka 
 
 ---
 
-## 52. Automatic Form T PDF Salary Slips
+## 51. Automatic Form T PDF Salary Slips
 
 - **Automated Generation:** Payroll finalization generates Form T payslips using PDFKit.
 - **Employee View-Only Access (`/payroll/payslips`):** Employees can view their own payslips via `/api/payroll/payslips/my-slips` and preview/download PDFs. Editing buttons are hidden and backend-enforced against IDOR.
@@ -1696,7 +1642,7 @@ A complete exit management lifecycle designed for compliance with the Karnataka 
 
 ---
 
-## 53. Complete Leave Management System (`/leaves`)
+## 52. Complete Leave Management System (`/leaves`)
 
 - **Configurable Leave Types:** Casual Leave (`CL`), Sick Leave (`SL`), Earned Leave (`EL`), and Loss of Pay (`LOP`).
 - **Live Annual Quotas:** Real-time balances with used, pending, and remaining days.
@@ -1706,7 +1652,7 @@ A complete exit management lifecycle designed for compliance with the Karnataka 
 
 ---
 
-## 54. Mobile Application — Android and iOS (`mobile/`)
+## 53. Mobile Application — Android and iOS (`mobile/`)
 
 Built using **React Native with Expo**, integrating directly with the shared backend API (`/api/mobile/*`):
 - **Employee Features:** Biometric geofenced check-in/out, leave application & balance tracking, Form T payslip breakdown & PDF download, ex-employee clearance status, profile dossier.
@@ -1715,16 +1661,15 @@ Built using **React Native with Expo**, integrating directly with the shared bac
 
 ---
 
-## 55. Automated Verification & Performance Benchmarks
+## 54. Automated Verification & Performance Benchmarks
 
-### 55.1 Test Execution Results (100% Passing)
+### 54.1 Test Execution Results (100% Passing)
 ```text
 ================================================================
 📊 TEST EXECUTION SUMMARY REPORT (212/212 PASSED)
 ================================================================
 📁 [ATTENDANCE]                    7/7 Passed  (Sub-millisecond)
 📁 [BREAKS]                        6/6 Passed  (Sub-millisecond)
-📁 [QR SYSTEM]                     5/5 Passed  (Cryptographic replay protected)
 📁 [FACE VERIFICATION]             5/5 Passed  (Threshold boundary validated)
 📁 [PERMISSIONS & LOCATION]        6/6 Passed  (Multi-tenant hub isolated)
 📁 [INCENTIVES & PENALTIES]        8/8 Passed  (₹1/min transparent math)
@@ -1746,7 +1691,7 @@ Built using **React Native with Expo**, integrating directly with the shared bac
 Total Tests Run: 212 | Passed: 212 (100.0%) | Failed: 0
 ```
 
-### 55.2 Performance Benchmarks
+### 54.2 Performance Benchmarks
 - **Indexed Database Reads:** 11–24 ms (Target: <100 ms)
 - **Aggregated F&F Dashboard Stats:** 14 ms
 - **Form T PDF Generation Time:** ~120 ms
@@ -1754,7 +1699,7 @@ Total Tests Run: 212 | Passed: 212 (100.0%) | Failed: 0
 
 ---
 
-## 56. Candidate Hiring Module (`/hiring` & Public `/apply`)
+## 55. Candidate Hiring Module (`/hiring` & Public `/apply`)
 
 End-to-end recruitment: from branded public application forms to a sharded candidate pipeline.
 
@@ -1768,11 +1713,11 @@ End-to-end recruitment: from branded public application forms to a sharded candi
 
 ---
 
-## 57. License
+## 56. License
 
 Proprietary enterprise software owned by **BSC Textiles Pvt Ltd**.  
 All rights reserved. Unauthorized reproduction, modification, distribution, or decompilation of this software is strictly prohibited.
 
 ```text
 © 2026 BSC Textiles Pvt Ltd. All Rights Reserved.
-```
+```

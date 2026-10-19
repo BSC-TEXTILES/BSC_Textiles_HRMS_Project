@@ -213,7 +213,7 @@ export default function FloorManagersPage() {
               <div className="flex items-center gap-space-md text-on-surface-variant font-body-sm text-body-sm">
                 <div className="flex items-center gap-1">
                   <span className="material-symbols-outlined text-[16px] text-secondary">timelapse</span>
-                  <span>Shift A (09:30 AM – 18:30 PM)</span>
+                  <span>Shift A (09:30 AM – 06:30 PM)</span>
                 </div>
                 <span className="text-outline-variant">•</span>
                 <div className="flex items-center gap-1">

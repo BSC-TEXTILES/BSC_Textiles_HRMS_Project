@@ -1,13 +1,11 @@
 /**
- * Privacy layer: consent records, subject data requests (export / erasure),
- * data minimisation helpers and the retention purge.
+ * Privacy layer: cookie consent records, subject data export and the retention
+ * purge.
  *
- * Erasure anonymises rather than deletes the account row. Payroll, attendance
- * and audit records are statutory — deleting the person behind them would
- * destroy the company's own compliance evidence and break foreign keys. What a
- * subject is entitled to is that their *personal data* can no longer be
- * attributed to them, which is what masking achieves while the ledger stays
- * intact.
+ * The self-service data-request workflow that used to orchestrate an
+ * anonymised erasure (`anonymiseSubject`) was removed with the My Privacy
+ * screen. Statutory payroll, attendance and audit records keep their retention
+ * regime via `runRetentionPurge`.
  */
 import crypto from 'node:crypto';
 import { pool } from '../nativeDb.js';
@@ -239,113 +237,7 @@ export async function buildDataExport(userId: string): Promise<Record<string, un
   return export_;
 }
 
-// ---------------------------------------------------------------------------
-// Data requests
-// ---------------------------------------------------------------------------
-
-export type DataRequestType = 'EXPORT' | 'ERASURE' | 'RESTRICTION' | 'CORRECTION';
-
-export async function createDataRequest(input: {
-  userId: string;
-  type: DataRequestType;
-  note?: string;
-  requestedBy: string;
-}): Promise<{ id: string; status: string }> {
-  const id = `drq_${crypto.randomUUID()}`;
-  await pool.query(
-    `INSERT INTO \`data_request\` (\`id\`, \`userId\`, \`type\`, \`status\`, \`note\`, \`requestedAt\`, \`updatedAt\`)
-     VALUES (?, ?, ?, 'PENDING', ?, NOW(3), NOW(3))`,
-    [id, input.userId, input.type, String(input.note || '').slice(0, 2000)]
-  );
-  await AuditService.log({
-    userId: input.requestedBy,
-    action: 'CREATE',
-    entityType: 'DataRequest',
-    entityId: id,
-    tags: ['privacy'],
-    after: { subject: input.userId, type: input.type },
-  }).catch(() => undefined);
-  return { id, status: 'PENDING' };
-}
-
-export async function listDataRequests(status?: string): Promise<any[]> {
-  const params: any[] = [];
-  let where = '1 = 1';
-  if (status && status !== 'ALL') {
-    where += ' AND dr.`status` = ?';
-    params.push(status);
-  }
-  const [rows]: any = await pool.query(
-    `SELECT dr.\`id\`, dr.\`userId\`, dr.\`type\`, dr.\`status\`, dr.\`note\`, dr.\`requestedAt\`, dr.\`completedAt\`,
-            dr.\`artifactPath\`, u.\`email\` AS subjectEmail, u.\`fullName\` AS subjectName, v.\`fullName\` AS verifiedByName
-       FROM \`data_request\` dr
-       JOIN \`user\` u ON u.\`id\` = dr.\`userId\`
-       LEFT JOIN \`user\` v ON v.\`id\` = dr.\`verifiedById\`
-      WHERE ${where} ORDER BY dr.\`requestedAt\` DESC LIMIT 200`,
-    params
-  );
-  return rows || [];
-}
-
-export async function transitionDataRequest(
-  requestId: string,
-  to: 'IN_REVIEW' | 'COMPLETED' | 'REJECTED',
-  actor: { id: string; email: string; ip: string },
-  note?: string
-): Promise<{ id: string; status: string; erasure?: { masked: string[] } }> {
-  const [rows]: any = await pool.query('SELECT * FROM `data_request` WHERE `id` = ? LIMIT 1', [requestId]);
-  if (!rows?.length) throw new Error('Request not found');
-  const request = rows[0];
-
-  let erasure: { masked: string[] } | undefined;
-  if (to === 'COMPLETED' && request.type === 'ERASURE') {
-    erasure = await anonymiseSubject(request.userId, actor);
-  }
-
-  await pool.query(
-    'UPDATE `data_request` SET `status` = ?, `verifiedById` = ?, `completedAt` = ?, `note` = COALESCE(?, `note`), `updatedAt` = NOW(3) WHERE `id` = ?',
-    [to, actor.id, to === 'COMPLETED' || to === 'REJECTED' ? new Date() : null, note || null, requestId]
-  );
-
-  await AuditService.log({
-    userId: actor.id,
-    action: to === 'COMPLETED' ? 'DELETE' : 'UPDATE',
-    entityType: 'DataRequest',
-    entityId: requestId,
-    ipAddress: actor.ip,
-    riskScore: to === 'COMPLETED' && request.type === 'ERASURE' ? 85 : 50,
-    tags: ['privacy', request.type],
-    before: { status: request.status },
-    after: { status: to, subject: request.userId, masked: erasure?.masked ?? null },
-  }).catch(() => undefined);
-
-  return { id: requestId, status: to, erasure };
-}
-
-/** Columns that identify a person, checked against the live schema first. */
-const USER_PII = ['fullName', 'email', 'loginId', 'locationId', 'employeeId'];
-const EMPLOYEE_PII = [
-  'firstName',
-  'lastName',
-  'fullName',
-  'email',
-  'phone',
-  'alternatePhone',
-  'emergencyContactName',
-  'emergencyContactPhone',
-  'addressLine1',
-  'addressLine2',
-  'city',
-  'state',
-  'pincode',
-  'aadhaarNumber',
-  'panNumber',
-  'uanNumber',
-  'dateOfBirth',
-  'photoUrl',
-  'signatureUrl',
-];
-
+/** Checks which of the given column names exist on the live table (schema-validated SQL). */
 async function existingColumns(table: string, candidates: string[]): Promise<string[]> {
   const [rows]: any = await pool.query(
     `SELECT \`column_name\` FROM information_schema.columns
@@ -353,84 +245,6 @@ async function existingColumns(table: string, candidates: string[]): Promise<str
     [table, candidates.map((c) => c.toLowerCase())]
   );
   return (rows || []).map((r: any) => String(Object.values(r)[0]));
-}
-
-/**
- * Erasure: replaces identifying values with non-attributable ones and removes
- * the personal artefacts (sessions, tokens, attempts, consent). The account row
- * stays so statutory payroll/attendance/audit history remains intact.
- */
-export async function anonymiseSubject(
-  userId: string,
-  actor: { id: string; email: string; ip: string }
-): Promise<{ masked: string[] }> {
-  const [rows]: any = await pool.query('SELECT `id`, `employeeId` FROM `user` WHERE `id` = ? LIMIT 1', [userId]);
-  if (!rows?.length) throw new Error('Subject not found');
-  const subject = rows[0];
-  const masked: string[] = [];
-
-  const userColumns = await existingColumns('user', USER_PII);
-  const userSets: string[] = [];
-  const userParams: any[] = [];
-  for (const column of userColumns) {
-    const lower = column.toLowerCase();
-    if (lower === 'email') {
-      userSets.push('`email` = ?');
-      userParams.push(`erased-${userId.slice(-8)}-${crypto.randomBytes(3).toString('hex')}@erasure.invalid`);
-    } else if (lower === 'fullname') {
-      userSets.push('`fullName` = ?');
-      userParams.push('Erased Data Subject');
-    } else if (lower === 'loginid') {
-      userSets.push('`loginId` = NULL');
-    } else {
-      userSets.push(`\`${column}\` = NULL`);
-    }
-    masked.push(`user.${column}`);
-  }
-  userSets.push('`passwordHash` = ?', '`isActive` = 0', '`status` = "DISABLED"', '`accessStatus` = "DISABLED"', '`updatedAt` = NOW(3)');
-  userParams.push(`erased-${crypto.randomUUID()}`, userId);
-  await pool.query(`UPDATE \`user\` SET ${userSets.join(', ')} WHERE \`id\` = ?`, userParams);
-
-  if (subject.employeeId) {
-    const empColumns = await existingColumns('employee', EMPLOYEE_PII);
-    if (empColumns.length) {
-      const sets: string[] = [];
-      for (const column of empColumns) {
-        if (column.toLowerCase() === 'fullname') sets.push('`fullName` = "Erased Data Subject"');
-        else if (column.toLowerCase() === 'firstname') sets.push('`firstName` = "Erased"');
-        else if (column.toLowerCase() === 'lastname') sets.push('`lastName` = "Data Subject"');
-        else if (column.toLowerCase() === 'email') sets.push('`email` = NULL');
-        else sets.push(`\`${column}\` = NULL`);
-        masked.push(`employee.${column}`);
-      }
-      await pool.query(`UPDATE \`employee\` SET ${sets.join(', ')}, \`updatedAt\` = NOW(3) WHERE \`id\` = ?`, [subject.employeeId]);
-    }
-  }
-
-  // Personal artefacts that have no statutory retention requirement.
-  for (const statement of [
-    'DELETE FROM `session` WHERE `userId` = ?',
-    'DELETE FROM `refresh_token` WHERE `userId` = ?',
-    'DELETE FROM `password_history` WHERE `userId` = ?',
-    'DELETE FROM `mfa_device` WHERE `userId` = ?',
-    'DELETE FROM `device_fingerprint` WHERE `userId` = ?',
-    'DELETE FROM `cookie_consent` WHERE `userId` = ?',
-  ]) {
-    await pool.query(statement, [userId]).catch((err: any) => console.warn('[privacy] artefact cleanup skipped:', err?.code));
-  }
-  await pool.query('UPDATE `login_attempt` SET `ipAddress` = "0.0.0.0", `userAgent` = "erased" WHERE `userId` = ?', [userId]).catch(() => undefined);
-
-  await raiseErasureAlert(userId, actor);
-  return { masked };
-}
-
-async function raiseErasureAlert(userId: string, actor: { id: string; email: string }): Promise<void> {
-  const { raiseSecurityAlert } = await import('./securityAlerts.js');
-  await raiseSecurityAlert({
-    title: `Right-to-erasure executed for ${userId}`,
-    message: `${actor.email} completed an erasure request. Personal identifiers were masked; statutory records were retained.`,
-    event: { type: 'CONFIG_CHANGE', severity: 'HIGH', userId, ipAddress: '0.0.0.0', riskScore: 70, details: { erasure: true } },
-  });
 }
 
 // ---------------------------------------------------------------------------

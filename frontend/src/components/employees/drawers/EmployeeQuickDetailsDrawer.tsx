@@ -11,7 +11,6 @@ import {
   Mail,
   Calendar,
   ShieldCheck,
-  QrCode,
   ScanFace,
   FileText,
   ExternalLink,
@@ -29,7 +28,6 @@ interface EmployeeQuickDetailsDrawerProps {
   open: boolean;
   onClose: () => void;
   employee: any | null;
-  onOpenQrPass?: (employee: any) => void;
   triggerRef?: React.RefObject<HTMLElement | null>;
 }
 
@@ -37,7 +35,6 @@ export function EmployeeQuickDetailsDrawer({
   open,
   onClose,
   employee,
-  onOpenQrPass,
   triggerRef,
 }: EmployeeQuickDetailsDrawerProps) {
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -102,9 +99,6 @@ export function EmployeeQuickDetailsDrawer({
 
   const hasFaceProfile = Boolean(
     employee.faceProfileId || employee.faceProfile || employee.faceVerified
-  );
-  const hasQrPass = Boolean(
-    employee.qrCodeId || employee.qrCode || employee.dailyQRCodeId
   );
 
   return (
@@ -247,7 +241,7 @@ export function EmployeeQuickDetailsDrawer({
           </h4>
 
           <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="p-3 rounded-lg bg-white dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 flex items-center gap-2.5">
+            <div className="col-span-2 p-3 rounded-lg bg-white dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 flex items-center gap-2.5">
               <div
                 className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
                   hasFaceProfile
@@ -267,26 +261,6 @@ export function EmployeeQuickDetailsDrawer({
                   }`}
                 >
                   {hasFaceProfile ? 'Verified & Enrolled' : 'Pending Enrollment'}
-                </span>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-white dark:bg-slate-800/70 border border-slate-200/60 dark:border-slate-700/60 flex items-center gap-2.5">
-              <div
-                className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                  hasQrPass
-                    ? 'bg-blue-50 dark:bg-blue-950/40 text-[#1346a1] dark:text-blue-400'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
-                }`}
-              >
-                <QrCode className="w-4 h-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <span className="text-[10px] text-slate-400 dark:text-slate-400 uppercase font-semibold block">
-                  Digital QR Pass
-                </span>
-                <span className="text-xs font-bold text-slate-800 dark:text-white">
-                  {hasQrPass ? 'Active Pass' : 'Not Generated'}
                 </span>
               </div>
             </div>
@@ -316,17 +290,6 @@ export function EmployeeQuickDetailsDrawer({
               </div>
             </div>
           </div>
-
-          {onOpenQrPass && (
-            <button
-              type="button"
-              onClick={() => onOpenQrPass(employee)}
-              className="w-full mt-1 inline-flex items-center justify-center gap-2 py-2 px-3 bg-[#eff4ff] dark:bg-blue-950/40 hover:bg-[#dce9ff] dark:hover:bg-blue-900/50 text-[#1346a1] dark:text-blue-300 text-xs font-bold rounded-lg border border-[#dce9ff] dark:border-blue-800/60 transition-all cursor-pointer shadow-2xs active:scale-98"
-            >
-              <QrCode className="w-3.5 h-3.5" />
-              <span>Launch One-Time QR Pass Scanner</span>
-            </button>
-          )}
         </div>
 
         {/* COMMUNICATION & CONTACT */}

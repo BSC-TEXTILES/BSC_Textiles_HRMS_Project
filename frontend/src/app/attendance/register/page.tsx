@@ -87,7 +87,7 @@ export default function AttendanceRegisterPage() {
   const [editForm, setEditForm] = useState({
     code: 'P',
     inTime: '09:30 AM',
-    outTime: '18:30 PM',
+    outTime: '06:30 PM',
     notes: '',
   });
   const [savingRecord, setSavingRecord] = useState(false);
@@ -191,13 +191,13 @@ export default function AttendanceRegisterPage() {
       return { date: dateStr, code: 'WO', actualLogin: null, actualLogout: null, notes: 'Weekly Off' };
     }
     if ((empIndex + day) % 11 === 0) {
-      return { date: dateStr, code: 'L', actualLogin: '10:05 AM', actualLogout: '18:30 PM', notes: 'Grace period late' };
+      return { date: dateStr, code: 'L', actualLogin: '10:05 AM', actualLogout: '06:30 PM', notes: 'Grace period late' };
     }
     if ((empIndex + day) % 23 === 0) {
       return { date: dateStr, code: 'EL', actualLogin: null, actualLogout: null, notes: 'Approved Earned Leave' };
     }
 
-    return { date: dateStr, code: 'P', actualLogin: '09:28 AM', actualLogout: '18:30 PM', notes: 'Biometric verified' };
+    return { date: dateStr, code: 'P', actualLogin: '09:28 AM', actualLogout: '06:30 PM', notes: 'Biometric verified' };
   };
 
   // Open Edit Modal for a specific Day and Employee
@@ -207,7 +207,7 @@ export default function AttendanceRegisterPage() {
     setEditForm({
       code: record.code,
       inTime: record.actualLogin || (record.code === 'WO' || record.code === 'A' ? '' : '09:30 AM'),
-      outTime: record.actualLogout || (record.code === 'WO' || record.code === 'A' ? '' : '18:30 PM'),
+      outTime: record.actualLogout || (record.code === 'WO' || record.code === 'A' ? '' : '06:30 PM'),
       notes: record.notes || '',
     });
   };
@@ -687,7 +687,7 @@ export default function AttendanceRegisterPage() {
                     </label>
                     <input
                       type="text"
-                      placeholder="e.g. 18:30 PM"
+                      placeholder="e.g. 06:30 PM"
                       value={editForm.outTime}
                       onChange={(e) => setEditForm({ ...editForm, outTime: e.target.value })}
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-800 focus:outline-none"

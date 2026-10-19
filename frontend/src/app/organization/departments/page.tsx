@@ -8,7 +8,7 @@
  * endpoints which compute all counts from real employee + attendance data.
  *
  * Features:
- *  - Location selector (All Locations + BEL / DAV / SHI / HUB)
+ *  - Location selector (All Locations + BEL / DAV / SHI)
  *  - Drill-down navigation: Location → Floor → Department → Section → Work Area
  *  - Back navigation preserving the selected location filter
  *  - "Data unavailable" indicator when attendance data is missing (never fabricated)
@@ -249,7 +249,7 @@ export default function OrganizationHierarchyPage() {
   /* ---- format helpers ---- */
   const fmtTime = (d: Date | null) => {
     if (!d) return '—';
-    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
   };
 
   /* ---- location list for the selector ---- */

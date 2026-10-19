@@ -857,7 +857,7 @@ export function BreakMetricDrawer({
                             </td>
                           )}
                           <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                            {b.startTime ? new Date(b.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                            {b.startTime ? new Date(b.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '—'}
                           </td>
 
                           {type === 'ACTIVE' ? (
@@ -879,7 +879,7 @@ export function BreakMetricDrawer({
                           ) : (
                             <>
                               <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                                {b.endTime ? new Date(b.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (
+                                {b.endTime ? new Date(b.endTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : (
                                   <span className="text-blue-600 font-semibold">Active Now</span>
                                 )}
                               </td>

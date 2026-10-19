@@ -21,7 +21,7 @@ import { Response } from 'express';
 import ExcelJS from 'exceljs';
 import { pool } from '../../nativeDb.js';
 import { loadGlobalSettings } from '../biometric/settings.js';
-import { fromUtcMysqlString, deviceCalendarDate, formatWallString } from '../biometric/timeCodec.js';
+import { fromUtcMysqlString, deviceCalendarDate, formatWallString, formatWallString12 } from '../biometric/timeCodec.js';
 import { guardFormula } from '../employeeCsvService.js';
 
 const COMPANY_NAME = 'BSC Textiles Pvt Ltd';
@@ -241,7 +241,7 @@ async function loadPunches(
       byDay = new Map<string, any>();
       byEmployee.set(row.employeeId, byDay);
     }
-    const wall = formatWallString(instant, zone, false).slice(11, 19);
+    const wall = formatWallString12(instant, zone, false);
     const agg = byDay.get(day) || { count: 0, first: wall, last: wall, terminals: new Set<string>(), methods: new Set<string>() };
     agg.count += 1;
     agg.last = wall;

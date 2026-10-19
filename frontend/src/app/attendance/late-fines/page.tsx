@@ -480,8 +480,8 @@ export default function LateFinesPage() {
       `"${e.departmentName || ''}"`,
       `"${e.locationName || ''}"`,
       `"${e.shiftName || ''}"`,
-      `"${e.scheduledLogin ? new Date(e.scheduledLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''}"`,
-      `"${e.actualPunchIn ? new Date(e.actualPunchIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-'}"`,
+      `"${e.scheduledLogin ? new Date(e.scheduledLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : ''}"`,
+      `"${e.actualPunchIn ? new Date(e.actualPunchIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : '-'}"`,
       Math.round(e.earlySeconds / 60),
       e.earlySeconds,
       '₹1.0/min',
@@ -523,8 +523,8 @@ export default function LateFinesPage() {
       `"${r.departmentName || ''}"`,
       `"${r.locationName || ''}"`,
       `"${r.shiftName || ''}"`,
-      `"${r.scheduledLogin ? new Date(r.scheduledLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''}"`,
-      `"${r.actualPunchIn ? new Date(r.actualPunchIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'MISSING'}"`,
+      `"${r.scheduledLogin ? new Date(r.scheduledLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : ''}"`,
+      `"${r.actualPunchIn ? new Date(r.actualPunchIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : 'MISSING'}"`,
       r.gracePeriodMinutes ?? 5,
       r.lateSeconds ?? 0,
       r.chargeableLateSeconds ?? 0,
@@ -1063,7 +1063,7 @@ export default function LateFinesPage() {
                             </span>
                           </td>
                           <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-400">
-                            {r.scheduledLogin ? new Date(r.scheduledLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                            {r.scheduledLogin ? new Date(r.scheduledLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-'}
                           </td>
                           <td className="py-2.5 px-3 font-mono">
                             {isMissing ? (
@@ -1072,7 +1072,7 @@ export default function LateFinesPage() {
                               </span>
                             ) : (
                               <span className={`font-semibold ${isLate ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                                {new Date(r.actualPunchIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                {new Date(r.actualPunchIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
                               </span>
                             )}
                           </td>
@@ -1364,10 +1364,10 @@ export default function LateFinesPage() {
                           {e.shiftName}
                         </td>
                         <td className="py-2.5 px-3 font-mono text-slate-600 dark:text-slate-400">
-                          {e.scheduledLogin ? new Date(e.scheduledLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                          {e.scheduledLogin ? new Date(e.scheduledLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-'}
                         </td>
                         <td className="py-2.5 px-3 font-mono text-emerald-600 dark:text-emerald-400 font-semibold">
-                          {e.actualPunchIn ? new Date(e.actualPunchIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '-'}
+                          {e.actualPunchIn ? new Date(e.actualPunchIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : '-'}
                         </td>
                         <td className="py-2.5 px-3 font-bold text-emerald-600">
                           {Math.round(e.earlySeconds / 60)} min early ({e.earlySeconds}s)
@@ -1486,13 +1486,13 @@ export default function LateFinesPage() {
                   <div>
                     <span className="text-[10px] font-bold text-slate-400 uppercase">Scheduled Login</span>
                     <div className="text-sm font-bold text-slate-800 dark:text-slate-100 mt-0.5">
-                      {selectedRecord.scheduledLogin ? new Date(selectedRecord.scheduledLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                      {selectedRecord.scheduledLogin ? new Date(selectedRecord.scheduledLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-'}
                     </div>
                   </div>
                   <div>
                     <span className="text-[10px] font-bold text-slate-400 uppercase">Actual Biometric Punch</span>
                     <div className="text-sm font-bold text-rose-600 dark:text-rose-400 mt-0.5">
-                      {selectedRecord.actualPunchIn ? new Date(selectedRecord.actualPunchIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : 'MISSING'}
+                      {selectedRecord.actualPunchIn ? new Date(selectedRecord.actualPunchIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : 'MISSING'}
                     </div>
                   </div>
                   <div>
@@ -1632,10 +1632,10 @@ export default function LateFinesPage() {
                         <td className="py-2 px-3 font-bold">{r.employeeName}</td>
                         <td className="py-2 px-3">{r.departmentName}</td>
                         <td className="py-2 px-3 font-mono">
-                          {r.scheduledLogin ? new Date(r.scheduledLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '-'}
+                          {r.scheduledLogin ? new Date(r.scheduledLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '-'}
                         </td>
                         <td className="py-2 px-3 font-mono">
-                          {r.actualPunchIn ? new Date(r.actualPunchIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'MISSING'}
+                          {r.actualPunchIn ? new Date(r.actualPunchIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : 'MISSING'}
                         </td>
                         <td className="py-2 px-3 font-bold text-rose-600">
                           {r.chargeableLateSeconds > 0 ? `+${Math.round(r.chargeableLateSeconds / 60)}m` : '0m'}
@@ -1889,7 +1889,7 @@ export default function LateFinesPage() {
                       <tr key={`${r.id || idx}-${idx}`}>
                         <td className="py-2 px-3 font-mono">{String(r.recordDate).split('T')[0]}</td>
                         <td className="py-2 px-3 font-mono">
-                          {r.actualPunchIn ? new Date(r.actualPunchIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'MISSING'}
+                          {r.actualPunchIn ? new Date(r.actualPunchIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : 'MISSING'}
                         </td>
                         <td className="py-2 px-3 font-bold text-rose-600">
                           {r.chargeableLateSeconds > 0 ? `+${Math.round(r.chargeableLateSeconds / 60)}m` : 'Grace / On time'}

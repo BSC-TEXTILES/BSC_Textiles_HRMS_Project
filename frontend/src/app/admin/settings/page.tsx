@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { 
-  Shield, QrCode, Coffee, 
+  Shield, Coffee, 
   Save, Lock, Users, Key, CheckCircle2, XCircle, AlertCircle, Eye, 
   Edit3, Plus, RefreshCw, ChevronRight, UserCheck, Search, Sparkles, 
   SlidersHorizontal, Layers, ShieldCheck, Check, ShieldQuestion, HelpCircle,
@@ -31,7 +31,6 @@ const MODULE_CATEGORY_INFO: Record<string, { group: string; color: string }> = {
   DOCUMENT_MANAGEMENT: { group: 'Compliance & Statutory', color: 'bg-teal-50 text-teal-700 border-teal-200' },
   SALARY_CADRES: { group: 'Payroll & Compensation', color: 'bg-cyan-50 text-cyan-700 border-cyan-200' },
   BIOMETRIC_POLICY: { group: 'Security & Biometric', color: 'bg-violet-50 text-violet-700 border-violet-200' },
-  QR_SECURITY_POLICY: { group: 'Security & Biometric', color: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' },
   BREAK_POLICIES: { group: 'Store Operations', color: 'bg-yellow-50 text-yellow-700 border-yellow-200' },
   ROLES_PERMISSIONS: { group: 'Security & Governance', color: 'bg-primary-50 text-primary-700 border-primary-200' },
   AUDIT_LOGS: { group: 'Security & Governance', color: 'bg-slate-100 text-slate-700 border-slate-300' },
@@ -66,8 +65,6 @@ export default function AdminSettingsPage() {
 
   const [settings, setSettings] = useState({
     faceVerificationThreshold: 85,
-    qrDailyTokenEnabled: true,
-    qrOneTimeScan: true,
     gracePeriodMinutes: 5,
     lateThresholdMinutes: 5,
     earlyLoginIncentiveEnabled: true,
@@ -84,11 +81,9 @@ export default function AdminSettingsPage() {
 
   // Module-level RBAC: view hides a card entirely, view-only locks its inputs.
   const canSeeBiometric = canViewModule(access, 'BIOMETRIC_POLICY');
-  const canSeeQr = canViewModule(access, 'QR_SECURITY_POLICY');
   const canSeeBreak = canViewModule(access, 'BREAK_POLICIES');
   const canSeeRoles = canViewModule(access, 'ROLES_PERMISSIONS');
   const canEditBiometric = canEditModule(access, 'BIOMETRIC_POLICY');
-  const canEditQr = canEditModule(access, 'QR_SECURITY_POLICY');
   const canEditBreak = canEditModule(access, 'BREAK_POLICIES');
   const canEditGeneral =
     (session?.user?.permissions || []).includes('CONFIGURE') ||
@@ -128,8 +123,6 @@ export default function AdminSettingsPage() {
         const s = res.data.settings;
         setSettings({
           faceVerificationThreshold: s.faceVerificationThreshold ?? 85,
-          qrDailyTokenEnabled: s.qrDailyTokenEnabled ?? true,
-          qrOneTimeScan: s.qrOneTimeScan ?? true,
           gracePeriodMinutes: s.gracePeriodMinutes ?? 5,
           lateThresholdMinutes: s.lateThresholdMinutes ?? 5,
           earlyLoginIncentiveEnabled: s.earlyLoginIncentiveEnabled ?? true,
@@ -294,10 +287,6 @@ export default function AdminSettingsPage() {
         Object.assign(payload, settings);
       } else {
         if (canEditBiometric) payload.faceVerificationThreshold = settings.faceVerificationThreshold;
-        if (canEditQr) {
-          payload.qrDailyTokenEnabled = settings.qrDailyTokenEnabled;
-          payload.qrOneTimeScan = settings.qrOneTimeScan;
-        }
         if (canEditBreak) {
           payload.maleLunchMinutes = settings.maleLunchMinutes;
           payload.femaleLunchMinutes = settings.femaleLunchMinutes;
@@ -353,7 +342,7 @@ export default function AdminSettingsPage() {
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Admin Control Center</h1>
             <p className="text-sm text-gray-500 mt-1">
-              Global system configuration, biometric thresholds, QR security policies, and break rules
+              Global system configuration, biometric thresholds, and break rules
             </p>
           </div>
 
@@ -416,55 +405,7 @@ export default function AdminSettingsPage() {
             renderRestrictedCard('Biometric Face Verification Threshold', 'Minimum match confidence settings', Shield)
           )}
 
-          {/* Card 2: Daily QR Token Security */}
-          {canSeeQr ? (
-            <div className={`bg-white rounded-xl shadow-sm border border-gray-200 p-6 ${canEditQr ? '' : 'opacity-80'}`}>
-              <div className="flex items-center justify-between pb-4 border-b border-gray-100">
-                <div className="flex items-center gap-3">
-                  <QrCode className="w-5 h-5 text-purple-600" />
-                  <div>
-                    <h3 className="font-bold text-gray-900">Daily QR Token Anti-Fraud Protection</h3>
-                    <p className="text-xs text-gray-500">Enforces daily expiration, one-time consumption, and replay protection</p>
-                  </div>
-                </div>
-                {!canEditQr && readOnlyBadge}
-              </div>
-
-              <div className="mt-6 space-y-4">
-                <label className={`flex items-center gap-3 ${canEditQr ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
-                  <input
-                    type="checkbox"
-                    disabled={!canEditQr}
-                    checked={settings.qrDailyTokenEnabled}
-                    onChange={(e) => setSettings({ ...settings, qrDailyTokenEnabled: e.target.checked })}
-                    className="rounded text-primary-600 focus:ring-primary-500 w-4 h-4 disabled:opacity-50"
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-gray-900 block">Daily Dynamic QR Token Generation</span>
-                    <span className="text-xs text-gray-500">Generates unique token per employee per date, invalidating previous day tokens.</span>
-                  </div>
-                </label>
-
-                <label className={`flex items-center gap-3 ${canEditQr ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
-                  <input
-                    type="checkbox"
-                    disabled={!canEditQr}
-                    checked={settings.qrOneTimeScan}
-                    onChange={(e) => setSettings({ ...settings, qrOneTimeScan: e.target.checked })}
-                    className="rounded text-primary-600 focus:ring-primary-500 w-4 h-4 disabled:opacity-50"
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-gray-900 block">One-Time Scan Protection per Event</span>
-                    <span className="text-xs text-gray-500">Rejects duplicate scans and prevents token sharing or double entry.</span>
-                  </div>
-                </label>
-              </div>
-            </div>
-          ) : (
-            renderRestrictedCard('Daily QR Token Anti-Fraud Protection', 'Daily token & replay protection rules', QrCode)
-          )}
-
-          {/* Card 3: Break Allowances */}
+          {/* Card 2: Break Allowances */}
           {canSeeBreak ? (
             <div className={`bg-white rounded-xl shadow-sm border border-gray-200 p-6 ${canEditBreak ? '' : 'opacity-80'}`}>
               <div className="flex items-center justify-between pb-4 border-b border-gray-100">
@@ -958,7 +899,7 @@ export default function AdminSettingsPage() {
           <div className="flex justify-end pt-4">
             <button
               type="submit"
-              disabled={saving || loading || (restrictedByRbac && !canEditBiometric && !canEditQr && !canEditBreak && !canEditGeneral)}
+              disabled={saving || loading || (restrictedByRbac && !canEditBiometric && !canEditBreak && !canEditGeneral)}
               className="bg-primary-600 hover:bg-primary-700 text-white font-medium py-2.5 px-6 rounded-lg shadow-sm text-sm flex items-center gap-2 transition-colors disabled:opacity-50"
             >
               <Save className="w-4 h-4" />

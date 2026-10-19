@@ -15,6 +15,7 @@ import { loadCalendarContext } from '../services/attendance/attendanceWorkbook.j
 import {
   deviceCalendarDate,
   formatWallString,
+  formatWallString12,
   fromUtcMysqlString,
   toUtcMysqlString,
   wallTimeToInstant,
@@ -467,7 +468,7 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res: Response) =>
             id: p.id,
             punchTime: instant ? instant.toISOString() : null,
             timeFormatted: wallHhmm(instant, zone),
-            dateTimeFormatted: instant ? formatWallString(instant, zone, false) : null,
+            dateTimeFormatted: instant ? formatWallString12(instant, zone) : null,
             timezone: zone,
             punchType: p.punchType,
             // Resolved once at ingest from the editable mapping table; an

@@ -23,8 +23,6 @@ interface DashboardStats {
   faceVerified?: number;
   faceFailed?: number;
   avgFaceMatch?: number;
-  qrScans?: number;
-  failedQrScans?: number;
   incentiveToday?: number;
   penaltyToday?: number;
 }
@@ -65,14 +63,11 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
   const absent = num(stats?.absent);
   const late = num(stats?.late);
   const weeklyOff = num(stats?.weeklyOff);
-  const hasPunchStats = stats?.qrScans !== undefined || stats?.faceVerified !== undefined;
-  const biometricPunches = hasPunchStats
-    ? (stats?.qrScans ?? 0) + (stats?.faceVerified ?? 0)
-    : null;
+  const hasPunchStats = stats?.faceVerified !== undefined;
+  const biometricPunches = hasPunchStats ? stats?.faceVerified ?? 0 : null;
   // Only ever the mean of match values the terminals themselves reported; the
   // backend returns 0 when no face verification row exists, which is no data.
   const avgFaceMatch = num(stats?.avgFaceMatch);
-  const qrScans = num(stats?.qrScans);
   const lunchBreaks = num(stats?.onLunch);
   const teaBreaks = num(stats?.onTeaBreak);
   const totalBreaks =
@@ -208,12 +203,6 @@ export function DashboardCards({ onSelectMetric, stats }: DashboardCardsProps) {
               <span>Face Verified:</span>
               <span className="font-bold text-[#0b1c30] dark:text-slate-100">
                 {avgFaceMatch === null ? 'Not reported by device' : `${avgFaceMatch.toFixed(1)}% Avg`}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-              <span>RFID & QR Scans:</span>
-              <span className="font-semibold text-slate-500 dark:text-slate-400">
-                {qrScans === null ? NO_DATA : `${qrScans} scans`}
               </span>
             </div>
           </div>

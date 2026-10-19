@@ -1401,7 +1401,7 @@ export class AnalysisService {
     const formatTime = (d: any): string | null => {
       if (!d) return null;
       try {
-        return new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }) + ' IST';
+        return new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) + ' IST';
       } catch {
         return String(d);
       }
@@ -1461,7 +1461,7 @@ export class AnalysisService {
         const rate = recorded > 0 ? Number(((present / recorded) * 100).toFixed(1)) : 0;
         return {
           id: `${r.hubCode}-${r.departmentName}`,
-          hub: `${r.hubName || 'Store'} (${r.hubCode || 'HUB'})`,
+          hub: `${r.hubName || 'Store'} (${r.hubCode || 'STORE'})`,
           department: r.departmentName || 'General',
           present,
           recorded,
@@ -1939,7 +1939,7 @@ export class AnalysisService {
         exited: Number(sumRows[0]?.exited || 0),
       };
       breakdowns = {
-        byHub: hubRows.map((r: any) => ({ name: r.name || 'Store', code: r.code || 'HUB', count: Number(r.count) })),
+        byHub: hubRows.map((r: any) => ({ name: r.name || 'Store', code: r.code || 'STORE', count: Number(r.count) })),
         byDept: deptRows.map((r: any) => ({ name: r.name || 'General', count: Number(r.count) })),
       };
     } else if (category === 'active_workforce' || category === 'active-emp') {
@@ -1974,7 +1974,7 @@ export class AnalysisService {
         onFloor: Number(actSum[0]?.total || 0),
       };
       breakdowns = {
-        byHub: hubRows.map((r: any) => ({ name: r.name || 'Store', code: r.code || 'HUB', count: Number(r.count) })),
+        byHub: hubRows.map((r: any) => ({ name: r.name || 'Store', code: r.code || 'STORE', count: Number(r.count) })),
         byShift: shiftRows.map((r: any) => ({ name: r.shiftName, count: Number(r.count) })),
       };
     } else if (category === 'inactive_exited' || category === 'inactive-emp' || category === 'inactive') {

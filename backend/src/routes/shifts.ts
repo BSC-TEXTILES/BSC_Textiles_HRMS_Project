@@ -41,8 +41,6 @@ const shiftSchema = z.object({
     maleTeaMinutes: z.number().int().min(0).max(120).optional(),
     femaleTeaMinutes: z.number().int().min(0).max(120).optional(),
     faceVerificationThreshold: z.number().min(0).max(100).optional(),
-    qrDailyTokenEnabled: z.boolean().optional(),
-    qrOneTimeScan: z.boolean().optional(),
     scannerRoles: z.any().optional(),
   }),
 });

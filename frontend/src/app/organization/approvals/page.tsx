@@ -412,7 +412,7 @@ export default function OrganizationApprovalsPage() {
         {lastSync && (
           <div className="text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
             <span className="material-symbols-outlined text-[14px]">schedule</span>
-            Last synchronized: {lastSync.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            Last synchronized: {lastSync.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
           </div>
         )}
 

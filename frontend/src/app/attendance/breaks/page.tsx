@@ -194,7 +194,7 @@ export default function AttendanceBreaksPage() {
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-3xl">
-              Live telemetry, duration countdowns, and strict policy adherence for meal and tea breaks across Karnataka stores (BEL, DAV, SHI, HUB).
+              Live telemetry, duration countdowns, and strict policy adherence for meal and tea breaks across Karnataka stores (BEL, DAV, SHI).
             </p>
           </div>
 
@@ -577,11 +577,11 @@ export default function AttendanceBreaksPage() {
                           </span>
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">
-                          {b.startTime ? new Date(b.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                          {b.startTime ? new Date(b.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '—'}
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-600 dark:text-slate-400">
                           {b.endTime ? (
-                            new Date(b.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            new Date(b.endTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
                           ) : (
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-bold bg-blue-50 text-[#1346a1] dark:bg-blue-950/50 dark:text-blue-300">
                               <span className="h-1.5 w-1.5 rounded-full bg-[#1346a1] animate-ping"></span>

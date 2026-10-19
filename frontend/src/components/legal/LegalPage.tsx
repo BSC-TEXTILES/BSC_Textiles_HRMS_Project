@@ -55,8 +55,8 @@ export function LegalPage({
           <a href="mailto:security@bsctextiles.com" className="font-medium text-[#1346a1] underline dark:text-blue-300">
             security@bsctextiles.com
           </a>
-          . You can also raise a request from <Link href="/privacy" className="font-medium underline">My privacy</Link>{' '}
-          once signed in.
+          . Requests about your data can be raised by email once your identity is
+            verified by HR.
         </footer>
       </div>
     </main>

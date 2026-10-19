@@ -41,7 +41,6 @@ import {
   Settings,
   Clock,
   MapPin,
-  QrCode,
   Database,
   HardDrive,
   Network,
@@ -122,8 +121,6 @@ export const enterpriseNavigation: NavSectionConfig[] = [
     items: [
       { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, moduleKey: 'DASHBOARD' },
       { title: 'My Desk Self-Service', href: '/my-desk', icon: UserCheck },
-      { title: 'My Privacy', href: '/privacy', icon: ShieldCheck },
-      { title: 'Notifications', href: '/notifications', icon: CalendarClock },
     ],
   },
   {
@@ -235,14 +232,6 @@ export const enterpriseNavigation: NavSectionConfig[] = [
         roles: WORKFORCE,
       },
       {
-        title: 'Digital QR Passes',
-        href: '/attendance/qr-codes',
-        icon: QrCode,
-        badge: 'Live ID',
-        moduleKey: 'QR_SECURITY_POLICY',
-        roles: WORKFORCE,
-      },
-      {
         title: 'Biometric Device Manager',
         href: '/attendance/devices',
         icon: Cpu,
@@ -347,7 +336,6 @@ export const enterpriseNavigation: NavSectionConfig[] = [
       { title: 'Live Attendance Floor', href: '/operations/live-attendance', icon: LayoutDashboard, roles: OPERATIONS },
       { title: 'Live Streams', href: '/operations/live-streams', icon: Eye, roles: OPERATIONS },
       { title: 'Break Policy Ops', href: '/operations/breaks', icon: Coffee, roles: OPERATIONS },
-      { title: 'Contactless QR Scanner', href: '/operations/qr-scanner', icon: QrCode, badge: 'Scanner', roles: OPERATIONS },
       { title: 'Time Shifts Board', href: '/operations/time-shifts', icon: Clock, roles: OPERATIONS },
     ],
   },

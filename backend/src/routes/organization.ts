@@ -19,6 +19,13 @@ import {
   getEmployeeAssignmentDetail,
   getRecentActivity,
 } from '../services/organizationService.js';
+import {
+  getAllDesignations,
+  createDesignation,
+  updateDesignation,
+  deleteDesignation,
+  assignEmployeeDesignation,
+} from '../services/designationService.js';
 
 const router = Router();
 router.use(authenticate);
@@ -178,6 +185,112 @@ router.get(
       const emergencyOverride = rows.find((r: any) => r.key === 'emergencyOverride')?.value ?? null;
       const approvalPolicy = rows.find((r: any) => r.key === 'approvalPolicy')?.value ?? null;
       res.json({ success: true, data: { approvalPolicy, liveUpdates, emergencyOverride } });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /organization/designations
+ * Returns full designation matrix with actual employee counts, departments, and employees list.
+ */
+router.get(
+  '/designations',
+  requireRole(
+    'SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'HR_EXECUTIVE', 'HR_AUDITOR',
+    'ORGANIZATION_MANAGER', 'LOCATION_MANAGER', 'FLOOR_MANAGER', 'DEPARTMENT_MANAGER',
+    'EMPLOYEE',
+  ),
+  async (_req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const data = await getAllDesignations();
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /organization/designations
+ * Adds a new designation and persists to the database.
+ */
+router.post(
+  '/designations',
+  requireRole('SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'ORGANIZATION_MANAGER'),
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { title, grade, band, minSalary, maxSalary, description, icon, department } = req.body || {};
+      if (!title || !grade) {
+        res.status(400).json({ success: false, error: { message: 'Title and grade are required' } });
+        return;
+      }
+      await createDesignation({ title, grade, band, minSalary, maxSalary, description, icon, department });
+      const data = await getAllDesignations();
+      res.status(201).json({ success: true, message: `Designation "${title}" created successfully`, data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * PUT /organization/designations/:id
+ * Updates an existing designation in the database.
+ */
+router.put(
+  '/designations/:id',
+  requireRole('SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'ORGANIZATION_MANAGER'),
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      await updateDesignation(id, req.body || {});
+      const data = await getAllDesignations();
+      res.json({ success: true, message: 'Designation updated successfully', data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * DELETE /organization/designations/:id
+ * Deactivates a designation.
+ */
+router.delete(
+  '/designations/:id',
+  requireRole('SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'ORGANIZATION_MANAGER'),
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { id } = req.params;
+      await deleteDesignation(id);
+      const data = await getAllDesignations();
+      res.json({ success: true, message: 'Designation removed successfully', data });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /organization/designations/:title/assign
+ * Assigns an employee to this designation.
+ */
+router.post(
+  '/designations/:title/assign',
+  requireRole('SUPER_ADMIN', 'ADMIN', 'HR', 'HR_MANAGER', 'ORGANIZATION_MANAGER'),
+  async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { title } = req.params;
+      const { employeeId } = req.body || {};
+      if (!employeeId) {
+        res.status(400).json({ success: false, error: { message: 'employeeId is required' } });
+        return;
+      }
+      await assignEmployeeDesignation(employeeId, title);
+      const data = await getAllDesignations();
+      res.json({ success: true, message: 'Employee designation updated', data });
     } catch (err) {
       next(err);
     }

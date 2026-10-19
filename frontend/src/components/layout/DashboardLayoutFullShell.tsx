@@ -16,7 +16,6 @@ import {
   User,
   ShieldCheck,
   CheckCheck,
-  ExternalLink,
   LogOut,
   Clock,
   ChevronDown,
@@ -211,7 +210,7 @@ export function DashboardLayoutFullShell({
           hour: '2-digit',
           minute: '2-digit',
           second: '2-digit',
-          hour12: false,
+          hour12: true,
         }) + ' IST'
       );
     };
@@ -296,7 +295,12 @@ export function DashboardLayoutFullShell({
       await markAsRead(notification.id);
     }
     setNotificationsOpen(false);
-    router.push(`/notifications?id=${notification.id}`, { scroll: false });
+    // There is no dedicated notifications page any more — a notification with
+    // an actionUrl opens the record it is about (employee profile, leave
+    // application, approval queue, …); otherwise the click just acknowledges.
+    if (notification.actionUrl) {
+      router.push(notification.actionUrl, { scroll: false });
+    }
   };
 
   const handleMarkAllRead = async () => {
@@ -558,7 +562,7 @@ export function DashboardLayoutFullShell({
           <div className="hidden md:flex flex-col text-right pr-2">
             <div className="flex items-center gap-1.5 justify-end">
               <Clock className="w-3.5 h-3.5 text-sky-200" />
-              <span className="text-xs font-semibold text-white font-mono">{currentTime || '19:16:52 IST'}</span>
+              <span className="text-xs font-semibold text-white font-mono">{currentTime || '07:16:52 PM IST'}</span>
             </div>
             <span className="text-[10px] text-sky-200 font-medium">
               Today • {activeShiftLabel || 'Shift A'}
@@ -651,16 +655,7 @@ export function DashboardLayoutFullShell({
                   )}
                 </div>
 
-                <div className="p-2.5 bg-slate-50 dark:bg-[#0b1220] border-t border-slate-200 dark:border-[#1e2d4d] flex items-center justify-between text-[11px]">
-                  <Link
-                    href="/notifications"
-                    scroll={false}
-                    onClick={() => setNotificationsOpen(false)}
-                    className="text-[#0058be] dark:text-[#3b82f6] hover:underline font-semibold flex items-center gap-1"
-                  >
-                    View All Notifications
-                    <ExternalLink className="w-3 h-3" />
-                  </Link>
+                <div className="p-2.5 bg-slate-50 dark:bg-[#0b1220] border-t border-slate-200 dark:border-[#1e2d4d] flex items-center justify-end text-[11px]">
                   <button
                     onClick={() => setNotificationsOpen(false)}
                     className="text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white font-medium"

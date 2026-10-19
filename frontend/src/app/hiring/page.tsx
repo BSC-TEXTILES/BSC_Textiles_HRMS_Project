@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Input';
 import { api } from '@/lib/api';
-import { useNotifications } from '@/context/NotificationContext';
+import { useSocket } from '@/context/SocketContext';
 import { HireError } from '@/components/hiring/HireError';
 import {
   HiringDashboardData,
@@ -50,7 +50,7 @@ function KpiCard({
 
 export default function HiringDashboardPage() {
   const router = useRouter();
-  const { socket } = useNotifications();
+  const { socket } = useSocket();
   const [data, setData] = useState<HiringDashboardData | null>(null);
   const [locations, setLocations] = useState<HiringLocation[]>([]);
   const [locationId, setLocationId] = useState('');

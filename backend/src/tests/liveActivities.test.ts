@@ -100,7 +100,7 @@ test('every event carries the fields the feed and the drawer render', async () =
 test('keyset pagination neither repeats nor drops rows', async () => {
   const seen: string[] = [];
   let cursor: string | null = null;
-  for (let page = 0; page < 10; page++) {
+  for (let page = 0; page < 100; page++) {
     const result = await listEvents({ businessDate: DAY, limit: 2, cursor });
     for (const event of result.events) seen.push(event.dedupeKey);
     if (!result.hasMore) break;

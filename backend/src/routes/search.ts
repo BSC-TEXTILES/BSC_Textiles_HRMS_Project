@@ -79,22 +79,6 @@ const SIDEBAR_MODULES = [
     minRole: 'HR',
   },
   {
-    title: 'Digital QR Passes',
-    description: 'Daily dynamic employee QR pass generation and terminal validation',
-    href: '/attendance/qr-codes',
-    category: 'QR Code Attendance',
-    keywords: ['qr', 'qr codes', 'pass', 'passes', 'digital qr', 'barcode', 'terminal'],
-    minRole: 'ALL',
-  },
-  {
-    title: 'Contactless QR Scanner',
-    description: 'Kiosk and mobile scanner for touchless attendance recording',
-    href: '/operations/qr-scanner',
-    category: 'QR Code Attendance',
-    keywords: ['scanner', 'scan', 'kiosk', 'touchless', 'contactless'],
-    minRole: 'ALL',
-  },
-  {
     title: 'Biometric Punches',
     description: 'Real-time biometric punch ledger, fingerprint and face terminal sync',
     href: '/attendance/punches',
@@ -437,7 +421,7 @@ searchRouter.get('/', authenticate, async (req: AuthRequest, res: Response) => {
           type: 'hub',
           targetRoute: `/dashboard?hub=${encodeURIComponent(h.id)}`,
           displayLabel: h.name,
-          secondaryLine: `${h.code || 'HUB'} • ${h.city || ''}, ${h.state || 'Karnataka'}`,
+          secondaryLine: `${h.code || 'STORE'} • ${h.city || ''}, ${h.state || 'Karnataka'}`,
           matchedField,
           moduleName: 'Executive Dashboard',
         };
@@ -590,21 +574,10 @@ searchRouter.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // 7. Biometric and QR Records
+    // 7. Biometric Terminals
     let biometricItems: any[] = [];
     let biometricTotal = 0;
     try {
-      const [qrRows]: any = await pool.query(
-        `SELECT q.id, q.employeeId, q.code, q.type, q.status,
-                e.employeeCode, e.firstName, e.lastName, e.fullName
-         FROM qrcode q
-         JOIN employee e ON q.employeeId = e.id
-         WHERE LOWER(q.code) LIKE ? OR LOWER(e.employeeCode) LIKE ? OR LOWER(e.fullName) LIKE ?
-         ORDER BY q.createdAt DESC
-         LIMIT ?`,
-        [term, term, term, limit]
-      );
-
       const [deviceRows]: any = await pool.query(
         `SELECT d.id, d.name, d.deviceType, d.status, l.name AS locationName
          FROM device d
@@ -615,16 +588,6 @@ searchRouter.get('/', authenticate, async (req: AuthRequest, res: Response) => {
       );
 
       const combinedBio = [
-        ...(qrRows || []).map((q: any) => ({
-          id: q.id,
-          type: 'biometric_qr',
-          targetRoute: `/attendance/qr-codes?employeeId=${encodeURIComponent(q.employeeId)}&q=${encodeURIComponent(query)}`,
-          displayLabel: `QR Pass: ${q.fullName || q.employeeCode}`,
-          secondaryLine: `${q.employeeCode} • Pass Type: ${q.type || 'DAILY'} • Status: ${q.status || 'ACTIVE'}`,
-          matchedField: 'QR Pass Code',
-          badge: q.status || 'ACTIVE',
-          moduleName: 'Digital QR Passes',
-        })),
         ...(deviceRows || []).map((d: any) => ({
           id: d.id,
           type: 'biometric_qr',

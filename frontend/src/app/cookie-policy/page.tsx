@@ -63,7 +63,7 @@ export default function CookiePolicyPage() {
           heading: 'Changing your choice',
           body: (
             <p>
-              Use the banner at the bottom of any page, or <em>My privacy</em> once signed in. Necessary cookies cannot
+              Use the banner at the bottom of any page. Necessary cookies cannot
               be switched off — without them the system cannot tell that your requests belong to your session, and it
               would refuse to sign you in.
             </p>

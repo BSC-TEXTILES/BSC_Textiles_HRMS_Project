@@ -2,7 +2,7 @@
 
 ## 1. Executive Summary
 
-BSC Textiles Pvt. Ltd. operates multi-store retail showrooms across Karnataka (Belagavi Head Store, Davanagere Mega Store, Shivamogga Flagship, and Hubballi/HQ). To ensure complete location data isolation, sub-millisecond query performance, fault isolation, and regulatory compliance, the application employs a **Production-Grade MySQL 8.0 Database Sharding Architecture**.
+BSC Textiles Pvt. Ltd. operates multi-store retail showrooms across Karnataka (Belagavi Head Store, Davanagere Mega Store, and Shivamogga Flagship). To ensure complete location data isolation, sub-millisecond query performance, fault isolation, and regulatory compliance, the application employs a **Production-Grade MySQL 8.0 Database Sharding Architecture**.
 
 ### Key Architectural Tenets
 - **Central Metadata / Control Database (`BSC-SHARD-HQ-001`)**: Authoritative repository for user identities, authentication, roles, session tokens, global registry, and audit trails.

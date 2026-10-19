@@ -37,6 +37,7 @@ import {
   wallTimeToInstant,
   deviceCalendarDate,
   formatWallString,
+  formatWallString12,
   toUtcMysqlString,
 } from './timeCodec.js';
 import { resolveVerifyMode, resolvePunchState, involvesFace, VerifyModeRow } from './verifyMode.js';
@@ -802,7 +803,7 @@ async function buildLiveEvent(input: {
     designation: emp.designation ?? null,
     photoUrl: input.photoPath ? `/${input.photoPath.replace(/^\/+/, '')}` : null,
     punchTimeUtc: input.instant.toISOString(),
-    punchTimeLocal: formatWallString(input.instant, input.timeZone, false),
+    punchTimeLocal: formatWallString12(input.instant, input.timeZone),
     attendanceDate: deviceCalendarDate(input.instant, input.timeZone),
     punchType: input.punchType,
     verifyMode: input.verify.rawCode,

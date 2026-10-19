@@ -15,7 +15,7 @@ import { SHIFTS_CHANGED_EVENT } from '@/lib/shiftRegistry';
 
 export default function ReportsPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'attendance' | 'face' | 'qr' | 'incentives' | 'payroll'>('attendance');
+  const [activeTab, setActiveTab] = useState<'attendance' | 'face' | 'incentives' | 'payroll'>('attendance');
   const [locations, setLocations] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [shifts, setShifts] = useState<any[]>([]);
@@ -36,7 +36,7 @@ export default function ReportsPage() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const t = new URLSearchParams(window.location.search).get('tab');
-      if (t && ['attendance', 'face', 'qr', 'incentives', 'payroll'].includes(t)) {
+      if (t && ['attendance', 'face', 'incentives', 'payroll'].includes(t)) {
         setActiveTab(t as any);
       }
     }
@@ -146,9 +146,6 @@ export default function ReportsPage() {
       } else if (activeTab === 'face') {
         const res = await api.get(`/face-verification${baseQ}`).catch(() => null);
         rows = res?.data?.verifications || res?.data?.rows || (Array.isArray(res?.data) ? res.data : []);
-      } else if (activeTab === 'qr') {
-        const res = await api.get(`/qr-codes/scans${baseQ}`).catch(() => null);
-        rows = res?.data?.scans || (Array.isArray(res?.data) ? res.data : []);
       } else if (activeTab === 'incentives') {
         const res = await api.get(`/incentives/transactions${baseQ}`).catch(() => null);
         rows = res?.data?.transactions || (Array.isArray(res?.data) ? res.data : []);
@@ -314,15 +311,6 @@ export default function ReportsPage() {
       };
     }
 
-    let qr = notLoaded('Canteen & QR Scan Passes');
-    if (activeTab === 'qr' && rows.length > 0) {
-      const ok = rows.filter((r) => String(r.result || '').toUpperCase() === 'SUCCESS').length;
-      qr = {
-        value: `${Math.round((ok / rows.length) * 1000) / 10}% Successful`,
-        sub: `${ok} of ${rows.length} scan row(s) succeeded`,
-      };
-    }
-
     let incentive = notLoaded('Festive Incentives Ledger');
     if (activeTab === 'incentives' && rows.length > 0) {
       const total = rows.reduce((acc, r) => acc + num(r.calculatedAmount), 0);
@@ -348,8 +336,6 @@ export default function ReportsPage() {
       musterSub: muster.sub,
       faceVal: face.value,
       faceSub: face.sub,
-      qrVal: qr.value,
-      qrSub: qr.sub,
       incentiveVal: incentive.value,
       incentiveSub: incentive.sub,
       complianceVal: compliance.value,
@@ -403,7 +389,7 @@ export default function ReportsPage() {
         </div>
 
         {/* 5 KPI Metric Horizon */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-space-md mb-space-lg">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md mb-space-lg">
           <button
             ref={(el) => {
               cardTriggerRefs.current['muster'] = el;
@@ -444,29 +430,6 @@ export default function ReportsPage() {
             </div>
             <div className="text-2xl font-bold font-mono text-on-surface">{cardMetrics.faceVal}</div>
             <span className="text-xs text-on-surface-variant mt-1">{cardMetrics.faceSub}</span>
-            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-secondary transition-colors">
-              <span>View Details</span>
-              <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
-            </div>
-          </button>
-
-          <button
-            ref={(el) => {
-              cardTriggerRefs.current['qr'] = el;
-            }}
-            type="button"
-            onClick={() => openDrawer('qr')}
-            aria-label="View details for Canteen QR Tokens"
-            className="group bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-slate-200/80 flex flex-col justify-between text-left cursor-pointer transition-all hover:shadow-md hover:border-[#1346a1]/40 hover:bg-[#F8F4F1]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1346a1] focus-visible:ring-offset-2"
-          >
-            <div className="flex items-center justify-between mb-space-sm">
-              <span className="font-label-md text-label-md uppercase tracking-wider text-on-surface-variant font-bold">Canteen QR Tokens</span>
-              <div className="w-8 h-8 rounded-lg bg-surface-container-low flex items-center justify-center text-secondary">
-                <span className="material-symbols-outlined text-[18px]">qr_code_scanner</span>
-              </div>
-            </div>
-            <div className="text-2xl font-bold font-mono text-on-surface">{cardMetrics.qrVal}</div>
-            <span className="text-xs text-on-surface-variant mt-1">{cardMetrics.qrSub}</span>
             <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 group-hover:text-secondary transition-colors">
               <span>View Details</span>
               <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
@@ -526,7 +489,6 @@ export default function ReportsPage() {
             {[
               { id: 'attendance', label: 'Attendance Muster Roll (Form T)', icon: 'calendar_month' },
               { id: 'face', label: 'Biometric Face Telemetry', icon: 'face' },
-              { id: 'qr', label: 'Canteen & QR Scan Passes', icon: 'lunch_dining' },
               { id: 'incentives', label: 'Festive Incentives Ledger', icon: 'payments' },
               { id: 'payroll', label: 'Statutory Payroll Summary', icon: 'account_balance' },
             ].map((tab) => (

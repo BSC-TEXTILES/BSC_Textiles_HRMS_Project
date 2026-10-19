@@ -63,7 +63,7 @@ async function fetchSummary(filters: DrillFilters): Promise<SummaryRow[]> {
   const late = attList.filter((a) => a.status === 'LATE').length;
   const adherencePct = totalEmp > 0 ? Math.round((present / totalEmp) * 1000) / 10 : 0;
 
-  // Biometric punches (face verifications + QR scans) for the selected date.
+  // Biometric punches (face verifications) for the selected date.
   const punchParams = () => {
     const p = new URLSearchParams();
     p.set('limit', String(ROSTER_LIMIT));
@@ -72,15 +72,9 @@ async function fetchSummary(filters: DrillFilters): Promise<SummaryRow[]> {
     p.set('endDate', dayEnd);
     return p.toString();
   };
-  const [fvRes, qrRes] = await Promise.all([
-    api.get(`/face-verification?${punchParams()}`).catch(() => ({ data: null })),
-    api.get(`/qr-codes/scans?${punchParams()}`).catch(() => ({ data: null })),
-  ]);
+  const fvRes = await api.get(`/face-verification?${punchParams()}`).catch(() => ({ data: null }));
   const fvList: any[] = ((fvRes.data?.verifications || fvRes.data?.rows || []) as any[]).filter(
     (v) => !scope.ready || scope.inScope.has(v.employeeId)
-  );
-  const qrList: any[] = ((qrRes.data?.scans || []) as any[]).filter(
-    (s) => !scope.ready || scope.inScope.has(s.employeeId)
   );
   const faceVerified = fvList.filter((v) => String(v.result).toLowerCase() === 'passed').length;
   const faceFailed = fvList.length - faceVerified;
@@ -88,7 +82,6 @@ async function fetchSummary(filters: DrillFilters): Promise<SummaryRow[]> {
     fvList.length > 0
       ? Math.round((fvList.reduce((s, v) => s + Number(v.score ?? v.matchPercentage ?? 0), 0) / fvList.length) * 10) / 10
       : 0;
-  const qrScans = qrList.length;
 
   // Active floor breaks for the selected date.
   const brkP = new URLSearchParams();
@@ -156,7 +149,7 @@ async function fetchSummary(filters: DrillFilters): Promise<SummaryRow[]> {
       key: 'punches',
       label: 'Biometric Punches',
       display: `${faceAvg.toFixed(1)}%`,
-      secondary: `Face Verified Avg • ${qrScans} RFID/QR scans`,
+      secondary: `${faceVerified} Verified • ${faceFailed} Failed`,
       percent: clamp(faceAvg),
       color: '#4f46e5',
       textColor: '#4338ca',
@@ -164,7 +157,6 @@ async function fetchSummary(filters: DrillFilters): Promise<SummaryRow[]> {
         { label: 'Face verified', value: String(faceVerified) },
         { label: 'Face failed', value: String(faceFailed) },
         { label: 'Average match score', value: `${faceAvg.toFixed(1)}%` },
-        { label: 'QR / RFID scans', value: String(qrScans) },
       ],
     },
     {

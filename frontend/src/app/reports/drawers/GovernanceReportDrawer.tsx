@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
-export type GovernanceMetric = 'muster' | 'face' | 'qr' | 'incentives' | 'compliance';
+export type GovernanceMetric = 'muster' | 'face' | 'incentives' | 'compliance';
 
 export interface GovernanceDrawerFilters {
   locationId: string;
@@ -25,7 +25,7 @@ interface GovernanceReportDrawerProps {
   filters: GovernanceDrawerFilters;
   empIdByCode: Record<string, string>;
   onClose: () => void;
-  onSwitchTab: (tabId: 'attendance' | 'face' | 'qr' | 'incentives' | 'payroll') => void;
+  onSwitchTab: (tabId: 'attendance' | 'face' | 'incentives' | 'payroll') => void;
 }
 
 /** Indian currency formatter: ₹1,84,500 */
@@ -100,7 +100,6 @@ function groupCounts(
  * The drawer only ever shows rows read from a real endpoint:
  *   muster       GET /reports/attendance-summary
  *   face         GET /face-verification (stored face transactions)
- *   qr           GET /qr-codes/scans
  *   incentives   GET /incentives/transactions
  *   compliance   GET /payroll/runs
  * A field the endpoint does not return is rendered as a placeholder — never as a
@@ -144,11 +143,6 @@ function useDrawerData(metric: GovernanceMetric, filters: GovernanceDrawerFilter
         q.set('startDate', start);
         q.set('endDate', end);
         res = await api.get(`/face-verification?${q.toString()}`, { signal });
-      } else if (metric === 'qr') {
-        q.set('limit', '100');
-        q.set('startDate', start);
-        q.set('endDate', end);
-        res = await api.get(`/qr-codes/scans?${q.toString()}`, { signal });
       } else if (metric === 'incentives') {
         q.set('limit', '100');
         q.set('startDate', start);
@@ -239,35 +233,6 @@ function useDrawerData(metric: GovernanceMetric, filters: GovernanceDrawerFilter
           slowestTerminal: null,
           breakdownTerminal: groupCounts(mapped, (r) => (r.terminal === NOT_RECORDED ? null : r.terminal), (_label, count) => `${count} scan(s)`),
           breakdownHub: groupCounts(mapped, (r) => r.hub, (_label, count) => `${count} scan(s)`),
-        });
-      } else if (metric === 'qr') {
-        const list: any[] = data.scans || [];
-        const mapped = list.map((s) => {
-          const ok = String(s.result || '').toUpperCase() === 'SUCCESS';
-          return {
-            id: s.id,
-            employeeId: s.employeeId || s.employee?.id || null,
-            code: s.employee?.employeeCode || DASH,
-            name: s.employee?.fullName || DASH,
-            hub: s.sellingPoint?.name || hubLabel,
-            shift: NOT_RECORDED,
-            scanTime: fmtStamp(s.scannedAt),
-            status: ok ? 'Verified' : 'Unverified',
-            mealCount: null,
-            overage: null,
-            purpose: s.purpose || NOT_RECORDED,
-          };
-        });
-        const verified = mapped.filter((r) => r.status === 'Verified').length;
-        setRows(mapped);
-        setSummary({
-          verifiedRate: mapped.length > 0 ? `${Math.round((verified / mapped.length) * 1000) / 10}% Verified` : null,
-          tokensIssued: typeof data.total === 'number' ? data.total : mapped.length,
-          tokensVerified: verified,
-          unverifiedCount: mapped.length - verified,
-          overageCount: null,
-          breakdownHub: groupCounts(mapped, (r) => r.hub, (_label, count) => `${count} scan(s)`),
-          breakdownShift: groupCounts(mapped, (r) => (r.purpose === NOT_RECORDED ? null : r.purpose), (_label, count) => `${count} scan(s)`),
         });
       } else if (metric === 'incentives') {
         const list: any[] = data.transactions || [];
@@ -426,15 +391,6 @@ export function GovernanceReportDrawer({
           emptyMsg: 'No stored face verification transactions for these filters',
           source: 'GET /face-verification',
         };
-      case 'qr':
-        return {
-          title: 'QR Scan Tokens Details',
-          tabId: 'qr' as const,
-          tabLabel: 'Canteen & QR Scan Passes',
-          chips: ['All', 'Verified', 'Unverified'],
-          emptyMsg: 'No QR scans recorded for these filters',
-          source: 'GET /qr-codes/scans',
-        };
       case 'incentives':
         return {
           title: 'Incentive Transactions Details',
@@ -481,9 +437,6 @@ export function GovernanceReportDrawer({
       } else if (metric === 'face') {
         if (activeChip === 'Verified') result = result.filter((r) => r.result === 'Verified');
         if (activeChip === 'Failed') result = result.filter((r) => r.result === 'Failed');
-      } else if (metric === 'qr') {
-        if (activeChip === 'Verified') result = result.filter((r) => r.status === 'Verified');
-        if (activeChip === 'Unverified') result = result.filter((r) => r.status === 'Unverified');
       } else if (metric === 'incentives') {
         if (activeChip === 'Approved') result = result.filter((r) => r.rawStatus === 'APPROVED');
         if (activeChip === 'Pending Approval') result = result.filter((r) => r.rawStatus === 'PENDING_APPROVAL');
@@ -633,21 +586,6 @@ export function GovernanceReportDrawer({
                 </div>
               )}
 
-              {metric === 'qr' && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                    <Stat label="Scans Recorded" value={fmt(summaryData.tokensIssued)} sub="Server count" />
-                    <Stat label="Verified Share" value={summaryData.verifiedRate ?? DASH} sub={`${fmt(summaryData.tokensVerified)} successful`} tone="emerald" accent />
-                    <Stat label="Unverified / Failed" value={fmt(summaryData.unverifiedCount)} sub="On this page" />
-                    <Stat label="Meal Count / Overage" value="Not tracked" sub="No such column in the scan record" />
-                  </div>
-                  <Breakdowns
-                    left={{ title: 'Scans by Selling Point / Hub', items: summaryData.breakdownHub }}
-                    right={{ title: 'Scans by Purpose', items: summaryData.breakdownShift }}
-                  />
-                </div>
-              )}
-
               {metric === 'incentives' && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
@@ -752,17 +690,6 @@ export function GovernanceReportDrawer({
                           <th className="py-2.5 px-3.5 text-center">Latency</th>
                         </tr>
                       )}
-                      {metric === 'qr' && (
-                        <tr>
-                          <th className="py-2.5 px-3.5">Scan ID</th>
-                          <th className="py-2.5 px-3.5">Employee ID</th>
-                          <th className="py-2.5 px-3.5">Employee Name</th>
-                          <th className="py-2.5 px-3.5">Selling Point / Hub</th>
-                          <th className="py-2.5 px-3.5">Purpose</th>
-                          <th className="py-2.5 px-3.5">Scanned At</th>
-                          <th className="py-2.5 px-3.5 text-center">Result</th>
-                        </tr>
-                      )}
                       {metric === 'incentives' && (
                         <tr>
                           <th className="py-2.5 px-3.5">Employee ID</th>
@@ -862,33 +789,6 @@ export function GovernanceReportDrawer({
                                   {row.confidence}
                                 </td>
                                 <td className="py-2 px-3.5 text-center font-mono text-slate-400">{NOT_MEASURED}</td>
-                              </>
-                            )}
-
-                            {metric === 'qr' && (
-                              <>
-                                <td className="py-2 px-3.5 font-mono text-[11px] font-bold text-slate-700 dark:text-slate-300">
-                                  {String(row.id).slice(0, 14)}
-                                </td>
-                                <td className="py-2 px-3.5 font-mono text-[11px] text-slate-500">{row.code}</td>
-                                <td className="py-2 px-3.5 font-semibold text-slate-900 dark:text-slate-100">
-                                  <NameButton
-                                    name={row.name}
-                                    onClick={() => handleEmployeeClick(row.employeeId, row.code === DASH ? undefined : row.code)}
-                                  />
-                                </td>
-                                <td className="py-2 px-3.5 text-slate-600 dark:text-slate-300">{row.hub}</td>
-                                <td className="py-2 px-3.5 text-slate-600 dark:text-slate-300">{row.purpose}</td>
-                                <td className="py-2 px-3.5 text-slate-500 font-mono text-[11px]">{row.scanTime}</td>
-                                <td className="py-2 px-3.5 text-center">
-                                  <span
-                                    className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                                      row.status === 'Verified' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-                                    }`}
-                                  >
-                                    {row.status}
-                                  </span>
-                                </td>
                               </>
                             )}
 

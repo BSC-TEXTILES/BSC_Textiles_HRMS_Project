@@ -1,6 +1,5 @@
 import { runAttendanceTests, TestResult } from './attendance.test.js';
 import { runBreaksTests } from './breaks.test.js';
-import { runQRTests } from './qr.test.js';
 import { runFaceVerificationTests } from './faceVerification.test.js';
 import { runPermissionsAndLocationTests } from './permissionsAndLocation.test.js';
 import { runIncentivesTests } from './incentives.test.js';
@@ -62,7 +61,6 @@ async function main() {
   let adminToken = '';
   let belagaviHrToken = '';
   let shivamoggaHrToken = '';
-  let scannerToken = '';
   let salesToken = '';
 
   try {
@@ -76,10 +74,6 @@ async function main() {
     // Shivamogga HR
     shivamoggaHrToken = await loginUser('vikram.singh@bsctextiles.com');
     console.log('  ✔ Shivamogga HR Authenticated');
-
-    // Scanner
-    scannerToken = await loginUser('ramesh.gowda@bsctextiles.com');
-    console.log('  ✔ T-Shop Scanner Authenticated');
 
     // Sales Employee
     salesToken = await loginUser('rbac.employee@bsctextiles.com');
@@ -103,12 +97,7 @@ async function main() {
   const breaksResults = await runBreaksTests(BASE_URL, adminToken);
   allResults.push(...breaksResults);
 
-  // 3. QR Suite
-  console.log('▶ Executing Suite 3: Daily QR Validation, Duplication & Security...');
-  const qrResults = await runQRTests(BASE_URL, adminToken, scannerToken);
-  allResults.push(...qrResults);
-
-  // 4. Face Verification Suite
+  // 3. Face Verification Suite
   console.log('▶ Executing Suite 4: Face Verification Thresholds & Logs...');
   const faceResults = await runFaceVerificationTests(BASE_URL, adminToken);
   allResults.push(...faceResults);

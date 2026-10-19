@@ -332,7 +332,7 @@ export default function HiringSettingsPage() {
                   { label: 'Processing', value: outbox.processing, tone: 'text-sky-600' },
                   { label: 'Done', value: outbox.done, tone: 'text-emerald-600' },
                   { label: 'Failed', value: outbox.failed, tone: 'text-red-600' },
-                  { label: 'Oldest pending', value: outbox.oldestPendingAt ? new Date(outbox.oldestPendingAt).toLocaleTimeString() : '—', tone: 'text-slate-600' },
+                  { label: 'Oldest pending', value: outbox.oldestPendingAt ? new Date(outbox.oldestPendingAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true }) : '—', tone: 'text-slate-600' },
                 ].map((item) => (
                   <div key={item.label} className="rounded-lg border border-slate-100 p-3 text-center dark:border-slate-800">
                     <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{item.label}</p>

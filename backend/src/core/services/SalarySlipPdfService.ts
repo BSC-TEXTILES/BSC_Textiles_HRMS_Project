@@ -10,8 +10,8 @@ export interface PayslipPdfData {
   departmentName?: string;
   locationName?: string;
   designation?: string;
-  periodStart: string;
-  periodEnd: string;
+  periodStart: string | Date;
+  periodEnd: string | Date;
   paidDays?: number;
   basicSalary: number;
   allowances: number;
@@ -65,8 +65,10 @@ export class SalarySlipPdfService {
         .text('Established 1938 • Khade Bazar, Belagavi, Karnataka', 55, 72);
       doc.fillColor('#FDE047').fontSize(11).font('Helvetica-Bold')
         .text('SALARY SLIP (FORM T)', 350, 55, { align: 'right' });
+      const periodStartStr = (data.periodStart instanceof Date ? data.periodStart.toISOString() : String(data.periodStart || '')).slice(0, 10);
+      const periodEndStr = (data.periodEnd instanceof Date ? data.periodEnd.toISOString() : String(data.periodEnd || '')).slice(0, 10);
       doc.fillColor('#FFFFFF').fontSize(8).font('Helvetica')
-        .text(`Pay Period: ${data.periodStart.slice(0, 10)} to ${data.periodEnd.slice(0, 10)}`, 320, 72, { align: 'right' });
+        .text(`Pay Period: ${periodStartStr} to ${periodEndStr}`, 320, 72, { align: 'right' });
 
       // Employee Dossier
       doc.rect(40, 108, 515, 65).fill('#F8FAFC').stroke('#E2E8F0');

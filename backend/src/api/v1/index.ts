@@ -13,7 +13,6 @@ import attendanceRoutes from '../../routes/attendance.js';
 import attendanceExportRoutes from '../../routes/attendanceExports.js';
 import breakRoutes from '../../routes/breaks.js';
 import faceVerificationRoutes from '../../routes/faceVerification.js';
-import qrCodeRoutes from '../../routes/qrCodes.js';
 import incentiveRoutes from '../../routes/incentives.js';
 import observationRoutes from '../../routes/observations.js';
 import liveStreamRoutes from '../../routes/liveStreams.js';
@@ -48,7 +47,6 @@ import accessControlRoutes, { moduleAccessRouter, meRouter } from '../../routes/
 import authSessionRouter from '../../routes/authSession.js';
 import credentialsRouter from '../../routes/credentials.js';
 import securityAdminRouter from '../../routes/securityAdmin.js';
-import privacyRouter from '../../routes/privacy.js';
 import liveActivitiesRouter from '../../routes/liveActivities.js';
 import hiringRoutes from '../../routes/hiring.js';
 import hiringPublicRoutes from '../../routes/hiringPublic.js';
@@ -87,7 +85,6 @@ apiV1Router.use('/staff-ops', staffOpsRouter);
 apiV1Router.use('/observation-levels', observationLevelsRouter);
 apiV1Router.use('/breaks', breakRoutes);
 apiV1Router.use('/face-verification', faceVerificationRoutes);
-apiV1Router.use('/qr-codes', qrCodeRoutes);
 apiV1Router.use('/incentives', incentiveRoutes);
 apiV1Router.use('/observations', observationRoutes);
 apiV1Router.use('/live-streams', liveStreamRoutes);
@@ -119,11 +116,10 @@ apiV1Router.use('/access', accessControlRoutes);
 apiV1Router.use('/module-access', moduleAccessRouter);
 apiV1Router.use('/me', meRouter);
 
-// Credential management (Admin), security operations, privacy self-service,
-// and the cookie-based session endpoints the browser signs in through.
+// Credential management (Admin), security operations, and the cookie-based
+// session endpoints the browser signs in through.
 apiV1Router.use('/credentials', credentialsRouter);
 apiV1Router.use('/admin/security', securityAdminRouter);
-apiV1Router.use('/privacy', privacyRouter);
 apiV1Router.use('/live-activities', liveActivitiesRouter);
 
 // Mounted at /api/session, NOT under /api/auth. Next.js exposes NextAuth at

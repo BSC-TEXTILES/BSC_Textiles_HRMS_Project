@@ -6,7 +6,6 @@ export async function seedExecutiveShifts() {
     { id: 'cmuzam5fe00014n4pq25hkcww', code: 'BEL' },
     { id: 'cmuzam5fr00024n4p4izbomev', code: 'DAV' },
     { id: 'cmuzam5g400034n4p89o33l8e', code: 'SHI' },
-    { id: 'cmuzam5gf00044n4pb43g9y4v', code: 'HUB' },
   ];
 
   for (const loc of locations) {

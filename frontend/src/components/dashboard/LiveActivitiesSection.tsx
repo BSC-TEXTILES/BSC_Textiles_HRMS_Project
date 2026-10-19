@@ -9,13 +9,13 @@
  * deterministic `dedupeKey` per event, so the merge below is idempotent and a
  * dropped socket cannot produce duplicates.
  *
- * Transport: the socket already owned by NotificationContext (a second
+ * Transport: the socket already owned by SocketContext (a second
  * connection would be a second thing to leak on unmount). If it is not
  * connected, a 12-second poll takes over, and the header says which one is
  * active rather than pretending to be live.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNotifications } from '@/context/NotificationContext';
+import { useSocket } from '@/context/SocketContext';
 import api from '@/lib/api';
 import { ActivityDetailDrawer } from './ActivityDetailDrawer';
 
@@ -90,7 +90,7 @@ function timeOfDay(iso: string | null): string {
 }
 
 export function LiveActivitiesSection({ selectedDate }: { selectedDate?: string }) {
-  const { socket } = useNotifications();
+  const { socket } = useSocket();
   const [date, setDate] = useState<string>(selectedDate || '');
   const [events, setEvents] = useState<LiveEvent[]>([]);
   const [summary, setSummary] = useState<LiveSummary | null>(null);

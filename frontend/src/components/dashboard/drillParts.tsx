@@ -63,7 +63,7 @@ export function fmtTime(v?: string | null): string {
   if (!v) return '—';
   try {
     const d = new Date(v);
-    if (!isNaN(d.getTime())) return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (!isNaN(d.getTime())) return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
   } catch {
     /* fall through */
   }

@@ -112,7 +112,6 @@ export const IMPORT_COLUMNS: ImportColumn[] = [
   // ── Attendance and biometric references ────────────────────────────────────
   { key: 'biometric_enrollment_status', label: 'Biometric Enrollment Status', group: 'attendance_biometric', presence: 'optional', dbColumn: '(computed from faceProfileId)', description: 'ENROLLED or NOT_ENROLLED. Read-only: derived from the employee face profile.', example: 'NOT_ENROLLED', readOnly: true },
   { key: 'biometric_device_employee_id', label: 'Biometric Device Employee ID', group: 'attendance_biometric', presence: 'optional', dbColumn: 'employee.biometricDeviceEmployeeId', description: 'Employee number programmed into the biometric device.', example: 'BIO-1372' },
-  { key: 'qr_pass_status', label: 'QR Pass Status', group: 'attendance_biometric', presence: 'optional', dbColumn: '(computed from qrCodeId)', description: 'ISSUED or NONE. Read-only: derived from the employee QR record.', example: 'ISSUED', readOnly: true },
   { key: 'attendance_eligibility', label: 'Attendance Eligibility', group: 'attendance_biometric', presence: 'optional', dbColumn: 'employee.attendanceEligible', description: 'TRUE/FALSE — whether the employee punches attendance.', example: 'TRUE' },
 
   // ── Additional administrative fields ───────────────────────────────────────
@@ -391,7 +390,7 @@ export async function buildTemplateCsv(): Promise<string> {
     aadhaar_verification_status: 'VERIFIED',
     biometric_enrollment_status: 'NOT_ENROLLED',
     biometric_device_employee_id: '',
-    qr_pass_status: 'NONE',
+    
     attendance_eligibility: 'TRUE',
     employee_photo_reference: '',
     employee_document_status: 'PENDING',
@@ -443,7 +442,7 @@ export async function buildTemplateCsv(): Promise<string> {
     aadhaar_verification_status: 'PENDING',
     biometric_enrollment_status: 'ENROLLED',
     biometric_device_employee_id: 'BIO-0037',
-    qr_pass_status: 'ISSUED',
+    
     attendance_eligibility: 'TRUE',
     employee_photo_reference: '',
     employee_document_status: 'COMPLETE',
@@ -495,7 +494,7 @@ export async function buildTemplateCsv(): Promise<string> {
     aadhaar_verification_status: 'NOT_VERIFIED',
     biometric_enrollment_status: 'NOT_ENROLLED',
     biometric_device_employee_id: '',
-    qr_pass_status: 'NONE',
+    
     attendance_eligibility: 'FALSE',
     employee_photo_reference: '',
     employee_document_status: 'PENDING',
@@ -645,7 +644,7 @@ export async function buildTemplateExcel(): Promise<Buffer> {
     aadhaar_verification_status: 'VERIFIED',
     biometric_enrollment_status: 'NOT_ENROLLED',
     biometric_device_employee_id: '',
-    qr_pass_status: 'NONE',
+    
     attendance_eligibility: 'TRUE',
     employee_photo_reference: '',
     employee_document_status: 'PENDING',
@@ -697,7 +696,7 @@ export async function buildTemplateExcel(): Promise<Buffer> {
     aadhaar_verification_status: 'PENDING',
     biometric_enrollment_status: 'ENROLLED',
     biometric_device_employee_id: 'BIO-0037',
-    qr_pass_status: 'ISSUED',
+    
     attendance_eligibility: 'TRUE',
     employee_photo_reference: '',
     employee_document_status: 'COMPLETE',
@@ -749,7 +748,7 @@ export async function buildTemplateExcel(): Promise<Buffer> {
     aadhaar_verification_status: 'NOT_VERIFIED',
     biometric_enrollment_status: 'NOT_ENROLLED',
     biometric_device_employee_id: '',
-    qr_pass_status: 'NONE',
+    
     attendance_eligibility: 'FALSE',
     employee_photo_reference: '',
     employee_document_status: 'PENDING',
@@ -942,7 +941,6 @@ interface ExistingEmployee {
   sectionId: string | null;
   shiftId: string | null;
   faceProfileId: string | null;
-  qrCodeId: string | null;
   row: any;
 }
 
@@ -976,7 +974,6 @@ async function loadExistingEmployees(): Promise<{
       sectionId: row.sectionId || null,
       shiftId: row.shiftId || null,
       faceProfileId: row.faceProfileId || null,
-      qrCodeId: row.qrCodeId || null,
       row,
     };
     byCode.set(emp.employeeCode.toLowerCase(), emp);
@@ -1904,33 +1901,6 @@ export async function executeImport(preview: PreviewResult, actor: ImportActor):
             },
           });
 
-          // QR pass records � keeps the QR / attendance modules connected,
-          // exactly like the single-employee "Add Employee" flow.
-          const empQR = await tx.qRCode.create({
-            data: {
-              token: `EMP-${employeeCode}-${Date.now()}`,
-              type: 'EMPLOYEE',
-              employeeId: created.id,
-              locationId: location.id,
-              validFrom: new Date(),
-              validTo: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-            },
-          });
-          const dailyQR = await tx.qRCode.create({
-            data: {
-              token: `DAILY-${employeeCode}-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
-              type: 'DAILY',
-              employeeId: created.id,
-              locationId: location.id,
-              validFrom: new Date(new Date().setHours(0, 0, 0, 0)),
-              validTo: new Date(new Date().setHours(23, 59, 59, 999)),
-            },
-          });
-          await tx.employee.update({
-            where: { id: created.id },
-            data: { qrCodeId: empQR.id, dailyQRCodeId: dailyQR.id },
-          });
-
           // Link matching login user account by email if exists and unlinked
           if (created.email) {
             await tx.$executeRawUnsafe(
@@ -2404,12 +2374,7 @@ async function findDanglingRelations(scopeParams: any[]): Promise<DataQualityIss
       sql: `SELECT f.id AS eid, NULL AS fullName FROM faceprofile f LEFT JOIN employee e ON e.faceProfileId = f.id WHERE e.id IS NULL`,
       label: 'biometric',
     },
-    {
-      category: 'DANGLING_QR_CODE', severity: 'LOW',
-      description: 'Employee QR codes no longer linked to any employee.',
-      sql: `SELECT q.id AS eid, NULL AS fullName FROM qrcode q LEFT JOIN employee e ON e.qrCodeId = q.id WHERE q.type = 'EMPLOYEE' AND e.id IS NULL`,
-      label: 'qr',
-    },
+    
     {
       category: 'DANGLING_EMPLOYEE_DOCUMENT', severity: 'MEDIUM',
       description: 'Employee documents no longer linked to any employee.',
@@ -2545,7 +2510,6 @@ export async function buildEmployeeExportCsv(options: ExportOptions): Promise<{ 
       aadhaar_verification_status: e.aadhaarVerificationStatus || '',
       biometric_enrollment_status: e.faceProfileId ? 'ENROLLED' : 'NOT_ENROLLED',
       biometric_device_employee_id: e.biometricDeviceEmployeeId || '',
-      qr_pass_status: e.qrCodeId ? 'ISSUED' : 'NONE',
       attendance_eligibility:
         e.attendanceEligible === null || e.attendanceEligible === undefined ? 'TRUE' : Number(e.attendanceEligible) ? 'TRUE' : 'FALSE',
       employee_photo_reference: e.photoReference || '',

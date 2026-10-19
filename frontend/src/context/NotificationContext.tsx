@@ -2,8 +2,9 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
 import { useSession } from 'next-auth/react';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
 import api from '@/lib/api';
+import { useSocket } from '@/context/SocketContext';
 
 export interface Notification {
   id: string;
@@ -55,37 +56,18 @@ interface NotificationContextType {
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 /**
- * Socket.IO is served by the Express API process, not by Next.js. Deriving the
- * default from NEXT_PUBLIC_API_URL (rather than window.location.origin) is what
- * makes live punches arrive at all: the browser page is on :3000, the socket
- * server is on :4000, and Next.js only proxies /api/* — not /socket.io/.
+ * Realtime transport is the single Socket.IO connection owned by SocketContext
+ * (the provider is nested inside it). Notification events ride the same
+ * connection as live punches and hiring updates — a second connection per
+ * feature would double the reconnect churn and leak handlers on unmount.
  */
-function resolveWebSocketUrl(): string {
-  const explicit = process.env.NEXT_PUBLIC_WS_URL?.trim();
-  if (explicit) return explicit.replace(/\/$/, '');
-
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
-  if (apiUrl) {
-    try {
-      const parsed = new URL(apiUrl, typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000');
-      return parsed.origin;
-    } catch {
-      // fall through to the origin default below
-    }
-  }
-
-  return typeof window !== 'undefined' ? window.location.origin : 'http://localhost:4000';
-}
-
-const WS_URL = resolveWebSocketUrl();
-
 export function NotificationProvider({ children }: { children: ReactNode }) {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
+  const { socket } = useSocket();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [socket, setSocket] = useState<Socket | null>(null);
 
   const fetchUnreadCount = useCallback(async () => {
     if (typeof window === 'undefined' || window.location.pathname.startsWith('/login')) return;
@@ -145,61 +127,26 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const markAllAsRead = useCallback(async () => {
-    try {
-      await api.post('/notifications/mark-all-read');
-      setNotifications(prev => prev.map(n => ({ ...n, isRead: true, readAt: new Date().toISOString() })));
-      setUnreadCount(0);
-    } catch (err: any) {
-      console.warn('Failed to mark all as read:', err?.message || err);
-    }
-  }, []);
-
   const deleteNotification = useCallback(async (id: string) => {
     try {
       await api.delete(`/notifications/${id}`);
       setNotifications(prev => prev.filter(n => n.id !== id));
-      const deleted = notifications.find(n => n.id === id);
-      if (deleted && !deleted.isRead) {
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
     } catch (err: any) {
       console.warn('Failed to delete notification:', err?.message || err);
     }
-  }, [notifications]);
+  }, []);
 
-  // Initialize WebSocket connection only when user is authenticated and not on login page
+  // Realtime notifications on the shared socket. The server derives the user
+  // room from the verified access token — never from anything the client
+  // claims — so this subscription cannot see anyone else's feed.
   useEffect(() => {
-    if (status !== 'authenticated' || (typeof window !== 'undefined' && window.location.pathname.startsWith('/login'))) {
-      setSocket((prev) => {
-        if (prev) prev.close();
-        return null;
-      });
-      return;
-    }
+    if (!socket || status !== 'authenticated') return;
 
-    // The socket authenticates with the same HttpOnly session cookie as the
-    // REST API (`withCredentials`), and the server derives the user room from
-    // the verified token — never from anything this client claims.
-    const currentUserId = (session?.user as any)?.id;
-
-    const newSocket = io(WS_URL, {
-      auth: { userId: currentUserId },
-      withCredentials: true,
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 2000,
-      timeout: 10000,
-    });
-
-    newSocket.on('connect', () => {});
-
-    newSocket.on('notification:new', (data: { notification: Notification }) => {
+    const onNewNotification = (data: { notification: Notification }) => {
       if (!data?.notification) return;
       setNotifications(prev => [data.notification, ...prev]);
       setUnreadCount(prev => prev + 1);
-      
+
       // Show browser notification if permitted
       if (typeof window !== 'undefined' && 'Notification' in window && window.Notification.permission === 'granted' && document.visibilityState === 'hidden') {
         new window.Notification(data.notification.title, {
@@ -208,20 +155,13 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
           tag: data.notification.id,
         });
       }
-    });
-
-    newSocket.on('disconnect', () => {});
-
-    newSocket.on('connect_error', (err) => {
-      console.warn('[NotificationContext] Realtime reconnecting:', err?.message || err);
-    });
-
-    setSocket(newSocket);
-
-    return () => {
-      newSocket.close();
     };
-  }, [status, session]);
+
+    socket.on('notification:new', onNewNotification);
+    return () => {
+      socket.off('notification:new', onNewNotification);
+    };
+  }, [socket, status]);
 
   // Fetch initial data only when authenticated and not on login page
   useEffect(() => {
@@ -236,6 +176,16 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       setUnreadCount(0);
     }
   }, [status, fetchUnreadCount, fetchNotifications]);
+
+  const markAllAsRead = useCallback(async () => {
+    try {
+      await api.post('/notifications/mark-all-read');
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true, readAt: new Date().toISOString() })));
+      setUnreadCount(0);
+    } catch (err: any) {
+      console.warn('Failed to mark all as read:', err?.message || err);
+    }
+  }, []);
 
   return (
     <NotificationContext.Provider value={{

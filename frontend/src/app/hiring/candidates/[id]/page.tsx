@@ -16,7 +16,7 @@ import { Input, Select } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { api } from '@/lib/api';
 import { canAction, useAccessSnapshot } from '@/lib/rbac';
-import { useNotifications } from '@/context/NotificationContext';
+import { useSocket } from '@/context/SocketContext';
 import { HireError } from '@/components/hiring/HireError';
 import { StageBadge } from '@/components/hiring/StageBadge';
 import {
@@ -32,7 +32,7 @@ export default function ApplicationDetailPage() {
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { socket } = useNotifications();
+  const { socket } = useSocket();
   const access = useAccessSnapshot();
   const canUpdate = canAction(access, 'RECRUITMENT', 'update');
   const canDelete = canAction(access, 'RECRUITMENT', 'delete');

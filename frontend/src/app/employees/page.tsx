@@ -17,7 +17,6 @@ import {
   Filter,
   X,
   ChevronRight,
-  QrCode,
   ScanFace,
   FilterX,
   Contact,
@@ -29,7 +28,6 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { HrAnalysisModule } from '@/components/employees/analysis/HrAnalysisModule';
-import { EmployeeQrModal } from '@/components/dashboard/EmployeeQrModal';
 import { EmployeeQuickDetailsDrawer } from '@/components/employees/drawers/EmployeeQuickDetailsDrawer';
 import { TotalWorkforceDrawer } from '@/components/employees/drawers/TotalWorkforceDrawer';
 import { ActiveOnFloorDrawer } from '@/components/employees/drawers/ActiveOnFloorDrawer';
@@ -76,7 +74,6 @@ export default function EmployeesPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [isExportingCSV, setIsExportingCSV] = useState(false);
-  const [selectedQrEmp, setSelectedQrEmp] = useState<any | null>(null);
   const [selectedDetailEmp, setSelectedDetailEmp] = useState<any | null>(null);
   const detailsTriggerRef = useRef<HTMLButtonElement | null>(null);
   const addEmployeeBtnRef = useRef<HTMLButtonElement>(null);
@@ -735,22 +732,6 @@ export default function EmployeesPage() {
                             <ScanFace className="w-3 h-3" />
                             Face
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => setSelectedQrEmp({
-                              id: emp.id,
-                              code: emp.employeeCode,
-                              name: emp.fullName || `${emp.firstName || ''} ${emp.lastName || ''}`.trim(),
-                              department: emp.department?.name,
-                              hub: emp.location?.name,
-                              shift: emp.shift?.name,
-                            })}
-                            className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded bg-[#eff4ff] hover:bg-[#dce9ff] text-[#0058be] font-bold border border-[#dce9ff] transition-all cursor-pointer shadow-2xs active:scale-95"
-                            title={`Open One-Time QR Pass for ${emp.fullName || emp.employeeCode}`}
-                          >
-                            <QrCode className="w-3 h-3" />
-                            <span>QR Pass</span>
-                          </button>
                         </div>
                       </td>
                       <td className="py-3 px-4">
@@ -824,24 +805,11 @@ export default function EmployeesPage() {
           }}
         />
 
-        {/* Employee One-Time QR Pass Modal */}
-        {selectedQrEmp && (
-          <EmployeeQrModal
-            open={!!selectedQrEmp}
-            onClose={() => setSelectedQrEmp(null)}
-            employee={selectedQrEmp}
-          />
-        )}
-
         {/* Employee Quick Details Drawer */}
         <EmployeeQuickDetailsDrawer
           open={Boolean(selectedDetailEmp)}
           onClose={() => setSelectedDetailEmp(null)}
           employee={selectedDetailEmp}
-          onOpenQrPass={(emp) => {
-            setSelectedDetailEmp(null);
-            setSelectedQrEmp(emp);
-          }}
           triggerRef={detailsTriggerRef}
         />
 

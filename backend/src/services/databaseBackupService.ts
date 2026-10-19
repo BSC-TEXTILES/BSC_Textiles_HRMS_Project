@@ -42,8 +42,6 @@ const EMPLOYEE_TABLES = [
   'payrollitem',
   'penaltyrule',
   'penaltytransaction',
-  'qrcode',
-  'qrscanrecord',
   'videonote',
   'weeklyoffrule',
   'user_database_assignments',

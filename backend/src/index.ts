@@ -31,6 +31,7 @@ import { setupKycSchema } from './scripts/setupKycSchema.js';
 import { seedDocumentReferenceConfig, seedDocumentDossierFixtures } from './scripts/setupEmployeeDocuments.js';
 import { bootFixturesAllowed } from './config/bootFixtures.js';
 import { setupFormerEmployees } from './scripts/setupFormerEmployees.js';
+import { removeHubballiLocation } from './scripts/removeHubballiLocation.js';
 import { setupOrganizationHubs } from './scripts/setupOrganizationHubs.js';
 import { ensureEmployeeImportSchema } from './scripts/setupEmployeeImportSchema.js';
 import { setupPayrollSchema } from './scripts/setupPayrollSchema.js';
@@ -340,6 +341,7 @@ if (!process.env.VERCEL) {
       seedDocumentDossierFixtures().catch((err) => console.warn('[seedDocumentDossierFixtures warning]:', err.message));
     }
     setupFormerEmployees({ schemaOnly }).catch((err) => console.warn('[setupFormerEmployees warning]:', err.message));
+    removeHubballiLocation().catch((err) => console.warn('[removeHubballiLocation warning]:', err.message));
     setupOrganizationHubs().catch((err) => console.warn('[setupOrganizationHubs warning]:', err.message));
     ensureEmployeeImportSchema().catch((err) => console.warn('[setupEmployeeImportSchema warning]:', err.message));
     setupPayrollSchema().catch((err) => console.warn('[setupPayrollSchema warning]:', err.message));

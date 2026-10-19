@@ -63,7 +63,6 @@ export const RBAC_MODULES: RbacModule[] = [
   { key: 'DOCUMENT_MANAGEMENT', label: 'Employee Documents & KYC', description: 'Aadhaar, PAN, Bank verification, academic records, and DigiLocker dossiers' },
   { key: 'SALARY_CADRES', label: 'Salary Cadres & Compensation', description: 'Statutory salary grades, HRA, fixed allowances, PF deductions and take-home' },
   { key: 'BIOMETRIC_POLICY', label: 'Biometric Face Verification Threshold', description: 'Face verification minimum match confidence threshold and fraud detection' },
-  { key: 'QR_SECURITY_POLICY', label: 'Daily QR Token Security & Anti-Fraud', description: 'Daily dynamic QR token generation, one-time scan expiration and replay protection' },
   { key: 'BREAK_POLICIES', label: 'Break Duration Policies', description: 'Male & Female lunch allowances, morning/evening tea break policy rules' },
   { key: 'ROLES_PERMISSIONS', label: 'Roles & Access Permissions (RBAC)', description: 'Enterprise role definitions, module-level access control matrix and user assignment' },
   { key: 'AUDIT_LOGS', label: 'Security & Audit Logs', description: 'Cryptographic system audit trail, configuration change logs and security alerts' },

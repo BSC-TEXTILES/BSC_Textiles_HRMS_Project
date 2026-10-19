@@ -487,7 +487,7 @@ export default function SecurityDashboardPage() {
                         <td className="px-4 py-2 tabular-nums">{row.consecutiveLockouts}</td>
                         <td className="px-4 py-2 text-xs">
                           {row.lockedUntil && new Date(row.lockedUntil) > new Date()
-                            ? new Date(row.lockedUntil).toLocaleTimeString()
+                            ? new Date(row.lockedUntil).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
                             : '—'}
                         </td>
                         <td className="px-4 py-2 text-right">

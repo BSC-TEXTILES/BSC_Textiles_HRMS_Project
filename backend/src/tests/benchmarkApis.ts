@@ -167,7 +167,6 @@ async function main() {
     { name: 'GET /api/employees', category: 'Database Read (Indexed)', targetP95: 100, path: '/api/employees?limit=20', iterations: 40 },
     { name: 'GET /api/attendance', category: 'Database Read (Indexed)', targetP95: 100, path: '/api/attendance?limit=16', iterations: 40 },
     { name: 'GET /api/face-verification', category: 'Database Read (Indexed)', targetP95: 100, path: '/api/face-verification?limit=16', iterations: 40 },
-    { name: 'GET /api/qr-codes/scans', category: 'Database Read (Indexed)', targetP95: 100, path: '/api/qr-codes/scans?limit=16', iterations: 40 },
     { name: 'GET /api/breaks', category: 'Database Read (Indexed)', targetP95: 100, path: '/api/breaks?limit=16', iterations: 40 },
     { name: 'GET /api/incentives/transactions', category: 'Database Read (Indexed)', targetP95: 100, path: '/api/incentives/transactions?limit=16', iterations: 40 },
     { name: 'GET /api/reports/dashboard-summary', category: 'Dashboard Summary', targetP95: 100, path: '/api/reports/dashboard-summary', iterations: 40 },

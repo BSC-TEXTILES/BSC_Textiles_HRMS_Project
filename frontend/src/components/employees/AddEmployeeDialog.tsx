@@ -1665,7 +1665,7 @@ export function AddEmployeeDialog({
                     required
                     value={newLocationName}
                     onChange={(e) => setNewLocationName(e.target.value)}
-                    placeholder="e.g. Hubballi Store"
+                    placeholder="e.g. Belagavi Head Store"
                     className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white focus:outline-none focus:border-[#1346a1] focus:ring-1 focus:ring-[#1346a1]"
                   />
                 </div>

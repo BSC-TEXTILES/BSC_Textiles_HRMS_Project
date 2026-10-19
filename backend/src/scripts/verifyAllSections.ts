@@ -109,7 +109,6 @@ async function runVerification() {
     // Attendance & Punches
     { section: 'Attendance Master', url: `${API_BASE}/api/v1/attendance?page=1&limit=10`, headers: authHeaders },
     { section: 'Attendance Breaks', url: `${API_BASE}/api/v1/breaks?page=1&limit=10`, headers: authHeaders },
-    { section: 'Attendance QR Passes', url: `${API_BASE}/api/v1/qr-codes/daily/${sampleEmployeeId || '1'}`, headers: authHeaders },
 
     // Payroll Operations
     { section: 'Payroll Runs Master', url: `${API_BASE}/api/v1/payroll/runs?page=1&limit=10`, headers: authHeaders },

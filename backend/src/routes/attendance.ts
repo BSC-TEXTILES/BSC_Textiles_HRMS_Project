@@ -700,12 +700,6 @@ router.get('/calculate/:employeeId/:date', authorize('VIEW'), async (req: AuthRe
       orderBy: { verifiedAt: 'desc' },
     });
 
-    const qrLogs = await prisma.qRScanRecord.findMany({
-      where: { employeeId },
-      take: 5,
-      orderBy: { scannedAt: 'desc' },
-    });
-
     const scheduledLogin = `${date}T10:30:00.000Z`;
     const scheduledLogout = `${date}T19:30:00.000Z`;
     const actualLogin = attendance?.actualLogin?.toISOString() || `${date}T10:20:00.000Z`;
@@ -763,11 +757,6 @@ router.get('/calculate/:employeeId/:date', authorize('VIEW'), async (req: AuthRe
         result: f.result,
         threshold: Number(f.threshold || 85),
         attemptedAt: f.verifiedAt?.toISOString() || new Date().toISOString(),
-      })),
-      qrScans: qrLogs.map((q: any) => ({
-        purpose: q.purpose,
-        result: q.result,
-        scannedAt: q.scannedAt?.toISOString() || new Date().toISOString(),
       })),
       events: [
         {

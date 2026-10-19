@@ -128,17 +128,20 @@ async function main() {
     const employee = employees[index % Math.max(employees.length, 1)];
     const tokens = await effectiveTokens([spec.roleId]);
 
+    const loginId = spec.email.split('@')[0];
+
     await pool.query(
-      `INSERT INTO user (id, email, passwordHash, fullName, role, permissions, locationId, employeeId,
+      `INSERT INTO user (id, loginId, email, passwordHash, fullName, role, permissions, locationId, employeeId,
                          isActive, status, accessStatus, mustChangePassword, mfaEnabled, mfaRequired,
                          emailVerifiedAt, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, 'ACTIVE', 'ACTIVE', 0, 0, 0, NOW(3), NOW(3), NOW(3))
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'ACTIVE', 'ACTIVE', 0, 0, 0, NOW(3), NOW(3), NOW(3))
        ON DUPLICATE KEY UPDATE
-         passwordHash = VALUES(passwordHash), fullName = VALUES(fullName), role = VALUES(role),
+         loginId = VALUES(loginId), passwordHash = VALUES(passwordHash), fullName = VALUES(fullName), role = VALUES(role),
          permissions = VALUES(permissions), isActive = 1, status = 'ACTIVE', accessStatus = 'ACTIVE',
          updatedAt = NOW(3)`,
       [
         id,
+        loginId,
         spec.email,
         passwordHash,
         spec.fullName,

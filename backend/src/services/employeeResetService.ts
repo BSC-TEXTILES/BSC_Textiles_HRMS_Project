@@ -75,8 +75,6 @@ export class EmployeeResetService {
         'payrollitem',
         'penaltyrule',
         'penaltytransaction',
-        'qrcode',
-        'qrscanrecord',
         'videonote',
         'weeklyoffrule',
         'attendancecorrection',

@@ -117,8 +117,6 @@ export const MODEL_TO_TABLE: Record<string, string> = {
   employeeBreak: 'employeebreak',
   weeklyOffRule: 'weeklyoffrule',
   holiday: 'holiday',
-  qRCode: 'qrcode',
-  qRScanRecord: 'qrscanrecord',
   faceVerification: 'faceverification',
   incentiveRule: 'incentiverule',
   incentiveTransaction: 'incentivetransaction',
@@ -174,12 +172,9 @@ const RELATION_META: Record<
     shift: { table: 'shift', foreignKey: 'shiftId' },
     user: { table: 'user', parentKey: 'id', foreignKey: 'employeeId' },
     faceProfile: { table: 'faceprofile', parentKey: 'id', foreignKey: 'employeeId' },
-    qrCode: { table: 'qrcode', foreignKey: 'qrCodeId' },
-    dailyQRCode: { table: 'qrcode', foreignKey: 'dailyQRCodeId' },
     attendances: { table: 'attendance', parentKey: 'id', foreignKey: 'employeeId', isMany: true },
     breaks: { table: 'employeebreak', parentKey: 'id', foreignKey: 'employeeId', isMany: true },
     faceVerifications: { table: 'faceverification', parentKey: 'id', foreignKey: 'employeeId', isMany: true },
-    qrScanRecords: { table: 'qrscanrecord', parentKey: 'id', foreignKey: 'employeeId', isMany: true },
     observations: { table: 'observation', parentKey: 'id', foreignKey: 'employeeId', isMany: true },
     sellingPoints: { table: 'employeesellingpoint', parentKey: 'id', foreignKey: 'employeeId', isMany: true },
     leaves: { table: 'leaverequest', parentKey: 'id', foreignKey: 'employeeId', isMany: true },
@@ -241,16 +236,6 @@ const RELATION_META: Record<
   faceVerification: {
     employee: { table: 'employee', foreignKey: 'employeeId' },
     location: { table: 'location', foreignKey: 'locationId' },
-  },
-  qRCode: {
-    employee: { table: 'employee', foreignKey: 'employeeId' },
-    location: { table: 'location', foreignKey: 'locationId' },
-  },
-  qRScanRecord: {
-    employee: { table: 'employee', foreignKey: 'employeeId' },
-    location: { table: 'location', foreignKey: 'locationId' },
-    qrCode: { table: 'qrcode', foreignKey: 'qrCodeId' },
-    dailyQRCode: { table: 'qrcode', foreignKey: 'qrCodeId' },
   },
   payrollRun: {
     location: { table: 'location', foreignKey: 'locationId' },

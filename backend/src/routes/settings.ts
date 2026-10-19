@@ -12,8 +12,8 @@ router.use(authenticate);
  * Module-level write gate for settings:
  *  - Unrestricted (legacy) users need CONFIGURE (or SUPER_ADMIN) as before.
  *  - RBAC-restricted users are checked per module group in the request body:
- *    biometric fields → BIOMETRIC_POLICY edit, QR fields → QR_SECURITY_POLICY
- *    edit, break fields → BREAK_POLICIES edit, everything else → legacy CONFIGURE.
+ *    biometric fields → BIOMETRIC_POLICY edit, break fields → BREAK_POLICIES
+ *    edit, everything else → legacy CONFIGURE.
  */
 async function settingsWriteAccess(req: AuthRequest, res: Response, next: NextFunction) {
   if (!req.user) return res.status(401).json({ error: 'Authentication required' });
@@ -37,13 +37,11 @@ async function settingsWriteAccess(req: AuthRequest, res: Response, next: NextFu
 
 const GROUP_MODULE: Record<string, string> = {
   BIOMETRIC: 'BIOMETRIC_POLICY',
-  QR: 'QR_SECURITY_POLICY',
   BREAK: 'BREAK_POLICIES',
 };
 
 const GROUP_FIELDS: Record<string, string[]> = {
   BIOMETRIC: ['faceVerificationThreshold'],
-  QR: ['qrDailyTokenEnabled', 'qrOneTimeScan', 'scannerRoles'],
   BREAK: [
     'lunchDurationMinutes',
     'teaDurationMinutes',
@@ -120,9 +118,6 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
         maleTeaMinutes: 20,
         femaleTeaMinutes: 15,
         faceVerificationThreshold: 85,
-        qrDailyTokenEnabled: true,
-        qrOneTimeScan: true,
-        scannerRoles: ['T_SHOP_OWNER', 'TEA_BREAK_MANAGER', 'HR_MANAGER', 'FLOOR_MANAGER'],
       },
     });
   } catch (error) {
@@ -156,9 +151,6 @@ router.put('/', settingsWriteAccess, async (req: AuthRequest, res) => {
       maleTeaMinutes,
       femaleTeaMinutes,
       faceVerificationThreshold,
-      qrDailyTokenEnabled,
-      qrOneTimeScan,
-      scannerRoles,
     } = req.body;
 
     const targetLocId = req.user!.role === 'SUPER_ADMIN' ? locationId : req.user!.locationId;
@@ -218,12 +210,6 @@ router.put('/', settingsWriteAccess, async (req: AuthRequest, res) => {
         ? Number(faceVerificationThreshold)
         : Number((current as any)?.faceVerificationThreshold ?? 85);
 
-    const qrValue = (field: string, fallback: any) => {
-      const editable = userAccess.source !== 'rbac' || accessRank(userAccess.access.QR_SECURITY_POLICY) >= accessRank('edit');
-      if (req.body[field] !== undefined && editable) return req.body[field];
-      return (current as any)?.[field] ?? fallback;
-    };
-
     const breakValue = (field: string, fallback: number) => {
       const editable = userAccess.source !== 'rbac' || accessRank(userAccess.access.BREAK_POLICIES) >= accessRank('edit');
       if (req.body[field] !== undefined && editable) return Number(req.body[field]);
@@ -252,9 +238,6 @@ router.put('/', settingsWriteAccess, async (req: AuthRequest, res) => {
         maleTeaMinutes: breakValue('maleTeaMinutes', 20),
         femaleTeaMinutes: breakValue('femaleTeaMinutes', 15),
         faceVerificationThreshold: biometricValue,
-        qrDailyTokenEnabled: Boolean(qrValue('qrDailyTokenEnabled', true)),
-        qrOneTimeScan: Boolean(qrValue('qrOneTimeScan', true)),
-        scannerRoles: qrValue('scannerRoles', ['T_SHOP_OWNER', 'TEA_BREAK_MANAGER', 'HR_MANAGER']),
       },
       create: {
         locationId: targetLocId,
@@ -279,9 +262,6 @@ router.put('/', settingsWriteAccess, async (req: AuthRequest, res) => {
         maleTeaMinutes: Number(maleTeaMinutes ?? 20),
         femaleTeaMinutes: Number(femaleTeaMinutes ?? 15),
         faceVerificationThreshold: biometricValue,
-        qrDailyTokenEnabled: Boolean(qrValue('qrDailyTokenEnabled', true)),
-        qrOneTimeScan: Boolean(qrValue('qrOneTimeScan', true)),
-        scannerRoles: qrValue('scannerRoles', ['T_SHOP_OWNER', 'TEA_BREAK_MANAGER', 'HR_MANAGER']),
       },
     });
 

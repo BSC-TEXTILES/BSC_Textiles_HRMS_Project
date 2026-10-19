@@ -19,7 +19,7 @@ import { Response } from 'express';
 import ExcelJS from 'exceljs';
 import { pool } from '../../nativeDb.js';
 import { loadGlobalSettings } from './settings.js';
-import { wallTimeToInstant, formatWallString, fromUtcMysqlString, deviceCalendarDate } from './timeCodec.js';
+import { wallTimeToInstant, formatWallString, formatWallString12, fromUtcMysqlString, deviceCalendarDate } from './timeCodec.js';
 import { listMismatchRecords, MISMATCH_TYPE_LABELS, MismatchListFilters, MismatchRecordRow } from './mismatch.js';
 
 export type ExportKind = 'complete' | 'floor-wise' | 'section-wise' | 'device-wise' | 'mismatch';
@@ -191,7 +191,7 @@ function mapPunchRow(row: any, fallbackTimeZone: string): PunchExportRow {
     departmentName: row.departmentName ?? '',
     enrollmentNumber: row.enrollmentNumber ?? '',
     attendanceDate: instant ? deviceCalendarDate(instant, zone) : '',
-    punchTimeLocal: instant ? formatWallString(instant, zone, false) : '',
+    punchTimeLocal: instant ? formatWallString12(instant, zone) : '',
     timezone: zone,
     punchTimeUtc: instant ? instant.toISOString() : '',
     punchType,
