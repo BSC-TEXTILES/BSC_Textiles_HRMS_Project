@@ -197,39 +197,34 @@ export function formatShiftDisplayName(nameOrLabel?: string | null): string {
   return cleaned || nameOrLabel;
 }
 
+export function isCustomShift(s: any): boolean {
+  if (!s) return false;
+  return Boolean(
+    s.isCustom === true ||
+    s.type === 'custom' ||
+    s.scannerRoles?.isCustomShift === true ||
+    s.scannerRoles?.isCustomBatch === true ||
+    (typeof s.code === 'string' && s.code.startsWith('S_'))
+  );
+}
+
 /**
  * Checks whether a shift represents an immutable System / Default shift.
- * Default shifts cannot be deleted, while custom shifts can.
+ * Shift 1 and Shift 2 are the system default shifts.
  */
 export function isSystemOrDefaultShift(s: { name?: string | null; code?: string | null; isCustom?: boolean | null }): boolean {
   if (s.isCustom === true) return false;
   const nameLower = (s.name || '').trim().toLowerCase();
   const codeUpper = (s.code || '').trim().toUpperCase();
 
-  const DEFAULT_SYSTEM_NAMES = [
-    'shift i',
-    'shift 1',
-    'shift 2',
-    'shift ii',
-    'shift 3',
-    'shift iii',
-    'shift 4',
-    'shift iv',
-    'shift 5',
-    'shift v',
-    'test shift to archive',
-    'morning shift',
-    'general shift',
-    'evening shift',
-    'night shift',
-    'night shift (batch)',
-  ];
-
-  if (DEFAULT_SYSTEM_NAMES.includes(nameLower)) return true;
-  if (/^shift\s*([1-5]|i{1,3}|iv|v)\b/i.test(nameLower)) return true;
-  if (/^SHIFT[_-]?([1-5]|I{1,3}|IV|V)\b/i.test(codeUpper)) return true;
-  if (codeUpper.includes('MORNING') || codeUpper.includes('GENERAL') || codeUpper.includes('EVENING') || codeUpper.includes('NIGHT')) return true;
-  return false;
+  return (
+    nameLower === 'shift 1' ||
+    nameLower === 'shift i' ||
+    codeUpper.startsWith('SHIFT_I') ||
+    nameLower === 'shift 2' ||
+    nameLower === 'shift ii' ||
+    codeUpper.startsWith('SHIFT_2')
+  );
 }
 
 /**
@@ -274,19 +269,10 @@ export function buildShiftRegistry(
       key = 'SHIFT_I';
     } else if (nameLower === 'shift 2' || nameLower === 'shift ii' || codeUpper.startsWith('SHIFT_2')) {
       key = 'SHIFT_2';
-    } else if (nameLower.includes('morning') || codeUpper.includes('MORNING')) {
-      key = 'LEGACY_MORNING';
-    } else if (nameLower.includes('general') || codeUpper.includes('GENERAL')) {
-      key = 'LEGACY_GENERAL';
-    } else if (nameLower.includes('evening') || codeUpper.includes('EVENING')) {
-      key = 'LEGACY_EVENING';
-    } else if (nameLower.includes('night') || codeUpper.includes('NIGHT')) {
-      key = 'LEGACY_NIGHT';
-    } else if (isSystemOrDefaultShift(s)) {
-      key = `SYSTEM_${s.id || nameLower}`;
+    } else if (isCustomShift(s)) {
+      key = `CUSTOM_${s.id || s.code || nameLower}`;
     } else {
-      // Custom shift: key by unique ID or distinct name
-      key = `CUSTOM_${s.id}`;
+      key = `LEGACY_${s.id || s.code || nameLower}`;
     }
 
     if (!groups.has(key)) groups.set(key, []);
@@ -407,7 +393,7 @@ export function buildShiftRegistry(
   const activeShifts: ShiftRegistryItem[] = [];
   const legacyShifts: ShiftRegistryItem[] = [];
 
-  // 1. Shift I (Active Seed)
+  // 1. Shift 1 (Active Seed)
   const shift1List = groups.get('SHIFT_I') || [];
   const isShift1Archived =
     shift1List.length > 0 &&
@@ -449,24 +435,10 @@ export function buildShiftRegistry(
     );
   }
 
-  // 3. System & User Custom shifts (in creation order)
-  const systemEntries: ShiftRegistryItem[] = [];
+  // 3. User Custom shifts (in creation order)
   const customEntries: ShiftRegistryItem[] = [];
   for (const [key, list] of groups.entries()) {
-    if (key.startsWith('SYSTEM_')) {
-      const isArchived =
-        list.length > 0 &&
-        list.every((s) => s.status === 'ARCHIVED' || s.status === 'INACTIVE');
-      const item = resolveGroup(key, list, {
-        defaultName: list[0]?.name || 'System Shift',
-        source: 'Seed',
-        status: isArchived ? 'Archived' : 'Active',
-        isCustom: false,
-      });
-      if (item.status !== 'Archived') {
-        systemEntries.push(item);
-      }
-    } else if (key.startsWith('CUSTOM_')) {
+    if (key.startsWith('CUSTOM_')) {
       const isArchived =
         list.length > 0 &&
         list.every((s) => s.status === 'ARCHIVED' || s.status === 'INACTIVE');
@@ -482,9 +454,6 @@ export function buildShiftRegistry(
     }
   }
 
-  // Preserve order: system defaults first, then custom shifts by createdAt ascending
-  activeShifts.push(...systemEntries);
-
   customEntries.sort((a, b) => {
     const timeA = new Date(a.createdAt || 0).getTime();
     const timeB = new Date(b.createdAt || 0).getTime();
@@ -492,69 +461,17 @@ export function buildShiftRegistry(
   });
   activeShifts.push(...customEntries);
 
-  // 4. Legacy Shifts: Morning Shift, General Shift, Evening Shift, Night Shift
-  const legacySpecs: Array<{
-    key: string;
-    defaultName: string;
-    punchIn: string;
-    punchOut: string;
-    lunchMinutes: number;
-    teaMinutes: number;
-    teaSlot: 'None' | 'Morning' | 'Evening';
-  }> = [
-    {
-      key: 'LEGACY_MORNING',
-      defaultName: 'Morning Shift',
-      punchIn: '06:00',
-      punchOut: '14:00',
-      lunchMinutes: 45,
-      teaMinutes: 15,
-      teaSlot: 'Morning',
-    },
-    {
-      key: 'LEGACY_GENERAL',
-      defaultName: 'General Shift',
-      punchIn: '09:00',
-      punchOut: '18:00',
-      lunchMinutes: 45,
-      teaMinutes: 15,
-      teaSlot: 'Morning',
-    },
-    {
-      key: 'LEGACY_EVENING',
-      defaultName: 'Evening Shift',
-      punchIn: '14:00',
-      punchOut: '22:00',
-      lunchMinutes: 45,
-      teaMinutes: 15,
-      teaSlot: 'Evening',
-    },
-    {
-      key: 'LEGACY_NIGHT',
-      defaultName: 'Night Shift',
-      punchIn: '22:00',
-      punchOut: '06:00',
-      lunchMinutes: 45,
-      teaMinutes: 15,
-      teaSlot: 'None',
-    },
-  ];
-
-  for (const spec of legacySpecs) {
-    const list = groups.get(spec.key) || [];
-    legacyShifts.push(
-      resolveGroup(spec.key, list, {
-        defaultName: spec.defaultName,
-        defaultPunchIn: spec.punchIn,
-        defaultPunchOut: spec.punchOut,
-        defaultLunch: spec.lunchMinutes,
-        defaultTea: spec.teaMinutes,
-        defaultTeaSlot: spec.teaSlot,
+  // 4. Legacy Shifts preserved safely for compatibility
+  for (const [key, list] of groups.entries()) {
+    if (key.startsWith('LEGACY_')) {
+      const item = resolveGroup(key, list, {
+        defaultName: list[0]?.name || 'Legacy Shift',
         source: 'Legacy',
         status: 'Legacy',
         isCustom: false,
-      })
-    );
+      });
+      legacyShifts.push(item);
+    }
   }
 
   const resetOption: ShiftRegistryItem = {
@@ -585,12 +502,12 @@ export function buildShiftRegistry(
   };
 
   const rawAllOptions = [...activeShifts, ...legacyShifts];
-  const allOptions = filterStandardShifts(rawAllOptions);
+  const allOptions = activeShifts;
 
   return {
     rawAllOptions,
-    activeShifts: filterStandardShifts(activeShifts),
-    legacyShifts: filterStandardShifts(legacyShifts),
+    activeShifts,
+    legacyShifts,
     allOptions,
     resetOption,
   };

@@ -12,6 +12,7 @@ import { monthRange } from '@/components/dashboard/DetailDrillDownModal';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { SHIFTS_CHANGED_EVENT } from '@/lib/shiftRegistry';
+import { useShiftRegistry } from '@/hooks/useShiftRegistry';
 
 export default function ReportsPage() {
   const router = useRouter();
@@ -94,17 +95,15 @@ export default function ReportsPage() {
     return locations.find((l) => l.code === selectedLocation)?.id || null;
   }, [locations, selectedLocation]);
 
-  /** Shift options scoped to the selected hub (deduped by shift code). */
+  // Centralized Shift Directory
+  const { allOptions: registryShifts, rawAllOptions } = useShiftRegistry(resolvedLocationId || undefined);
+
+  /** Standardized shift options scoped to the selected hub (Shift 1, Shift 2, Custom Shifts) */
   const shiftOptions = useMemo(() => {
-    const scoped = resolvedLocationId ? shifts.filter((s) => s.locationId === resolvedLocationId) : shifts;
-    const seen = new Set<string>();
-    return scoped.filter((s) => {
-      const key = String(s.code || s.name);
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  }, [shifts, resolvedLocationId]);
+    return (registryShifts || []).filter(
+      (s) => s.id !== 'all' && s.name !== 'All Shifts' && s.displayName !== 'All Shifts'
+    );
+  }, [registryShifts]);
 
   /** Last 12 months for the Monthly Report month filter. */
   const monthOptions = useMemo(() => {
@@ -255,7 +254,10 @@ export default function ReportsPage() {
       shiftName:
         selectedShift === 'all'
           ? 'All Shifts'
-          : shifts.find((s) => s.id === selectedShift)?.name || selectedShift,
+          : registryShifts.find((s) => s.id === selectedShift)?.displayName ||
+            registryShifts.find((s) => s.id === selectedShift)?.name ||
+            rawAllOptions.find((s) => s.id === selectedShift)?.name ||
+            selectedShift,
       status: selectedStatus,
     };
   }, [
@@ -267,7 +269,8 @@ export default function ReportsPage() {
     selectedDept,
     departments,
     selectedShift,
-    shifts,
+    registryShifts,
+    rawAllOptions,
     selectedStatus,
   ]);
 

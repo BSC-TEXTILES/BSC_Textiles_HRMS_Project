@@ -226,11 +226,17 @@ function processShifts(rawShifts: any[], isAllHubs: boolean): ShiftOptionItem[] 
     );
   });
 
-  // 3. User custom shifts (exclude legacy: Morning, General, Evening, Night Batch, and Shift I / Shift 2)
-  const legacyNames = ['morning', 'general', 'evening', 'night'];
-  const legacyCodes = ['MORNING', 'GENERAL', 'EVENING', 'NIGHT', 'SHIFT-240'];
-
+  // 3. User custom shifts (strictly genuine user-created custom shifts)
   const customShiftsRaw = rawShifts.filter((s: any) => {
+    const isCustom = Boolean(
+      s.isCustom === true ||
+      s.type === 'custom' ||
+      s.scannerRoles?.isCustomShift === true ||
+      s.scannerRoles?.isCustomBatch === true ||
+      (typeof s.code === 'string' && s.code.startsWith('S_'))
+    );
+    if (!isCustom) return false;
+
     const nameLower = (s.name || '').trim().toLowerCase();
     const codeUpper = (s.code || '').trim().toUpperCase();
 
@@ -244,9 +250,6 @@ function processShifts(rawShifts: any[], isAllHubs: boolean): ShiftOptionItem[] 
     ) {
       return false;
     }
-
-    if (legacyNames.some((leg) => nameLower.includes(leg))) return false;
-    if (legacyCodes.some((leg) => codeUpper.includes(leg))) return false;
 
     return true;
   });

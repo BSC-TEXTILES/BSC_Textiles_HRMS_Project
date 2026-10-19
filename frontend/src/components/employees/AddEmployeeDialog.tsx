@@ -242,14 +242,21 @@ export function AddEmployeeDialog({
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Load standardized shift master via shared hook
-  const { allOptions: shiftOptions } = useShiftRegistry(formData.locationId || undefined);
+  const { allOptions: shiftOptions, rawAllOptions } = useShiftRegistry(formData.locationId || undefined);
 
   // Real shift options excluding any 'All Shifts' item
   const validShiftOptions = useMemo(() => {
-    return (shiftOptions || []).filter(
+    const list = (shiftOptions || []).filter(
       (s) => s.id !== 'all' && s.id !== 'ALL' && s.name !== 'All Shifts' && s.displayName !== 'All Shifts'
     );
-  }, [shiftOptions]);
+    if (formData.shiftId && !list.some((s) => s.id === formData.shiftId)) {
+      const legacy = rawAllOptions?.find((s) => s.id === formData.shiftId);
+      if (legacy) {
+        list.push(legacy);
+      }
+    }
+    return list;
+  }, [shiftOptions, rawAllOptions, formData.shiftId]);
 
   useEffect(() => {
     setMounted(true);
