@@ -54,6 +54,7 @@ const USERS = [
   { email: 'admin@bsctextiles.com', name: 'System Administrator', role: 'SUPER_ADMIN', employeeIndex: 3 },
   { email: 'vikram.singh@bsctextiles.com', name: 'Vikram Singh', role: 'HR_MANAGER', employeeIndex: 10 },
   { email: 'amit.patel@bsctextiles.com', name: 'Amit Patel', role: 'FLOOR_MANAGER', employeeIndex: 2 },
+  { email: 'ramesh.gowda@bsctextiles.com', name: 'Ramesh Gowda', role: 'TEA_BREAK_MANAGER', employeeIndex: 4 },
 ];
 
 const SIMULATED_DEVICE = {

@@ -24,6 +24,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
+import { SHIFTS_CHANGED_EVENT } from '@/lib/shiftRegistry';
 import { Input, Select } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { EmployeeCodeText } from '@/components/employees/EmployeeCodeField';
@@ -123,8 +124,28 @@ export default function InactiveEmployeesPage() {
     setDepartments(dept.data?.departments || (Array.isArray(dept.data) ? dept.data : []));
     setFloors(flr.data?.floors || []);
     setSections(sec.data?.sections || []);
-    setShifts(shf.data?.shifts || []);
+    const apiShifts: any[] = shf.data?.shifts || [];
+    const merged = [...apiShifts];
+    if (typeof window !== 'undefined') {
+      try {
+        const localCustom: any[] = JSON.parse(localStorage.getItem('bsc_custom_shifts') || '[]');
+        for (const c of localCustom) {
+          if (!merged.some((s) => s.id === c.id || (s.name && c.name && s.name.toLowerCase() === c.name.toLowerCase()))) {
+            merged.push(c);
+          }
+        }
+      } catch {}
+    }
+    setShifts(merged);
   }, []);
+
+  useEffect(() => {
+    const handleShiftEvent = () => {
+      loadReferenceData();
+    };
+    window.addEventListener(SHIFTS_CHANGED_EVENT, handleShiftEvent);
+    return () => window.removeEventListener(SHIFTS_CHANGED_EVENT, handleShiftEvent);
+  }, [loadReferenceData]);
 
   /**
    * Employment status is the only definition of "inactive". The API filters by

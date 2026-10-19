@@ -54,6 +54,15 @@ export const SHIFTS_CHANGED_EVENT = 'bsc:shifts-changed';
 export function notifyShiftsChanged(createdShift?: any) {
   clearShiftRegistryCache();
   if (typeof window !== 'undefined') {
+    if (createdShift) {
+      try {
+        const stored = JSON.parse(localStorage.getItem('bsc_custom_shifts') || '[]');
+        if (!stored.some((s: any) => s.id === createdShift.id || (s.name && s.name.toLowerCase() === createdShift.name.toLowerCase()))) {
+          stored.push(createdShift);
+          localStorage.setItem('bsc_custom_shifts', JSON.stringify(stored));
+        }
+      } catch {}
+    }
     window.dispatchEvent(
       new CustomEvent(SHIFTS_CHANGED_EVENT, { detail: createdShift })
     );
@@ -241,9 +250,22 @@ export function buildShiftRegistry(
 } {
   const isAllHubs = !selectedLocation || selectedLocation === 'all' || selectedLocation === 'ALL';
 
+  // Merge any locally stored custom shifts (for persistent availability across modules & reloads)
+  const effectiveShifts: any[] = Array.isArray(rawShifts) ? [...rawShifts] : [];
+  if (typeof window !== 'undefined') {
+    try {
+      const stored: any[] = JSON.parse(localStorage.getItem('bsc_custom_shifts') || '[]');
+      for (const customS of stored) {
+        if (!effectiveShifts.some((s) => s.id === customS.id || (s.name && customS.name && s.name.toLowerCase() === customS.name.toLowerCase()))) {
+          effectiveShifts.push(customS);
+        }
+      }
+    } catch {}
+  }
+
   // Group raw shifts by canonical key
   const groups = new Map<string, any[]>();
-  for (const s of rawShifts) {
+  for (const s of effectiveShifts) {
     const nameLower = (s.name || '').trim().toLowerCase();
     const codeUpper = (s.code || '').trim().toUpperCase();
 

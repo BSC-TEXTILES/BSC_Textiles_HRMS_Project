@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import { useShiftRegistry } from '@/hooks/useShiftRegistry';
 import {
   Clock,
   AlertTriangle,
@@ -182,10 +183,21 @@ export default function MissedPunchingPage() {
   const [selectedStore, setSelectedStore] = useState('all');
   const [selectedFloor, setSelectedFloor] = useState('all');
   const [selectedFolder, setSelectedFolder] = useState('all');
+  const [selectedShift, setSelectedShift] = useState('all');
   const [selectedMissingType, setSelectedMissingType] = useState('ALL');
   const [selectedDate, setSelectedDate] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  // Centralized Shift Directory
+  const { allOptions: shiftOptions } = useShiftRegistry(
+    selectedStore === 'all' ? undefined : selectedStore
+  );
+  const validShiftOptions = useMemo(() => {
+    return (shiftOptions || []).filter(
+      (s) => s.id !== 'all' && s.name !== 'All Shifts' && s.displayName !== 'All Shifts'
+    );
+  }, [shiftOptions]);
 
   // Modals
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -376,6 +388,27 @@ export default function MissedPunchingPage() {
     };
   }, [punchInTime, punchOutTime, breakDuration]);
 
+  // Filter records by standardized shift selection
+  const filteredRecords = useMemo(() => {
+    if (!records || records.length === 0) return [];
+    if (selectedShift === 'all') return records;
+
+    const chosenShift = validShiftOptions.find((s) => s.id === selectedShift);
+    const chosenName = chosenShift?.displayName || chosenShift?.name || selectedShift;
+
+    return records.filter((rec) => {
+      if (!rec.scheduledShift) return false;
+      const shiftStr = String(rec.scheduledShift).toLowerCase();
+      if (chosenShift?.id && shiftStr.includes(chosenShift.id.toLowerCase())) return true;
+      if (chosenName && shiftStr.includes(chosenName.toLowerCase())) return true;
+      if (chosenShift?.type === 'default') {
+        if (chosenShift.id.includes('shift-1') && (shiftStr.includes('shift 1') || shiftStr.includes('shift i') || shiftStr.includes('shift-1'))) return true;
+        if (chosenShift.id.includes('shift-2') && (shiftStr.includes('shift 2') || shiftStr.includes('shift ii') || shiftStr.includes('shift-2'))) return true;
+      }
+      return false;
+    });
+  }, [records, selectedShift, validShiftOptions]);
+
   // Open Edit Modal
   const handleOpenEdit = (rec: MissedPunchRecord, autoCalculate9h: boolean = false) => {
     setSelectedRecord(rec);
@@ -496,6 +529,7 @@ export default function MissedPunchingPage() {
     setSelectedStore('all');
     setSelectedFloor('all');
     setSelectedFolder('all');
+    setSelectedShift('all');
     setSelectedMissingType('ALL');
     setSelectedDate('');
     setStartDate('');
@@ -636,7 +670,7 @@ export default function MissedPunchingPage() {
 
         {/* Global Multi-Dimension Filter Bar */}
         <Card className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
             {/* Search */}
             <div className="lg:col-span-2">
               <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
@@ -665,6 +699,25 @@ export default function MissedPunchingPage() {
               >
                 {STORE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Standardized Shift Filter */}
+            <div>
+              <label className="block text-[11px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+                Shift
+              </label>
+              <select
+                value={selectedShift}
+                onChange={(e) => { setSelectedShift(e.target.value); setPage(1); }}
+                className="w-full h-9 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs px-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
+              >
+                <option value="all">All Shifts</option>
+                {validShiftOptions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.displayName || s.name}
+                  </option>
                 ))}
               </select>
             </div>
@@ -758,6 +811,11 @@ export default function MissedPunchingPage() {
               {selectedStore !== 'all' && (
                 <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 dark:bg-amber-950 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
                   Store: {selectedStore}
+                </span>
+              )}
+              {selectedShift !== 'all' && (
+                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 dark:bg-purple-950 text-purple-800 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
+                  Shift: {validShiftOptions.find(s => s.id === selectedShift)?.displayName || validShiftOptions.find(s => s.id === selectedShift)?.name || selectedShift}
                 </span>
               )}
             </div>
@@ -1088,7 +1146,7 @@ export default function MissedPunchingPage() {
                 </h3>
               </div>
               <span className="text-[11px] text-slate-500 font-medium">
-                {totalRecords} records found meeting exception criteria
+                {selectedShift !== 'all' ? filteredRecords.length : totalRecords} records found meeting exception criteria
               </span>
             </div>
 
@@ -1115,7 +1173,7 @@ export default function MissedPunchingPage() {
                         Loading attendance exception records...
                       </td>
                     </tr>
-                  ) : records.length === 0 ? (
+                  ) : filteredRecords.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="py-12 text-center text-slate-500">
                         <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2 opacity-80" />
@@ -1124,7 +1182,7 @@ export default function MissedPunchingPage() {
                       </td>
                     </tr>
                   ) : (
-                    records.map((rec) => (
+                    filteredRecords.map((rec) => (
                       <tr key={rec.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
                         {/* Employee Info */}
                         <td className="py-3.5 px-4">

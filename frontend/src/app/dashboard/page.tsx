@@ -19,6 +19,7 @@ import {
   dashboardDepartmentOptions,
 } from '@/components/dashboard/ExecutiveDeptFilter';
 import { SHIFT_I_LABEL } from '@/config/shiftPolicyConfig';
+import { notifyShiftsChanged, SHIFTS_CHANGED_EVENT } from '@/lib/shiftRegistry';
 import type { CreatedCustomShift } from '@/components/dashboard/ExecutiveCustomShiftDialog';
 import { ExecutiveHeaderSearch } from '@/components/dashboard/ExecutiveHeaderSearch';
 import {
@@ -330,6 +331,37 @@ function processShifts(rawShifts: any[], isAllHubs: boolean): ShiftOptionItem[] 
     }
   }
 
+  // Also include any locally created custom shifts if not already present
+  if (typeof window !== 'undefined') {
+    try {
+      const localCustom = JSON.parse(localStorage.getItem('bsc_custom_shifts') || '[]');
+      if (Array.isArray(localCustom)) {
+        for (const loc of localCustom) {
+          if (loc?.id && !seenIds.has(loc.id)) {
+            seenIds.add(loc.id);
+            const start = loc.punchIn || loc.startTime || '10:00';
+            const end = loc.punchOut || loc.endTime || '19:00';
+            result.push({
+              id: loc.id,
+              name: loc.name,
+              code: loc.code || loc.id,
+              timeRange: `${start} – ${end}`,
+              startTime: start,
+              endTime: end,
+              lunchDurationMinutes: loc.lunchBreakMinutes ?? 45,
+              teaDurationMinutes: loc.teaBreakMinutes ?? 0,
+              teaBreakSlot: loc.teaBreakMinutes > 0 ? 'Evening' : 'None',
+              staffCount: 0,
+              isCustom: true,
+            });
+          }
+        }
+      }
+    } catch {
+      // safe fallback
+    }
+  }
+
   return result;
 }
 
@@ -532,6 +564,16 @@ export default function DashboardPage() {
     };
   }, []);
 
+  // Listen for shift changes broadcast from other components or tabs
+  useEffect(() => {
+    const handleShiftRegistryChange = () => {
+      shiftCacheRef.current = {};
+      loadShiftOptions(selectedHub, true);
+    };
+    window.addEventListener(SHIFTS_CHANGED_EVENT, handleShiftRegistryChange);
+    return () => window.removeEventListener(SHIFTS_CHANGED_EVENT, handleShiftRegistryChange);
+  }, [selectedHub, loadShiftOptions]);
+
   const handleCustomShiftCreated = (newShift: CreatedCustomShift) => {
     shiftCacheRef.current = {};
 
@@ -552,6 +594,24 @@ export default function DashboardPage() {
     setShiftOptions((prev) => {
       if (prev.some((p) => p.id === newShift.id)) return prev;
       return [...prev, newOption];
+    });
+
+    // Auto-select the newly created custom shift in the Executive Dashboard
+    setSelectedShift(newShift.id);
+
+    // Broadcast newly created shift to all modules across the application
+    notifyShiftsChanged({
+      id: newShift.id,
+      name: newShift.name,
+      code: newShift.code,
+      type: 'custom',
+      punchIn: newShift.startTime,
+      punchOut: newShift.endTime,
+      lunchBreakMinutes: newShift.lunchDurationMinutes,
+      lunchBreakLabel: `${newShift.lunchDurationMinutes} Min`,
+      teaBreakMinutes: newShift.teaDurationMinutes,
+      teaBreakLabel: newShift.teaDurationMinutes > 0 ? `${newShift.teaDurationMinutes} Min` : 'No Tea Break',
+      isActive: true,
     });
 
     setShiftNotice(`Shift ${newShift.name} added.`);

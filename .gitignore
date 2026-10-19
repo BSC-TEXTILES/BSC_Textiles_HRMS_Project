@@ -76,3 +76,4 @@ nginx/ssl/
 *.bak
 backups/
 backend/backups/
+scratch/

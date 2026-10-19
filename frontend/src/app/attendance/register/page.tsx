@@ -5,6 +5,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
 import { describeExportError, downloadAttendanceExport } from '@/lib/exportDownload';
 import toast from 'react-hot-toast';
+import { useShiftRegistry } from '@/hooks/useShiftRegistry';
 
 interface EmployeeRegisterItem {
   id: string;
@@ -56,11 +57,22 @@ export default function AttendanceRegisterPage() {
   const [employees, setEmployees] = useState<EmployeeRegisterItem[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [selectedLocation, setSelectedLocation] = useState('ALL');
+  const [selectedShift, setSelectedShift] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedYear, setSelectedYear] = useState<number>(() => new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(() => new Date().getMonth() + 1);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+
+  // Load centralized shift registry
+  const { allOptions: shiftOptions } = useShiftRegistry(
+    selectedLocation === 'ALL' ? undefined : selectedLocation
+  );
+  const validShiftOptions = useMemo(() => {
+    return (shiftOptions || []).filter(
+      (s) => s.id !== 'all' && s.name !== 'All Shifts' && s.displayName !== 'All Shifts'
+    );
+  }, [shiftOptions]);
 
   // Matrix stored as: { [employeeId]: { [dayNum]: DayAttendanceRecord } }
   const [attendanceMatrix, setAttendanceMatrix] = useState<Record<string, Record<number, DayAttendanceRecord>>>({});
@@ -247,17 +259,34 @@ export default function AttendanceRegisterPage() {
 
   // Filtered employees for display
   const filteredEmployees = useMemo(() => {
-    if (!searchQuery.trim()) return employees;
-    const q = searchQuery.toLowerCase().trim();
-    return employees.filter(
-      (e) =>
-        e.fullName.toLowerCase().includes(q) ||
-        e.employeeCode.toLowerCase().includes(q) ||
-        (e.role && e.role.toLowerCase().includes(q)) ||
-        (e.designation && e.designation.toLowerCase().includes(q)) ||
-        (e.departmentName && e.departmentName.toLowerCase().includes(q))
-    );
-  }, [employees, searchQuery]);
+    let list = employees;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(
+        (e) =>
+          e.fullName.toLowerCase().includes(q) ||
+          e.employeeCode.toLowerCase().includes(q) ||
+          (e.role && e.role.toLowerCase().includes(q)) ||
+          (e.designation && e.designation.toLowerCase().includes(q)) ||
+          (e.departmentName && e.departmentName.toLowerCase().includes(q))
+      );
+    }
+    if (selectedShift !== 'all') {
+      list = list.filter((e: any) => {
+        const empShiftId = e.shiftId || e.shift?.id;
+        const empShiftName = (e.shift?.name || '').toLowerCase();
+        const selectedObj = validShiftOptions.find((s) => s.id === selectedShift);
+        const matchName = selectedObj?.name.toLowerCase();
+        return (
+          empShiftId === selectedShift ||
+          (matchName && empShiftName.includes(matchName)) ||
+          (selectedShift === 'shift-i-bel' && (empShiftName.includes('shift 1') || empShiftName.includes('shift i'))) ||
+          (selectedShift === 'shift-2-bel' && (empShiftName.includes('shift 2') || empShiftName.includes('shift ii')))
+        );
+      });
+    }
+    return list;
+  }, [employees, searchQuery, selectedShift, validShiftOptions]);
 
   return (
     <DashboardLayout>
@@ -405,6 +434,23 @@ export default function AttendanceRegisterPage() {
                   {locations.map((loc) => (
                     <option key={loc.id} value={loc.id}>
                       {loc.name} ({loc.code})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Standardized Shift Filter */}
+              <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs">
+                <span className="material-symbols-outlined text-[16px] text-[#1346a1] mr-1.5">schedule</span>
+                <select
+                  value={selectedShift}
+                  onChange={(e) => setSelectedShift(e.target.value)}
+                  className="bg-transparent font-semibold text-slate-800 focus:outline-none cursor-pointer max-w-[170px] truncate"
+                >
+                  <option value="all">All Shifts</option>
+                  {validShiftOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.displayName || s.name}
                     </option>
                   ))}
                 </select>
