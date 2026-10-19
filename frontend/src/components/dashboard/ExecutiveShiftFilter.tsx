@@ -350,6 +350,7 @@ export function ExecutiveShiftFilter({
                     role="option"
                     aria-selected={isSelected}
                     aria-label={accessibleDescription}
+                    aria-describedby={activeHoverId === opt.id ? `exec-shift-popover-${opt.id}` : undefined}
                     type="button"
                     onClick={() => {
                       onSelectShift(opt.id);
@@ -380,16 +381,11 @@ export function ExecutiveShiftFilter({
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                      {/* Staff count with muted text for 0 staff */}
-                      <span
-                        className={`text-[10px] font-mono ${
-                          (opt.staffCount ?? 0) === 0
-                            ? 'text-slate-400 dark:text-slate-500 italic'
-                            : 'text-slate-500 dark:text-slate-400'
-                        }`}
-                      >
-                        {opt.staffCount ?? 0} staff
-                      </span>
+                      {typeof opt.staffCount === 'number' && opt.staffCount > 0 && (
+                        <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                          {opt.staffCount} staff
+                        </span>
+                      )}
 
                       {isSelected && <Check className="w-3.5 h-3.5 text-[#0058be] shrink-0" />}
                     </div>
@@ -435,7 +431,14 @@ export function ExecutiveShiftFilter({
             >
               {/* Shift name title */}
               <div className="font-bold text-xs text-[#0b1c30] dark:text-slate-100 pb-1.5 mb-2 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <span>{popoverTitle}</span>
+                <div>
+                  <div className="font-bold">{popoverTitle}</div>
+                  {hoveredOption?.isCustom && (
+                    <div className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 mt-0.5">
+                      Custom Shift
+                    </div>
+                  )}
+                </div>
                 {isShift1 && (
                   <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
                     10h 30m

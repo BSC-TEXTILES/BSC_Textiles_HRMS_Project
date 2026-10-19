@@ -274,14 +274,16 @@ export default function AttendanceRegisterPage() {
     if (selectedShift !== 'all') {
       list = list.filter((e: any) => {
         const empShiftId = e.shiftId || e.shift?.id;
-        const empShiftName = (e.shift?.name || '').toLowerCase();
+        const empShiftName = (e.shift?.name || e.shiftName || '').toLowerCase();
         const selectedObj = validShiftOptions.find((s) => s.id === selectedShift);
         const matchName = selectedObj?.name.toLowerCase();
+        const matchDisplayName = (selectedObj?.displayName || '').toLowerCase();
         return (
           empShiftId === selectedShift ||
           (matchName && empShiftName.includes(matchName)) ||
-          (selectedShift === 'shift-i-bel' && (empShiftName.includes('shift 1') || empShiftName.includes('shift i'))) ||
-          (selectedShift === 'shift-2-bel' && (empShiftName.includes('shift 2') || empShiftName.includes('shift ii')))
+          (matchDisplayName && empShiftName.includes(matchDisplayName)) ||
+          ((selectedShift.includes('shift-1') || selectedShift.includes('shift-i')) && (empShiftName.includes('shift 1') || empShiftName.includes('shift i'))) ||
+          ((selectedShift.includes('shift-2') || selectedShift.includes('shift-ii')) && (empShiftName.includes('shift 2') || empShiftName.includes('shift ii')))
         );
       });
     }
