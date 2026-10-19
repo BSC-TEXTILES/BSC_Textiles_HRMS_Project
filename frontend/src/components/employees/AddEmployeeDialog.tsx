@@ -431,7 +431,7 @@ export function AddEmployeeDialog({
 
   // Compile combined locations list
   const combinedLocationOptions = useMemo(() => {
-    const standard = INITIAL_LOCATIONS.map((loc) => {
+    const standard = INITIAL_LOCATIONS.map((loc: { label: string; code: string; name: string; hubCode: string }) => {
       const matched = locations.find(
         (l) =>
           l.code === loc.hubCode ||
@@ -1061,7 +1061,7 @@ export function AddEmployeeDialog({
                     }`}
                   >
                     <option value="">Select Gender</option>
-                    {GENDER_OPTIONS.map((g) => (
+                    {GENDER_OPTIONS.map((g: { value: string; label: string }) => (
                       <option key={g.value} value={g.value}>
                         {g.label}
                       </option>
