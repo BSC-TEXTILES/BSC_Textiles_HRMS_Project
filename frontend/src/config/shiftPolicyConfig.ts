@@ -21,7 +21,7 @@ export const STATUTORY_CAPS: StatutoryCapsConfig = {
 /**
  * Single constant for the Shift I Roman numeral label so it can be changed in one place.
  */
-export const SHIFT_I_LABEL = 'Shift I';
+export const SHIFT_I_LABEL = 'Shift 1';
 
 /**
  * Allowed Tea Break choices in the Custom Shift dialog.

@@ -6,6 +6,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
 import { safeJsonParse } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { SHIFTS_CHANGED_EVENT } from '@/lib/shiftRegistry';
 import {
   Clock,
   AlertTriangle,
@@ -142,25 +143,52 @@ export default function LateFinesPage() {
     }
   }, []);
 
-  // Fetch filter options
-  useEffect(() => {
-    const loadFilterData = async () => {
-      try {
-        const [locRes, deptRes, shiftRes] = await Promise.all([
-          api.get('/locations/all').catch(() => ({ data: [] })),
-          api.get('/departments').catch(() => ({ data: { departments: [] } })),
-          api.get('/shifts').catch(() => ({ data: { shifts: [] } }))
-        ]);
-        setLocations(locRes.data || []);
-        setDepartments(deptRes.data?.departments || []);
-        setShifts(shiftRes.data?.shifts || []);
-        await fetchPolicy();
-      } catch (err) {
-        console.error('Error loading filter data:', err);
+  const loadFilterData = useCallback(async () => {
+    try {
+      const [locRes, deptRes, shiftRes] = await Promise.all([
+        api.get('/locations/all').catch(() => ({ data: [] })),
+        api.get('/departments').catch(() => ({ data: { departments: [] } })),
+        api.get('/shifts').catch(() => ({ data: { shifts: [] } }))
+      ]);
+      setLocations(locRes.data || []);
+      setDepartments(deptRes.data?.departments || []);
+
+      const apiShifts: any[] = shiftRes.data?.shifts || [];
+      const merged = [...apiShifts];
+      if (typeof window !== 'undefined') {
+        try {
+          const localCustom: any[] = JSON.parse(localStorage.getItem('bsc_custom_shifts') || '[]');
+          for (const c of localCustom) {
+            if (!merged.some((s) => s.id === c.id || (s.name && c.name && s.name.toLowerCase() === c.name.toLowerCase()))) {
+              merged.push({
+                ...c,
+                startTime: c.punchIn || c.startTime,
+                endTime: c.punchOut || c.endTime,
+              });
+            }
+          }
+        } catch {}
       }
-    };
-    loadFilterData();
+      setShifts(merged);
+      await fetchPolicy();
+    } catch (err) {
+      console.error('Error loading filter data:', err);
+    }
   }, [fetchPolicy]);
+
+  // Fetch filter options on mount
+  useEffect(() => {
+    loadFilterData();
+  }, [loadFilterData]);
+
+  // Live Sync: Listen for shift changes across modules
+  useEffect(() => {
+    const handleShiftEvent = () => {
+      loadFilterData();
+    };
+    window.addEventListener(SHIFTS_CHANGED_EVENT, handleShiftEvent);
+    return () => window.removeEventListener(SHIFTS_CHANGED_EVENT, handleShiftEvent);
+  }, [loadFilterData]);
 
   // Fetch dashboard summary cards
   const fetchDashboardMetrics = useCallback(async () => {

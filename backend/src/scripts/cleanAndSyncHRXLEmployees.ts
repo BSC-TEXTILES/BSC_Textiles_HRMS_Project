@@ -3,9 +3,11 @@ import { pool } from '../nativeDb.js';
 import { Client } from 'pg';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import bcrypt from 'bcryptjs';
 
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 dotenv.config();
 
 interface RawExcelEmployee {
@@ -77,10 +79,23 @@ export async function executeCleanAndSync() {
   console.log('   BSC TEXTILES HRMS — COMPLETE CLEANSE & HRXL.xlsx MASTER SYNC');
   console.log('========================================================================\n');
 
-  // 1. Read HRXL.xlsx
+  // 1. Locate and read HRXL.xlsx
   console.log('Step 1: Reading Excel file HRXL.xlsx...');
+  const possiblePaths = [
+    path.resolve(process.cwd(), 'HRXL.xlsx'),
+    path.resolve(process.cwd(), '../HRXL.xlsx'),
+    path.resolve(__dirname, '../../../../HRXL.xlsx'),
+    path.resolve(__dirname, '../../../HRXL.xlsx'),
+    path.resolve(__dirname, '../../HRXL.xlsx'),
+    'c:\\BSC_Textiles_HRMS_Project\\BSC_Textiles_HRMS_Project\\HRXL.xlsx'
+  ];
+  const excelPath = possiblePaths.find((p) => fs.existsSync(p));
+  if (!excelPath) {
+    throw new Error(`Could not find HRXL.xlsx in any of the search paths:\n${possiblePaths.join('\n')}`);
+  }
+  console.log(`Found HRXL.xlsx at: ${excelPath}`);
+
   const workbook = new ExcelJS.Workbook();
-  const excelPath = path.resolve(process.cwd(), '../HRXL.xlsx');
   await workbook.xlsx.readFile(excelPath);
   const sheet = workbook.getWorksheet('Sheet1') || workbook.worksheets[0];
 
@@ -142,27 +157,43 @@ export async function executeCleanAndSync() {
 
   const allowedEmpCodes = excelEmployees.map((e) => e.empNo);
   const allowedEmpIds = excelEmployees.map((e) => `emp_bsc_${e.empNo}`);
-  const davLocationId = 'cmuwszr9500021vdtxscy3nsc';
 
-  // 2. Setup Davanagere Org Entities (Floors, Departments, Shifts)
-  console.log('\nStep 2: Ensuring Davanagere Organization Entities...');
-  const floorMap: Record<string, string> = {
-    GF: 'cmuwszreb000j1vdtz5vu1gyf', // Ground Floor
-    '1ST': 'cmuwszrem000l1vdtikb404mp', // First Floor
-    '2ND': 'cmuwszrf2000n1vdtgkjreziy', // Second Floor
-    '3RD': 'cmuwszrfc000p1vdtttfj50pm', // Third Floor
-    '4TH FL': 'cmuwszrg4000x1vdt4thfloordav', // Fourth Floor
-  };
+  // 2. Setup Davanagere Org Entities (Location, Floors, Departments, Shifts)
+  console.log('\nStep 2: Resolving Davanagere Organization Entities...');
+  const [davLocRows]: any = await pool.query("SELECT id FROM location WHERE code = 'DAV' LIMIT 1");
+  const davLocationId = davLocRows[0]?.id || 'cmuzam5fr00024n4p4izbomev';
+  console.log(`Using Davanagere Location ID: ${davLocationId}`);
 
-  await pool.query(
-    `
-    INSERT INTO floor (id, name, floorNumber, locationId, status, createdAt, updatedAt)
-    VALUES (?, 'Fourth Floor', 4, ?, 'ACTIVE', NOW(), NOW())
-    ON DUPLICATE KEY UPDATE name = 'Fourth Floor', updatedAt = NOW()
-  `,
-    [floorMap['4TH FL'], davLocationId]
+  // Resolve Floors
+  const [existingFloors]: any = await pool.query(
+    'SELECT id, name, floorNumber FROM floor WHERE locationId = ?',
+    [davLocationId]
   );
+  const floorMap: Record<string, string> = {};
+  for (const f of existingFloors) {
+    if (f.floorNumber === 0) floorMap['GF'] = f.id;
+    if (f.floorNumber === 1) floorMap['1ST'] = f.id;
+    if (f.floorNumber === 2) floorMap['2ND'] = f.id;
+    if (f.floorNumber === 3) floorMap['3RD'] = f.id;
+    if (f.floorNumber === 4) floorMap['4TH FL'] = f.id;
+  }
 
+  // Ensure 4th Floor exists
+  if (!floorMap['4TH FL']) {
+    const floor4Id = `floor-dav-4th`;
+    await pool.query(
+      `
+      INSERT INTO floor (id, name, floorNumber, locationId, status, createdAt, updatedAt)
+      VALUES (?, 'Fourth Floor', 4, ?, 'ACTIVE', NOW(), NOW())
+      ON DUPLICATE KEY UPDATE name = 'Fourth Floor', updatedAt = NOW()
+    `,
+      [floor4Id, davLocationId]
+    );
+    floorMap['4TH FL'] = floor4Id;
+  }
+  if (!floorMap['GF'] && existingFloors.length > 0) floorMap['GF'] = existingFloors[0].id;
+
+  // Resolve / Create Departments for Davanagere
   const deptMap: Record<string, string> = {};
   const uniqueDepts = Array.from(new Set(excelEmployees.map((e) => e.dept)));
   for (const deptName of uniqueDepts) {
@@ -179,6 +210,7 @@ export async function executeCleanAndSync() {
     deptMap[deptName] = deptId;
   }
 
+  // Resolve / Create Shifts for Davanagere
   const shiftMap: Record<string, string> = {};
   const uniqueShifts = Array.from(new Set(excelEmployees.map((e) => e.batch)));
   for (const shiftName of uniqueShifts) {
@@ -197,10 +229,10 @@ export async function executeCleanAndSync() {
   console.log('✓ Davanagere floors, departments, and shifts ready.');
 
   // 3. Purge all old data from database
-  console.log('\nStep 3: Purging old data and legacy records...');
+  console.log('\nStep 3: Purging old demo data and legacy records...');
   await pool.query('SET FOREIGN_KEY_CHECKS = 0');
 
-  // Detach all administrative user accounts from employee FKs
+  // Detach all user accounts from old employee FKs
   await pool.query('UPDATE user SET employeeId = NULL');
   try {
     await pool.query('UPDATE users SET employee_id = NULL');
@@ -246,6 +278,7 @@ export async function executeCleanAndSync() {
     'qrscanrecord',
     'videonote',
     'weeklyoffrule',
+    'workforce_event',
     'attendance',
     'attendancecorrection',
     'biometric_employee_mappings',
@@ -281,11 +314,22 @@ export async function executeCleanAndSync() {
     }
   }
 
-  // Clean old dummy users from user table (preserve admin@bsctextiles.com)
+  // Clean old dummy test users from user table (preserve admin and RBAC accounts)
   await pool.query(`
     DELETE FROM user 
-    WHERE email NOT IN ('admin@bsctextiles.com') 
-      AND (email LIKE '%@bsctextiles.com' OR role IN ('HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER', 'SALES_EMPLOYEE', 'TEA_BREAK_MANAGER', 'T_SHOP_OWNER', 'EMPLOYEE'))
+    WHERE email NOT IN (
+      'admin@bsctextiles.com',
+      'rbac.admin@bsctextiles.com',
+      'rbac.hr@bsctextiles.com',
+      'rbac.floor@bsctextiles.com',
+      'rbac.employee@bsctextiles.com'
+    ) 
+    AND (
+      email LIKE '%@bsctextiles.com' 
+      OR email LIKE '%test%' 
+      OR email LIKE '%demo%' 
+      OR role IN ('HR_MANAGER', 'HR_EXECUTIVE', 'FLOOR_MANAGER', 'SALES_EMPLOYEE', 'TEA_BREAK_MANAGER', 'T_SHOP_OWNER', 'EMPLOYEE')
+    )
   `);
   try {
     await pool.query(`
@@ -293,7 +337,7 @@ export async function executeCleanAndSync() {
       WHERE email NOT IN ('admin@bsctextiles.com')
     `);
   } catch (_) {}
-  console.log('✓ Cleaned legacy demo accounts, preserved admin@bsctextiles.com.');
+  console.log('✓ Cleaned legacy demo accounts, preserved admin & core system accounts.');
 
   await pool.query('SET FOREIGN_KEY_CHECKS = 1');
 
@@ -430,7 +474,7 @@ export async function executeCleanAndSync() {
       );
     }
 
-    // Baseline attendance for recent dates
+    // Baseline attendance for recent active dates
     await pool.query(
       `
       INSERT INTO attendance (
@@ -498,34 +542,39 @@ export async function executeCleanAndSync() {
   }
   console.log('✓ Provisioned user logins for HR & Management staff.');
 
-  // 6. Sync to bsc_shard_dav
-  console.log('\nStep 6: Syncing employees to Shard DBs...');
+  // 6. Sync to bsc_shard_dav if mounted
+  console.log('\nStep 6: Syncing employees to Shard DBs if present...');
   try {
-    await pool.query('SET FOREIGN_KEY_CHECKS = 0');
-    await pool.query('DELETE FROM bsc_shard_bel.employee');
-    await pool.query('DELETE FROM bsc_shard_shi.employee');
-    await pool.query('DELETE FROM bsc_shard_dav.employee');
+    const [shardDbs]: any = await pool.query("SHOW DATABASES LIKE 'bsc_shard_dav'");
+    if (shardDbs.length > 0) {
+      await pool.query('SET FOREIGN_KEY_CHECKS = 0');
+      try { await pool.query('DELETE FROM bsc_shard_bel.employee'); } catch (_) {}
+      try { await pool.query('DELETE FROM bsc_shard_shi.employee'); } catch (_) {}
+      try { await pool.query('DELETE FROM bsc_shard_dav.employee'); } catch (_) {}
 
-    const commonCols = [
-      'id', 'employeeCode', 'firstName', 'lastName', 'fullName', 'email', 'phone', 'gender',
-      'locationId', 'floorId', 'departmentId', 'shiftId', 'designation', 'role', 'status',
-      'joiningDate', 'basicSalary', 'hra', 'fixedGrossSalary', 'currentAddress', 'permanentAddress',
-      'city', 'state', 'batch', 'biometricDeviceEmployeeId', 'attendanceEligible',
-      'employeeCategory', 'createdAt', 'updatedAt'
-    ].map(c => `\`${c}\``).join(', ');
+      const commonCols = [
+        'id', 'employeeCode', 'firstName', 'lastName', 'fullName', 'email', 'phone', 'gender',
+        'locationId', 'floorId', 'departmentId', 'shiftId', 'designation', 'role', 'status',
+        'joiningDate', 'basicSalary', 'hra', 'fixedGrossSalary', 'currentAddress', 'permanentAddress',
+        'city', 'state', 'batch', 'biometricDeviceEmployeeId', 'attendanceEligible',
+        'employeeCategory', 'createdAt', 'updatedAt'
+      ].map((c) => `\`${c}\``).join(', ');
 
-    await pool.query(`
-      INSERT INTO bsc_shard_dav.employee (${commonCols})
-      SELECT ${commonCols} FROM bsc_textiles_hrms.employee
-    `);
-    await pool.query('SET FOREIGN_KEY_CHECKS = 1');
-    console.log('✓ Successfully synced 56 employees into bsc_shard_dav.');
+      await pool.query(`
+        INSERT INTO bsc_shard_dav.employee (${commonCols})
+        SELECT ${commonCols} FROM bsc_textiles_hrms.employee
+      `);
+      await pool.query('SET FOREIGN_KEY_CHECKS = 1');
+      console.log('✓ Successfully synced 56 employees into bsc_shard_dav.');
+    } else {
+      console.log('✓ Shard DB bsc_shard_dav not mounted, skipping shard sync.');
+    }
   } catch (err: any) {
     console.warn('[Shard Sync warning]:', err.message);
   }
 
-  // 7. Sync to Supabase PostgreSQL
-  console.log('\nStep 7: Synchronizing to Supabase PostgreSQL Cloud...');
+  // 7. Sync to Supabase PostgreSQL Cloud if configured
+  console.log('\nStep 7: Synchronizing to Supabase PostgreSQL Cloud (if configured)...');
   const supabaseUrl = process.env.SUPABASE_POOLER_URL || process.env.SUPABASE_DB_URL;
   if (supabaseUrl) {
     try {
@@ -610,6 +659,8 @@ export async function executeCleanAndSync() {
     } catch (err: any) {
       console.warn('[Supabase Sync warning]:', err.message);
     }
+  } else {
+    console.log('✓ No Supabase connection configured, skipping Supabase sync.');
   }
 
   // 8. Final Count Verifications
@@ -619,9 +670,6 @@ export async function executeCleanAndSync() {
 
   const [finalEmpCount]: any = await pool.query('SELECT count(*) as count FROM employee');
   console.log(`✓ MySQL Main DB Employee Count: ${finalEmpCount[0].count}`);
-
-  const [finalShardCount]: any = await pool.query('SELECT count(*) as count FROM bsc_shard_dav.employee');
-  console.log(`✓ MySQL Davanagere Shard Employee Count: ${finalShardCount[0].count}`);
 
   const [finalMappingCount]: any = await pool.query('SELECT count(*) as count FROM biometric_employee_mappings');
   console.log(`✓ Active Biometric Device Mappings: ${finalMappingCount[0].count}`);
@@ -636,12 +684,19 @@ export async function executeCleanAndSync() {
   console.log('Only the 56 employees from HRXL.xlsx now exist in the project.');
   console.log('All employee details (DOJ, salary, address, shifts, departments) are 100% updated.\n');
 
-  process.exit(0);
+  return {
+    employeeCount: finalEmpCount[0].count,
+    mappingCount: finalMappingCount[0].count,
+    leaveBalanceCount: finalLeaveCount[0].count,
+    attendanceCount: finalAttCount[0].count,
+  };
 }
 
 if (process.argv[1]?.includes('cleanAndSyncHRXLEmployees')) {
-  executeCleanAndSync().catch((err) => {
-    console.error('Fatal execution error:', err);
-    process.exit(1);
-  });
+  executeCleanAndSync()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error('Fatal execution error:', err);
+      process.exit(1);
+    });
 }

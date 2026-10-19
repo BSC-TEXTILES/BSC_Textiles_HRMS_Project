@@ -94,8 +94,10 @@ export function ExecutiveShiftFilter({
   const currentLabel =
     selectedShiftId === 'all'
       ? 'All Shifts'
-      : currentOption?.name === 'Shift I'
-      ? SHIFT_I_LABEL
+      : currentOption?.name === 'Shift I' || currentOption?.name?.toLowerCase() === 'shift 1'
+      ? 'Shift 1'
+      : currentOption?.name === 'Shift 2' || currentOption?.name?.toLowerCase() === 'shift 2'
+      ? 'Shift 2'
       : currentOption?.name || 'Selected Shift';
 
   // Clear hover timer on unmount
@@ -130,7 +132,7 @@ export function ExecutiveShiftFilter({
       return;
     }
 
-    const totalItems = shiftOptions.length + 1; // +1 for "All Shifts (Combined)"
+    const totalItems = shiftOptions.length + 1; // +1 for "All Shifts"
 
     switch (e.key) {
       case 'ArrowDown': {
@@ -164,36 +166,58 @@ export function ExecutiveShiftFilter({
 
   // Find the currently hovered shift option for the popover
   const hoveredOption = shiftOptions.find((s) => s.id === activeHoverId);
-  const isShift1 = hoveredOption?.name === 'Shift I' || hoveredOption?.name.toLowerCase() === 'shift 1';
-  const isShift2 = hoveredOption?.name === 'Shift 2';
+  const isShift1 = hoveredOption?.name === 'Shift I' || hoveredOption?.name?.toLowerCase() === 'shift 1';
+  const isShift2 = hoveredOption?.name === 'Shift 2' || hoveredOption?.name?.toLowerCase() === 'shift 2' || hoveredOption?.name === 'Shift II';
 
-  const punchInDisplay = formatPunchTime12(
-    isShift1 ? '10:00' : isShift2 ? '11:00' : hoveredOption?.startTime
-  );
-  const punchOutDisplay = formatPunchTime12(
-    isShift1 ? '21:30' : isShift2 ? '21:00' : hoveredOption?.endTime
-  );
+  const punchInDisplay = isShift1
+    ? '10:00 AM'
+    : isShift2
+    ? '11:00 AM'
+    : formatPunchTime12(hoveredOption?.startTime);
+  const punchOutDisplay = isShift1
+    ? '09:30 PM'
+    : isShift2
+    ? '09:00 PM'
+    : formatPunchTime12(hoveredOption?.endTime);
+
+  const lunchDisplay = isShift1
+    ? '01:40 Hrs'
+    : isShift2
+    ? '45 Min'
+    : hoveredOption?.lunchDurationMinutes === 100
+    ? '1hr 40 Min'
+    : hoveredOption?.lunchDurationMinutes === 60
+    ? '1hr'
+    : hoveredOption?.lunchDurationMinutes === 45
+    ? '45 Min'
+    : hoveredOption?.lunchDurationMinutes
+    ? `${hoveredOption.lunchDurationMinutes} Min`
+    : 'Not available';
+
+  const teaMinutes = isShift1
+    ? 20
+    : isShift2
+    ? 10
+    : hoveredOption?.teaDurationMinutes ?? 0;
+
+  const teaLabel = isShift1 ? 'Evening Tea Break:' : 'Tea Break:';
+  const teaDisplay = isShift1
+    ? '20 Min'
+    : isShift2
+    ? '10 Min'
+    : !teaMinutes || teaMinutes === 0
+    ? 'No Tea Break'
+    : `${teaMinutes} Min`;
+
   const lunchMinutes = isShift1
     ? 100
     : isShift2
     ? 45
     : hoveredOption?.lunchDurationMinutes ?? null;
-  const teaMinutes = isShift1
-    ? 20
-    : isShift2
-    ? 10
-    : hoveredOption?.teaDurationMinutes ?? null;
-  const teaSlot = isShift1
-    ? 'Evening'
-    : isShift2
-    ? 'None'
-    : hoveredOption?.teaBreakSlot ?? 'None';
 
-  const lunchDisplay = formatLunchBreakDisplay(lunchMinutes);
-  const teaDisplay = formatTeaBreakDisplay(teaMinutes, teaSlot);
   const isLunchWarning =
-    lunchMinutes !== null && lunchMinutes > STATUTORY_CAPS.lunchCapMinutes;
-  const popoverTitle = isShift1 ? SHIFT_I_LABEL : hoveredOption?.name;
+    lunchMinutes !== null && lunchMinutes > STATUTORY_CAPS.lunchCapMinutes && !isShift1;
+  const popoverTitle = isShift1 ? 'Shift 1' : isShift2 ? 'Shift 2' : hoveredOption?.name;
 
   return (
     <div
@@ -264,14 +288,14 @@ export function ExecutiveShiftFilter({
 
           {/* Options list: with overflow-x-hidden to prevent horizontal scrollbar */}
           <div className="exec-shift-options-list max-h-72 overflow-y-auto overflow-x-hidden py-1">
-            {/* 1. All Shifts (Combined) - always first */}
+            {/* 1. All Shifts - always first */}
             <button
               ref={(el) => {
                 optionsRef.current[0] = el;
               }}
               role="option"
               aria-selected={selectedShiftId === 'all'}
-              aria-label="All shifts, combined"
+              aria-label="All shifts"
               type="button"
               onClick={() => {
                 onSelectShift('all');
@@ -289,22 +313,27 @@ export function ExecutiveShiftFilter({
                   : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/60'
               }`}
             >
-              <span>All Shifts (Combined)</span>
+              <span>All Shifts</span>
               {selectedShiftId === 'all' && <Check className="w-3.5 h-3.5 text-[#0058be]" />}
             </button>
 
-            {/* Individual Shifts in exact order: Shift I, Shift 2, then Custom Shifts */}
+            {/* Individual Shifts in exact order: Shift 1, Shift 2, then Custom Shifts */}
             {shiftOptions.map((opt, idx) => {
               const optionIndex = idx + 1;
               const isSelected = selectedShiftId === opt.id;
-              const isOptShift1 = opt.name === 'Shift I' || opt.name.toLowerCase() === 'shift 1';
-              const displayName = isOptShift1 ? SHIFT_I_LABEL : opt.name;
-              const optPunchIn = formatPunchTime12(
-                isOptShift1 ? '10:00' : opt.name === 'Shift 2' ? '11:00' : opt.startTime
-              );
-              const optPunchOut = formatPunchTime12(
-                isOptShift1 ? '21:30' : opt.name === 'Shift 2' ? '21:00' : opt.endTime
-              );
+              const isOptShift1 = opt.name === 'Shift I' || opt.name?.toLowerCase() === 'shift 1';
+              const isOptShift2 = opt.name === 'Shift 2' || opt.name?.toLowerCase() === 'shift 2' || opt.name === 'Shift II';
+              const displayName = isOptShift1 ? 'Shift 1' : isOptShift2 ? 'Shift 2' : opt.name;
+              const optPunchIn = isOptShift1
+                ? '10:00 AM'
+                : isOptShift2
+                ? '11:00 AM'
+                : formatPunchTime12(opt.startTime);
+              const optPunchOut = isOptShift1
+                ? '09:30 PM'
+                : isOptShift2
+                ? '09:00 PM'
+                : formatPunchTime12(opt.endTime);
               const accessibleDescription = `${displayName}, punch in ${optPunchIn}, punch out ${optPunchOut}`;
 
               return (
@@ -344,7 +373,7 @@ export function ExecutiveShiftFilter({
                     <div className="min-w-0 pr-2 flex items-center gap-1.5">
                       <span className="truncate">{displayName}</span>
                       {opt.isCustom && (
-                        <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                           Custom
                         </span>
                       )}
@@ -384,7 +413,7 @@ export function ExecutiveShiftFilter({
                 className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold text-[#0058be] dark:text-blue-400 bg-blue-50/80 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>Custom Shift</span>
+                <span>+ Custom Shift</span>
               </button>
             </div>
           )}
@@ -458,7 +487,7 @@ export function ExecutiveShiftFilter({
 
                 {/* 4. Tea Break */}
                 <div className="flex items-center justify-between pt-0.5">
-                  <span className="text-slate-500 dark:text-slate-400">Tea Break:</span>
+                  <span className="text-slate-500 dark:text-slate-400">{teaLabel}</span>
                   <span className="font-semibold text-slate-800 dark:text-slate-200">
                     {teaDisplay}
                   </span>

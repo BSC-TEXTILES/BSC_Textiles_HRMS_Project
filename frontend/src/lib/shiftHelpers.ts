@@ -98,7 +98,12 @@ export function calculateShiftDuration(punchIn24: string, punchOut24: string): n
   const [outH, outM] = punchOut24.split(':').map((v) => Number.parseInt(v, 10) || 0);
   const inTotal = inH * 60 + inM;
   const outTotal = outH * 60 + outM;
-  return outTotal - inTotal;
+  if (inTotal === outTotal) return 0;
+  if (outTotal > inTotal) {
+    return outTotal - inTotal;
+  }
+  // Overnight shift (e.g. 10:00 PM to 06:00 AM)
+  return 1440 - inTotal + outTotal;
 }
 
 /**

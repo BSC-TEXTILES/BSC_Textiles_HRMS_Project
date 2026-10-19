@@ -7,6 +7,7 @@ import { DetailDrillDownModal, type DetailMetric } from '@/components/dashboard/
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { ADMIN_ROLES } from '@/lib/roles';
+import { SHIFTS_CHANGED_EVENT } from '@/lib/shiftRegistry';
 
 /** Attendance statuses selectable from the Status filter (see shift-board API). */
 const STATUS_OPTIONS = [
@@ -184,7 +185,28 @@ export default function ShiftsRosterPage() {
     setShiftsError(null);
     try {
       const res = await api.get('/shifts', { params: { limit: 100 } });
-      setShifts(res.data?.shifts || []);
+      const apiShifts: any[] = res.data?.shifts || [];
+
+      // Merge locally stored custom shifts if any
+      const merged = [...apiShifts];
+      if (typeof window !== 'undefined') {
+        try {
+          const localCustom: any[] = JSON.parse(localStorage.getItem('bsc_custom_shifts') || '[]');
+          for (const c of localCustom) {
+            if (!merged.some((s) => s.id === c.id || (s.name && c.name && s.name.toLowerCase() === c.name.toLowerCase()))) {
+              merged.push({
+                ...c,
+                startTime: c.punchIn || c.startTime,
+                endTime: c.punchOut || c.endTime,
+                lunchDurationMinutes: c.lunchBreakMinutes ?? c.lunchDurationMinutes ?? 45,
+                teaDurationMinutes: c.teaBreakMinutes ?? c.teaDurationMinutes ?? 0,
+              });
+            }
+          }
+        } catch {}
+      }
+
+      setShifts(merged);
     } catch (err: any) {
       console.error('Failed to load shifts:', err);
       setShiftsError('Could not load shifts');
@@ -195,6 +217,15 @@ export default function ShiftsRosterPage() {
 
   useEffect(() => {
     fetchShifts();
+  }, [fetchShifts]);
+
+  // Synchronize shifts live when custom shifts are created anywhere
+  useEffect(() => {
+    const handleShiftEvent = () => {
+      fetchShifts();
+    };
+    window.addEventListener(SHIFTS_CHANGED_EVENT, handleShiftEvent);
+    return () => window.removeEventListener(SHIFTS_CHANGED_EVENT, handleShiftEvent);
   }, [fetchShifts]);
 
   /* ---------------- memoized canonical dropdown options ---------------- */

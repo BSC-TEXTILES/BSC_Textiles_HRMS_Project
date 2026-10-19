@@ -45,9 +45,7 @@ export async function setupFormerEmployees(options?: { schemaOnly?: boolean }) {
       locationId, departmentId, shiftId, designation, role, status, joiningDate, exitDate, createdAt, updatedAt
     ) VALUES 
     (
-  // Digits-only (the enforced employeeCode check) and deliberately outside the
-  // ranges the biometric identity tests use for suffix collisions.
-      '+'emp_ex_001'+', '+'991001'+', 'Anand', 'Kulkarni', 'Anand Kulkarni (Former Lead Cashier)', 'MALE', '+91 9880000091', 'anand.k@bsctextiles.com',
+      'emp_ex_001', '991001', 'Anand', 'Kulkarni', 'Anand Kulkarni (Former Lead Cashier)', 'MALE', '+91 9880000091', 'anand.k@bsctextiles.com',
       ?, ?, ?, 'Former Lead Cashier', 'SALES_EMPLOYEE', 'RESIGNED', '2022-04-15', '2026-08-31', NOW(3), NOW(3)
     ),
     (
