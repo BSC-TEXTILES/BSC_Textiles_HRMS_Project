@@ -126,18 +126,7 @@ export default function EmployeeProfileDossierPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
 
-  // Take PTO state
-  const [isTakePtoModalOpen, setIsTakePtoModalOpen] = useState(false);
-  const [ptoForm, setPtoForm] = useState({
-    leaveTypeId: '',
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
-    isHalfDay: false,
-    halfDaySession: 'FIRST_HALF',
-    reason: '',
-  });
-  const [isSubmittingPto, setIsSubmittingPto] = useState(false);
-  const [availableLeaveTypes, setAvailableLeaveTypes] = useState<any[]>([]);
+
 
   const startCamera = async () => {
     try {
@@ -189,47 +178,7 @@ export default function EmployeeProfileDossierPage() {
     }
   };
 
-  const openTakePtoModal = async () => {
-    try {
-      const res = await api.get('/leaves/types');
-      if (res.data && res.data.length > 0) {
-        setAvailableLeaveTypes(res.data);
-        setPtoForm((prev) => ({ ...prev, leaveTypeId: prev.leaveTypeId || res.data[0].id }));
-      }
-    } catch {
-      setAvailableLeaveTypes([
-        { id: 'lt-cl', name: 'Casual Leave (CL)', quota: 8 },
-        { id: 'lt-sl', name: 'Sick Leave (SL)', quota: 10 },
-        { id: 'lt-el', name: 'Earned Leave / Annual PTO (EL)', quota: 18 },
-      ]);
-      setPtoForm((prev) => ({ ...prev, leaveTypeId: prev.leaveTypeId || 'lt-cl' }));
-    }
-    setIsTakePtoModalOpen(true);
-  };
 
-  const handleApplyPto = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!ptoForm.reason.trim()) {
-      toast.error('Please specify the reason for taking PTO');
-      return;
-    }
-    try {
-      setIsSubmittingPto(true);
-      await api.post('/leaves/apply', {
-        employeeId: id,
-        ...ptoForm,
-      });
-      toast.success('PTO (Paid Time Off) application submitted successfully!');
-      setIsTakePtoModalOpen(false);
-      fetchProfile();
-    } catch (err: any) {
-      const errMsg = err.response?.data?.error || err.response?.data?.message || err.message;
-      toast.success(`PTO application registered: ${errMsg || 'Approved for review'}`);
-      setIsTakePtoModalOpen(false);
-    } finally {
-      setIsSubmittingPto(false);
-    }
-  };
 
   // Role permissions
   const currentUserRole = (session?.user as any)?.role || 'ADMIN';
@@ -802,14 +751,7 @@ export default function EmployeeProfileDossierPage() {
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={openTakePtoModal}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 dark:bg-amber-950/60 hover:bg-amber-100 dark:hover:bg-amber-900/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 text-xs font-semibold rounded-lg shadow-2xs transition-all cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px] text-amber-600 dark:text-amber-400">beach_access</span>
-                    <span>Take PTO</span>
-                  </button>
+
                   <button
                     type="button"
                     onClick={startCamera}
@@ -1082,16 +1024,7 @@ export default function EmployeeProfileDossierPage() {
                   </button>
                 )}
 
-                {/* 2. Take PTO (Paid Time Off) */}
-                <button
-                  type="button"
-                  onClick={openTakePtoModal}
-                  aria-label="Take PTO / Apply Leave for employee"
-                  className="w-full sm:w-auto lg:w-48 inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-300/80 dark:border-amber-700/60 text-[13px] font-semibold shadow-2xs hover:shadow-xs transition-all focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
-                >
-                  <Palmtree className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <span>Take PTO / Leave</span>
-                </button>
+
 
                 {/* 3. Download PDF */}
                 <button
@@ -1395,10 +1328,10 @@ export default function EmployeeProfileDossierPage() {
                   </div>
                   <div className="mt-3">
                     <h4 className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-[#1346a1] dark:group-hover:text-blue-400 transition-colors">
-                      Leaves &amp; PTO Quota
+                      Leave Balances &amp; Quota
                     </h4>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      Apply for paid leave, view annual quotas (CL, SL, EL) &amp; request approvals.
+                      Review annual leave quotas (CL, SL, EL), balance accruals and approvals.
                     </p>
                   </div>
                 </button>
@@ -2484,166 +2417,7 @@ export default function EmployeeProfileDossierPage() {
           </div>
         )}
 
-        {/* ========================================================
-            MODAL 8: TAKE PTO / APPLY LEAVE MODAL
-        ======================================================== */}
-        {isTakePtoModalOpen && (
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="take-pto-title"
-            className="fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center p-4 backdrop-blur-xs"
-          >
-            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 w-full max-w-lg p-5 flex flex-col gap-4">
-              <div className="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800 flex items-center justify-center">
-                    <span className="material-symbols-outlined text-[18px]">beach_access</span>
-                  </div>
-                  <div>
-                    <h3 id="take-pto-title" className="text-[15px] font-bold text-slate-900 dark:text-white">
-                      Take PTO / Apply Leave
-                    </h3>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Record leave request for {emp.fullName} ({emp.employeeCode})
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsTakePtoModalOpen(false)}
-                  className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1 rounded-lg"
-                >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
-              </div>
 
-              <form onSubmit={handleApplyPto} className="space-y-3.5 text-[12px]">
-                {/* Leave Type */}
-                <div>
-                  <label className="text-[12px] font-semibold text-slate-700 dark:text-slate-200 block mb-1">
-                    PTO / Leave Category <span className="text-rose-500">*</span>
-                  </label>
-                  <select
-                    value={ptoForm.leaveTypeId}
-                    onChange={(e) => setPtoForm({ ...ptoForm, leaveTypeId: e.target.value })}
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[13px] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30 font-medium"
-                  >
-                    {availableLeaveTypes.map((lt) => (
-                      <option key={lt.id} value={lt.id}>
-                        {lt.name} {lt.quota ? `(Annual Quota: ${lt.quota} days)` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Dates */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[12px] font-semibold text-slate-700 dark:text-slate-200 block mb-1">
-                      From Date <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      value={ptoForm.startDate}
-                      onChange={(e) => setPtoForm({ ...ptoForm, startDate: e.target.value })}
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[13px] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[12px] font-semibold text-slate-700 dark:text-slate-200 block mb-1">
-                      To Date <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      required
-                      min={ptoForm.startDate}
-                      value={ptoForm.endDate}
-                      onChange={(e) => setPtoForm({ ...ptoForm, endDate: e.target.value })}
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[13px] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
-                    />
-                  </div>
-                </div>
-
-                {/* Half Day Option */}
-                <div className="flex items-center gap-4 p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={ptoForm.isHalfDay}
-                      onChange={(e) => setPtoForm({ ...ptoForm, isHalfDay: e.target.checked })}
-                      className="rounded border-slate-300 text-[#1346a1] focus:ring-[#1346a1]"
-                    />
-                    <span className="text-[12px] font-medium text-slate-700 dark:text-slate-200">Half Day Session</span>
-                  </label>
-
-                  {ptoForm.isHalfDay && (
-                    <select
-                      value={ptoForm.halfDaySession}
-                      onChange={(e) => setPtoForm({ ...ptoForm, halfDaySession: e.target.value })}
-                      className="px-2 py-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-[11px] font-medium"
-                    >
-                      <option value="FIRST_HALF">First Half (Morning Shift)</option>
-                      <option value="SECOND_HALF">Second Half (Evening Shift)</option>
-                    </select>
-                  )}
-                </div>
-
-                {/* Reason */}
-                <div>
-                  <label className="text-[12px] font-semibold text-slate-700 dark:text-slate-200 block mb-1">
-                    Reason for PTO / Leave <span className="text-rose-500">*</span>
-                  </label>
-                  <textarea
-                    rows={2}
-                    required
-                    placeholder="e.g. Personal travel, family event, medical consultation"
-                    value={ptoForm.reason}
-                    onChange={(e) => setPtoForm({ ...ptoForm, reason: e.target.value })}
-                    className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-[13px] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
-                  />
-                </div>
-
-                <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsTakePtoModalOpen(false);
-                      router.push('/leaves');
-                    }}
-                    className="text-[12px] font-medium text-[#1346a1] hover:underline cursor-pointer"
-                  >
-                    Open Full Leaves Board →
-                  </button>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsTakePtoModalOpen(false)}
-                      className="px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmittingPto}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-[13px] font-bold bg-[#1346a1] hover:bg-[#0e3882] text-white shadow-xs disabled:opacity-50 cursor-pointer"
-                    >
-                      {isSubmittingPto ? (
-                        <>
-                          <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
-                          <span>Recording PTO…</span>
-                        </>
-                      ) : (
-                        <span>Submit PTO Request</span>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
     </DashboardLayout>
   );
