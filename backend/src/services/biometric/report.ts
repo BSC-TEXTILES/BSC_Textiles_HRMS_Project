@@ -298,37 +298,74 @@ export function sendCsv(res: Response, csv: string, filename: string): void {
   res.send(`\uFEFF${csv}`);
 }
 
-export async function sendXlsx(res: Response, rows: ReportRow[], filename: string, meta: { filterSummary: string }): Promise<void> {
+/** Builds a styled ExcelJS workbook for attendance reports with formula-injection guard. */
+export function buildXlsxWorkbook(
+  rows: ReportRow[],
+  meta: { filterSummary: string },
+  columns: Array<{ key: any; header: string }> = COLUMNS
+): ExcelJS.Workbook {
   const workbook = new ExcelJS.Workbook();
   workbook.created = new Date();
   const sheet = workbook.addWorksheet('Attendance');
 
-  sheet.columns = COLUMNS.map((c) => ({ header: c.header, key: c.key, width: Math.max(12, c.header.length + 4) }));
+  sheet.columns = columns.map((c) => ({
+    header: c.header,
+    key: String(c.key),
+    width: Math.max(14, c.header.length + 4),
+  }));
 
-  sheet.getRow(1).font = { bold: true };
-  sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEF' } };
+  sheet.getRow(1).font = { bold: true, color: { argb: 'FF1E293B' } };
+  sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
   sheet.autoFilter = {
     from: { row: 1, column: 1 },
-    to: { row: 1, column: COLUMNS.length },
+    to: { row: 1, column: columns.length },
   };
 
   for (const row of rows) {
-    sheet.addRow(COLUMNS.map((c) => {
-      let val = row[c.key];
-      if (c.key === 'locationCode' && (!val || val === 'DAV')) {
-        val = 'DAV - Davanagere';
-      }
-      return val === null || val === undefined ? '' : val;
-    }));
+    sheet.addRow(
+      columns.map((c) => {
+        let val: any = (row as any)[c.key];
+        if (c.key === 'locationCode' && (!val || val === 'DAV')) {
+          val = 'DAV - Davanagere';
+        }
+        if (val === null || val === undefined) return '';
+        if (typeof val === 'string' && /^[=+\-@\t\r]/.test(val)) {
+          return `'${val}`;
+        }
+        return val;
+      })
+    );
   }
 
   const notes = workbook.addWorksheet('About');
-  notes.getCell('A1').value = 'BSC Textiles HRMS — biometric attendance report';
+  notes.getCell('A1').value = 'BSC Textiles HRMS — Biometric Attendance Report';
   notes.getCell('A2').value = `Generated: ${new Date().toISOString()}`;
   notes.getCell('A3').value = `Filters: ${meta.filterSummary}`;
   notes.getCell('A4').value = 'Times are shown in the timezone the recording device is configured for; the UTC column is also included.';
   notes.getCell('A5').value = 'An empty Photo column means this firmware did not push a snapshot for that punch.';
 
+  return workbook;
+}
+
+/** Generates an XLSX file buffer for attendance report rows. */
+export async function buildXlsxBuffer(
+  rows: ReportRow[],
+  meta: { filterSummary: string },
+  columns: Array<{ key: any; header: string }> = COLUMNS
+): Promise<Buffer> {
+  const workbook = buildXlsxWorkbook(rows, meta, columns);
+  const arrayBuffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+export async function sendXlsx(
+  res: Response,
+  rows: ReportRow[],
+  filename: string,
+  meta: { filterSummary: string },
+  columns: Array<{ key: any; header: string }> = COLUMNS
+): Promise<void> {
+  const workbook = buildXlsxWorkbook(rows, meta, columns);
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
   res.setHeader('Content-Disposition', `attachment; filename="${filename.replace(/[^A-Za-z0-9._-]/g, '_')}"`);
   await workbook.xlsx.write(res);

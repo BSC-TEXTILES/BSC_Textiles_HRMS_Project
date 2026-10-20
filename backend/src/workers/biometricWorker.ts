@@ -299,6 +299,11 @@ async function tick(): Promise<void> {
 }
 
 export async function startWorker(options: { once?: boolean } = {}): Promise<void> {
+  if (deviceIntegrationConfig.isDisabled()) {
+    log({ msg: 'biometric worker disabled (DEVICE_SYNC_MODE=disabled or DISABLE_DEVICE_POLLING=1) — no device connections will be made.' });
+    return;
+  }
+
   const settings = await loadGlobalSettings();
   log({
     msg: 'biometric worker starting',

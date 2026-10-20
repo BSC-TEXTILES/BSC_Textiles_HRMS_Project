@@ -1570,8 +1570,21 @@ router.get('/report/export-1601-1610', authorize('VIEW'), async (req: AuthReques
 
     const report = await buildAttendanceReport(filters);
     const stamp = new Date().toISOString().slice(0, 10);
-    const filename = `BSC_DAV_MB160_Attendance_1601-1610_${stamp}.csv`;
+    const format = String(req.query.format || 'csv').toLowerCase();
 
+    if (format === 'xlsx' || format === 'excel') {
+      const filename = `BSC_DAV_MB160_Attendance_1601-1610_${stamp}.xlsx`;
+      await sendXlsx(
+        res,
+        report.rows,
+        filename,
+        { filterSummary: 'Davanagere MB160 Attendance (1601–1610)' },
+        MB160_DAV_1601_1610_COLUMNS
+      );
+      return;
+    }
+
+    const filename = `BSC_DAV_MB160_Attendance_1601-1610_${stamp}.csv`;
     const csvData = toCsv(report.rows, MB160_DAV_1601_1610_COLUMNS);
     sendCsv(res, csvData, filename);
   } catch (error: any) {

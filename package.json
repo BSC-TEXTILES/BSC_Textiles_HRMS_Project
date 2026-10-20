@@ -8,7 +8,9 @@
     "database"
   ],
   "scripts": {
-    "dev": "concurrently -k -n api,web,device -c blue,green,magenta \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run worker:supervised\"",
+    "dev": "concurrently -k -n api,web -c blue,green \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:app": "concurrently -k -n api,web -c blue,green \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:all": "concurrently -k -n api,web,device -c blue,green,magenta \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run worker:supervised\"",
     "dev:backend": "npm run dev --workspace=backend",
     "dev:frontend": "npm run dev --workspace=frontend",
     "build": "npm run build --workspaces",

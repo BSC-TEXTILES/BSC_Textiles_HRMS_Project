@@ -13,7 +13,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-export type DeviceSyncMode = 'local_lan' | 'cloud_push' | 'hybrid';
+export type DeviceSyncMode = 'local_lan' | 'cloud_push' | 'hybrid' | 'disabled';
 
 export function isPrivateIp(ip: string): boolean {
   if (!ip || typeof ip !== 'string') return false;
@@ -45,8 +45,12 @@ export function isPrivateIp(ip: string): boolean {
 }
 
 function resolveDeviceSyncMode(): DeviceSyncMode {
+  if (process.env.DISABLE_DEVICE_POLLING === '1' || process.env.ENABLE_DEVICE_POLLING === 'false') {
+    return 'disabled';
+  }
+
   const envMode = (process.env.DEVICE_SYNC_MODE || '').trim().toLowerCase();
-  if (envMode === 'local_lan' || envMode === 'cloud_push' || envMode === 'hybrid') {
+  if (envMode === 'local_lan' || envMode === 'cloud_push' || envMode === 'hybrid' || envMode === 'disabled') {
     return envMode as DeviceSyncMode;
   }
 
@@ -71,8 +75,12 @@ export const deviceIntegrationConfig = {
     const mode = resolveDeviceSyncMode();
     return mode === 'cloud_push' || mode === 'hybrid';
   },
+  isDisabled(): boolean {
+    return resolveDeviceSyncMode() === 'disabled';
+  },
   shouldPollDevice(ipAddress: string): boolean {
     const mode = resolveDeviceSyncMode();
+    if (mode === 'disabled') return false;
     if (mode === 'local_lan') return true;
     if (mode === 'hybrid') return true;
 

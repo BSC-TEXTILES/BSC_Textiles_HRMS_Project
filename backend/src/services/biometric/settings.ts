@@ -486,6 +486,15 @@ export async function markPollAttempt(
 }
 
 export async function markBackfillPending(deviceId: string, fromUtc: Date | null): Promise<void> {
+  if (fromUtc === null) {
+    await pool.query(
+      `UPDATE biometric_device_sync_state
+          SET backfillPending = 0, updatedAt = NOW()
+        WHERE deviceId = ?`,
+      [deviceId]
+    );
+    return;
+  }
   await pool.query(
     `UPDATE biometric_device_sync_state
         SET backfillPending = 1, lastBackfillFromUtc = COALESCE(?, lastWatermarkUtc, lastBackfillFromUtc), updatedAt = NOW()

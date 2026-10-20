@@ -453,6 +453,7 @@ export default function BiometricDeviceConsole() {
   const [davReportTotal, setDavReportTotal] = useState(0);
   const [davReportBusy, setDavReportBusy] = useState(false);
   const [davDownloadingCsv, setDavDownloadingCsv] = useState(false);
+  const [davDownloadingXlsx, setDavDownloadingXlsx] = useState(false);
   const [davPullingLogs, setDavPullingLogs] = useState(false);
   const [syncingClockId, setSyncingClockId] = useState<string | null>(null);
   const [syncingDeviceId, setSyncingDeviceId] = useState<string | null>(null);
@@ -1062,6 +1063,44 @@ export default function BiometricDeviceConsole() {
     }
   };
 
+  const downloadDavXlsx = async () => {
+    setDavDownloadingXlsx(true);
+    try {
+      const params: any = {
+        from: davReportFilters.from || undefined,
+        to: davReportFilters.to || undefined,
+        format: 'xlsx',
+      };
+      if (davReportFilters.employeeCode) {
+        params.employeeCode = davReportFilters.employeeCode;
+      }
+      if (davReportFilters.serialNumber) {
+        params.serialNumber = davReportFilters.serialNumber;
+      }
+      const response = await api.get('/devices/report/export-1601-1610', {
+        params,
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const stamp = new Date().toISOString().slice(0, 10);
+      link.download = `BSC_DAV_MB160_Attendance_1601-1610_${stamp}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success(`Downloaded BSC_DAV_MB160_Attendance_1601-1610_${stamp}.xlsx`);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || 'Excel download failed');
+    } finally {
+      setDavDownloadingXlsx(false);
+    }
+  };
+
   const pullDavLogs = async () => {
     setDavPullingLogs(true);
     try {
@@ -1479,6 +1518,14 @@ export default function BiometricDeviceConsole() {
                     >
                       <Download className="w-4 h-4" />
                       Download CSV (1601–1610)
+                    </Button>
+                    <Button
+                      onClick={downloadDavXlsx}
+                      loading={davDownloadingXlsx}
+                      className="bg-[#107c41] hover:bg-[#0b5c30] text-white font-medium shadow-md flex items-center gap-2 px-4 py-2.5 text-xs rounded-lg transition"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" />
+                      Download Excel (1601–1610)
                     </Button>
                     <Button
                       variant="outline"
