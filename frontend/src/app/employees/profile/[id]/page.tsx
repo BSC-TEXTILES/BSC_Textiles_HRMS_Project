@@ -7,6 +7,35 @@ import { useSession } from 'next-auth/react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
+import {
+  User,
+  Briefcase,
+  Building2,
+  MapPin,
+  Calendar,
+  Clock,
+  Phone,
+  Mail,
+  AlertCircle,
+  ShieldCheck,
+  CreditCard,
+  Camera,
+  Upload,
+  Trash2,
+  FileDown,
+  Edit3,
+  Palmtree,
+  CheckCircle2,
+  Timer,
+  Receipt,
+  FileCheck,
+  History,
+  LayoutDashboard,
+  ArrowRight,
+  ArrowLeft,
+  Sparkles,
+  Info,
+} from 'lucide-react';
 
 // Configurable rule: Indian mobile numbers must start with 6-9 followed by 9 digits
 const INDIAN_MOBILE_REGEX = /^[6-9]\d{9}$/;
@@ -649,13 +678,13 @@ export default function EmployeeProfileDossierPage() {
 
   // Keyboard navigation for tabs
   const tabList = [
-    { key: 'overview', label: '1. Overview', icon: 'badge' },
-    { key: 'attendance', label: '2. Attendance & Biometrics', icon: 'fingerprint' },
-    { key: 'breaks', label: '3. Work Hours & Breaks', icon: 'timelapse' },
-    { key: 'leaves', label: '4. Leave Balances & Quota', icon: 'beach_access' },
-    { key: 'payroll', label: '5. Salary & Payslip History', icon: 'payments' },
-    { key: 'documents', label: `6. KYC & Digital Documents (${kycDocuments.length})`, icon: 'verified_user' },
-    { key: 'audit', label: '7. Audit Trail', icon: 'history' },
+    { key: 'overview', label: '1. Overview', icon: LayoutDashboard },
+    { key: 'attendance', label: '2. Attendance & Biometrics', icon: Clock },
+    { key: 'breaks', label: '3. Work Hours & Breaks', icon: Timer },
+    { key: 'leaves', label: '4. Leave Balances & Quota', icon: Palmtree },
+    { key: 'payroll', label: '5. Salary & Payslip History', icon: Receipt },
+    { key: 'documents', label: `6. KYC & Digital Documents (${kycDocuments.length})`, icon: FileCheck },
+    { key: 'audit', label: '7. Audit Trail', icon: History },
   ];
 
   const handleTabKeyDown = (e: React.KeyboardEvent, index: number) => {
@@ -691,7 +720,7 @@ export default function EmployeeProfileDossierPage() {
             aria-label="Go back"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:outline-none focus:ring-2 focus:ring-[#1346a1]/30"
           >
-            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            <ArrowLeft className="w-4 h-4" />
             <span>Back to Workforce Directory</span>
           </button>
         </div>
@@ -900,7 +929,7 @@ export default function EmployeeProfileDossierPage() {
                         title="Take profile photo with camera"
                         className="w-7 h-7 rounded-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all opacity-100 sm:opacity-90 sm:group-hover:opacity-100 focus:opacity-100 focus:ring-2 focus:ring-[#1346a1]/40 cursor-pointer"
                       >
-                        <span className="material-symbols-outlined text-[16px]">photo_camera</span>
+                        <Camera className="w-3.5 h-3.5" />
                       </button>
                       <button
                         type="button"
@@ -909,7 +938,7 @@ export default function EmployeeProfileDossierPage() {
                         title="Upload profile photo (JPG, PNG, WebP • max 2MB)"
                         className="w-7 h-7 rounded-full bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 hover:text-[#1346a1] dark:hover:text-blue-300 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all opacity-100 sm:opacity-90 sm:group-hover:opacity-100 focus:opacity-100 focus:ring-2 focus:ring-[#1346a1]/40 cursor-pointer"
                       >
-                        <span className="material-symbols-outlined text-[15px]">upload</span>
+                        <Upload className="w-3.5 h-3.5" />
                       </button>
                       {profilePhoto && (
                         <button
@@ -919,22 +948,9 @@ export default function EmployeeProfileDossierPage() {
                           title="Remove profile photo"
                           className="w-7 h-7 rounded-full bg-white dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-600 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all opacity-100 sm:opacity-90 sm:group-hover:opacity-100 focus:opacity-100 cursor-pointer"
                         >
-                          <span className="material-symbols-outlined text-[15px]">delete</span>
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
-                    </div>
-                  )}
-
-                  {canEditProfile && (
-                    <div className="flex items-center justify-center gap-1 mt-2">
-                      <button
-                        type="button"
-                        onClick={startCamera}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[10px] font-semibold border border-slate-200/80 dark:border-slate-700 shadow-2xs transition-colors cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-[13px] text-blue-600 dark:text-blue-400">photo_camera</span>
-                        <span>Take Photo</span>
-                      </button>
                     </div>
                   )}
 
@@ -961,9 +977,9 @@ export default function EmployeeProfileDossierPage() {
                     </span>
 
                     {/* Branch badge */}
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 text-[11px] font-medium border border-slate-200 dark:border-slate-700">
-                      <span className="material-symbols-outlined text-[13px] text-[#1346a1] dark:text-blue-400">storefront</span>
-                      <span>{emp.location?.name || 'Belagavi Flagship Store (BEL-01)'}</span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 text-[11px] font-medium border border-slate-200 dark:border-slate-700">
+                      <Building2 className="w-3.5 h-3.5 text-[#1346a1] dark:text-blue-400" />
+                      <span>{emp.location?.name || 'Davanagere Mega Store (DAV)'}</span>
                     </span>
                   </div>
 
@@ -974,12 +990,13 @@ export default function EmployeeProfileDossierPage() {
 
                   {/* Designation and department: 13px, weight 400, muted */}
                   <p
-                    className="text-[13px] font-normal text-slate-500 dark:text-slate-400 mb-3 truncate"
-                    title={`${emp.designation} • ${emp.department?.name || 'Bridal & Silk Department'}`}
+                    className="text-[13px] font-normal text-slate-500 dark:text-slate-400 mb-3 truncate flex items-center gap-1.5"
+                    title={`${emp.designation} • ${emp.department?.name || 'Retail Sales & Operations'}`}
                   >
+                    <Briefcase className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     <span>{emp.designation}</span>
-                    <span className="mx-1.5">•</span>
-                    <span className="text-slate-700 dark:text-slate-300 font-medium">{emp.department?.name || 'Bridal & Silk Department'}</span>
+                    <span className="mx-1 text-slate-300 dark:text-slate-600">•</span>
+                    <span className="text-slate-700 dark:text-slate-300 font-medium">{emp.department?.name || 'Retail Sales & Operations'}</span>
                   </p>
 
                   {/* Meta row: 4-column grid (2x2 on mobile), label above value, no collision, wraps safely */}
@@ -989,7 +1006,7 @@ export default function EmployeeProfileDossierPage() {
                         Reporting Head
                       </span>
                       <span className="text-[13px] font-medium text-slate-800 dark:text-slate-100 break-words leading-snug">
-                        {emp.managerName || 'Anand Kulkarni'}
+                        {emp.managerName || 'Store Manager (Davanagere)'}
                       </span>
                     </div>
 
@@ -998,7 +1015,7 @@ export default function EmployeeProfileDossierPage() {
                         HR Partner
                       </span>
                       <span className="text-[13px] font-medium text-slate-800 dark:text-slate-100 break-words leading-snug">
-                        {emp.hrPartner || 'Sunita Deshmukh'}
+                        {emp.hrPartner || 'HR Operations (DAV)'}
                       </span>
                     </div>
 
@@ -1007,7 +1024,7 @@ export default function EmployeeProfileDossierPage() {
                         Shift &amp; Cadence
                       </span>
                       <span className="text-[13px] font-medium text-slate-800 dark:text-slate-100 break-words leading-snug">
-                        {emp.shift?.name || 'Retail A (09:30 – 18:30)'}
+                        {emp.shift?.name || 'Shift A (09:30 – 18:30)'}
                       </span>
                     </div>
 
@@ -1016,7 +1033,7 @@ export default function EmployeeProfileDossierPage() {
                         Tenure
                       </span>
                       <span className="text-[13px] font-medium text-slate-800 dark:text-slate-100 break-words leading-snug">
-                        {emp.joiningDate} (4y 2m)
+                        {emp.joiningDate}
                       </span>
                     </div>
                   </div>
@@ -1024,21 +1041,21 @@ export default function EmployeeProfileDossierPage() {
                   {/* Contact strip: in its own row below identity block, separated by dividers, wraps cleanly */}
                   <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] font-normal text-slate-700 dark:text-slate-300">
                     <div className="inline-flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[15px] text-[#1346a1] dark:text-blue-400">mail</span>
+                      <Mail className="w-3.5 h-3.5 text-[#1346a1] dark:text-blue-400" />
                       <span className="break-all">{emp.email}</span>
                     </div>
 
                     <span className="hidden sm:inline text-slate-300 dark:text-slate-600">|</span>
 
                     <div className="inline-flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[15px] text-[#1346a1] dark:text-blue-400">phone_iphone</span>
+                      <Phone className="w-3.5 h-3.5 text-[#1346a1] dark:text-blue-400" />
                       <span>+91 {emp.phone}</span>
                     </div>
 
                     <span className="hidden sm:inline text-slate-300 dark:text-slate-600">|</span>
 
                     <div className="inline-flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[15px] text-rose-500">emergency</span>
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-500" />
                       <span className="text-slate-600 dark:text-slate-400">SOS:</span>
                       <span className="font-medium text-slate-800 dark:text-slate-100">{emp.emergencyContact}</span>
                     </div>
@@ -1047,7 +1064,7 @@ export default function EmployeeProfileDossierPage() {
               </div>
 
               {/* RIGHT COLUMN: ACTION BUTTONS DOCK (lg:col-span-4 xl:col-span-3, ALIGNED TOP-RIGHT) */}
-              <div className="lg:col-span-4 xl:col-span-3 flex flex-wrap lg:flex-col lg:items-end justify-start lg:justify-start gap-2 pt-1 lg:pt-0">
+              <div className="lg:col-span-4 xl:col-span-3 flex flex-wrap lg:flex-col lg:items-end justify-start lg:justify-start gap-2.5 pt-1 lg:pt-0">
                 {/* 1. Edit Profile */}
                 {canEditProfile && (
                   <button
@@ -1058,88 +1075,40 @@ export default function EmployeeProfileDossierPage() {
                       setIsEditModalOpen(true);
                     }}
                     aria-label="Edit employee profile"
-                    className="w-full sm:w-auto lg:w-48 inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 text-[13px] font-semibold shadow-2xs hover:shadow-xs transition-all focus:ring-2 focus:ring-[#1346a1]/30 cursor-pointer"
+                    className="w-full sm:w-auto lg:w-48 inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 text-[13px] font-semibold shadow-2xs hover:shadow-xs transition-all focus:ring-2 focus:ring-[#1346a1]/30 cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-[17px] text-[#1346a1] dark:text-blue-400">edit_square</span>
+                    <Edit3 className="w-4 h-4 text-[#1346a1] dark:text-blue-400" />
                     <span>Edit Profile</span>
                   </button>
                 )}
 
-                {/* 2. Log Correction */}
-                <button
-                  type="button"
-                  onClick={() => router.push('/attendance/corrections')}
-                  aria-label="Open log correction"
-                  className="w-full sm:w-auto lg:w-48 inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 text-[13px] font-semibold shadow-2xs hover:shadow-xs transition-all focus:ring-2 focus:ring-[#1346a1]/30 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[17px] text-slate-600 dark:text-slate-400">more_time</span>
-                  <span>Log Correction</span>
-                </button>
-
-                {/* 3. Take PTO (Paid Time Off) */}
+                {/* 2. Take PTO (Paid Time Off) */}
                 <button
                   type="button"
                   onClick={openTakePtoModal}
                   aria-label="Take PTO / Apply Leave for employee"
-                  className="w-full sm:w-auto lg:w-48 inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-300/80 dark:border-amber-700/60 text-[13px] font-semibold shadow-2xs hover:shadow-xs transition-all focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
+                  className="w-full sm:w-auto lg:w-48 inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 hover:bg-amber-100 dark:hover:bg-amber-900/50 text-amber-800 dark:text-amber-300 border border-amber-300/80 dark:border-amber-700/60 text-[13px] font-semibold shadow-2xs hover:shadow-xs transition-all focus:ring-2 focus:ring-amber-500/30 cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[17px] text-amber-600 dark:text-amber-400">beach_access</span>
-                  <span>Take PTO</span>
+                  <Palmtree className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  <span>Take PTO / Leave</span>
                 </button>
 
-                {/* 4. eSSL Biometric Sync Toggle Switch */}
-                <div className="w-full sm:w-auto lg:w-48 inline-flex items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-300/80 dark:border-emerald-700/60 shadow-2xs">
-                  <div className="flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[17px] text-emerald-600 dark:text-emerald-400">fingerprint</span>
-                    <span className="text-[12px] font-bold text-emerald-800 dark:text-emerald-300">eSSL Sync</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={isEsslSyncActive}
-                      onClick={() => {
-                        const next = !isEsslSyncActive;
-                        setIsEsslSyncActive(next);
-                        if (next) {
-                          triggerBiometricSync();
-                        } else {
-                          toast.success('eSSL Biometric Live Sync Paused');
-                        }
-                      }}
-                      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                        isEsslSyncActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
-                      }`}
-                      title={isEsslSyncActive ? 'eSSL Biometric Push Sync Active (Click to Pause)' : 'eSSL Sync Paused (Click to Enable)'}
-                    >
-                      <span
-                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
-                          isEsslSyncActive ? 'translate-x-4' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
-                    <span className={`text-[10px] font-black uppercase ${isEsslSyncActive ? 'text-emerald-700 dark:text-emerald-300' : 'text-slate-400'}`}>
-                      {isEsslSyncActive ? 'ON' : 'OFF'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* 5. Download PDF */}
+                {/* 3. Download PDF */}
                 <button
                   type="button"
                   disabled={isDownloadingPdf}
                   onClick={handleDownloadPdf}
                   aria-label={`Download complete profile PDF for ${emp.fullName}`}
-                  className="w-full sm:w-auto lg:w-48 inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#1346a1] to-[#0e3882] hover:from-[#0e3882] hover:to-[#092659] text-white text-[13px] font-semibold shadow-xs hover:shadow-md transition-all disabled:opacity-60 disabled:cursor-not-allowed focus:ring-2 focus:ring-[#1346a1]/40 cursor-pointer"
+                  className="w-full sm:w-auto lg:w-48 inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-[#1346a1] to-[#0e3882] hover:from-[#0e3882] hover:to-[#092659] text-white text-[13px] font-semibold shadow-xs hover:shadow-md transition-all disabled:opacity-60 disabled:cursor-not-allowed focus:ring-2 focus:ring-[#1346a1]/40 cursor-pointer"
                 >
                   {isDownloadingPdf ? (
                     <>
-                      <span className="material-symbols-outlined text-[17px] animate-spin">progress_activity</span>
+                      <Clock className="w-4 h-4 animate-spin" />
                       <span>Preparing PDF…</span>
                     </>
                   ) : (
                     <>
-                      <span className="material-symbols-outlined text-[17px]">download</span>
+                      <FileDown className="w-4 h-4" />
                       <span>Download PDF</span>
                     </>
                   )}
@@ -1175,9 +1144,10 @@ export default function EmployeeProfileDossierPage() {
                       : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:border-slate-300 dark:hover:border-slate-700'
                   }`}
                 >
-                  <span className={`material-symbols-outlined text-[16px] ${isActive ? 'text-[#1346a1] dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`}>
-                    {tab.icon}
-                  </span>
+                  {(() => {
+                    const IconComp = tab.icon;
+                    return <IconComp className={`w-4 h-4 shrink-0 ${isActive ? 'text-[#1346a1] dark:text-blue-400' : 'text-slate-400 dark:text-slate-500'}`} />;
+                  })()}
                   <span>{tab.label}</span>
                 </button>
               );
@@ -1189,341 +1159,273 @@ export default function EmployeeProfileDossierPage() {
         <div className="w-full">
           {/* TAB 1: OVERVIEW */}
           {activeTab === 'overview' && (
-            <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
-              {/* LEFT 4 COLS: Demographics & Statutory Registry */}
-              <div className="xl:col-span-4 flex flex-col gap-4">
-                {/* Personal Demographics */}
-                <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-xs">
-                  <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[#1346a1] dark:text-blue-400 text-[18px]">badge</span>
-                      <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white">Personal Demographics</h3>
+            <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" className="space-y-5">
+              {/* TOP ROW: 2 BALANCED COLUMN CARDS */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* CARD 1: OFFICIAL EMPLOYMENT & ORGANIZATION */}
+                <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs">
+                  <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1.5 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-[#1346a1] dark:text-blue-400">
+                        <Briefcase className="w-4 h-4" />
+                      </span>
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Employment &amp; Organization</h3>
                     </div>
-                    <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800 uppercase">
-                      Verified
+                    <span className="text-[11px] font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 px-2.5 py-0.5 rounded-full border border-blue-200 dark:border-blue-800">
+                      {emp.statusBadgeLabel}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 mb-3 text-slate-700 dark:text-slate-300">
+                  <div className="grid grid-cols-2 gap-4 text-xs">
                     <div>
-                      <span className="text-[12px] font-normal text-slate-500 dark:text-slate-400 block">Date of Birth</span>
-                      <span className="text-[14px] font-semibold text-slate-900 dark:text-white">{emp.dateOfBirth}</span>
+                      <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-medium">Employee Code</span>
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white font-mono mt-0.5 block">{emp.employeeCode}</span>
                     </div>
                     <div>
-                      <span className="text-[12px] font-normal text-slate-500 dark:text-slate-400 block">Gender</span>
-                      <span className="text-[14px] font-semibold text-slate-900 dark:text-white">{emp.gender}</span>
+                      <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-medium">Department</span>
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5 block">{emp.department?.name || 'Retail Operations'}</span>
                     </div>
                     <div>
-                      <span className="text-[12px] font-normal text-slate-500 dark:text-slate-400 block">Blood Group</span>
-                      <span className="text-[14px] font-semibold text-slate-900 dark:text-white">{emp.bloodGroup}</span>
+                      <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-medium">Designation</span>
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5 block">{emp.designation}</span>
                     </div>
                     <div>
-                      <span className="text-[12px] font-normal text-slate-500 dark:text-slate-400 block">Marital Status</span>
-                      <span className="text-[14px] font-semibold text-slate-900 dark:text-white">{emp.maritalStatus}</span>
+                      <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-medium">Work Location</span>
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5 block">{emp.location?.name || 'Davanagere Mega Store'}</span>
                     </div>
-                  </div>
-
-                  <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-lg border border-slate-200/60 dark:border-slate-700">
-                    <span className="text-[12px] font-normal text-slate-500 dark:text-slate-400 block">Permanent Address</span>
-                    <p className="text-[13px] font-normal text-slate-800 dark:text-slate-200 leading-snug mt-0.5">
-                      {emp.addressLine1},<br />
-                      {emp.city}, {emp.state} – {emp.pincode}
-                    </p>
-                    <div className="flex items-center gap-1 mt-1.5 text-[#1346a1] dark:text-blue-400 text-[11px] font-medium">
-                      <span className="material-symbols-outlined text-[13px]">home_pin</span>
-                      <span>Proof of Residence: Aadhaar on file</span>
+                    <div>
+                      <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-medium">Shift Assignment</span>
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5 block">{emp.shift?.name || 'Retail Shift (09:30 – 18:30)'}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-medium">Date of Joining</span>
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5 block">{emp.joiningDate}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-medium">Reporting Manager</span>
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5 block">{emp.managerName}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-medium">HR Partner</span>
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5 block">{emp.hrPartner}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Identity & Statutory Compliance */}
-                <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-xs">
-                  <div className="flex items-center justify-between pb-2 mb-3 border-b border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[#1346a1] dark:text-blue-400 text-[18px]">account_balance</span>
-                      <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white">Statutory &amp; Bank Registry</h3>
+                {/* CARD 2: PERSONAL DEMOGRAPHICS & RESIDENCE */}
+                <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs">
+                  <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400">
+                        <User className="w-4 h-4" />
+                      </span>
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Personal Demographics &amp; Contact</h3>
                     </div>
-                    <span className="material-symbols-outlined text-emerald-600 dark:text-emerald-400 text-[18px]">verified_user</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditModalOpen(true)}
+                      className="text-[11px] font-semibold text-[#1346a1] dark:text-blue-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <Edit3 className="w-3 h-3" /> Edit
+                    </button>
                   </div>
 
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
-                      <div>
-                        <span className="text-[11px] font-normal text-slate-400 uppercase tracking-wider block">Aadhaar (UIDAI)</span>
-                        <span className="text-[13px] font-medium text-slate-900 dark:text-white">{emp.aadhaar}</span>
-                      </div>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">e-KYC Done</span>
+                  <div className="grid grid-cols-2 gap-4 text-xs mb-4">
+                    <div>
+                      <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-medium">Date of Birth</span>
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5 block">{emp.dateOfBirth}</span>
                     </div>
-
-                    <div className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
-                      <div>
-                        <span className="text-[11px] font-normal text-slate-400 uppercase tracking-wider block">Income Tax PAN</span>
-                        <span className="text-[13px] font-medium text-slate-900 dark:text-white">{emp.pan}</span>
-                      </div>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">NSDL Active</span>
+                    <div>
+                      <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-medium">Gender</span>
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5 block">{emp.gender}</span>
                     </div>
-
-                    <div className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
-                      <div>
-                        <span className="text-[11px] font-normal text-slate-400 uppercase tracking-wider block">Provident Fund (UAN)</span>
-                        <span className="text-[13px] font-medium text-slate-900 dark:text-white">{emp.uan}</span>
-                      </div>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-[#1346a1] dark:text-blue-300 border border-blue-200 dark:border-blue-800">EPFO Synced</span>
+                    <div>
+                      <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-medium">Blood Group</span>
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5 block">{emp.bloodGroup}</span>
                     </div>
-
-                    <div className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
-                      <div>
-                        <span className="text-[11px] font-normal text-slate-400 uppercase tracking-wider block">ESI Corporation ID</span>
-                        <span className="text-[13px] font-medium text-slate-900 dark:text-white">{emp.esic}</span>
-                      </div>
-                      <span className="text-[11px] font-medium px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">Active</span>
+                    <div>
+                      <span className="text-slate-400 block text-[11px] uppercase tracking-wider font-medium">Marital Status</span>
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5 block">{emp.maritalStatus}</span>
                     </div>
+                  </div>
 
-                    {/* Bank Account */}
-                    <div className="p-2.5 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-start gap-2.5 mt-2 border border-slate-200 dark:border-slate-700">
-                      <div className="w-7 h-7 rounded bg-white dark:bg-slate-700 flex items-center justify-center shrink-0 text-[#1346a1] dark:text-blue-400 shadow-2xs">
-                        <span className="material-symbols-outlined text-[16px]">account_balance_wallet</span>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700/60">
+                    <div className="flex items-start gap-2">
+                      <MapPin className="w-4 h-4 text-[#1346a1] dark:text-blue-400 shrink-0 mt-0.5" />
+                      <div className="text-xs">
+                        <span className="font-semibold text-slate-900 dark:text-white block">Permanent Residential Address</span>
+                        <p className="text-slate-600 dark:text-slate-300 mt-0.5 leading-relaxed">
+                          {emp.addressLine1}, {emp.city}, {emp.state} – {emp.pincode}
+                        </p>
                       </div>
-                      <div className="flex flex-col flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[12px] font-semibold text-slate-900 dark:text-white">{emp.bankName}</span>
-                          <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase bg-emerald-50 dark:bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">Direct ACH</span>
-                        </div>
-                        <span className="text-[12px] text-slate-700 dark:text-slate-300">{emp.bankAccount} • IFSC: {emp.bankIfsc}</span>
-                        <span className="text-[11px] text-slate-400 dark:text-slate-500">Branch: {emp.bankBranch}</span>
+                    </div>
+                    {emp.emergencyContact && emp.emergencyContact !== '—' && (
+                      <div className="mt-2.5 pt-2 border-t border-slate-200/70 dark:border-slate-700/70 flex items-center gap-2 text-xs">
+                        <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                        <span className="text-slate-500 dark:text-slate-400 font-medium">Emergency Contact:</span>
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">{emp.emergencyContact}</span>
                       </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* MIDDLE ROW: STATUTORY, BANKING & COMPLIANCE REGISTRY */}
+              <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 p-5 shadow-xs">
+                <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
+                      <ShieldCheck className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Statutory, Compliance &amp; Banking Registry</h3>
+                      <p className="text-[11px] text-slate-400">Government identity records, Provident Fund, ESIC and Direct ACH Salary Account</p>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                    <CheckCircle2 className="w-3 h-3" /> Fully Verified
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 text-xs">
+                  {/* PAN */}
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700/60 flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Income Tax PAN</span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">NSDL Valid</span>
+                    </div>
+                    <span className="text-sm font-mono font-bold text-slate-900 dark:text-white mt-1">{emp.pan}</span>
+                  </div>
+
+                  {/* Aadhaar */}
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700/60 flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Aadhaar (UIDAI)</span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">e-KYC Done</span>
+                    </div>
+                    <span className="text-sm font-mono font-bold text-slate-900 dark:text-white mt-1">{emp.aadhaar}</span>
+                  </div>
+
+                  {/* UAN / PF */}
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700/60 flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Provident Fund (UAN)</span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">EPFO Synced</span>
+                    </div>
+                    <span className="text-sm font-mono font-bold text-slate-900 dark:text-white mt-1">{emp.uan}</span>
+                  </div>
+
+                  {/* Bank Account */}
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700/60 flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Salary Account</span>
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">Direct ACH</span>
+                    </div>
+                    <div className="mt-1">
+                      <span className="text-sm font-semibold text-slate-900 dark:text-white block">{emp.bankName}</span>
+                      <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">{emp.bankAccount} · IFSC: {emp.bankIfsc}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* RIGHT 8 COLS: Attendance Performance, Salary Summary, Citations */}
-              <div className="xl:col-span-8 flex flex-col gap-4">
-                {/* Verified eSSL MB160 Biometric Hardware Status Card */}
-                <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-xs space-y-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-200 dark:border-blue-800">
-                        <span className="material-symbols-outlined text-[20px]">fingerprint</span>
-                      </div>
-                      <div>
-                        <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white">eSSL MB160 Biometric Integration</h3>
-                        <p className="text-[11px] text-slate-400">Direct hardware synchronization • Davanagere Mega Store</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center flex-wrap gap-2">
-                      {/* eSSL Hardware Sync Toggle */}
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">eSSL Toggle:</span>
-                        <button
-                          type="button"
-                          role="switch"
-                          aria-checked={isEsslSyncActive}
-                          onClick={() => {
-                            const next = !isEsslSyncActive;
-                            setIsEsslSyncActive(next);
-                            toast.success(next ? 'eSSL MB160 Biometric Push Active' : 'eSSL MB160 Push Paused');
-                          }}
-                          className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border border-slate-300 dark:border-slate-600 transition-colors duration-200 ease-in-out focus:outline-none ${
-                            isEsslSyncActive ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'
-                          }`}
-                          title="Toggle eSSL MB160 Push Attendance"
-                        >
-                          <span
-                            className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-2xs ring-0 transition duration-200 ease-in-out ${
-                              isEsslSyncActive ? 'translate-x-4' : 'translate-x-0'
-                            }`}
-                          />
-                        </button>
-                        <span className={`text-[10px] font-black ${isEsslSyncActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'}`}>
-                          {isEsslSyncActive ? 'ON' : 'OFF'}
-                        </span>
-                      </div>
-
-                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-bold border ${
-                        diagnosticSync?.status === 'CONNECTED'
-                          ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                          : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800'
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${diagnosticSync?.status === 'CONNECTED' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-                        <span>{diagnosticSync?.status || 'CONNECTED'}</span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={triggerBiometricSync}
-                        disabled={isSyncingBiometric}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#1346a1] hover:bg-[#0e3882] disabled:opacity-50 text-white text-[11px] font-semibold rounded-md shadow-xs transition-all cursor-pointer"
-                      >
-                        <span className={`material-symbols-outlined text-[14px] ${isSyncingBiometric ? 'animate-spin' : ''}`}>sync</span>
-                        <span>{isSyncingBiometric ? 'Syncing...' : 'Sync Device'}</span>
-                      </button>
-                    </div>
+              {/* BOTTOM ROW: INTERACTIVE QUICK WORKSPACE SHORTCUTS */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* 1. ATTENDANCE & BIOMETRICS */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('attendance')}
+                  className="p-4 bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-[#1346a1]/50 dark:hover:border-blue-500/50 transition-all text-left group cursor-pointer flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 group-hover:scale-105 transition-transform">
+                      <Clock className="w-5 h-5" />
+                    </span>
+                    <span className="text-slate-400 group-hover:text-[#1346a1] dark:group-hover:text-blue-400 transition-colors">
+                      <ArrowRight className="w-4 h-4" />
+                    </span>
                   </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700">
-                      <span className="text-[10px] uppercase font-semibold text-slate-400 block">Device PIN</span>
-                      <span className="text-sm font-bold font-mono text-slate-900 dark:text-white">{(employee as any)?.biometricDeviceEmployeeId || diagnosticSync?.enrollmentNumber || emp.employeeCode}</span>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block">MB160 User ID</span>
-                    </div>
-                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700">
-                      <span className="text-[10px] uppercase font-semibold text-slate-400 block">Hardware Model</span>
-                      <span className="text-sm font-bold text-slate-900 dark:text-white">eSSL MB160</span>
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold block">Online • Connected</span>
-                    </div>
-                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700">
-                      <span className="text-[10px] uppercase font-semibold text-slate-400 block">Showroom</span>
-                      <span className="text-sm font-bold text-slate-900 dark:text-white">Davanagere (DAV)</span>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block">Mega Store Main Terminal</span>
-                    </div>
-                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700">
-                      <span className="text-[10px] uppercase font-semibold text-slate-400 block">Last Sync</span>
-                      <span className="text-sm font-bold text-slate-900 dark:text-white">{diagnosticSync?.lastSuccessfulSyncAt ? new Date(diagnosticSync.lastSuccessfulSyncAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'Verified Live'}</span>
-                      <span className="text-[10px] text-slate-500 dark:text-slate-400 block">ADMS / ZK Protocol</span>
-                    </div>
+                  <div className="mt-3">
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-[#1346a1] dark:group-hover:text-blue-400 transition-colors">
+                      Attendance &amp; Biometrics
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      View daily punch logs, terminal hardware audits &amp; monthly attendance history.
+                    </p>
                   </div>
-                </div>
+                </button>
 
-                {/* October 2024 Attendance Performance Card (4 Metric Tiles in 4-column desktop, 2-col tablet, 1-col mobile) */}
-                <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-xs">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100 dark:border-slate-800">
-                    <div>
-                      <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white">October 2024 Attendance Performance</h3>
-                      <p className="text-[11px] text-slate-400">Biometric facial recognition sync across Karnataka store terminals</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-[11px] font-medium">
-                        98.4% Present
-                      </span>
-                      <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 text-[11px] font-medium">
-                        0 Unexcused
-                      </span>
-                    </div>
+                {/* 2. WORK HOURS & BREAKS */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('breaks')}
+                  className="p-4 bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-[#1346a1]/50 dark:hover:border-blue-500/50 transition-all text-left group cursor-pointer flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="p-2 rounded-lg bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 group-hover:scale-105 transition-transform">
+                      <Timer className="w-5 h-5" />
+                    </span>
+                    <span className="text-slate-400 group-hover:text-[#1346a1] dark:group-hover:text-blue-400 transition-colors">
+                      <ArrowRight className="w-4 h-4" />
+                    </span>
                   </div>
-
-                  {/* 4 Metric Tiles: label (12px), value (18px, single font), helper line (11px) */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 my-3">
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700">
-                      <span className="text-[12px] font-normal text-slate-500 dark:text-slate-400 block">Avg Check-in</span>
-                      <div className="text-[18px] font-semibold text-slate-900 dark:text-white mt-0.5">09:27 AM</div>
-                      <span className="text-[11px] text-[#1346a1] dark:text-blue-400 font-normal block mt-0.5">3m Early Shift Buffer</span>
-                    </div>
-
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700">
-                      <span className="text-[12px] font-normal text-slate-500 dark:text-slate-400 block">Avg Check-out</span>
-                      <div className="text-[18px] font-semibold text-slate-900 dark:text-white mt-0.5">06:34 PM</div>
-                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal block mt-0.5">Standard 06:30 PM Closure</span>
-                    </div>
-
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700">
-                      <span className="text-[12px] font-normal text-slate-500 dark:text-slate-400 block">Total Overtime Hours</span>
-                      <div className="text-[18px] font-semibold text-[#1346a1] dark:text-blue-400 mt-0.5">6.5 Hours</div>
-                      <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal block mt-0.5">1.25x Overtime Credit</span>
-                    </div>
-
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-200/60 dark:border-slate-700">
-                      <span className="text-[12px] font-normal text-slate-500 dark:text-slate-400 block">Break Adherence</span>
-                      <div className="text-[18px] font-semibold text-slate-900 dark:text-white mt-0.5">100%</div>
-                      <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-normal block mt-0.5">Zero Overages</span>
-                    </div>
+                  <div className="mt-3">
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-[#1346a1] dark:group-hover:text-blue-400 transition-colors">
+                      Work Hours &amp; Shifts
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Inspect shift schedule, overtime credits, break hours &amp; meal tracking.
+                    </p>
                   </div>
-                </div>
+                </button>
 
-                {/* Compensation & Salary Structure */}
-                <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-xs">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[#1346a1] dark:text-blue-400 text-[18px]">payments</span>
-                      <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white">Compensation &amp; Salary Structure</h3>
-                    </div>
-                    <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Cycle: Oct 2024</span>
+                {/* 3. LEAVE BALANCES & QUOTA */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('leaves')}
+                  className="p-4 bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-[#1346a1]/50 dark:hover:border-blue-500/50 transition-all text-left group cursor-pointer flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 group-hover:scale-105 transition-transform">
+                      <Palmtree className="w-5 h-5" />
+                    </span>
+                    <span className="text-slate-400 group-hover:text-[#1346a1] dark:group-hover:text-blue-400 transition-colors">
+                      <ArrowRight className="w-4 h-4" />
+                    </span>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 my-3">
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg space-y-2 border border-slate-200/60 dark:border-slate-700">
-                      <span className="text-[11px] font-medium uppercase text-slate-400 tracking-wider block">Earnings Breakdown</span>
-                      <div className="flex justify-between text-[13px]">
-                        <span className="text-slate-500 dark:text-slate-400">Basic Salary:</span>
-                        <span className="font-semibold text-slate-900 dark:text-white">₹28,000</span>
-                      </div>
-                      <div className="flex justify-between text-[13px]">
-                        <span className="text-slate-500 dark:text-slate-400">House Rent Allowance (HRA):</span>
-                        <span className="font-semibold text-slate-900 dark:text-white">₹11,200</span>
-                      </div>
-                      <div className="flex justify-between text-[13px]">
-                        <span className="text-slate-500 dark:text-slate-400">Special Floor Allowance:</span>
-                        <span className="font-semibold text-slate-900 dark:text-white">₹10,500</span>
-                      </div>
-                      <div className="flex justify-between text-[13px]">
-                        <span className="text-slate-500 dark:text-slate-400">Sales Performance Incentive:</span>
-                        <span className="font-semibold text-[#1346a1] dark:text-blue-400">₹4,500</span>
-                      </div>
-                      <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between font-semibold text-[14px]">
-                        <span className="text-slate-900 dark:text-white">Gross Earnings:</span>
-                        <span className="text-slate-900 dark:text-white">₹54,200</span>
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg space-y-2 border border-slate-200/60 dark:border-slate-700">
-                      <span className="text-[11px] font-medium uppercase text-slate-400 tracking-wider block">Statutory Deductions</span>
-                      <div className="flex justify-between text-[13px]">
-                        <span className="text-slate-500 dark:text-slate-400">Provident Fund (EPF 12%):</span>
-                        <span className="font-semibold text-slate-900 dark:text-white">₹3,360</span>
-                      </div>
-                      <div className="flex justify-between text-[13px]">
-                        <span className="text-slate-500 dark:text-slate-400">ESIC Contribution (0.75%):</span>
-                        <span className="font-semibold text-slate-900 dark:text-white">₹407</span>
-                      </div>
-                      <div className="flex justify-between text-[13px]">
-                        <span className="text-slate-500 dark:text-slate-400">Karnataka Professional Tax (PT):</span>
-                        <span className="font-semibold text-slate-900 dark:text-white">₹200</span>
-                      </div>
-                      <div className="flex justify-between text-[13px]">
-                        <span className="text-slate-500 dark:text-slate-400">TDS / Income Tax:</span>
-                        <span className="font-semibold text-slate-900 dark:text-white">₹0</span>
-                      </div>
-                      <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between font-semibold text-[14px]">
-                        <span className="text-[#1346a1] dark:text-blue-400">Net Take-Home Pay:</span>
-                        <span className="text-[#1346a1] dark:text-blue-400">₹50,233</span>
-                      </div>
-                    </div>
+                  <div className="mt-3">
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-[#1346a1] dark:group-hover:text-blue-400 transition-colors">
+                      Leaves &amp; PTO Quota
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Apply for paid leave, view annual quotas (CL, SL, EL) &amp; request approvals.
+                    </p>
                   </div>
-                </div>
+                </button>
 
-                {/* Commendations & Citations */}
-                <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 p-4 shadow-xs">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center gap-1.5">
-                      <span className="material-symbols-outlined text-[#1346a1] dark:text-blue-400 text-[18px]">military_tech</span>
-                      <h3 className="text-[15px] font-semibold text-slate-900 dark:text-white">Supervisory Commendations &amp; Milestones</h3>
-                    </div>
-                    <span className="text-[11px] text-slate-400">Total: 2 Citations</span>
+                {/* 4. SALARY & PAYSLIPS */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('payroll')}
+                  className="p-4 bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-[#1346a1]/50 dark:hover:border-blue-500/50 transition-all text-left group cursor-pointer flex flex-col justify-between"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="p-2 rounded-lg bg-purple-50 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400 group-hover:scale-105 transition-transform">
+                      <Receipt className="w-5 h-5" />
+                    </span>
+                    <span className="text-slate-400 group-hover:text-[#1346a1] dark:group-hover:text-blue-400 transition-colors">
+                      <ArrowRight className="w-4 h-4" />
+                    </span>
                   </div>
-
-                  <div className="space-y-2.5 mt-2.5">
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg flex items-start gap-2.5 border border-slate-200/60 dark:border-slate-700">
-                      <span className="material-symbols-outlined text-amber-500 text-[18px] mt-0.5">hotel_class</span>
-                      <div>
-                        <h4 className="text-[14px] font-semibold text-slate-900 dark:text-white">Exceptional Bridal Presentation Handover</h4>
-                        <p className="text-[13px] text-slate-600 dark:text-slate-300 mt-0.5">
-                          Presented high-end Kanjeevaram wedding silks to wedding patrons resulting in record single-bill closing of ₹3.4L.
-                        </p>
-                        <span className="text-[11px] text-slate-400 mt-1 block">Commended by Anand Kulkarni (Store Lead) • 24 Oct 2024</span>
-                      </div>
-                    </div>
-
-                    <div className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg flex items-start gap-2.5 border border-slate-200/60 dark:border-slate-700">
-                      <span className="material-symbols-outlined text-emerald-500 text-[18px] mt-0.5">verified</span>
-                      <div>
-                        <h4 className="text-[14px] font-semibold text-slate-900 dark:text-white">Zero Discrepancy Biometric Adherence</h4>
-                        <p className="text-[13px] text-slate-600 dark:text-slate-300 mt-0.5">
-                          Maintained 100% on-time attendance across 74 consecutive work shifts without grace period breach.
-                        </p>
-                        <span className="text-[11px] text-slate-400 mt-1 block">Awarded by HR Partner Sunita Deshmukh • 30 Jun 2024</span>
-                      </div>
-                    </div>
+                  <div className="mt-3">
+                    <h4 className="text-sm font-semibold text-slate-900 dark:text-white group-hover:text-[#1346a1] dark:group-hover:text-blue-400 transition-colors">
+                      Salary &amp; Payslips
+                    </h4>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Review detailed salary structures, earnings, deductions &amp; download payslips.
+                    </p>
                   </div>
-                </div>
+                </button>
               </div>
             </div>
           )}
