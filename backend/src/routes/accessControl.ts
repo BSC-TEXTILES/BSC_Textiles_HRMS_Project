@@ -333,22 +333,27 @@ adminRouter.put('/users/:userId/roles', requireRoleLifecycle, async (req: AuthRe
     const [target]: any = await pool.query('SELECT `id`, `email`, `role` FROM `user` WHERE `id` = ? LIMIT 1', [userId]);
     if (!target?.length) return res.status(404).json({ error: 'User not found' });
 
+    const roleMap = new Map<string, any>();
+    let grantsSuperAdmin = false;
+
     if (roleIds.length > 0) {
       const [found]: any = await pool.query('SELECT `id`, `name`, `isActive` FROM `role` WHERE `id` IN (?)', [roleIds]);
-      const byId = new Map<string, any>((found || []).map((r: any) => [r.id, r]));
-      const invalid = roleIds.filter((id) => !byId.has(id));
+      for (const r of found || []) {
+        roleMap.set(r.id, r);
+      }
+      const invalid = roleIds.filter((id) => !roleMap.has(id));
       if (invalid.length > 0) {
         return res.status(400).json({ error: `Unknown role ids: ${invalid.join(', ')}` });
       }
-      const inactive = roleIds.filter((id) => !byId.get(id)?.isActive);
+      const inactive = roleIds.filter((id) => !roleMap.get(id)?.isActive);
       if (inactive.length > 0) {
         return res
           .status(400)
-          .json({ error: `Cannot assign inactive role(s): ${inactive.map((id) => byId.get(id).name).join(', ')}` });
+          .json({ error: `Cannot assign inactive role(s): ${inactive.map((id) => roleMap.get(id).name).join(', ')}` });
       }
       // Only a Super Admin may hand out SUPER_ADMIN, and nobody may hand it to
       // themselves — that is the escalation path this split exists to close.
-      const grantsSuperAdmin = roleIds.some((id) => byId.get(id)?.name === 'SUPER_ADMIN');
+      grantsSuperAdmin = roleIds.some((id) => roleMap.get(id)?.name === 'SUPER_ADMIN');
       if (grantsSuperAdmin && req.user!.role !== 'SUPER_ADMIN') {
         return res.status(403).json({ error: 'Only a Super Admin can assign the SUPER_ADMIN role' });
       }
@@ -359,6 +364,25 @@ adminRouter.put('/users/:userId/roles', requireRoleLifecycle, async (req: AuthRe
 
     const [before]: any = await pool.query('SELECT `roleId` FROM `userrole` WHERE `userId` = ?', [userId]);
     const beforeRoleIds = (before || []).map((r: any) => r.roleId);
+
+    // Prevent removing the final required administrator
+    const hadSuperAdmin = target[0]?.role === 'SUPER_ADMIN' || (before || []).some((r: any) => r.name === 'SUPER_ADMIN');
+    if (hadSuperAdmin && !grantsSuperAdmin) {
+      const [otherAdmins]: any = await pool.query(`
+        SELECT COUNT(DISTINCT u.id) as count 
+        FROM user u 
+        LEFT JOIN userrole ur ON ur.userId = u.id 
+        LEFT JOIN role r ON ur.roleId = r.id 
+        WHERE (u.role = 'SUPER_ADMIN' OR r.name = 'SUPER_ADMIN') 
+          AND u.isActive = 1 
+          AND u.id != ?
+      `, [userId]);
+      if (Number(otherAdmins[0]?.count || 0) === 0) {
+        return res.status(400).json({
+          error: 'Cannot remove the final required administrator. The system requires at least one active Super Admin.',
+        });
+      }
+    }
 
     const conn = await pool.getConnection();
     try {

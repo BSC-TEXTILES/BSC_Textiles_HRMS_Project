@@ -83,10 +83,10 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
     
     const isElevated = ['SUPER_ADMIN', 'ADMIN', 'HR_AUDITOR'].includes(req.user!.role);
     const where: any = {};
-    if (locationId) {
-      where.locationId = locationId;
-    } else if (!isElevated && req.user!.locationId) {
+    if (!isElevated && req.user!.locationId) {
       where.locationId = req.user!.locationId;
+    } else if (locationId) {
+      where.locationId = locationId;
     }
     if (floorId) where.floorId = floorId;
     if (departmentId && departmentId !== 'all' && departmentId !== 'ALL') {

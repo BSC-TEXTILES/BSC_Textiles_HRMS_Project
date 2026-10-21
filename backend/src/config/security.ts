@@ -123,9 +123,21 @@ export const securityConfig = {
     globalPerSecond: num('RATE_LIMIT_PER_SECOND', 100),
     sensitivePerWindow: num('RATE_LIMIT_SENSITIVE', 5),
     sensitiveWindowSeconds: num('RATE_LIMIT_SENSITIVE_WINDOW', 60),
+    /**
+     * Wider per-IP ceiling across all credential endpoints. It is high enough
+     * for a showroom full of staff signing in at shift change, but still caps
+     * a single address spraying one attempt across hundreds of accounts.
+     */
+    sensitiveIpPerWindow: num('RATE_LIMIT_SENSITIVE_IP', 120),
+    sensitiveIpWindowSeconds: parseDuration(process.env.RATE_LIMIT_SENSITIVE_IP_WINDOW || '1m') || 60,
     /** A source IP is auto-blocked for this long once it trips the limiter. */
     autoBlockSeconds: num('RATE_LIMIT_AUTOBLOCK_SECONDS', 900),
-    autoBlockTrips: num('RATE_LIMIT_AUTOBLOCK_TRIPS', 5),
+    /**
+     * Consecutive 429s from one address before the durable deny row is written.
+     * Only the global/device limiters feed this; credential endpoints rely on
+     * account cooldowns so a shared NAT is never taken down by a typo.
+     */
+    autoBlockTrips: num('RATE_LIMIT_AUTOBLOCK_TRIPS', 20),
     enabled: bool('RATE_LIMIT_ENABLED', true),
   },
 

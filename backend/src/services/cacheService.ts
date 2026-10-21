@@ -80,6 +80,11 @@ class CacheService {
     this.invalidatePrefix('dashboard:');
   }
 
+  invalidateAttendance(): void {
+    this.invalidatePrefix('attendance:');
+    this.invalidatePrefix('dashboard:');
+  }
+
   invalidateHolidays(): void {
     this.invalidatePrefix('holidays:');
     this.invalidatePrefix('dashboard:');

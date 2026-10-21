@@ -235,7 +235,7 @@ export default function BreaksOperationsPage() {
                 <tr>
                   <td className="py-3 px-4 font-semibold text-gray-900 flex items-center gap-2">
                     <Utensils className="w-4 h-4 text-blue-600" />
-                    Lunch Break (Male Group)
+                    Lunch Break (Men Group)
                   </td>
                   <td className="py-3 px-4 text-xs">Standard Sales Floor Group</td>
                   <td className="py-3 px-4 text-xs font-mono font-medium text-gray-800">1 Hour 40 Mins (100 min)</td>
@@ -245,9 +245,9 @@ export default function BreaksOperationsPage() {
                 <tr>
                   <td className="py-3 px-4 font-semibold text-gray-900 flex items-center gap-2">
                     <Utensils className="w-4 h-4 text-blue-600" />
-                    Lunch Break (Female Group)
+                    Lunch Break (Women Group)
                   </td>
-                  <td className="py-3 px-4 text-xs">Custom Shift Retail Group</td>
+                  <td className="py-3 px-4 text-xs">Retail Floor Group</td>
                   <td className="py-3 px-4 text-xs font-mono font-medium text-gray-800">40 Minutes</td>
                   <td className="py-3 px-4 text-xs">1 Session / day</td>
                   <td className="py-3 px-4"><span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-semibold">Active</span></td>
@@ -255,7 +255,7 @@ export default function BreaksOperationsPage() {
                 <tr>
                   <td className="py-3 px-4 font-semibold text-gray-900 flex items-center gap-2">
                     <Coffee className="w-4 h-4 text-amber-600" />
-                    Tea Break (Male Group)
+                    Tea Break (Men Group)
                   </td>
                   <td className="py-3 px-4 text-xs">Storewide Operational Policy</td>
                   <td className="py-3 px-4 text-xs font-mono font-medium text-gray-800">20 Minutes</td>
@@ -265,7 +265,7 @@ export default function BreaksOperationsPage() {
                 <tr>
                   <td className="py-3 px-4 font-semibold text-gray-900 flex items-center gap-2">
                     <Coffee className="w-4 h-4 text-amber-600" />
-                    Tea Break (Female Group)
+                    Tea Break (Women Group)
                   </td>
                   <td className="py-3 px-4 text-xs">Storewide Operational Policy</td>
                   <td className="py-3 px-4 text-xs font-mono font-medium text-gray-800">15 Minutes</td>

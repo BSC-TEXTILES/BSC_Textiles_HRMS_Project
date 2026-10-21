@@ -4,12 +4,36 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { DetailDrillDownModal, type DetailMetric } from '@/components/dashboard/DetailDrillDownModal';
+import { AddShiftModal } from './components/AddShiftModal';
+import { EditShiftModal } from './components/EditShiftModal';
+import { ReassignShiftModal } from './components/ReassignShiftModal';
+import { DeleteShiftModal } from './components/DeleteShiftModal';
+import { ViewShiftEmployeesModal } from './components/ViewShiftEmployeesModal';
+import { ShiftsDataTable } from './components/ShiftsDataTable';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { ADMIN_ROLES } from '@/lib/roles';
-import { SHIFTS_CHANGED_EVENT } from '@/lib/shiftRegistry';
+import { SHIFTS_CHANGED_EVENT, notifyShiftsChanged } from '@/lib/shiftRegistry';
+import {
+  Users,
+  Clock,
+  Plus,
+  RefreshCw,
+  Search,
+  LayoutGrid,
+  List,
+  Edit3,
+  ArrowRightLeft,
+  Trash2,
+  Utensils,
+  Coffee,
+  CheckCircle,
+  AlertTriangle,
+  ChevronRight,
+  ShieldAlert,
+} from 'lucide-react';
 
-/** Attendance statuses selectable from the Status filter (see shift-board API). */
+/** Attendance statuses selectable from the Status filter */
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Statuses' },
   { value: 'PRESENT', label: 'Present (any)' },
@@ -45,7 +69,7 @@ function hmOf(iso?: string | null): string {
   return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
-/** Canonical list of departments in required exact order */
+/** Canonical list of departments */
 const CANONICAL_DEPARTMENTS = [
   'Customer Service & Billing',
   'Finance & Accounts',
@@ -55,53 +79,45 @@ const CANONICAL_DEPARTMENTS = [
   'Store Operations',
 ] as const;
 
-interface DepartmentOption {
-  id: string;
-  name: string;
-  disabled?: boolean;
-}
-
-interface ShiftOption {
-  id: string;
-  name: string;
-  timeRange?: string;
-  noRosterInHub?: boolean;
-}
-
 export default function ShiftsRosterPage() {
   const { data: session } = useSession();
   const role = (session?.user as any)?.role as string | undefined;
   const userLocationId = (session?.user as any)?.locationId as string | undefined;
   const canViewAllHubs = (ADMIN_ROLES as readonly string[]).includes(role || '');
 
+  // Shifts & References
   const [shifts, setShifts] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
+
+  // Filters & State
   const [selectedLocation, setSelectedLocation] = useState('');
   const [selectedDept, setSelectedDept] = useState('all');
   const [selectedShift, setSelectedShift] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedDate, setSelectedDate] = useState(() => ymdOf(new Date()));
+  const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+
+  // Board Data & Status
   const [loading, setLoading] = useState(true);
+  const [shiftsLoading, setShiftsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [board, setBoard] = useState<any>(null);
+
+  // Modals State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingShift, setEditingShift] = useState<any | null>(null);
+  const [reassigningShift, setReassigningShift] = useState<any | null>(null);
+  const [reassignPreselectedEmpId, setReassignPreselectedEmpId] = useState<string | undefined>(undefined);
+  const [deletingShift, setDeletingShift] = useState<any | null>(null);
+  const [viewEmployeesShift, setViewEmployeesShift] = useState<any | null>(null);
   const [drill, setDrill] = useState<{ metric: DetailMetric; title: string; shiftId?: string; shiftName?: string } | null>(null);
-  const [newShift, setNewShift] = useState({
-    name: '',
-    code: '',
-    locationId: '',
-    startTime: '09:30',
-    endTime: '18:30',
-    gracePeriod: 5,
-    lateThreshold: 15,
-  });
 
   const reqIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
-  /* ---------------- reference data ---------------- */
-
+  /* ---------------- Initialize location ---------------- */
   useEffect(() => {
     if (!session) return;
     setSelectedLocation((cur) => {
@@ -111,14 +127,21 @@ export default function ShiftsRosterPage() {
     });
   }, [session, canViewAllHubs, userLocationId]);
 
+  /* ---------------- Fetch locations & departments ---------------- */
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await api.get('/locations/all');
-        if (!cancelled) setLocations(res.data || []);
+        const [locRes, deptRes] = await Promise.all([
+          api.get('/locations/all'),
+          api.get('/departments', { params: { limit: 100 } }),
+        ]);
+        if (!cancelled) {
+          setLocations(locRes.data || []);
+          setDepartments(deptRes.data?.departments || []);
+        }
       } catch (e) {
-        console.error(e);
+        console.error('Failed to load reference data:', e);
       }
     })();
     return () => {
@@ -126,100 +149,28 @@ export default function ShiftsRosterPage() {
     };
   }, []);
 
-  const [shiftsLoading, setShiftsLoading] = useState(true);
-  const [shiftsError, setShiftsError] = useState<string | null>(null);
-  const [deptsLoading, setDeptsLoading] = useState(true);
-  const [deptsError, setDeptsError] = useState<string | null>(null);
-
-  const [shiftDropdownOpen, setShiftDropdownOpen] = useState(false);
-  const [shiftHighlightedIndex, setShiftHighlightedIndex] = useState(-1);
-  const shiftContainerRef = useRef<HTMLDivElement>(null);
-  const shiftTriggerRef = useRef<HTMLButtonElement>(null);
-
-  /* ---------------- reference data ---------------- */
-
-  useEffect(() => {
-    if (!session) return;
-    setSelectedLocation((cur) => {
-      if (cur) return cur;
-      if (canViewAllHubs || !userLocationId) return 'all';
-      return userLocationId;
-    });
-  }, [session, canViewAllHubs, userLocationId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await api.get('/locations/all');
-        if (!cancelled) setLocations(res.data || []);
-      } catch (e) {
-        console.error(e);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const fetchDepartments = useCallback(async () => {
-    setDeptsLoading(true);
-    setDeptsError(null);
-    try {
-      const res = await api.get('/departments', { params: { limit: 100 } });
-      setDepartments(res.data?.departments || []);
-    } catch (err: any) {
-      console.error('Failed to load departments:', err);
-      setDeptsError('Could not load departments');
-    } finally {
-      setDeptsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchDepartments();
-  }, [fetchDepartments]);
-
+  /* ---------------- Fetch Shifts from Backend ---------------- */
   const fetchShifts = useCallback(async () => {
     setShiftsLoading(true);
-    setShiftsError(null);
     try {
-      const res = await api.get('/shifts', { params: { limit: 100 } });
-      const apiShifts: any[] = res.data?.shifts || [];
-
-      // Merge locally stored custom shifts if any
-      const merged = [...apiShifts];
-      if (typeof window !== 'undefined') {
-        try {
-          const localCustom: any[] = JSON.parse(localStorage.getItem('bsc_custom_shifts') || '[]');
-          for (const c of localCustom) {
-            if (!merged.some((s) => s.id === c.id || (s.name && c.name && s.name.toLowerCase() === c.name.toLowerCase()))) {
-              merged.push({
-                ...c,
-                startTime: c.punchIn || c.startTime,
-                endTime: c.punchOut || c.endTime,
-                lunchDurationMinutes: c.lunchBreakMinutes ?? c.lunchDurationMinutes ?? 45,
-                teaDurationMinutes: c.teaBreakMinutes ?? c.teaDurationMinutes ?? 0,
-              });
-            }
-          }
-        } catch {}
+      const params: any = { limit: 100 };
+      if (selectedLocation && selectedLocation !== 'all') {
+        params.locationId = selectedLocation;
       }
-
-      setShifts(merged);
+      const res = await api.get('/shifts', { params });
+      setShifts(res.data?.shifts || []);
     } catch (err: any) {
       console.error('Failed to load shifts:', err);
-      setShiftsError('Could not load shifts');
     } finally {
       setShiftsLoading(false);
     }
-  }, []);
+  }, [selectedLocation]);
 
   useEffect(() => {
     fetchShifts();
   }, [fetchShifts]);
 
-  // Synchronize shifts live when custom shifts are created anywhere
+  // Synchronize shifts on global events
   useEffect(() => {
     const handleShiftEvent = () => {
       fetchShifts();
@@ -228,211 +179,7 @@ export default function ShiftsRosterPage() {
     return () => window.removeEventListener(SHIFTS_CHANGED_EVENT, handleShiftEvent);
   }, [fetchShifts]);
 
-  /* ---------------- memoized canonical dropdown options ---------------- */
-
-  const departmentOptions = useMemo<DepartmentOption[]>(() => {
-    const options: DepartmentOption[] = [
-      { id: 'all', name: 'All Departments', disabled: false },
-    ];
-
-    for (const canonicalName of CANONICAL_DEPARTMENTS) {
-      // Find matching department in current hub if specified, otherwise across any hub
-      let match = departments.find(
-        (d) =>
-          d.name?.trim().toLowerCase() === canonicalName.toLowerCase() &&
-          (selectedLocation && selectedLocation !== 'all' ? d.locationId === selectedLocation : true)
-      );
-      if (!match) {
-        match = departments.find((d) => d.name?.trim().toLowerCase() === canonicalName.toLowerCase());
-      }
-
-      if (match) {
-        options.push({
-          id: match.id,
-          name: canonicalName,
-          disabled: false,
-        });
-      } else {
-        if (process.env.NODE_ENV !== 'production' && !deptsLoading && departments.length > 0) {
-          console.warn(`Department "${canonicalName}" is missing from master list.`);
-        }
-        options.push({
-          id: `missing-${canonicalName}`,
-          name: `${canonicalName} (Not available)`,
-          disabled: true,
-        });
-      }
-    }
-
-    return options;
-  }, [departments, selectedLocation, deptsLoading]);
-
-  const uniqueShiftOptions = useMemo<ShiftOption[]>(() => {
-    const options: ShiftOption[] = [
-      { id: 'all', name: 'All Shifts' },
-    ];
-
-    // Group shifts by canonical code or name
-    const groups = new Map<string, any[]>();
-    for (const s of shifts) {
-      const key = (s.code?.trim().toUpperCase() || s.name?.trim().toLowerCase());
-      if (!key) continue;
-      if (!groups.has(key)) {
-        groups.set(key, []);
-      }
-      groups.get(key)!.push(s);
-    }
-
-    // Preserve the canonical standard order: MORNING, GENERAL, EVENING, NIGHT, then custom batches
-    const STANDARD_KEYS = ['MORNING', 'GENERAL', 'EVENING', 'NIGHT'];
-    const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
-      const idxA = STANDARD_KEYS.indexOf(a);
-      const idxB = STANDARD_KEYS.indexOf(b);
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
-      return a.localeCompare(b);
-    });
-
-    for (const key of sortedKeys) {
-      const list = groups.get(key) || [];
-      const activeList = list.filter((s) => s.status !== 'INACTIVE');
-      const targetList = activeList.length > 0 ? activeList : list;
-
-      let chosen = targetList.find(
-        (s) => (selectedLocation && selectedLocation !== 'all' ? s.locationId === selectedLocation : true)
-      );
-      const existsInSelectedHub = Boolean(chosen);
-      if (!chosen) {
-        chosen = targetList[0];
-      }
-      if (!chosen) continue;
-
-      const start = hmOf(chosen.startTime);
-      const end = hmOf(chosen.endTime);
-      const timeRange = start !== '—' && end !== '—' ? `${start} – ${end}${chosen.overnight ? ' (+1d)' : ''}` : undefined;
-      const noRosterInHub = Boolean(selectedLocation && selectedLocation !== 'all' && !existsInSelectedHub);
-
-      options.push({
-        id: chosen.id,
-        name: chosen.name,
-        timeRange,
-        noRosterInHub,
-      });
-    }
-
-    return options;
-  }, [shifts, selectedLocation]);
-
-  // If selected shift is no longer available, reset to 'all' with toast notice
-  useEffect(() => {
-    if (shiftsLoading) return;
-    if (selectedShift !== 'all') {
-      const exists = shifts.some((s) => s.id === selectedShift);
-      if (!exists && shifts.length > 0) {
-        setSelectedShift('all');
-        toast('Selected shift is no longer available. Reset to All Shifts.', { id: 'shift-reset-toast' });
-      }
-    }
-  }, [shifts, selectedShift, shiftsLoading]);
-
-  // Synchronize department selection when switching location hubs
-  useEffect(() => {
-    if (deptsLoading || selectedDept === 'all') return;
-    const currentDeptObj = departments.find((d) => d.id === selectedDept);
-    if (!currentDeptObj) return;
-
-    const code = currentDeptObj.code?.trim().toUpperCase();
-    const name = currentDeptObj.name?.trim().toLowerCase();
-
-    const matchInLoc = departments.find(
-      (d) =>
-        (d.code?.trim().toUpperCase() === code || d.name?.trim().toLowerCase() === name) &&
-        (selectedLocation === 'all' ? true : d.locationId === selectedLocation)
-    );
-
-    if (matchInLoc && matchInLoc.id !== selectedDept) {
-      setSelectedDept(matchInLoc.id);
-    }
-  }, [selectedLocation, selectedDept, departments, deptsLoading]);
-
-  // Synchronize shift selection when switching location hubs
-  useEffect(() => {
-    if (shiftsLoading || selectedShift === 'all') return;
-    const currentShiftObj = shifts.find((s) => s.id === selectedShift);
-    if (!currentShiftObj) return;
-
-    const code = currentShiftObj.code?.trim().toUpperCase();
-    const name = currentShiftObj.name?.trim().toLowerCase();
-
-    const matchInLoc = shifts.find(
-      (s) =>
-        (s.code?.trim().toUpperCase() === code || s.name?.trim().toLowerCase() === name) &&
-        (selectedLocation === 'all' ? true : s.locationId === selectedLocation)
-    );
-
-    if (matchInLoc && matchInLoc.id !== selectedShift) {
-      setSelectedShift(matchInLoc.id);
-    }
-  }, [selectedLocation, selectedShift, shifts, shiftsLoading]);
-
-  // Click outside to close shift listbox
-  useEffect(() => {
-    if (!shiftDropdownOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (shiftContainerRef.current && !shiftContainerRef.current.contains(e.target as Node)) {
-        setShiftDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [shiftDropdownOpen]);
-
-  const handleShiftKeyDown = (e: React.KeyboardEvent) => {
-    if (shiftsLoading) return;
-    if (!shiftDropdownOpen) {
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        setShiftDropdownOpen(true);
-        const selIdx = uniqueShiftOptions.findIndex((o) => o.id === selectedShift);
-        setShiftHighlightedIndex(selIdx >= 0 ? selIdx : 0);
-      }
-      return;
-    }
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setShiftHighlightedIndex((prev) => (prev + 1) % uniqueShiftOptions.length);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setShiftHighlightedIndex((prev) => (prev - 1 + uniqueShiftOptions.length) % uniqueShiftOptions.length);
-    } else if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      const highlighted = uniqueShiftOptions[shiftHighlightedIndex];
-      if (highlighted) {
-        setSelectedShift(highlighted.id);
-      }
-      setShiftDropdownOpen(false);
-      shiftTriggerRef.current?.focus();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      setShiftDropdownOpen(false);
-      shiftTriggerRef.current?.focus();
-    } else if (e.key === 'Tab') {
-      setShiftDropdownOpen(false);
-    }
-  };
-
-  const selectedShiftLabel = useMemo(() => {
-    if (selectedShift === 'all') return 'All Shifts';
-    const found = uniqueShiftOptions.find((o) => o.id === selectedShift);
-    if (found) return found.name;
-    const match = shifts.find((s) => s.id === selectedShift);
-    return match?.name || 'All Shifts';
-  }, [selectedShift, uniqueShiftOptions, shifts]);
-
-  /* ---------------- board data ---------------- */
-
+  /* ---------------- Fetch Live Roster Board ---------------- */
   const fetchBoard = useCallback(
     async (opts?: { bustCache?: boolean }) => {
       if (!selectedDate) return;
@@ -470,34 +217,6 @@ export default function ShiftsRosterPage() {
     return () => abortRef.current?.abort();
   }, [fetchBoard]);
 
-  /* ---------------- actions ---------------- */
-
-  const handleCreateShift = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newShift.name || !newShift.locationId) {
-      toast.error('Shift name and location are required');
-      return;
-    }
-    try {
-      // Backend expects 24-hour wall-clock times (HH:MM), not full datetimes.
-      await api.post('/shifts', {
-        name: newShift.name,
-        code: (newShift.code || `SHIFT-${Math.floor(100 + Math.random() * 900)}`).toUpperCase(),
-        locationId: newShift.locationId,
-        startTime: newShift.startTime,
-        endTime: newShift.endTime,
-        gracePeriod: Number(newShift.gracePeriod),
-        lateThreshold: Number(newShift.lateThreshold),
-      });
-      toast.success('Shift created successfully!');
-      setIsAddModalOpen(false);
-      await fetchShifts();
-      fetchBoard({ bustCache: true });
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Failed to create shift');
-    }
-  };
-
   const stepDate = (delta: number) => {
     const [y, m, d] = selectedDate.split('-').map(Number);
     const dt = new Date(y, m - 1, d + delta);
@@ -507,28 +226,67 @@ export default function ShiftsRosterPage() {
   const openDrill = (metric: DetailMetric, title: string, shiftId?: string, shiftName?: string) =>
     setDrill({ metric, title, shiftId, shiftName });
 
-  /* ---------------- derived ---------------- */
+  /* ---------------- Filter and Search Shifts ---------------- */
+  const boardShiftMap = useMemo(() => {
+    const map = new Map<string, any>();
+    if (board?.shifts) {
+      for (const bs of board.shifts) {
+        map.set(bs.id, bs);
+      }
+    }
+    return map;
+  }, [board]);
+
+  const mergedShifts = useMemo(() => {
+    return shifts.map((s) => {
+      const bs = boardShiftMap.get(s.id);
+      return {
+        ...s,
+        staff: bs?.staff || {
+          rostered: s.staffCount || s._count?.employees || 0,
+          present: 0,
+          absent: 0,
+          onLeave: 0,
+          weeklyOff: 0,
+          missingPunch: 0,
+          onBreak: 0,
+          late: 0,
+        },
+      };
+    });
+  }, [shifts, boardShiftMap]);
+
+  const filteredShifts = useMemo(() => {
+    let result = mergedShifts;
+
+    // Filter by location
+    if (selectedLocation && selectedLocation !== 'all') {
+      result = result.filter((s) => s.locationId === selectedLocation);
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(
+        (s) =>
+          s.name?.toLowerCase().includes(q) ||
+          s.code?.toLowerCase().includes(q) ||
+          s.locationName?.toLowerCase().includes(q)
+      );
+    }
+
+    return result;
+  }, [mergedShifts, selectedLocation, searchQuery]);
 
   const summary = board?.summary || null;
-  const shiftCards: any[] = useMemo(() => board?.shifts || [], [board]);
   const hubName = useCallback(
-    (id: string) => (id === 'all' ? 'All Hubs (Karnataka)' : locations.find((l) => l.id === id)?.name || 'All Hubs'),
+    (id: string) => (id === 'all' ? 'All Hubs (Karnataka Combined)' : locations.find((l) => l.id === id)?.name || 'All Hubs'),
     [locations]
   );
 
-  const graceMinutes = useMemo(() => {
-    const list = shiftCards.length > 0 ? shiftCards : shifts;
-    if (list.length === 0) return 5;
-    return Math.min(...list.map((s) => Number(s.gracePeriod ?? 5)));
-  }, [shiftCards, shifts]);
-
-  const lateCutoffMinutes = useMemo(() => {
-    const list = shiftCards.length > 0 ? shiftCards : shifts;
-    if (list.length === 0) return 15;
-    return Math.max(...list.map((s) => Number(s.lateThreshold ?? 15)));
-  }, [shiftCards, shifts]);
-
-  const activeShiftsShown = shiftCards.length || shifts.length;
+  const totalAssignedStaff = useMemo(() => {
+    return filteredShifts.reduce((acc, s) => acc + Number(s.staffCount ?? s._count?.employees ?? 0), 0);
+  }, [filteredShifts]);
 
   const drillFilters = {
     locationId: selectedLocation || 'all',
@@ -537,6 +295,7 @@ export default function ShiftsRosterPage() {
     status: selectedStatus,
     date: selectedDate,
   };
+
   const drillChips = [
     { label: 'Hub', value: hubName(selectedLocation || 'all') },
     { label: 'Dept', value: departments.find((d) => d.id === selectedDept)?.name || 'All Departments' },
@@ -557,38 +316,44 @@ export default function ShiftsRosterPage() {
             <div className="flex items-center gap-1.5 text-slate-400 text-[11px] uppercase tracking-wider font-bold">
               <span>Time & Attendance</span>
               <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-              <span className="text-[#1346a1]">Staff Rostering & Shift Allocations</span>
+              <span className="text-[#1346a1]">Floor Shifts & Workforce Rosters Directory</span>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-2xl font-bold text-[#0b1c30] tracking-tight">
-                Floor Shifts & Workforce Rosters Dashboard
+                Floor Shifts & Workforce Rosters Directory
               </h1>
               <span className="px-2.5 py-0.5 rounded-full bg-[#F8F4F1] text-[#1346a1] text-[10px] font-bold uppercase tracking-wider border border-[#E5D5D7] flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-[#1346a1]"></span>
                 {board?.isToday ? 'Live Roster' : board?.isFuture ? 'Future Schedule' : 'Historical Roster'}
               </span>
+              <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-[#0058be] text-[11px] font-mono font-bold border border-blue-200">
+                {filteredShifts.length} Shift{filteredShifts.length === 1 ? '' : 's'} • {totalAssignedStaff} Workforce Assigned
+              </span>
             </div>
             <p className="text-xs text-slate-500 max-w-3xl">
-              Active shift timing definitions, grace windows, store rosters, and floor allocation oversight — all
-              figures below are read live from the attendance records for the selected date.
+              Centralized floor shift directory and workforce allocation module. Create, edit, reassign, and delete floor shifts with Men/Women break allowances and live biometric attendance tracking.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => fetchBoard({ bustCache: true })}
-              disabled={loading}
+              onClick={() => {
+                fetchShifts();
+                fetchBoard({ bustCache: true });
+                toast.success('Shift directory refreshed');
+              }}
+              disabled={loading || shiftsLoading}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all text-xs font-bold disabled:opacity-50"
             >
-              <span className={`material-symbols-outlined text-[18px] ${loading ? 'animate-spin' : ''}`}>refresh</span>
-              Refresh
+              <RefreshCw className={`w-4 h-4 ${loading || shiftsLoading ? 'animate-spin' : ''}`} />
+              <span>Refresh / Sync</span>
             </button>
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#1346a1] hover:bg-[#0e3882] text-white shadow-md shadow-[#1346a1]/20 transition-all text-xs font-bold"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#1346a1] hover:bg-[#0e3882] text-white shadow-md shadow-[#1346a1]/20 transition-all text-xs font-bold"
             >
-              <span className="material-symbols-outlined text-[18px]">add</span>
-              <span>+ Create Floor Shift</span>
+              <Plus className="w-4 h-4" />
+              <span>+ Add Shift</span>
             </button>
           </div>
         </div>
@@ -597,115 +362,104 @@ export default function ShiftsRosterPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <button type="button" onClick={() => openDrill('shift-configs', 'Active Shifts')} aria-label="View Active Shifts details" className={kpiCardClass}>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Active Shifts</span>
-              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] dark:bg-slate-800 flex items-center justify-center text-[#1346a1] dark:text-[#E8DCC6]">
-                <span className="material-symbols-outlined text-[18px]">calendar_view_week</span>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Configured Shifts</span>
+              <span className="material-symbols-outlined text-slate-400 text-[18px]">calendar_view_week</span>
+            </div>
+            <div className="my-2">
+              <div className="text-2xl font-bold font-mono text-[#0b1c30] dark:text-white">
+                {filteredShifts.length}
               </div>
+              <span className="text-[11px] font-semibold text-slate-500">
+                {hubName(selectedLocation || 'all')}
+              </span>
             </div>
-            <div className="my-1">
-              <div className="text-2xl font-bold text-[#0b1c30] dark:text-white">{activeShiftsShown}</div>
-              <div className="text-[11px] text-slate-400 dark:text-slate-500">{locations.length} Hub{locations.length === 1 ? '' : 's'} In Scope</div>
-            </div>
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-[#1346a1] dark:text-[#E8DCC6] font-semibold">
-              <span>Shift windows configured</span>
-            </div>
-            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-[#1346a1] transition-colors">
-              <span>View Details</span>
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-[#1346a1] dark:text-[#E8DCC6] font-semibold">
+              <span>View shift specs</span>
               <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
             </div>
           </button>
 
-          <button type="button" onClick={() => openDrill('shift-roster', 'Total Staff Rostered')} aria-label="View Total Staff Rostered details" className={kpiCardClass}>
+          <button type="button" onClick={() => openDrill('shift-roster', 'Total Rostered Staff')} aria-label="View Rostered Staff details" className={kpiCardClass}>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Total Staff Rostered</span>
-              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] dark:bg-slate-800 flex items-center justify-center text-[#1346a1] dark:text-[#E8DCC6]">
-                <span className="material-symbols-outlined text-[18px]">badge</span>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Assigned Workforce</span>
+              <span className="material-symbols-outlined text-[#1346a1] text-[18px]">badge</span>
+            </div>
+            <div className="my-2">
+              <div className="text-2xl font-bold font-mono text-[#1346a1] dark:text-blue-400">
+                {totalAssignedStaff}
               </div>
+              <span className="text-[11px] font-semibold text-slate-500">
+                {summary?.present ?? 0} currently on floor
+              </span>
             </div>
-            <div className="my-1">
-              <div className="text-2xl font-bold text-[#0b1c30] dark:text-white">{loading ? '—' : summary?.rostered ?? 0}</div>
-              <div className="text-[11px] text-slate-400 dark:text-slate-500">{summary?.withRecord ?? 0} with punch records</div>
-            </div>
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-              <span>On the {selectedDate} roster</span>
-            </div>
-            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-[#1346a1] transition-colors">
-              <span>View Details</span>
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-[#1346a1] font-semibold">
+              <span>View full roster</span>
               <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
             </div>
           </button>
 
-          <button type="button" onClick={() => openDrill('shift-roster', 'Present On Floor')} aria-label="View Present On Floor details" className={kpiCardClass}>
+          <button type="button" onClick={() => openDrill('shift-roster', 'Present On-Time Staff')} aria-label="View On-Time Staff details" className={kpiCardClass}>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Present On Floor</span>
-              <div className="w-8 h-8 rounded-lg bg-[#F8F4F1] dark:bg-slate-800 flex items-center justify-center text-[#1346a1] dark:text-[#E8DCC6]">
-                <span className="material-symbols-outlined text-[18px]">wb_sunny</span>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">On-Time Attendance</span>
+              <span className="material-symbols-outlined text-emerald-600 text-[18px]">check_circle</span>
+            </div>
+            <div className="my-2">
+              <div className="text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
+                {summary ? summary.present - summary.late : 0}
               </div>
+              <span className="text-[11px] font-semibold text-slate-500">
+                Within grace window
+              </span>
             </div>
-            <div className="my-1">
-              <div className="text-2xl font-bold text-[#0058be] dark:text-blue-300">{loading ? '—' : summary?.present ?? 0}</div>
-              <div className="text-[11px] text-slate-400 dark:text-slate-500">
-                {summary?.checkedOut ?? 0} checked out • {summary?.onBreak ?? 0} on break
-              </div>
-            </div>
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-              <span>{summary?.late ?? 0} arrived late</span>
-            </div>
-            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-[#1346a1] transition-colors">
-              <span>View Details</span>
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-emerald-600 font-semibold">
+              <span>View present staff</span>
               <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
             </div>
           </button>
 
-          <button type="button" onClick={() => openDrill('shift-roster', 'Absent & Not Punched')} aria-label="View Absent and Not Punched details" className={kpiCardClass}>
+          <button type="button" onClick={() => openDrill('shift-exceptions', 'Late Arrivals')} aria-label="View Late Arrivals details" className={kpiCardClass}>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Absent / No Punch</span>
-              <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-950/40 flex items-center justify-center text-red-600 dark:text-red-400">
-                <span className="material-symbols-outlined text-[18px]">person_alert</span>
-              </div>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Late Arrivals</span>
+              <span className="material-symbols-outlined text-amber-600 text-[18px]">schedule</span>
             </div>
-            <div className="my-1">
-              <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                {loading ? '—' : (summary?.absent ?? 0) + (summary?.notPunchedIn ?? 0)}
+            <div className="my-2">
+              <div className="text-2xl font-bold font-mono text-amber-600 dark:text-amber-400">
+                {summary?.late ?? 0}
               </div>
-              <div className="text-[11px] text-slate-400 dark:text-slate-500">
-                {summary?.absent ?? 0} absent • {summary?.notPunchedIn ?? 0} awaiting punch
-              </div>
+              <span className="text-[11px] font-semibold text-slate-500">
+                Exceeded late threshold
+              </span>
             </div>
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-amber-600 dark:text-amber-400 font-semibold">
-              <span>{summary?.incomplete ?? 0} missing OUT punch</span>
-            </div>
-            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-[#1346a1] transition-colors">
-              <span>View Details</span>
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-amber-600 font-semibold">
+              <span>View late staff</span>
               <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
             </div>
           </button>
 
-          <button type="button" onClick={() => openDrill('shift-exceptions', 'Grace Period & Regularization')} aria-label="View Grace Period and Regularization details" className={kpiCardClass}>
+          <button type="button" onClick={() => openDrill('shift-exceptions', 'Missing Punches')} aria-label="View Missing Punches details" className={kpiCardClass}>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Grace Period</span>
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
-                <span className="material-symbols-outlined text-[18px]">verified</span>
+              <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Missing Punches</span>
+              <span className="material-symbols-outlined text-rose-600 text-[18px]">warning</span>
+            </div>
+            <div className="my-2">
+              <div className="text-2xl font-bold font-mono text-rose-600 dark:text-rose-400">
+                {summary?.missingPunch ?? 0}
               </div>
+              <span className="text-[11px] font-semibold text-slate-500">
+                Incomplete biometric punch
+              </span>
             </div>
-            <div className="my-1">
-              <div className="text-2xl font-bold text-[#0b1c30] dark:text-white">{graceMinutes} Mins</div>
-              <div className="text-[11px] text-slate-400 dark:text-slate-500">{lateCutoffMinutes}m Late Cutoff</div>
-            </div>
-            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-              <span>{summary?.late ?? 0} late arrivals today</span>
-            </div>
-            <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 group-hover:text-[#1346a1] transition-colors">
-              <span>View Details</span>
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-[11px] text-rose-600 font-semibold">
+              <span>View audit list</span>
               <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
             </div>
           </button>
         </div>
 
-        {/* Location Filter & Shift Cards Grid */}
-        <div className="bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        {/* Location Filter & Controls Bar */}
+        <div className="bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold text-[#0b1c30] dark:text-white mr-1">Filter by Location Hub:</span>
+            <span className="text-xs font-bold text-[#0b1c30] dark:text-white mr-1">Location Hub:</span>
             {canViewAllHubs && (
               <button
                 onClick={() => setSelectedLocation('all')}
@@ -732,224 +486,103 @@ export default function ShiftsRosterPage() {
               </button>
             ))}
           </div>
-          <span className="text-xs text-slate-400 dark:text-slate-500">
-            {shifts.length} Shift{shifts.length === 1 ? '' : 's'} Configured
-            {summary ? ` • ${summary.rostered} Rostered` : ''}
-          </span>
-        </div>
 
-        {/* Detail Drill-down Filters (Department / Shift / Status / Date) */}
-        <div className="bg-white dark:bg-[#0e172a] p-4 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-wrap items-end gap-3">
-          <div className="flex flex-col gap-1">
-            <label htmlFor="fsr-dept" className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-              Department
-            </label>
-            <select
-              id="fsr-dept"
-              aria-label="Filter by department"
-              value={selectedDept}
-              onChange={(e) => setSelectedDept(e.target.value)}
-              disabled={deptsLoading}
-              className="h-[34px] px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#0b1c30] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]/40 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {deptsLoading ? (
-                <option value="all">Loading…</option>
-              ) : (
-                departmentOptions.map((d) => (
-                  <option key={d.id} value={d.id} disabled={d.disabled}>
-                    {d.name}
-                  </option>
-                ))
-              )}
-            </select>
-            {deptsError && (
-              <div className="flex items-center gap-1 text-[11px] text-red-600 font-medium">
-                <span>Could not load departments</span>
-                <button
-                  type="button"
-                  onClick={() => fetchDepartments()}
-                  className="underline font-bold hover:text-red-700"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div ref={shiftContainerRef} className="relative flex flex-col gap-1">
-            <label htmlFor="fsr-shift" className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-              Shift
-            </label>
-            <button
-              ref={shiftTriggerRef}
-              type="button"
-              id="fsr-shift"
-              role="combobox"
-              aria-label="Filter by shift"
-              aria-expanded={shiftDropdownOpen}
-              aria-haspopup="listbox"
-              aria-controls="fsr-shift-listbox"
-              aria-activedescendant={
-                shiftDropdownOpen && shiftHighlightedIndex >= 0
-                  ? `shift-opt-${uniqueShiftOptions[shiftHighlightedIndex]?.id || 'all'}`
-                  : undefined
-              }
-              onClick={() => {
-                if (shiftsLoading) return;
-                setShiftDropdownOpen((prev) => !prev);
-                if (!shiftDropdownOpen) {
-                  const selIdx = uniqueShiftOptions.findIndex((o) => o.id === selectedShift);
-                  setShiftHighlightedIndex(selIdx >= 0 ? selIdx : 0);
-                }
-              }}
-              onKeyDown={handleShiftKeyDown}
-              disabled={shiftsLoading}
-              className="h-[34px] px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#0b1c30] dark:text-white flex items-center justify-between gap-2 min-w-[170px] focus:outline-none focus:ring-2 focus:ring-[#1346a1]/40 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <span className="truncate">{shiftsLoading ? 'Loading…' : selectedShiftLabel}</span>
-              <span className={`material-symbols-outlined text-[18px] text-slate-400 transition-transform ${shiftDropdownOpen ? 'rotate-180' : ''}`}>
-                expand_more
-              </span>
-            </button>
-
-            {shiftDropdownOpen && (
-              <ul
-                id="fsr-shift-listbox"
-                role="listbox"
-                aria-label="Filter by shift"
-                tabIndex={-1}
-                className="absolute left-0 top-[calc(100%+4px)] z-50 w-64 max-h-64 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#0e172a] p-1 shadow-lg focus:outline-none"
-              >
-                {uniqueShiftOptions.map((opt, idx) => {
-                  const isSelected = selectedShift === opt.id;
-                  const isHighlighted = shiftHighlightedIndex === idx;
-                  return (
-                    <li
-                      key={opt.id}
-                      id={`shift-opt-${opt.id}`}
-                      role="option"
-                      aria-selected={isSelected}
-                      aria-label={
-                        opt.id === 'all'
-                          ? 'All shifts'
-                          : `${opt.name}, ${opt.timeRange || ''}${opt.noRosterInHub ? ', No roster in this hub' : ''}`.trim()
-                      }
-                      onClick={() => {
-                        setSelectedShift(opt.id);
-                        setShiftDropdownOpen(false);
-                        shiftTriggerRef.current?.focus();
-                      }}
-                      onMouseEnter={() => setShiftHighlightedIndex(idx)}
-                      className={`flex flex-col gap-0.5 px-3 py-2 rounded-md cursor-pointer text-left transition-colors ${
-                        isHighlighted ? 'bg-slate-100 dark:bg-slate-800' : ''
-                      } ${
-                        isSelected
-                          ? 'bg-[#eff4ff] dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 font-bold'
-                          : 'text-[#0b1c30] dark:text-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span className="text-xs font-semibold">{opt.name}</span>
-                        {opt.noRosterInHub && (
-                          <span className="text-[10px] text-slate-400 font-normal italic">
-                            No roster in this hub
-                          </span>
-                        )}
-                        {isSelected && (
-                          <span className="material-symbols-outlined text-[16px] text-[#0058be] dark:text-blue-400">
-                            check
-                          </span>
-                        )}
-                      </div>
-                      {opt.timeRange && (
-                        <span className="text-[11px] text-slate-400 dark:text-slate-400 font-mono font-normal">
-                          {opt.timeRange}
-                        </span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-
-            {shiftsError && (
-              <div className="flex items-center gap-1 text-[11px] text-red-600 font-medium">
-                <span>Could not load shifts</span>
-                <button
-                  type="button"
-                  onClick={() => fetchShifts()}
-                  className="underline font-bold hover:text-red-700"
-                >
-                  Retry
-                </button>
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label htmlFor="fsr-status" className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Attendance Status</label>
-            <select
-              id="fsr-status"
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#0b1c30] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]/40 cursor-pointer"
-            >
-              {STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label htmlFor="fsr-date" className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Date</label>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => stepDate(-1)}
-                aria-label="Previous day"
-                className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
-              >
-                <span className="material-symbols-outlined text-[16px]">chevron_left</span>
-              </button>
+          {/* Search bar & View toggle */}
+          <div className="flex items-center gap-2 w-full md:w-auto">
+            <div className="relative flex-1 md:w-60">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
-                id="fsr-date"
-                type="date"
-                value={selectedDate}
-                onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#0b1c30] dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]/40 cursor-pointer"
+                type="text"
+                placeholder="Search shifts by name or code..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#1346a1]"
               />
+            </div>
+
+            <div className="flex items-center rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden bg-slate-100 dark:bg-slate-800 shrink-0">
               <button
                 type="button"
-                onClick={() => stepDate(1)}
-                aria-label="Next day"
-                className="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
+                onClick={() => setViewMode('cards')}
+                title="Cards View"
+                className={`p-1.5 transition-colors ${
+                  viewMode === 'cards'
+                    ? 'bg-white dark:bg-slate-900 text-[#1346a1] shadow-xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
               >
-                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                <LayoutGrid className="w-4 h-4" />
               </button>
               <button
                 type="button"
-                onClick={() => setSelectedDate(ymdOf(new Date()))}
-                className="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#eff4ff] border border-[#dce9ff] text-[#0058be] hover:bg-[#dce9ff]"
+                onClick={() => setViewMode('table')}
+                title="Data Table View"
+                className={`p-1.5 transition-colors ${
+                  viewMode === 'table'
+                    ? 'bg-white dark:bg-slate-900 text-[#1346a1] shadow-xs'
+                    : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                }`}
               >
-                Today
+                <List className="w-4 h-4" />
               </button>
             </div>
           </div>
+        </div>
 
-          <div className="ml-auto text-right">
-            {error ? (
-              <button
-                type="button"
-                onClick={() => fetchBoard({ bustCache: true })}
-                className="text-xs font-semibold text-red-600 hover:underline"
+        {/* Detail Drill-down Filters Strip (Date / Status) */}
+        <div className="bg-white dark:bg-[#0e172a] p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Roster Date:</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => stepDate(-1)}
+                  aria-label="Previous day"
+                  className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  <ChevronRight className="w-3.5 h-3.5 rotate-180" />
+                </button>
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => e.target.value && setSelectedDate(e.target.value)}
+                  className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#0b1c30] dark:text-white focus:outline-none focus:ring-1 focus:ring-[#1346a1]"
+                />
+                <button
+                  type="button"
+                  onClick={() => stepDate(1)}
+                  aria-label="Next day"
+                  className="px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate(ymdOf(new Date()))}
+                  className="px-2 py-1 rounded-lg text-[10px] font-bold bg-blue-50 text-[#0058be] border border-blue-200 hover:bg-blue-100"
+                >
+                  Today
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-slate-400 uppercase tracking-wider text-[10px]">Status:</span>
+              <select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="px-2.5 py-1 rounded-lg text-xs font-semibold border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-[#0b1c30] dark:text-white"
               >
-                Failed to load — Retry
-              </button>
-            ) : (
-              <span className="text-[11px] text-slate-400 dark:text-slate-500">
-                {loading ? 'Loading roster…' : `${board?.total ?? 0} record${(board?.total ?? 0) === 1 ? '' : 's'} match the filters`}
-              </span>
-            )}
+                {STATUS_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="text-right text-slate-400 text-[11px]">
+            {loading ? 'Refreshing biometric roster…' : `${board?.total ?? 0} punch records for ${selectedDate}`}
           </div>
         </div>
 
@@ -964,7 +597,6 @@ export default function ShiftsRosterPage() {
               { label: 'On leave', value: summary.onLeave, tone: 'text-slate-600' },
               { label: 'Weekly off', value: summary.weeklyOff, tone: 'text-slate-500' },
               { label: 'Holiday', value: summary.holiday, tone: 'text-slate-500' },
-              { label: 'Scheduled', value: summary.scheduled, tone: 'text-slate-500' },
             ].map((s) => (
               <span key={s.label} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-[#0e172a] border border-slate-200/80 dark:border-slate-800 font-semibold text-slate-600 dark:text-slate-300">
                 <span className={`font-mono font-bold ${s.tone}`}>{s.value}</span>
@@ -974,10 +606,10 @@ export default function ShiftsRosterPage() {
           </div>
         )}
 
-        {/* SHIFTS GRID */}
+        {/* MAIN DIRECTORY VIEW: CARDS OR TABLE */}
         {error && !board ? (
           <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 p-10 text-center">
-            <span className="material-symbols-outlined text-red-400 text-[36px] mb-2">error</span>
+            <AlertTriangle className="w-10 h-10 mx-auto text-red-500 mb-2" />
             <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">{error}</p>
             <button
               type="button"
@@ -987,28 +619,54 @@ export default function ShiftsRosterPage() {
               Retry
             </button>
           </div>
+        ) : viewMode === 'table' ? (
+          <ShiftsDataTable
+            shifts={filteredShifts}
+            locations={locations}
+            onViewEmployees={(shift) => setViewEmployeesShift(shift)}
+            onEditShift={(shift) => setEditingShift(shift)}
+            onChangeShift={(shift) => {
+              setReassigningShift(shift);
+              setReassignPreselectedEmpId(undefined);
+            }}
+            onDeleteShift={(shift) => setDeletingShift(shift)}
+            onOpenDrill={(shift) => openDrill('shift-roster', `Shift: ${shift.name}`, shift.id, shift.name)}
+          />
+        ) : filteredShifts.length === 0 ? (
+          <div className="bg-white dark:bg-[#0e172a] rounded-xl border border-slate-200/80 dark:border-slate-800 p-12 text-center text-slate-400">
+            <Users className="w-12 h-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+            <div className="font-bold text-slate-700 dark:text-slate-300 text-sm">No shifts configured for this selection.</div>
+            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+              You can create a floor shift with standard names (Shift I – Shift IX) and define Men/Women break durations.
+            </p>
+            <button
+              type="button"
+              onClick={() => setIsAddModalOpen(true)}
+              className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#1346a1] text-white text-xs font-bold shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create Floor Shift</span>
+            </button>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {(shiftCards.length > 0 ? shiftCards : shifts.map((s) => ({ ...s, staff: null }))).map((s: any) => {
-              const staff = s.staff || { rostered: 0, present: 0, absent: 0, onLeave: 0, weeklyOff: 0, missingPunch: 0, onBreak: 0, late: 0 };
-              const locationLabel = s.locationName || locations.find((l) => l.id === s.locationId)?.name || '';
+            {filteredShifts.map((s) => {
+              const staff = s.staff || { rostered: s.staffCount || 0, present: 0, absent: 0, onLeave: 0, weeklyOff: 0, missingPunch: 0, onBreak: 0, late: 0 };
+              const loc = locations.find((l) => l.id === s.locationId);
+              const locationLabel = s.locationName || (loc ? `${loc.name} (${loc.code})` : '');
+              const staffCount = Number(s.staffCount ?? s._count?.employees ?? staff.rostered ?? 0);
+              const maleLunch = s.maleLunchMinutes ?? s.lunchDurationMinutes ?? 45;
+              const femaleLunch = s.femaleLunchMinutes ?? s.lunchDurationMinutes ?? 45;
+              const maleTea = s.maleTeaMinutes ?? s.teaDurationMinutes ?? 15;
+              const femaleTea = s.femaleTeaMinutes ?? s.teaDurationMinutes ?? 15;
+
               return (
                 <div
                   key={s.id}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`View roster details for ${s.name}`}
-                  onClick={() => openDrill('shift-roster', `Shift: ${s.name}`, s.id, s.name)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      openDrill('shift-roster', `Shift: ${s.name}`, s.id, s.name);
-                    }
-                  }}
-                  className="group bg-white dark:bg-[#0e172a] rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-[#1346a1]/40 dark:hover:border-blue-500/40 hover:bg-[#F8F4F1]/30 dark:hover:bg-slate-800/40 transition-all flex flex-col justify-between cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1346a1] focus-visible:ring-offset-2"
+                  className="bg-white dark:bg-[#0e172a] rounded-xl p-5 border border-slate-200/80 dark:border-slate-800 shadow-xs hover:shadow-md hover:border-[#1346a1]/40 dark:hover:border-blue-500/40 transition-all flex flex-col justify-between"
                 >
                   <div>
-                    {/* Card Header with Badges */}
+                    {/* Card Header & Badges */}
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <span className="text-[10px] font-mono font-bold text-[#1346a1] dark:text-[#E8DCC6] bg-[#F8F4F1] dark:bg-slate-800 px-2 py-0.5 rounded border border-[#E5D5D7] dark:border-slate-700">
@@ -1021,32 +679,34 @@ export default function ShiftsRosterPage() {
                       </div>
                       <div className="flex flex-col items-end gap-1.5 shrink-0">
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
-                          {s.status === 'ACTIVE' ? 'Active' : s.status || 'Active'}
+                          {s.status === 'ACTIVE' || !s.status ? 'Active' : s.status}
                         </span>
                         {s.overnight && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                             Overnight
                           </span>
                         )}
-                        <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-950/60 text-[#0058be] dark:text-blue-300 border border-blue-200 dark:border-blue-800 flex items-center gap-1 shadow-xs">
-                          <span className="material-symbols-outlined text-[13px]">groups</span>
-                          <span>{staff.rostered} Staff</span>
-                        </span>
                       </div>
                     </div>
 
                     {/* PROMINENT WORKFORCE HEADCOUNT BOX */}
-                    <div className="mt-3.5 p-3 rounded-xl bg-gradient-to-r from-blue-50/90 via-sky-50/60 to-indigo-50/80 dark:from-blue-950/40 dark:via-slate-900/40 dark:to-indigo-950/30 border border-blue-200/80 dark:border-blue-900/60 flex items-center justify-between shadow-xs">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setViewEmployeesShift(s)}
+                      className="mt-3.5 p-3 rounded-xl bg-gradient-to-r from-blue-50/90 via-sky-50/60 to-indigo-50/80 dark:from-blue-950/40 dark:via-slate-900/40 dark:to-indigo-950/30 border border-blue-200/80 dark:border-blue-900/60 flex items-center justify-between shadow-xs cursor-pointer hover:border-blue-400 transition-colors"
+                      title="Click to view assigned employees"
+                    >
                       <div className="flex items-center gap-2.5">
                         <div className="w-9 h-9 rounded-lg bg-[#0058be] text-white flex items-center justify-center shadow-xs shrink-0">
-                          <span className="material-symbols-outlined text-[20px]">badge</span>
+                          <Users className="w-5 h-5" />
                         </div>
                         <div>
                           <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">
                             Staff Headcount
                           </div>
                           <div className="text-sm font-extrabold text-[#0058be] dark:text-blue-300 font-mono leading-tight">
-                            {staff.rostered} Employees Working
+                            {staffCount} Employees Assigned
                           </div>
                         </div>
                       </div>
@@ -1064,28 +724,47 @@ export default function ShiftsRosterPage() {
                     {/* Working Parameters */}
                     <div className="mt-3 space-y-2 text-xs">
                       <div className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60">
-                        <span className="text-slate-500 dark:text-slate-400">Working Window:</span>
+                        <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 text-[#1346a1]" />
+                          Working Window:
+                        </span>
                         <span className="font-bold font-mono text-[#0b1c30] dark:text-white">
                           {hmOf(s.startTime)} – {hmOf(s.endTime)}
                           {s.overnight ? ' (+1d)' : ''}
                         </span>
                       </div>
+
+                      {/* Men Break Allowance */}
                       <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 px-1">
-                        <span>Staff on this Shift:</span>
-                        <span className="font-bold text-[#0058be] dark:text-blue-300 font-mono">
-                          {staff.rostered} Staff ({staff.present} Present • {staff.absent + staff.onLeave + staff.weeklyOff + staff.missingPunch} Off)
+                        <span className="flex items-center gap-1">
+                          <Utensils className="w-3.5 h-3.5 text-blue-600" />
+                          Men Breaks:
+                        </span>
+                        <span className="font-bold text-slate-700 dark:text-slate-200 font-mono">
+                          {maleLunch}m Lunch • {maleTea}m Tea
                         </span>
                       </div>
+
+                      {/* Women Break Allowance */}
                       <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 px-1">
-                        <span>Grace Period:</span>
-                        <span className="font-bold text-[#1346a1] dark:text-[#E8DCC6]">{s.gracePeriod ?? 5} Mins</span>
+                        <span className="flex items-center gap-1">
+                          <Utensils className="w-3.5 h-3.5 text-pink-600" />
+                          Women Breaks:
+                        </span>
+                        <span className="font-bold text-slate-700 dark:text-slate-200 font-mono">
+                          {femaleLunch}m Lunch • {femaleTea}m Tea
+                        </span>
                       </div>
+
                       <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 px-1">
-                        <span>Late Threshold:</span>
-                        <span className="font-bold text-red-600 dark:text-red-400">{s.lateThreshold ?? 15} Mins</span>
+                        <span>Grace / Late Cutoff:</span>
+                        <span className="font-bold text-[#1346a1] dark:text-[#E8DCC6]">
+                          {s.gracePeriod ?? 5}m Grace • {s.lateThreshold ?? 15}m Cutoff
+                        </span>
                       </div>
+
                       <div className="flex items-center justify-between text-slate-600 dark:text-slate-300 px-1">
-                        <span>Late / Missing Punch:</span>
+                        <span>Biometric Status:</span>
                         <span className="font-bold text-amber-600 dark:text-amber-400">
                           {staff.late} late • {staff.missingPunch} missing
                         </span>
@@ -1093,16 +772,58 @@ export default function ShiftsRosterPage() {
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
-                    <span className="text-slate-400 dark:text-slate-500 font-medium">{selectedDate}</span>
-                    <span className="font-semibold text-[#1346a1] dark:text-[#E8DCC6] flex items-center gap-1">
-                      <span>View Roster Details</span>
-                      <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-[#0058be] dark:text-blue-400 group-hover:text-[#1346a1] transition-colors">
-                    <span>View {staff.rostered} Roster Details</span>
-                    <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+                  {/* Card Bottom: Working Actions Bar */}
+                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+                    <div className="grid grid-cols-4 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setViewEmployeesShift(s)}
+                        className="py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center gap-1 transition-colors"
+                        title="View assigned employees"
+                      >
+                        <Users className="w-3 h-3 text-[#1346a1]" />
+                        <span>Staff</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingShift(s)}
+                        className="py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center gap-1 transition-colors"
+                        title="Edit shift timings and breaks"
+                      >
+                        <Edit3 className="w-3 h-3 text-amber-600" />
+                        <span>Edit</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReassigningShift(s);
+                          setReassignPreselectedEmpId(undefined);
+                        }}
+                        className="py-1.5 px-2 rounded-lg text-[11px] font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center gap-1 transition-colors"
+                        title="Change shift (reassign employees)"
+                      >
+                        <ArrowRightLeft className="w-3 h-3 text-blue-600" />
+                        <span>Reassign</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeletingShift(s)}
+                        className="py-1.5 px-2 rounded-lg text-[11px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50 flex items-center justify-center gap-1 transition-colors"
+                        title="Delete shift"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => openDrill('shift-roster', `Shift: ${s.name}`, s.id, s.name)}
+                      className="w-full py-1.5 px-3 rounded-lg text-[11px] font-bold text-[#1346a1] dark:text-[#E8DCC6] bg-[#F8F4F1]/60 dark:bg-slate-800/80 hover:bg-[#F8F4F1] dark:hover:bg-slate-800 flex items-center justify-between transition-colors border border-[#E5D5D7]/50"
+                    >
+                      <span>View Live Floor Attendance</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
               );
@@ -1111,117 +832,77 @@ export default function ShiftsRosterPage() {
         )}
 
         {/* CREATE SHIFT MODAL */}
-        {isAddModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-md w-full p-6 space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[#1346a1] text-[20px]">calendar_view_week</span>
-                  <h3 className="font-bold text-base text-[#0b1c30]">Create New Floor Shift</h3>
-                </div>
-                <button
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="text-slate-400 hover:text-slate-600 p-1"
-                >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
-              </div>
+        <AddShiftModal
+          open={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          locations={locations}
+          defaultLocationId={selectedLocation !== 'all' ? selectedLocation : locations[0]?.id}
+          onSuccess={async () => {
+            await fetchShifts();
+            fetchBoard({ bustCache: true });
+            notifyShiftsChanged({ action: 'CREATE' });
+          }}
+        />
 
-              <form onSubmit={handleCreateShift} className="space-y-3 text-xs">
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Shift Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={newShift.name}
-                    onChange={(e) => setNewShift({ ...newShift, name: e.target.value })}
-                    placeholder="e.g. Morning Retail Shift A"
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs"
-                  />
-                </div>
+        {/* EDIT SHIFT MODAL */}
+        <EditShiftModal
+          open={Boolean(editingShift)}
+          shift={editingShift}
+          onClose={() => setEditingShift(null)}
+          onSuccess={async () => {
+            await fetchShifts();
+            fetchBoard({ bustCache: true });
+            notifyShiftsChanged({ action: 'UPDATE', shiftId: editingShift?.id });
+          }}
+        />
 
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">Location Hub *</label>
-                  <select
-                    required
-                    value={newShift.locationId}
-                    onChange={(e) => setNewShift({ ...newShift, locationId: e.target.value })}
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white"
-                  >
-                    <option value="">Select Location</option>
-                    {locations.map((l) => (
-                      <option key={l.id} value={l.id}>{l.name} ({l.code})</option>
-                    ))}
-                  </select>
-                </div>
+        {/* REASSIGN SHIFT MODAL */}
+        <ReassignShiftModal
+          open={Boolean(reassigningShift)}
+          sourceShift={reassigningShift}
+          availableShifts={shifts}
+          preselectedEmployeeId={reassignPreselectedEmpId}
+          onClose={() => {
+            setReassigningShift(null);
+            setReassignPreselectedEmpId(undefined);
+          }}
+          onSuccess={async () => {
+            await fetchShifts();
+            fetchBoard({ bustCache: true });
+            notifyShiftsChanged({ action: 'UPDATE', shiftId: reassigningShift?.id });
+          }}
+        />
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Start Time (HH:MM)</label>
-                    <input
-                      type="time"
-                      required
-                      value={newShift.startTime}
-                      onChange={(e) => setNewShift({ ...newShift, startTime: e.target.value })}
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">End Time (HH:MM)</label>
-                    <input
-                      type="time"
-                      required
-                      value={newShift.endTime}
-                      onChange={(e) => setNewShift({ ...newShift, endTime: e.target.value })}
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs"
-                    />
-                  </div>
-                </div>
+        {/* DELETE SHIFT MODAL */}
+        <DeleteShiftModal
+          open={Boolean(deletingShift)}
+          shift={deletingShift}
+          onClose={() => setDeletingShift(null)}
+          onSuccess={async () => {
+            await fetchShifts();
+            fetchBoard({ bustCache: true });
+            notifyShiftsChanged({ action: 'DELETE', shiftId: deletingShift?.id });
+          }}
+          onReassignRequest={(shift) => {
+            setReassigningShift(shift);
+            setReassignPreselectedEmpId(undefined);
+          }}
+        />
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Grace Period (Mins)</label>
-                    <input
-                      type="number"
-                      value={newShift.gracePeriod}
-                      onChange={(e) => setNewShift({ ...newShift, gracePeriod: Number(e.target.value) })}
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Late Cutoff (Mins)</label>
-                    <input
-                      type="number"
-                      value={newShift.lateThreshold}
-                      onChange={(e) => setNewShift({ ...newShift, lateThreshold: Number(e.target.value) })}
-                      className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-xs"
-                    />
-                  </div>
-                </div>
-
-                <p className="text-[10px] text-slate-400">
-                  End time earlier than the start time creates an overnight shift (e.g. 22:00 → 07:00).
-                </p>
-
-                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddModalOpen(false)}
-                    className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg font-medium"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-1.5 text-xs bg-[#1346a1] hover:bg-[#0e3882] text-white rounded-lg font-bold shadow-sm"
-                  >
-                    Save Floor Shift
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+        {/* VIEW EMPLOYEES MODAL */}
+        <ViewShiftEmployeesModal
+          open={Boolean(viewEmployeesShift)}
+          shift={viewEmployeesShift}
+          onClose={() => setViewEmployeesShift(null)}
+          onReassignIndividual={(shift, empId) => {
+            setReassigningShift(shift);
+            setReassignPreselectedEmpId(empId);
+          }}
+          onReassignAll={(shift) => {
+            setReassigningShift(shift);
+            setReassignPreselectedEmpId(undefined);
+          }}
+        />
 
         {/* CARD DRILL-DOWN DETAIL VIEW */}
         {drill && (

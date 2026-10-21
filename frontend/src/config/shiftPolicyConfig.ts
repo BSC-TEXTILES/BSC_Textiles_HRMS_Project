@@ -21,7 +21,22 @@ export const STATUTORY_CAPS: StatutoryCapsConfig = {
 /**
  * Single constant for the Shift I Roman numeral label so it can be changed in one place.
  */
-export const SHIFT_I_LABEL = 'Shift 1';
+export const SHIFT_I_LABEL = 'Shift I';
+
+/**
+ * Standard BSC Textiles HRMS Shift Names
+ */
+export const STANDARD_SHIFT_NAMES = [
+  'Shift I',
+  'Shift II',
+  'Shift III',
+  'Shift IV',
+  'Shift V',
+  'Shift VI',
+  'Shift VII',
+  'Shift VIII',
+  'Shift IX',
+] as const;
 
 /**
  * Allowed Tea Break choices in the Custom Shift dialog.

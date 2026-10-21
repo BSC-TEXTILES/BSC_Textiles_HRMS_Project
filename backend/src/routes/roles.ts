@@ -496,6 +496,25 @@ router.put('/rbac/users/:userId/roles', requireRoleAdmin, async (req: AuthReques
     const beforeAssignments = await prisma.userRole.findMany({ where: { userId } });
     const beforeRoleIds = (beforeAssignments || []).map((a: any) => a.roleId);
 
+    // Prevent removing the final required administrator
+    const hadSuperAdmin = beforeRoleIds.some((id: string) => roleById.get(id)?.name === 'SUPER_ADMIN') || targetUser.role === 'SUPER_ADMIN';
+    if (hadSuperAdmin && !grantsSuperAdmin) {
+      const [otherAdmins]: any = await pool.query(`
+        SELECT COUNT(DISTINCT u.id) as count 
+        FROM user u 
+        LEFT JOIN userrole ur ON ur.userId = u.id 
+        LEFT JOIN role r ON ur.roleId = r.id 
+        WHERE (u.role = 'SUPER_ADMIN' OR r.name = 'SUPER_ADMIN') 
+          AND u.isActive = 1 
+          AND u.id != ?
+      `, [userId]);
+      if (Number(otherAdmins[0]?.count || 0) === 0) {
+        return res.status(400).json({
+          error: 'Cannot remove the final required administrator. The system requires at least one active Super Admin.',
+        });
+      }
+    }
+
     await prisma.userRole.deleteMany({ where: { userId } });
     if (roleIds.length > 0) {
       await prisma.userRole.createMany({

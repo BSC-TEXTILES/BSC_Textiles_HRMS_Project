@@ -192,166 +192,99 @@ function normalizeTimeRange(shift: any): string {
   return `${start} – ${end}`;
 }
 
+const STANDARD_ORDER_INDEX: Record<string, number> = {
+  'shift i': 1,
+  'shift 1': 1,
+  'shift ii': 2,
+  'shift 2': 2,
+  'shift iii': 3,
+  'shift 3': 3,
+  'shift iv': 4,
+  'shift 4': 4,
+  'shift v': 5,
+  'shift 5': 5,
+  'shift vi': 6,
+  'shift 6': 6,
+  'shift vii': 7,
+  'shift 7': 7,
+  'shift viii': 8,
+  'shift 8': 8,
+  'shift ix': 9,
+  'shift 9': 9,
+};
+
+function normalizeStandardShiftName(name: string): string {
+  const trimmed = (name || '').trim();
+  const lower = trimmed.toLowerCase();
+  if (lower === 'shift 1' || lower === 'shift i') return 'Shift I';
+  if (lower === 'shift 2' || lower === 'shift ii') return 'Shift II';
+  if (lower === 'shift 3' || lower === 'shift iii') return 'Shift III';
+  if (lower === 'shift 4' || lower === 'shift iv') return 'Shift IV';
+  if (lower === 'shift 5' || lower === 'shift v') return 'Shift V';
+  if (lower === 'shift 6' || lower === 'shift vi') return 'Shift VI';
+  if (lower === 'shift 7' || lower === 'shift vii') return 'Shift VII';
+  if (lower === 'shift 8' || lower === 'shift viii') return 'Shift VIII';
+  if (lower === 'shift 9' || lower === 'shift ix') return 'Shift IX';
+  return trimmed;
+}
+
 function processShifts(rawShifts: any[], isAllHubs: boolean): ShiftOptionItem[] {
-  if (!Array.isArray(rawShifts) || rawShifts.length === 0) return DEFAULT_SHIFTS;
+  if (!Array.isArray(rawShifts) || rawShifts.length === 0) return [];
 
-  // 1. Match Shift I
-  const shift1Matches = rawShifts.filter((s: any) => {
-    const nameLower = (s.name || '').trim().toLowerCase();
-    const codeUpper = (s.code || '').trim().toUpperCase();
-    return (
-      nameLower === 'shift i' ||
-      nameLower === 'shift 1' ||
-      codeUpper.startsWith('SHIFT_I')
-    );
-  });
-
-  // 2. Match Shift 2
-  const shift2Matches = rawShifts.filter((s: any) => {
-    const nameLower = (s.name || '').trim().toLowerCase();
-    const codeUpper = (s.code || '').trim().toUpperCase();
-    return (
-      nameLower === 'shift 2' ||
-      nameLower === 'shift ii' ||
-      codeUpper.startsWith('SHIFT_2')
-    );
-  });
-
-  // 3. User custom shifts (exclude legacy: Morning, General, Evening, Night Batch, and Shift I / Shift 2)
   const legacyNames = ['morning', 'general', 'evening', 'night'];
-  const legacyCodes = ['MORNING', 'GENERAL', 'EVENING', 'NIGHT', 'SHIFT-240'];
 
-  const customShiftsRaw = rawShifts.filter((s: any) => {
+  // Filter out unused legacy shifts that have no assigned staff
+  const activeCandidates = rawShifts.filter((s: any) => {
     const nameLower = (s.name || '').trim().toLowerCase();
-    const codeUpper = (s.code || '').trim().toUpperCase();
-
-    if (
-      nameLower === 'shift i' ||
-      nameLower === 'shift 1' ||
-      codeUpper.startsWith('SHIFT_I') ||
-      nameLower === 'shift 2' ||
-      nameLower === 'shift ii' ||
-      codeUpper.startsWith('SHIFT_2')
-    ) {
+    const staffCount = s.staffCount ?? s._count?.employees ?? 0;
+    if (legacyNames.some((leg) => nameLower.includes(leg)) && staffCount === 0) {
       return false;
     }
-
-    if (legacyNames.some((leg) => nameLower.includes(leg))) return false;
-    if (legacyCodes.some((leg) => codeUpper.includes(leg))) return false;
-
     return true;
   });
 
+  // Group by normalized shift name across hubs if isAllHubs, or keep per-location
+  const groupMap = new Map<string, any[]>();
+  for (const s of activeCandidates) {
+    const normName = normalizeStandardShiftName(s.name);
+    const key = isAllHubs ? normName.toLowerCase() : s.id;
+    if (!groupMap.has(key)) groupMap.set(key, []);
+    groupMap.get(key)!.push(s);
+  }
+
   const result: ShiftOptionItem[] = [];
+  for (const [, list] of groupMap.entries()) {
+    const primary = list[0];
+    const normName = normalizeStandardShiftName(primary.name);
+    const totalStaff = list.reduce(
+      (sum, s) => sum + (s.staffCount ?? s._count?.employees ?? 0),
+      0
+    );
+    const compositeId = isAllHubs ? list.map((s) => s.id).join(',') : primary.id;
 
-  // Exact option 2: Shift I (Roman numeral I)
-  const shift1Staff = shift1Matches.reduce(
-    (sum: number, s: any) => sum + (s._count?.employees || 0),
-    0
-  );
-  const shift1Id =
-    shift1Matches.length > 0
-      ? isAllHubs
-        ? shift1Matches.map((s: any) => s.id).join(',')
-        : shift1Matches[0].id
-      : 'shift-i-bel';
-
-  result.push({
-    id: shift1Id,
-    name: SHIFT_I_LABEL,
-    timeRange: '10:00 – 21:30',
-    startTime: '10:00',
-    endTime: '21:30',
-    lunchDurationMinutes: 100,
-    teaDurationMinutes: 20,
-    teaBreakSlot: 'Evening',
-    staffCount: shift1Staff,
-    isCustom: false,
-  });
-
-  // Exact option 3: Shift 2
-  const shift2Staff = shift2Matches.reduce(
-    (sum: number, s: any) => sum + (s._count?.employees || 0),
-    0
-  );
-  const shift2Id =
-    shift2Matches.length > 0
-      ? isAllHubs
-        ? shift2Matches.map((s: any) => s.id).join(',')
-        : shift2Matches[0].id
-      : 'shift-2-bel';
-
-  result.push({
-    id: shift2Id,
-    name: 'Shift 2',
-    timeRange: '11:00 – 21:00',
-    startTime: '11:00',
-    endTime: '21:00',
-    lunchDurationMinutes: 45,
-    teaDurationMinutes: 10,
-    teaBreakSlot: 'None',
-    staffCount: shift2Staff,
-    isCustom: false,
-  });
-
-  // Exact option 4: Custom shifts in creation order, de-duplicated by shiftId
-  const seenIds = new Set<string>();
-  const sortedCustom = [...customShiftsRaw].sort((a: any, b: any) => {
-    const timeA = new Date(a.createdAt || 0).getTime();
-    const timeB = new Date(b.createdAt || 0).getTime();
-    return timeA - timeB;
-  });
-
-  for (const s of sortedCustom) {
-    if (!seenIds.has(s.id)) {
-      seenIds.add(s.id);
-      const scanner = s.scannerRoles || {};
-      result.push({
-        id: s.id,
-        name: s.name,
-        code: s.code,
-        timeRange: normalizeTimeRange(s),
-        startTime: s.startTime,
-        endTime: s.endTime,
-        lunchDurationMinutes: s.lunchDurationMinutes ?? 45,
-        teaDurationMinutes: s.teaDurationMinutes ?? 0,
-        teaBreakSlot: scanner.teaBreakSlot || 'None',
-        staffCount: s._count?.employees || 0,
-        isCustom: true,
-      });
-    }
+    const scanner = primary.scannerRoles || {};
+    result.push({
+      id: compositeId,
+      name: normName,
+      code: primary.code,
+      timeRange: normalizeTimeRange(primary),
+      startTime: primary.startTime,
+      endTime: primary.endTime,
+      lunchDurationMinutes: primary.lunchDurationMinutes ?? 45,
+      teaDurationMinutes: primary.teaDurationMinutes ?? 15,
+      teaBreakSlot: scanner.teaBreakSlot || 'None',
+      staffCount: totalStaff,
+      isCustom: false,
+    });
   }
 
-  // Also include any locally created custom shifts if not already present
-  if (typeof window !== 'undefined') {
-    try {
-      const localCustom = JSON.parse(localStorage.getItem('bsc_custom_shifts') || '[]');
-      if (Array.isArray(localCustom)) {
-        for (const loc of localCustom) {
-          if (loc?.id && !seenIds.has(loc.id)) {
-            seenIds.add(loc.id);
-            const start = loc.punchIn || loc.startTime || '10:00';
-            const end = loc.punchOut || loc.endTime || '19:00';
-            result.push({
-              id: loc.id,
-              name: loc.name,
-              code: loc.code || loc.id,
-              timeRange: `${start} – ${end}`,
-              startTime: start,
-              endTime: end,
-              lunchDurationMinutes: loc.lunchBreakMinutes ?? 45,
-              teaDurationMinutes: loc.teaBreakMinutes ?? 0,
-              teaBreakSlot: loc.teaBreakMinutes > 0 ? 'Evening' : 'None',
-              staffCount: 0,
-              isCustom: true,
-            });
-          }
-        }
-      }
-    } catch {
-      // safe fallback
-    }
-  }
+  // Sort canonically: Shift I through Shift IX first, then alphabetically
+  result.sort((a, b) => {
+    const idxA = STANDARD_ORDER_INDEX[a.name.toLowerCase()] ?? 99;
+    const idxB = STANDARD_ORDER_INDEX[b.name.toLowerCase()] ?? 99;
+    if (idxA !== idxB) return idxA - idxB;
+    return a.name.localeCompare(b.name);
+  });
 
   return result;
 }

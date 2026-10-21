@@ -68,7 +68,7 @@ async function main() {
     console.log('  ✔ Super Admin Authenticated');
 
     // Belagavi HR
-    belagaviHrToken = await loginUser('rbac.hr@bsctextiles.com');
+    belagaviHrToken = await loginUser('bel.hr.sec.test@bsctextiles.internal');
     console.log('  ✔ Belagavi HR Authenticated');
 
     // Shivamogga HR

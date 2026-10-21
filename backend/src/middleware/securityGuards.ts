@@ -126,9 +126,15 @@ async function tripCounter(key: string): Promise<number> {
   return hits.limit - hits.remaining;
 }
 
+/** Loopback can never be an abusive remote peer: blocking it only locks out local dev. */
+function isLoopback(ip: string): boolean {
+  return ip === '127.0.0.1' || ip === '::1' || ip === 'localhost';
+}
+
 async function autoBlockIfNeeded(ip: string, path: string): Promise<void> {
   const cfg = securityConfig.rateLimit;
   if (cfg.autoBlockSeconds <= 0 || cfg.autoBlockTrips <= 0) return;
+  if (isLoopback(ip)) return;
   const trips = await tripCounter(ip);
   if (trips < cfg.autoBlockTrips) return;
 
@@ -158,30 +164,62 @@ async function autoBlockIfNeeded(ip: string, path: string): Promise<void> {
   });
 }
 
-function limiter(options: { name: string; limit: number; windowMs: number; sensitive: boolean }) {
+interface LimiterOptions {
+  name: string;
+  limit: number;
+  windowMs: number;
+  sensitive: boolean;
+  autoBlock: boolean;
+  /**
+   * Sensitive endpoints get a second, wider per-IP ceiling. The per-account
+   * bucket stops one login being hammered; this one stops credential spraying
+   * across many accounts without punishing colleagues on a shared NAT.
+   */
+  ipLimit?: number;
+  ipWindowMs?: number;
+}
+
+function sendRateLimited(res: Response, options: LimiterOptions, retryAfter: number): void {
+  res.setHeader('Retry-After', String(Math.max(1, retryAfter)));
+  res.status(429).json({
+    error: 'Too many requests',
+    message: options.sensitive
+      ? 'This action is rate limited. Please wait before trying again.'
+      : 'Request limit exceeded for this network address.',
+    retryAfterSeconds: Math.max(1, retryAfter),
+  });
+}
+
+function limiter(options: LimiterOptions) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (!securityConfig.rateLimit.enabled || (req as any).rateLimitExempt) return next();
     const ip = clientIpOf(req);
+    // Credential endpoints are bucketed per account as well as per network.
+    // `identifier` is the field the live login screen sends; keeping only the
+    // legacy names made every user behind one NAT share a single bucket.
     const identity = options.sensitive
-      ? `${ip}:${String((req.body?.loginId || req.body?.email || '')).toLowerCase().trim() || 'anon'}`
+      ? `${ip}:${String((req.body?.identifier || req.body?.loginId || req.body?.email || '')).toLowerCase().trim()
+          || `anon${req.path}`}`
       : ip;
     const key = `${KEY_PREFIX.rateLimit}${options.name}:${identity}`;
     try {
       const result = await storeSlidingWindow(key, options.limit, options.windowMs);
-      applyHeaders(res, options.limit, result.remaining, result.resetMs);
       if (!result.allowed) {
-        const retryAfter = Math.max(1, Math.ceil(result.resetMs / 1000));
-        res.setHeader('Retry-After', String(retryAfter));
-        if (options.sensitive) await autoBlockIfNeeded(ip, req.path);
-        res.status(429).json({
-          error: 'Too many requests',
-          message: options.sensitive
-            ? 'This action is rate limited. Please wait before trying again.'
-            : 'Request limit exceeded for this network address.',
-          retryAfterSeconds: retryAfter,
-        });
+        if (options.autoBlock) await autoBlockIfNeeded(ip, req.path);
+        sendRateLimited(res, options, Math.ceil(result.resetMs / 1000));
         return;
       }
+
+      if (options.ipLimit && options.ipLimit > 0) {
+        const ipKey = `${KEY_PREFIX.rateLimit}${options.name}:ip:${ip}`;
+        const ipResult = await storeSlidingWindow(ipKey, options.ipLimit, options.ipWindowMs ?? options.windowMs);
+        if (!ipResult.allowed) {
+          sendRateLimited(res, options, Math.ceil(ipResult.resetMs / 1000));
+          return;
+        }
+      }
+
+      applyHeaders(res, options.limit, result.remaining, result.resetMs);
     } catch (err: any) {
       // Fail open on a store outage: a Redis blip must not black-hole the API.
       console.error('[guards] rate limiter unavailable:', err?.message || err);
@@ -196,14 +234,40 @@ export const globalRateLimit = limiter({
   limit: securityConfig.rateLimit.globalPerSecond,
   windowMs: 1000,
   sensitive: false,
+  autoBlock: true,
 });
 
-/** Sensitive: login, password change and credential APIs. */
+/**
+ * Sensitive: login, password change and credential APIs.
+ *
+ * Deliberately NO IP auto-block here. A typo, a captcha refresh and a retry can
+ * trip this limiter, and an auto-block would then refuse *every* request from
+ * that address — including the correct password and the captcha needed to
+ * recover. Behind a showroom NAT that also locks out every colleague. The
+ * per-account attempt counter and cooldown already stop password guessing;
+ * persistent network-level abuse is caught by the global limiter instead.
+ */
 export const sensitiveRateLimit = limiter({
   name: 'sensitive',
   limit: securityConfig.rateLimit.sensitivePerWindow,
   windowMs: securityConfig.rateLimit.sensitiveWindowSeconds * 1000,
+  ipLimit: securityConfig.rateLimit.sensitiveIpPerWindow,
+  ipWindowMs: securityConfig.rateLimit.sensitiveIpWindowSeconds * 1000,
   sensitive: true,
+  autoBlock: false,
+});
+
+/**
+ * Captcha issuance. Its own bucket: a user may refresh the image a few times
+ * after a failed password without eating the credential attempts, and one
+ * person's refreshes must not leave colleagues without a challenge.
+ */
+export const captchaRateLimit = limiter({
+  name: 'captcha',
+  limit: 30,
+  windowMs: 60 * 1000,
+  sensitive: false,
+  autoBlock: false,
 });
 
 /** Hardware ADMS: tailored for eSSL/ZKTeco real-time pushes and heartbeats. */
@@ -212,6 +276,7 @@ export const admsRateLimit = limiter({
   limit: 240, // 240 requests/min per device IP (allows rapid real-time bursts)
   windowMs: 60 * 1000,
   sensitive: false,
+  autoBlock: true,
 });
 
 /** Drops every stored window, used by the Admin "clear limiter state" action. */

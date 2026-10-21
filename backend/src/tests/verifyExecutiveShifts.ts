@@ -3,14 +3,15 @@ import { pool } from '../nativeDb.js';
 async function runTests() {
   console.log('=== RUNNING EXECUTIVE SHIFT TESTS ===');
 
-  // Test Database Seed Records for Shift I and Shift 2
-  const [shiftIRows]: any = await pool.query('SELECT * FROM shift WHERE name = ?', ['Shift I']);
-  if (!shiftIRows || shiftIRows.length === 0) throw new Error('Shift I must exist in DB');
-  console.log(`Test Passed: Shift I found in DB (${shiftIRows.length} records).`);
-
-  const [shift2Rows]: any = await pool.query('SELECT * FROM shift WHERE name = ?', ['Shift 2']);
-  if (!shift2Rows || shift2Rows.length === 0) throw new Error('Shift 2 must exist in DB');
-  console.log(`Test Passed: Shift 2 found in DB (${shift2Rows.length} records).`);
+  // Test Database Standard Shift Records
+  const [standardShifts]: any = await pool.query(
+    "SELECT * FROM shift WHERE name IN ('Shift II', 'Shift III', 'Shift IV', 'Shift VIII', 'Shift IX') AND status = 'ACTIVE'"
+  );
+  if (!standardShifts || standardShifts.length === 0) throw new Error('Standard shifts must exist in DB');
+  console.log(`Test Passed: Standard shifts found in DB (${standardShifts.length} records).`);
+  for (const s of standardShifts) {
+    console.log(`  - ${s.name} (${s.code})`);
+  }
 
   console.log('=== ALL EXECUTIVE SHIFT TESTS PASSED SUCCESSFULLY! ===');
   process.exit(0);

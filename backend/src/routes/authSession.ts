@@ -11,7 +11,7 @@ import { Router, Request, Response } from 'express';
 import { pool } from '../nativeDb.js';
 import { securityConfig } from '../config/security.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
-import { sensitiveRateLimit } from '../middleware/securityGuards.js';
+import { sensitiveRateLimit, captchaRateLimit } from '../middleware/securityGuards.js';
 import { issueCaptcha, verifyCaptcha } from '../services/captchaService.js';
 import { performLogin, exchangeMfaChallenge, consumeTicket, type LoginRequest } from '../services/authentication.js';
 import {
@@ -53,7 +53,7 @@ function fail(res: Response, error: any, fallback = 'Request failed'): void {
 // CAPTCHA
 // ---------------------------------------------------------------------------
 
-router.get('/captcha', sensitiveRateLimit, async (_req: Request, res: Response) => {
+router.get('/captcha', captchaRateLimit, async (_req: Request, res: Response) => {
   try {
     const challenge = await issueCaptcha();
     res.setHeader('Cache-Control', 'no-store');

@@ -48,13 +48,13 @@ const QUICK_TEST_ACCOUNTS = [
   },
   {
     role: 'HR_MANAGER',
-    email: 'vikram.singh@bsctextiles.com',
+    email: 'rbac.hr@bsctextiles.com',
     label: 'HR Manager',
     desc: 'Staff & Payroll',
   },
   {
     role: 'STAFF',
-    email: 'rajesh.kumar@bsctextiles.com',
+    email: 'rbac.employee@bsctextiles.com',
     label: 'Staff Member',
     desc: 'My Desk & Attendance',
   },

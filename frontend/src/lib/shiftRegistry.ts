@@ -54,15 +54,9 @@ export const SHIFTS_CHANGED_EVENT = 'bsc:shifts-changed';
 export function notifyShiftsChanged(createdShift?: any) {
   clearShiftRegistryCache();
   if (typeof window !== 'undefined') {
-    if (createdShift) {
-      try {
-        const stored = JSON.parse(localStorage.getItem('bsc_custom_shifts') || '[]');
-        if (!stored.some((s: any) => s.id === createdShift.id || (s.name && s.name.toLowerCase() === createdShift.name.toLowerCase()))) {
-          stored.push(createdShift);
-          localStorage.setItem('bsc_custom_shifts', JSON.stringify(stored));
-        }
-      } catch {}
-    }
+    try {
+      localStorage.removeItem('bsc_custom_shifts');
+    } catch {}
     window.dispatchEvent(
       new CustomEvent(SHIFTS_CHANGED_EVENT, { detail: createdShift })
     );
@@ -136,7 +130,7 @@ export const SEED_SHIFT_SPECS = {
     teaSlot: 'Evening' as const,
   },
   shift2: {
-    name: 'Shift 2',
+    name: 'Shift II',
     punchIn: '11:00',
     punchOut: '21:00',
     punchInDisplay: '11:00 AM',
@@ -217,6 +211,14 @@ export function isSystemOrDefaultShift(s: { name?: string | null; code?: string 
     'shift iv',
     'shift 5',
     'shift v',
+    'shift 6',
+    'shift vi',
+    'shift 7',
+    'shift vii',
+    'shift 8',
+    'shift viii',
+    'shift 9',
+    'shift ix',
     'test shift to archive',
     'morning shift',
     'general shift',
@@ -226,8 +228,8 @@ export function isSystemOrDefaultShift(s: { name?: string | null; code?: string 
   ];
 
   if (DEFAULT_SYSTEM_NAMES.includes(nameLower)) return true;
-  if (/^shift\s*([1-5]|i{1,3}|iv|v)\b/i.test(nameLower)) return true;
-  if (/^SHIFT[_-]?([1-5]|I{1,3}|IV|V)\b/i.test(codeUpper)) return true;
+  if (/^shift\s*([1-9]|i{1,3}|iv|v|vi{1,3}|ix)\b/i.test(nameLower)) return true;
+  if (/^SHIFT[_-]?([1-9]|I{1,3}|IV|V|VI{1,3}|IX)\b/i.test(codeUpper)) return true;
   if (codeUpper.includes('MORNING') || codeUpper.includes('GENERAL') || codeUpper.includes('EVENING') || codeUpper.includes('NIGHT')) return true;
   return false;
 }
@@ -250,16 +252,10 @@ export function buildShiftRegistry(
 } {
   const isAllHubs = !selectedLocation || selectedLocation === 'all' || selectedLocation === 'ALL';
 
-  // Merge any locally stored custom shifts (for persistent availability across modules & reloads)
   const effectiveShifts: any[] = Array.isArray(rawShifts) ? [...rawShifts] : [];
   if (typeof window !== 'undefined') {
     try {
-      const stored: any[] = JSON.parse(localStorage.getItem('bsc_custom_shifts') || '[]');
-      for (const customS of stored) {
-        if (!effectiveShifts.some((s) => s.id === customS.id || (s.name && customS.name && s.name.toLowerCase() === customS.name.toLowerCase()))) {
-          effectiveShifts.push(customS);
-        }
-      }
+      localStorage.removeItem('bsc_custom_shifts');
     } catch {}
   }
 
@@ -407,15 +403,15 @@ export function buildShiftRegistry(
   const activeShifts: ShiftRegistryItem[] = [];
   const legacyShifts: ShiftRegistryItem[] = [];
 
-  // 1. Shift I (Active Seed)
+  // 1. Shift I: Only push if actually configured in database
   const shift1List = groups.get('SHIFT_I') || [];
   const isShift1Archived =
     shift1List.length > 0 &&
     shift1List.every((s) => s.status === 'ARCHIVED' || s.status === 'INACTIVE');
-  if (!isShift1Archived) {
+  if (shift1List.length > 0 && !isShift1Archived) {
     activeShifts.push(
       resolveGroup('SHIFT_I', shift1List, {
-        defaultName: SHIFT_I_LABEL,
+        defaultName: 'Shift I',
         defaultPunchIn: SEED_SHIFT_SPECS.shift1.punchIn,
         defaultPunchOut: SEED_SHIFT_SPECS.shift1.punchOut,
         defaultLunch: SEED_SHIFT_SPECS.shift1.lunchMinutes,
@@ -428,15 +424,15 @@ export function buildShiftRegistry(
     );
   }
 
-  // 2. Shift 2 (Active Seed)
+  // 2. Shift II: Only push if actually configured in database
   const shift2List = groups.get('SHIFT_2') || [];
   const isShift2Archived =
     shift2List.length > 0 &&
     shift2List.every((s) => s.status === 'ARCHIVED' || s.status === 'INACTIVE');
-  if (!isShift2Archived) {
+  if (shift2List.length > 0 && !isShift2Archived) {
     activeShifts.push(
       resolveGroup('SHIFT_2', shift2List, {
-        defaultName: 'Shift 2',
+        defaultName: 'Shift II',
         defaultPunchIn: SEED_SHIFT_SPECS.shift2.punchIn,
         defaultPunchOut: SEED_SHIFT_SPECS.shift2.punchOut,
         defaultLunch: SEED_SHIFT_SPECS.shift2.lunchMinutes,
@@ -449,16 +445,20 @@ export function buildShiftRegistry(
     );
   }
 
-  // 3. System & User Custom shifts (in creation order)
+  // 3. System & Standard Shifts (Shift III through Shift IX, etc.)
   const systemEntries: ShiftRegistryItem[] = [];
-  const customEntries: ShiftRegistryItem[] = [];
+  const otherEntries: ShiftRegistryItem[] = [];
   for (const [key, list] of groups.entries()) {
-    if (key.startsWith('SYSTEM_')) {
-      const isArchived =
-        list.length > 0 &&
-        list.every((s) => s.status === 'ARCHIVED' || s.status === 'INACTIVE');
+    if (key === 'SHIFT_I' || key === 'SHIFT_2') continue;
+    if (key.startsWith('LEGACY_')) continue;
+
+    const isArchived =
+      list.length > 0 &&
+      list.every((s) => s.status === 'ARCHIVED' || s.status === 'INACTIVE');
+
+    if (key.startsWith('SYSTEM_') || isSystemOrDefaultShift(list[0] || {})) {
       const item = resolveGroup(key, list, {
-        defaultName: list[0]?.name || 'System Shift',
+        defaultName: list[0]?.name || 'Standard Shift',
         source: 'Seed',
         status: isArchived ? 'Archived' : 'Active',
         isCustom: false,
@@ -466,31 +466,49 @@ export function buildShiftRegistry(
       if (item.status !== 'Archived') {
         systemEntries.push(item);
       }
-    } else if (key.startsWith('CUSTOM_')) {
-      const isArchived =
-        list.length > 0 &&
-        list.every((s) => s.status === 'ARCHIVED' || s.status === 'INACTIVE');
+    } else {
       const item = resolveGroup(key, list, {
-        defaultName: list[0]?.name || 'Custom Shift',
+        defaultName: list[0]?.name || 'Shift',
         source: 'Custom',
         status: isArchived ? 'Archived' : 'Active',
-        isCustom: true,
+        isCustom: false,
       });
       if (item.status !== 'Archived') {
-        customEntries.push(item);
+        otherEntries.push(item);
       }
     }
   }
 
-  // Preserve order: system defaults first, then custom shifts by createdAt ascending
-  activeShifts.push(...systemEntries);
+  activeShifts.push(...systemEntries, ...otherEntries);
 
-  customEntries.sort((a, b) => {
-    const timeA = new Date(a.createdAt || 0).getTime();
-    const timeB = new Date(b.createdAt || 0).getTime();
-    return timeA - timeB;
+  // Canonical ordering: Shift I through Shift IX first, then others
+  const STANDARD_ORDER_MAP: Record<string, number> = {
+    'shift i': 1,
+    'shift 1': 1,
+    'shift ii': 2,
+    'shift 2': 2,
+    'shift iii': 3,
+    'shift 3': 3,
+    'shift iv': 4,
+    'shift 4': 4,
+    'shift v': 5,
+    'shift 5': 5,
+    'shift vi': 6,
+    'shift 6': 6,
+    'shift vii': 7,
+    'shift 7': 7,
+    'shift viii': 8,
+    'shift 8': 8,
+    'shift ix': 9,
+    'shift 9': 9,
+  };
+
+  activeShifts.sort((a, b) => {
+    const idxA = STANDARD_ORDER_MAP[a.name.toLowerCase().trim()] ?? 99;
+    const idxB = STANDARD_ORDER_MAP[b.name.toLowerCase().trim()] ?? 99;
+    if (idxA !== idxB) return idxA - idxB;
+    return a.name.localeCompare(b.name);
   });
-  activeShifts.push(...customEntries);
 
   // 4. Legacy Shifts: Morning Shift, General Shift, Evening Shift, Night Shift
   const legacySpecs: Array<{

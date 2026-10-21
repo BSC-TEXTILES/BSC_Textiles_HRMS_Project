@@ -421,7 +421,7 @@ export default function AdminSettingsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Male Group Lunch (Minutes)</label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Men Lunch Break (Minutes)</label>
                   <input
                     type="number"
                     disabled={!canEditBreak}
@@ -432,7 +432,7 @@ export default function AdminSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Female Group Lunch (Minutes)</label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Women Lunch Break (Minutes)</label>
                   <input
                     type="number"
                     disabled={!canEditBreak}
@@ -443,7 +443,7 @@ export default function AdminSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Male Group Tea (Minutes)</label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Men Tea Break (Minutes)</label>
                   <input
                     type="number"
                     disabled={!canEditBreak}
@@ -454,7 +454,7 @@ export default function AdminSettingsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Female Group Tea (Minutes)</label>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">Women Tea Break (Minutes)</label>
                   <input
                     type="number"
                     disabled={!canEditBreak}

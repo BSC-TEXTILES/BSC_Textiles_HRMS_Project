@@ -53,6 +53,7 @@ import {
   PartyPopper,
   Briefcase,
   FileSpreadsheet,
+  Cookie,
 } from 'lucide-react';
 import type { MyAccess } from '@/lib/rbac';
 import { canAction, canEditModule, canViewModule } from '@/lib/rbac';
@@ -399,6 +400,22 @@ export const enterpriseNavigation: NavSectionConfig[] = [
       { title: 'Registration Approvals', href: '/admin/registrations', icon: ClipboardCheck, roles: ADMIN },
       { title: 'Database & Shards', href: '/admin/shards', icon: Database, badge: 'MySQL', roles: ADMIN },
       { title: 'Local DB & Backups', href: '/admin/local-database', icon: HardDrive, roles: ADMIN },
+    ],
+  },
+  {
+    title: 'Compliance & Legal',
+    theme: theme(
+      'text-teal-200',
+      'bg-teal-400',
+      'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-teal-300',
+      'hover:text-white hover:bg-white/10',
+      'text-teal-300 group-hover:text-white'
+    ),
+    items: [
+      { title: 'Privacy Policy', href: '/privacy-policy', icon: ShieldCheck },
+      { title: 'Terms of Use', href: '/terms-of-use', icon: FileText },
+      { title: 'Cookie Policy', href: '/cookie-policy', icon: Cookie },
+      { title: 'Data Retention', href: '/data-retention', icon: Database },
     ],
   },
 ];

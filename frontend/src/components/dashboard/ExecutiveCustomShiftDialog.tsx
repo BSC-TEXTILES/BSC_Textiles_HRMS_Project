@@ -221,7 +221,7 @@ export function ExecutiveCustomShiftDialog({
     const payload = {
       name: trimmedName,
       code: cleanCode,
-      locationId: locationId !== 'all' ? locationId : 'cmuzam5fe00014n4pq25hkcww', // Default Belagavi
+      locationId: locationId && locationId !== 'all' ? locationId : undefined,
       startTime: punchIn24,
       endTime: punchOut24,
       lunchDurationMinutes: lunchBreakMinutes,
@@ -235,7 +235,6 @@ export function ExecutiveCustomShiftDialog({
       earlyLoginIncentive: true,
       overtimeEnabled: true,
       scannerRoles: {
-        isCustomShift: true,
         teaBreakSlot: teaMinutes === 0 ? 'None' : 'Evening',
       },
     };
@@ -254,10 +253,10 @@ export function ExecutiveCustomShiftDialog({
         teaDurationMinutes: teaMinutes,
         teaBreakSlot: teaMinutes === 0 ? 'None' : 'Evening',
         staffCount: 0,
-        isCustom: true,
+        isCustom: false,
       };
 
-      toast.success(`Custom shift "${trimmedName}" created successfully.`);
+      toast.success(`Shift "${trimmedName}" created successfully.`);
       onSuccess(createdShift);
       onClose();
     } catch (err: any) {
@@ -307,10 +306,10 @@ export function ExecutiveCustomShiftDialog({
                 id="exec-shift-dialog-title"
                 className="text-base font-bold text-[#0b1c30] dark:text-slate-100"
               >
-                Add Custom Shift
+                Add Floor Shift
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Configure punch timings and break durations.
+                Configure floor punch timings and break durations.
               </p>
             </div>
           </div>

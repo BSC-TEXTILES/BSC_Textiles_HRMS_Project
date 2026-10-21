@@ -94,10 +94,10 @@ export function ExecutiveShiftFilter({
   const currentLabel =
     selectedShiftId === 'all'
       ? 'All Shifts'
-      : currentOption?.name === 'Shift I' || currentOption?.name?.toLowerCase() === 'shift 1'
-      ? 'Shift 1'
-      : currentOption?.name === 'Shift 2' || currentOption?.name?.toLowerCase() === 'shift 2'
-      ? 'Shift 2'
+      : currentOption?.name === 'Shift 1' || currentOption?.name?.toLowerCase() === 'shift i'
+      ? 'Shift I'
+      : currentOption?.name === 'Shift 2' || currentOption?.name?.toLowerCase() === 'shift ii'
+      ? 'Shift II'
       : currentOption?.name || 'Selected Shift';
 
   // Clear hover timer on unmount
@@ -215,14 +215,14 @@ export function ExecutiveShiftFilter({
     ? 45
     : hoveredOption?.lunchDurationMinutes ?? null;
 
-  // Staggered Girls and Boys lunch timings for Karnataka retail showroom floor coverage
-  const girlsLunchTiming = isShift1
+  // Staggered Women and Men lunch timings for Karnataka retail showroom floor coverage
+  const womenLunchTiming = isShift1
     ? '01:00 PM – 01:50 PM'
     : isShift2
     ? '01:30 PM – 02:15 PM'
     : '01:00 PM – 01:45 PM';
 
-  const boysLunchTiming = isShift1
+  const menLunchTiming = isShift1
     ? '01:50 PM – 02:40 PM'
     : isShift2
     ? '02:15 PM – 03:00 PM'
@@ -230,7 +230,7 @@ export function ExecutiveShiftFilter({
 
   const isLunchWarning =
     lunchMinutes !== null && lunchMinutes > STATUTORY_CAPS.lunchCapMinutes && !isShift1;
-  const popoverTitle = isShift1 ? 'Shift 1' : isShift2 ? 'Shift 2' : hoveredOption?.name;
+  const popoverTitle = isShift1 ? 'Shift I' : isShift2 ? 'Shift II' : hoveredOption?.name;
 
   return (
     <div
@@ -330,13 +330,13 @@ export function ExecutiveShiftFilter({
               {selectedShiftId === 'all' && <Check className="w-3.5 h-3.5 text-[#0058be]" />}
             </button>
 
-            {/* Individual Shifts in exact order: Shift 1, Shift 2, then Custom Shifts */}
+            {/* Individual Shifts in canonical order */}
             {shiftOptions.map((opt, idx) => {
               const optionIndex = idx + 1;
               const isSelected = selectedShiftId === opt.id;
-              const isOptShift1 = opt.name === 'Shift I' || opt.name?.toLowerCase() === 'shift 1';
-              const isOptShift2 = opt.name === 'Shift 2' || opt.name?.toLowerCase() === 'shift 2' || opt.name === 'Shift II';
-              const displayName = isOptShift1 ? 'Shift 1' : isOptShift2 ? 'Shift 2' : opt.name;
+              const isOptShift1 = opt.name === 'Shift 1' || opt.name?.toLowerCase() === 'shift i';
+              const isOptShift2 = opt.name === 'Shift 2' || opt.name?.toLowerCase() === 'shift ii';
+              const displayName = isOptShift1 ? 'Shift I' : isOptShift2 ? 'Shift II' : opt.name;
               const optPunchIn = isOptShift1
                 ? '10:00 AM'
                 : isOptShift2
@@ -385,11 +385,6 @@ export function ExecutiveShiftFilter({
                   >
                     <div className="min-w-0 pr-2 flex items-center gap-1.5">
                       <span className="truncate">{displayName}</span>
-                      {opt.isCustom && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
-                          Custom
-                        </span>
-                      )}
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
@@ -412,7 +407,7 @@ export function ExecutiveShiftFilter({
             })}
           </div>
 
-          {/* Action Divider and + Custom Shift Action */}
+          {/* Action Divider and + Add Shift Action */}
           {onOpenCreateModal && (
             <div className="p-1.5 border-t border-slate-100 dark:border-slate-800/80">
               <button
@@ -422,11 +417,11 @@ export function ExecutiveShiftFilter({
                   setActiveHoverId(null);
                   onOpenCreateModal();
                 }}
-                aria-label="Create custom shift"
+                aria-label="Add shift"
                 className="w-full flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-semibold text-[#0058be] dark:text-blue-400 bg-blue-50/80 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Custom Shift</span>
+                <span>+ Add Shift</span>
               </button>
             </div>
           )}
@@ -487,24 +482,24 @@ export function ExecutiveShiftFilter({
                   </span>
                 </div>
 
-                {/* Staggered Girls & Boys Lunch Timings */}
+                {/* Staggered Women & Men Lunch Timings */}
                 <div className="bg-slate-50 dark:bg-slate-800/60 rounded-lg p-2 border border-slate-100 dark:border-slate-800 my-1 space-y-1.5">
                   <div className="flex items-center justify-between text-[10.5px]">
                     <span className="flex items-center gap-1.5 text-pink-700 dark:text-pink-400 font-medium">
                       <span className="w-1.5 h-1.5 rounded-full bg-pink-500 shrink-0"></span>
-                      Girls Lunch:
+                      Women Lunch:
                     </span>
                     <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
-                      {girlsLunchTiming}
+                      {womenLunchTiming}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-[10.5px]">
                     <span className="flex items-center gap-1.5 text-blue-700 dark:text-blue-400 font-medium">
                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0"></span>
-                      Boys Lunch:
+                      Men Lunch:
                     </span>
                     <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
-                      {boysLunchTiming}
+                      {menLunchTiming}
                     </span>
                   </div>
                 </div>
