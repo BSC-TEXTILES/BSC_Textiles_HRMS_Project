@@ -22,7 +22,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 dotenv.config();
 
-const uri = process.env.DATABASE_URL || 'mysql://root@localhost:3306/bsc_textiles_hrms';
+const uri = process.env.DATABASE_URL || 'mysql://root:root@localhost:3306/bsc_textiles_hrms';
 
 const ACTIONS = ['view', 'create', 'edit', 'update', 'delete', 'export', 'approve'] as const;
 

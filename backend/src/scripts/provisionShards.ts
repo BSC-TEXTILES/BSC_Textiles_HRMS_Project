@@ -12,7 +12,7 @@ import crypto from 'node:crypto';
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 dotenv.config();
 
-const BASE_URI = process.env.DATABASE_URL || 'mysql://root@localhost:3306/bsc_textiles_hrms';
+const BASE_URI = process.env.DATABASE_URL || 'mysql://root:root@localhost:3306/bsc_textiles_hrms';
 
 interface ShardConfig {
   databaseId: string;

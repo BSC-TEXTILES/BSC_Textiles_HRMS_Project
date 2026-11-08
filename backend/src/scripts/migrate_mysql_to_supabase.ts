@@ -39,7 +39,7 @@ export async function runMigration(supabaseConnString: string) {
   console.log('================================================================');
   
   const mysqlConn = await mysql.createConnection(
-    process.env.DATABASE_URL || 'mysql://root@localhost:3306/bsc_textiles_hrms'
+    process.env.DATABASE_URL || 'mysql://root:root@localhost:3306/bsc_textiles_hrms'
   );
   console.log('✓ Connected to local MySQL (bsc_textiles_hrms)');
 

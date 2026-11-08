@@ -46,22 +46,31 @@ export function ipMatches(ip: string, cidr: string): boolean {
 
 async function loadRules(): Promise<IpRule[]> {
   if (Date.now() - ruleCache.fetchedAt < RULE_CACHE_MS) return ruleCache.rules;
-  const [rows]: any = await pool.query(
-    `SELECT \`id\`, \`type\`, \`ipAddress\`, \`cidr\`, \`label\` FROM \`ip_rules\`
-      WHERE \`enabled\` = 1 AND (\`expiresAt\` IS NULL OR \`expiresAt\` > NOW(3))`
-  );
-  ruleCache = {
-    fetchedAt: Date.now(),
-    rules: (rows || []).map((row: any) => {
-      const patterns = [row.ipAddress, row.cidr].filter(Boolean) as string[];
-      return {
-        id: row.id,
-        type: row.type,
-        label: row.label || patterns.join(','),
-        match: (ip: string) => patterns.some((pattern) => ipMatches(ip, pattern)),
-      };
-    }),
-  };
+  try {
+    const [rows]: any = await pool.query(
+      `SELECT \`id\`, \`type\`, \`ipAddress\`, \`cidr\`, \`label\` FROM \`ip_rules\`
+        WHERE \`enabled\` = 1 AND (\`expiresAt\` IS NULL OR \`expiresAt\` > NOW(3))`
+    );
+    ruleCache = {
+      fetchedAt: Date.now(),
+      rules: (rows || []).map((row: any) => {
+        const patterns = [row.ipAddress, row.cidr].filter(Boolean) as string[];
+        return {
+          id: row.id,
+          type: row.type,
+          label: row.label || patterns.join(','),
+          match: (ip: string) => patterns.some((pattern) => ipMatches(ip, pattern)),
+        };
+      }),
+    };
+  } catch (err: any) {
+    // Table doesn't exist yet - return empty rules
+    if (err?.code === 'ER_NO_SUCH_TABLE' || err?.errno === 1146) {
+      ruleCache = { fetchedAt: Date.now(), rules: [] };
+    } else {
+      throw err;
+    }
+  }
   return ruleCache.rules;
 }
 
@@ -110,7 +119,12 @@ export async function ipRuleGuard(req: Request, res: Response, next: NextFunctio
   } catch (err: any) {
     // A failed rule lookup must not become an open door, but it must not take
     // the whole API down either: log loudly and continue with rate limiting on.
-    console.error('[guards] ip rule lookup failed:', err?.message || err);
+    // Specifically handle "table doesn't exist" gracefully during initial setup.
+    if (err?.code === 'ER_NO_SUCH_TABLE' || err?.errno === 1146) {
+      console.warn('[guards] ip_rules table not found, skipping IP rule check');
+    } else {
+      console.error('[guards] ip rule lookup failed:', err?.message || err);
+    }
   }
   next();
 }

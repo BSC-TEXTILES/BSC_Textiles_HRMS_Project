@@ -42,7 +42,7 @@ export class ShardConnectionManager {
     
     // 1. Establish control database pool first
     const controlPool = this.createPoolForDatabase(
-      process.env.DATABASE_URL_HQ || process.env.DATABASE_URL || 'mysql://root@localhost:3306/bsc_textiles_hrms',
+      process.env.DATABASE_URL_HQ || process.env.DATABASE_URL || 'mysql://root:root@localhost:3306/bsc_textiles_hrms',
       'bsc_textiles_hrms'
     );
     this.pools.set(this.controlDatabaseId, controlPool);
@@ -101,13 +101,13 @@ export class ShardConnectionManager {
       return process.env[envKey] as string;
     }
 
-    const baseUri = process.env.DATABASE_URL || 'mysql://root@localhost:3306/bsc_textiles_hrms';
+    const baseUri = process.env.DATABASE_URL || 'mysql://root:root@localhost:3306/bsc_textiles_hrms';
     try {
       const url = new URL(baseUri.startsWith('mysql://') ? baseUri : `mysql://${baseUri}`);
       url.pathname = `/${shard.database_name}`;
       return url.toString();
     } catch {
-      return `mysql://root@localhost:3306/${shard.database_name}`;
+      return `mysql://root:root@localhost:3306/${shard.database_name}`;
     }
   }
 

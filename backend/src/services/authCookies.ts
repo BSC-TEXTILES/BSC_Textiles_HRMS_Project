@@ -52,11 +52,12 @@ export function setAccessCookie(res: Response, token: string): void {
 
 export function setRefreshCookie(res: Response, token: string): void {
   const { refresh } = cookieNames();
-  // The refresh cookie is scoped to the one path that can use it, so a
-  // compromised asset route cannot echo it back.
+  // The refresh cookie is scoped to the session paths that can use it.
+  // Mounted at both /api/session and /api/auth/session for compatibility.
+  // We set it on the broader /api/session path so it works for both mounts.
   res.cookie(refresh, token, {
     ...baseOptions(securityConfig.tokens.refreshTtlSeconds),
-    path: '/api/auth/session',
+    path: '/api/session',
   });
 }
 
@@ -65,6 +66,8 @@ export function clearAuthCookies(res: Response): void {
   for (const name of [names.access, names.refresh]) {
     res.clearCookie(name, { path: securityConfig.cookies.path });
   }
+  // Clear from both possible mount paths
+  res.clearCookie(names.refresh, { path: '/api/session' });
   res.clearCookie(names.refresh, { path: '/api/auth/session' });
 }
 

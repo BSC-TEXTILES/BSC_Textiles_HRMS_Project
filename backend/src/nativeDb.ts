@@ -31,7 +31,7 @@ const isMysql = !isPostgres && !isSqlite;
 
 const connectionUri = isPostgres
   ? process.env.SUPABASE_POOLER_URL || process.env.SUPABASE_DB_URL || rawUri
-  : rawUri || 'mysql://root@localhost:3306/bsc_textiles_hrms';
+  : rawUri || 'mysql://root:root@localhost:3306/bsc_textiles_hrms';
 
 console.log(
   `[Database] Engine: ${isPostgres ? 'PostgreSQL (Supabase Cloud)' : isMysql ? 'MySQL' : 'SQLite'} (DB_TYPE=${dbType || '<unset>'}, VERCEL=${Boolean(process.env.VERCEL)})`

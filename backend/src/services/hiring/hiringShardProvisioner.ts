@@ -108,7 +108,7 @@ async function resolveControlDatabaseName(): Promise<string> {
   } catch {
     // fall through to env parsing
   }
-  const base = process.env.DATABASE_URL || 'mysql://root@localhost:3306/bsc_textiles_hrms';
+  const base = process.env.DATABASE_URL || 'mysql://root:root@localhost:3306/bsc_textiles_hrms';
   try {
     const url = new URL(base.startsWith('mysql://') ? base : `mysql://${base}`);
     return (url.pathname || '/bsc_textiles_hrms').replace(/^\//, '') || 'bsc_textiles_hrms';
@@ -157,7 +157,7 @@ export function splitDdlStatements(sql: string): string[] {
 }
 
 async function baseConnectionOptions() {
-  const base = process.env.DATABASE_URL || 'mysql://root@localhost:3306/bsc_textiles_hrms';
+  const base = process.env.DATABASE_URL || 'mysql://root:root@localhost:3306/bsc_textiles_hrms';
   const url = new URL(base.startsWith('mysql://') ? base : `mysql://${base}`);
   return {
     host: url.hostname || 'localhost',

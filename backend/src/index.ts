@@ -146,7 +146,16 @@ app.get('/health', (req, res) => {
 });
 
 app.get('/api/health', async (req, res) => {
-  const [biometric, store] = await Promise.all([readBiometricHealth(), redisHealth()]);
+  let biometric: any = { ok: false, reason: 'unavailable' };
+  let store: any = { driver: 'unavailable' };
+  try {
+    [biometric, store] = await Promise.all([
+      readBiometricHealth().catch((e) => ({ ok: false, reason: e?.message || 'error' })),
+      redisHealth().catch((e) => ({ driver: 'error', reason: e?.message || 'error' })),
+    ]);
+  } catch {
+    // Fallback already handled
+  }
   res.json({
     status: biometric.ok ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
