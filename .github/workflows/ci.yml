@@ -57,7 +57,7 @@ jobs:
           set -euo pipefail
           if grep -rnE "(mysql|postgres(ql)?|rediss?)://[^\"' ]*:[^\"' ]*@" \
                --include='*.ts' --include='*.tsx' --include='*.js' \
-               backend/src frontend/src connector database/scripts 2>/dev/null; then
+               backend/src frontend/src backend/connector database/scripts 2>/dev/null; then
             echo "::error::A connection string with an embedded password was found in source."
             exit 1
           fi

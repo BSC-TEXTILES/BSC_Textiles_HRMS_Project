@@ -22,7 +22,7 @@ jobs:
           node-version: 20
 
       - name: Run Repository Secret Scanner
-        run: node scripts/scan-secrets.mjs
+        run: node backend/scripts/scan-secrets.mjs
 
       - name: Run Gitleaks Secret Detector
         uses: gitleaks/gitleaks-action@v2
