@@ -36,7 +36,7 @@ const incentiveTransactionSchema = z.object({
     transactionDate: z.string(),
     calculationBasis: z.string(),
     calculatedAmount: z.number(),
-    calculationDetails: z.record(z.any()),
+    calculationDetails: z.record(z.any(), z.string()),
   }),
 });
 

@@ -4,20 +4,21 @@ import { Request, Response, NextFunction } from 'express';
 export const validate = (schema: z.ZodSchema) => {
   return (req: Request, res: Response, next: NextFunction) => {
     try {
-      const data = schema.parse({
+      const data: any = schema.parse({
         body: req.body,
         query: req.query,
         params: req.params,
       });
-      req.body = data.body;
-      req.query = data.query;
-      req.params = data.params;
+      if (data?.body !== undefined) req.body = data.body;
+      if (data?.query !== undefined) req.query = data.query;
+      if (data?.params !== undefined) req.params = data.params;
       next();
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
+        const issues = (error.issues || (error as any).errors || []) as any[];
         return res.status(400).json({
           error: 'Validation failed',
-          details: error.errors.map(e => `${e.path.join('.')}: ${e.message}`),
+          details: issues.map((e: any) => `${Array.isArray(e.path) ? e.path.join('.') : e.path}: ${e.message}`),
         });
       }
       return res.status(400).json({ error: 'Invalid request' });

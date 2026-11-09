@@ -59,6 +59,7 @@
     "postcss": "^8.5.29",
     "postcss-selector-parser": "^7.1.6",
     "glob": "^14.0.2",
+    "minimatch": "^11.0.1",
     "dompurify": "^3.4.16",
     "braces": "3.0.3",
     "nodemailer": "^10.1.0",
