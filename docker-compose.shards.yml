@@ -104,9 +104,9 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./infra/nginx/snippets:/etc/nginx/snippets:ro
-      - ${TLS_DIR:-./infra/nginx/tls}:/etc/nginx/tls:ro
+      - ./backend/infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./backend/infra/nginx/snippets:/etc/nginx/snippets:ro
+      - ${TLS_DIR:-./backend/infra/nginx/tls}:/etc/nginx/tls:ro
       - certbot_www:/var/www/certbot:ro
     tmpfs:
       - /tmp:mode=1777,size=64m,noexec
@@ -267,8 +267,8 @@ services:
     environment:
       REDISCLI_AUTH: ${REDIS_PASSWORD:?}
     volumes:
-      - ./infra/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
-      - ${REDIS_TLS_DIR:-./infra/redis/tls}:/usr/local/etc/redis/tls:ro
+      - ./backend/infra/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ${REDIS_TLS_DIR:-./backend/infra/redis/tls}:/usr/local/etc/redis/tls:ro
       - redis_data:/data
     expose:
       - "6379"

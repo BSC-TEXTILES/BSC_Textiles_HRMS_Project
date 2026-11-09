@@ -32,12 +32,12 @@
     "device:simulator": "npm run device:simulator --workspace=backend",
     "diagnose": "npm run diagnose --workspace=backend",
     "setup:local": "npm run db:schema --workspace=database && npm run db:migrate --workspace=database && npm run db:seed --workspace=database && npm run db:seed:biometric-demo --workspace=database",
-    "connector": "tsx connector/bscBiometricConnector.ts",
+    "connector": "tsx backend/connector/bscBiometricConnector.ts",
     "db:seed:rbac-demo": "npm run db:seed:rbac-demo --workspace=database",
     "test:rbac": "npm run test:rbac --workspace=backend",
     "test:security": "npm run test:security --workspace=backend",
     "test:live": "npm run test:live --workspace=backend",
-    "secret-scan": "node scripts/scan-secrets.mjs",
+    "secret-scan": "node backend/scripts/scan-secrets.mjs",
     "test:export": "npm run test:export --workspace=backend"
   },
   "devDependencies": {
@@ -46,8 +46,8 @@
     "typescript": "^5.3.3"
   },
   "overrides": {
-    "next": "15.5.27",
-    "eslint-config-next": "15.5.27",
+    "next": "15.5.29",
+    "eslint-config-next": "15.5.29",
     "eslint": "^8.57.1",
     "next-auth": {
       ".": "4.24.15",
@@ -58,7 +58,7 @@
     "react-dom": "18.3.1",
     "postcss": "^8.5.29",
     "postcss-selector-parser": "^7.1.6",
-    "glob": "^10.5.0",
+    "glob": "^14.0.2",
     "dompurify": "^3.4.16",
     "braces": "3.0.3",
     "nodemailer": "^10.1.0",

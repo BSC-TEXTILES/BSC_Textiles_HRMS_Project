@@ -188,9 +188,9 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./infra/nginx/snippets:/etc/nginx/snippets:ro
-      - ${TLS_DIR:-./infra/nginx/tls}:/etc/nginx/tls:ro
+      - ./backend/infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./backend/infra/nginx/snippets:/etc/nginx/snippets:ro
+      - ${TLS_DIR:-./backend/infra/nginx/tls}:/etc/nginx/tls:ro
       - certbot_www:/var/www/certbot:ro
     tmpfs:
       - /tmp:mode=1777,size=64m,noexec
@@ -402,10 +402,10 @@ services:
       # which is the same trust boundary as the .env file itself.
       REDISCLI_AUTH: ${REDIS_PASSWORD:?}
     volumes:
-      - ./infra/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./backend/infra/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
       # Mount only once TLS is enabled in redis.conf; an empty directory is
       # harmless while the block stays commented.
-      - ${REDIS_TLS_DIR:-./infra/redis/tls}:/usr/local/etc/redis/tls:ro
+      - ${REDIS_TLS_DIR:-./backend/infra/redis/tls}:/usr/local/etc/redis/tls:ro
       - redis_data:/data
     tmpfs:
       - /tmp:mode=1777,size=32m,noexec
