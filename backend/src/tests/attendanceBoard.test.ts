@@ -21,7 +21,9 @@ import { loginWithRetry } from './testAuth.js';
 const TODAY = new Date().toISOString().slice(0, 10);
 const PAST_DATE = '2026-10-08'; // A Thursday
 const SUNDAY = '2026-10-11'; // Verified Sunday in seed data
-const FUTURE_DATE = '2026-10-20';
+const futureDateObj = new Date();
+futureDateObj.setDate(futureDateObj.getDate() + 10);
+const FUTURE_DATE = futureDateObj.toISOString().slice(0, 10);
 
 /**
  * Section 60.14: Attendance & Shifts Board

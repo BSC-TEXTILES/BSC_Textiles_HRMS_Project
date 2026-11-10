@@ -120,7 +120,7 @@ export const securityConfig = {
   },
 
   rateLimit: {
-    globalPerSecond: num('RATE_LIMIT_PER_SECOND', 100),
+    globalPerSecond: num('RATE_LIMIT_PER_SECOND', 1000),
     sensitivePerWindow: num('RATE_LIMIT_SENSITIVE', 5),
     sensitiveWindowSeconds: num('RATE_LIMIT_SENSITIVE_WINDOW', 60),
     /**

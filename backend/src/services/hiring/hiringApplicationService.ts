@@ -667,9 +667,15 @@ interface BuiltQuery {
   offset: number;
 }
 
-function buildApplicationQuery(filters: ApplicationListFilters, shardLimit: number): BuiltQuery {
+function buildApplicationQuery(filters: ApplicationListFilters, shardLimit: number, locationId?: string | null): BuiltQuery {
   const conditions: string[] = ['a.deletedAt IS NULL'];
   const params: any[] = [];
+
+  const locId = locationId || filters.locationId;
+  if (locId) {
+    conditions.push('a.locationId = ?');
+    params.push(locId);
+  }
 
   if (filters.formId) {
     conditions.push('a.formId = ?');
@@ -809,7 +815,8 @@ export async function listApplications(viewer: HiringViewer, filters: Applicatio
     targets.map(async (target) => {
       const started = Date.now();
       try {
-        const query = buildApplicationQuery(filters, scatter ? page * limit + 1 : 0);
+        const locFilter = target.locationId || (scope.mode === 'single' ? scope.locationId : undefined);
+        const query = buildApplicationQuery(filters, scatter ? page * limit + 1 : 0, locFilter);
         const [countRows]: any = await target.pool.query(
           `SELECT COUNT(*) AS count FROM application a JOIN candidate c ON c.id = a.candidateId WHERE ${query.where}`,
           query.params
@@ -1447,6 +1454,7 @@ export async function getHiringDashboard(viewer: HiringViewer, options: { locati
     averageTimeToHireDays: null as number | null,
   };
   const stageCounts = new Map<string, number>();
+  for (const s of APPLICATION_STAGES) stageCounts.set(s, 0);
   const byDay = new Map<string, number>();
   const bySource = new Map<string, number>();
   const byLocation: HiringDashboard['byLocation'] = [];

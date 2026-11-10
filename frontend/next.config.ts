@@ -131,15 +131,9 @@ const backendRoutes = [
 ];
 
 const nextConfig: NextConfig = {
-  env: {
-    NEXTAUTH_SECRET:
-      process.env.NEXTAUTH_SECRET ||
-      process.env.JWT_SECRET ||
-      'bsc-textiles-hrms-super-secret-jwt-key-2024-production-ready-32chars',
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'https://hrms.bsctextiles.in',
-    BACKEND_URL: process.env.BACKEND_URL || 'http://127.0.0.1:4000',
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api',
-  },
+  // Do not add an `env` block here: Next.js inlines every value in it into the
+  // browser bundle. NEXTAUTH_SECRET must never reach client code. Server code
+  // reads process.env directly, and only NEXT_PUBLIC_* values are exposed.
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ['recharts'],

@@ -109,8 +109,18 @@ export async function ensureActiveKey(actorId?: string): Promise<LoadedKey> {
   );
 
   const existing = rows?.[0];
+  let canOpenExisting = false;
+  if (existing?.privateKeyPem) {
+    try {
+      open(existing.privateKeyPem);
+      canOpenExisting = true;
+    } catch {
+      canOpenExisting = false;
+    }
+  }
+
   const needsRotation =
-    !existing || (existing.expiresAt && new Date(existing.expiresAt).getTime() < now) || existing.privateKeyPem == null;
+    !existing || !canOpenExisting || (existing.expiresAt && new Date(existing.expiresAt).getTime() < now) || existing.privateKeyPem == null;
 
   if (needsRotation) {
     if (existing) {
@@ -118,7 +128,7 @@ export async function ensureActiveKey(actorId?: string): Promise<LoadedKey> {
       // access tokens are not cut off mid-request.
       const graceUntil = new Date(now + securityConfig.tokens.keyGraceSeconds * 1000);
       await pool.query(
-        'UPDATE `jwt_signing_key` SET `status` = `retiring`, `retiredAt` = NOW(3), `expiresAt` = ?, `rotatedById` = ? WHERE `kid` = ?',
+        'UPDATE `jwt_signing_key` SET `status` = \'retiring\', `retiredAt` = NOW(3), `expiresAt` = ?, `rotatedById` = ? WHERE `kid` = ?',
         [graceUntil, actorId || null, existing.kid]
       );
     }
@@ -134,7 +144,22 @@ export async function ensureActiveKey(actorId?: string): Promise<LoadedKey> {
   );
   if (!activeRows?.length) throw new Error('[signingKeys] no active signing key could be established');
 
-  const row = activeRows[0];
+  let row = activeRows[0];
+  let privateKey: string;
+  try {
+    privateKey = open(row.privateKeyPem);
+  } catch (err) {
+    console.warn('[signingKeys] Stored key cannot be decrypted with current secret. Regenerating active key...');
+    await insertKey(algorithm);
+    const [freshRows]: any = await pool.query(
+      `SELECT \`kid\`, \`algorithm\`, \`status\`, \`publicKeyPem\`, \`privateKeyPem\`, \`createdAt\`, \`expiresAt\`
+         FROM \`jwt_signing_key\` WHERE \`status\` = 'active' AND \`algorithm\` = ? ORDER BY \`activatedAt\` DESC LIMIT 1`,
+      [algorithm]
+    );
+    row = freshRows[0];
+    privateKey = open(row.privateKeyPem);
+  }
+
   const key: LoadedKey = {
     kid: row.kid,
     algorithm: row.algorithm,
@@ -142,7 +167,7 @@ export async function ensureActiveKey(actorId?: string): Promise<LoadedKey> {
     publicKeyPem: row.publicKeyPem,
     createdAt: row.createdAt,
     expiresAt: row.expiresAt,
-    privateKeyPem: open(row.privateKeyPem),
+    privateKeyPem: privateKey,
   };
   cache = { active: key, verify: new Map(), fetchedAt: Date.now() };
   return key;

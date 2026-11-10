@@ -317,7 +317,7 @@ io.on('connection', (socket) => {
 import { shardManager } from './core/sharding/index.js';
 import { startHiringOutboxWorker } from './services/hiring/hiringOutbox.js';
 
-const PORT = Number(process.env.PORT) || 4000;
+const PORT = Number(process.env.BACKEND_PORT) || (process.env.PORT && process.env.PORT !== '3000' ? Number(process.env.PORT) : 4000);
 
 if (!process.env.VERCEL) {
   httpServer.listen(PORT, '0.0.0.0', () => {

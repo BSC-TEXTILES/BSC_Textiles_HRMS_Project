@@ -29,6 +29,13 @@ const isSqlite =
 
 const isMysql = !isPostgres && !isSqlite;
 
+if (process.env.NODE_ENV === 'production' && isMysql && !rawUri.trim()) {
+  throw new Error(
+    '[Database] DATABASE_URL is required in production for MySQL. ' +
+      'Refusing to fall back to an unauthenticated localhost database.'
+  );
+}
+
 const connectionUri = isPostgres
   ? process.env.SUPABASE_POOLER_URL || process.env.SUPABASE_DB_URL || rawUri
   : rawUri || 'mysql://localhost:3306/bsc_textiles_hrms';

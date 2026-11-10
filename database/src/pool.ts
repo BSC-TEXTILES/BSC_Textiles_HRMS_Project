@@ -8,7 +8,15 @@ import dotenv from 'dotenv';
 dotenv.config();
 dotenv.config({ path: '../.env' });
 
-const connectionUri = process.env.DATABASE_URL || 'mysql://root:root@localhost:3306/bsc_textiles_hrms';
+const rawUri = (process.env.DATABASE_URL || '').trim();
+
+if (process.env.NODE_ENV === 'production' && !rawUri) {
+  throw new Error(
+    'DATABASE_URL is required in production. Refusing to fall back to a localhost database.'
+  );
+}
+
+const connectionUri = rawUri || 'mysql://root:root@localhost:3306/bsc_textiles_hrms';
 
 export const pool = mysql.createPool({
   uri: connectionUri,

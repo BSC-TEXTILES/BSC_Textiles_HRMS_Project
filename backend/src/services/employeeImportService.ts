@@ -112,6 +112,7 @@ export const IMPORT_COLUMNS: ImportColumn[] = [
   // ── Attendance and biometric references ────────────────────────────────────
   { key: 'biometric_enrollment_status', label: 'Biometric Enrollment Status', group: 'attendance_biometric', presence: 'optional', dbColumn: '(computed from faceProfileId)', description: 'ENROLLED or NOT_ENROLLED. Read-only: derived from the employee face profile.', example: 'NOT_ENROLLED', readOnly: true },
   { key: 'biometric_device_employee_id', label: 'Biometric Device Employee ID', group: 'attendance_biometric', presence: 'optional', dbColumn: 'employee.biometricDeviceEmployeeId', description: 'Employee number programmed into the biometric device.', example: 'BIO-1372' },
+  { key: 'qr_pass_status', label: 'QR Pass Status', group: 'attendance_biometric', presence: 'optional', dbColumn: '(computed from qrCodeId)', description: 'ISSUED or NONE. Read-only: derived from the employee QR record.', example: 'ISSUED', readOnly: true },
   { key: 'attendance_eligibility', label: 'Attendance Eligibility', group: 'attendance_biometric', presence: 'optional', dbColumn: 'employee.attendanceEligible', description: 'TRUE/FALSE — whether the employee punches attendance.', example: 'TRUE' },
 
   // ── Additional administrative fields ───────────────────────────────────────
@@ -390,7 +391,7 @@ export async function buildTemplateCsv(): Promise<string> {
     aadhaar_verification_status: 'VERIFIED',
     biometric_enrollment_status: 'NOT_ENROLLED',
     biometric_device_employee_id: '',
-    
+    qr_pass_status: 'NONE',
     attendance_eligibility: 'TRUE',
     employee_photo_reference: '',
     employee_document_status: 'PENDING',
@@ -442,7 +443,7 @@ export async function buildTemplateCsv(): Promise<string> {
     aadhaar_verification_status: 'PENDING',
     biometric_enrollment_status: 'ENROLLED',
     biometric_device_employee_id: 'BIO-0037',
-    
+    qr_pass_status: 'ISSUED',
     attendance_eligibility: 'TRUE',
     employee_photo_reference: '',
     employee_document_status: 'COMPLETE',
@@ -494,7 +495,7 @@ export async function buildTemplateCsv(): Promise<string> {
     aadhaar_verification_status: 'NOT_VERIFIED',
     biometric_enrollment_status: 'NOT_ENROLLED',
     biometric_device_employee_id: '',
-    
+    qr_pass_status: 'NONE',
     attendance_eligibility: 'FALSE',
     employee_photo_reference: '',
     employee_document_status: 'PENDING',
@@ -644,7 +645,7 @@ export async function buildTemplateExcel(): Promise<Buffer> {
     aadhaar_verification_status: 'VERIFIED',
     biometric_enrollment_status: 'NOT_ENROLLED',
     biometric_device_employee_id: '',
-    
+    qr_pass_status: 'NONE',
     attendance_eligibility: 'TRUE',
     employee_photo_reference: '',
     employee_document_status: 'PENDING',
@@ -696,7 +697,7 @@ export async function buildTemplateExcel(): Promise<Buffer> {
     aadhaar_verification_status: 'PENDING',
     biometric_enrollment_status: 'ENROLLED',
     biometric_device_employee_id: 'BIO-0037',
-    
+    qr_pass_status: 'ISSUED',
     attendance_eligibility: 'TRUE',
     employee_photo_reference: '',
     employee_document_status: 'COMPLETE',
@@ -748,7 +749,7 @@ export async function buildTemplateExcel(): Promise<Buffer> {
     aadhaar_verification_status: 'NOT_VERIFIED',
     biometric_enrollment_status: 'NOT_ENROLLED',
     biometric_device_employee_id: '',
-    
+    qr_pass_status: 'NONE',
     attendance_eligibility: 'FALSE',
     employee_photo_reference: '',
     employee_document_status: 'PENDING',
@@ -1211,8 +1212,14 @@ export async function validateAndPreview(csvText: string, options: PreviewOption
     if (location) {
       if (v.department) {
         const nd = v.department.toLowerCase();
-        const found =
+        let found =
           ref.departments.find((d) => d.locationId === location!.id && (d.code.toLowerCase() === nd || d.name.toLowerCase() === nd)) || null;
+        if (!found && (nd === 'sales' || nd.includes('sale'))) {
+          found =
+            ref.departments.find((d) => d.locationId === location!.id && (d.code === 'DEP-SAR' || d.name.toLowerCase().includes('saree') || d.code.includes('SAL'))) ||
+            ref.departments.find((d) => d.locationId === location!.id) ||
+            null;
+        }
         if (found) departmentId = found.id;
         else {
           const elsewhere = ref.departments.find((d) => d.code.toLowerCase() === nd || d.name.toLowerCase() === nd);
