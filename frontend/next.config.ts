@@ -1,6 +1,11 @@
 import path from 'node:path';
 import type { NextConfig } from 'next';
 
+// Ensure production build environment is strictly enforced during next build
+if (process.argv.some(arg => arg.includes('build'))) {
+  (process.env as Record<string, string>).NODE_ENV = 'production';
+}
+
 const API_URL = process.env.BACKEND_URL || 'http://localhost:4000';
 
 /**
