@@ -2,6 +2,7 @@
   "name": "bsc-textiles-hrms",
   "version": "1.0.0",
   "private": true,
+  "main": "server.js",
   "workspaces": [
     "frontend",
     "backend",

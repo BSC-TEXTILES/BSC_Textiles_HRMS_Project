@@ -105,3 +105,4 @@ app
     if (backendProcess) backendProcess.kill('SIGTERM');
     process.exit(1);
   });
+
