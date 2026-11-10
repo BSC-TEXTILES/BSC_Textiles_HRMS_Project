@@ -33,6 +33,7 @@ export interface AuthRequest extends Request {
   shardDatabaseId?: string;
   /** Resolved action-level grants, populated by the rbac guards. */
   access?: EffectiveAccess;
+  clientIp?: string;
 }
 
 /**

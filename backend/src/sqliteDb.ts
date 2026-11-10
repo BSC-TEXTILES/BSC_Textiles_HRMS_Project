@@ -4,7 +4,7 @@
  * Provides drop-in compatibility with mysql2/promise `pool.query(sql, params)`.
  */
 
-import type { Database as DatabaseType } from 'better-sqlite3';
+type DatabaseType = any;
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
