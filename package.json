@@ -43,6 +43,11 @@
     "secret-scan": "node backend/scripts/scan-secrets.mjs",
     "test:export": "npm run test:export --workspace=backend"
   },
+  "dependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.5",
+    "typescript": "^5.3.3"
+  },
   "devDependencies": {
     "@types/express": "^4.17.21",
     "@types/node": "^20.10.5",

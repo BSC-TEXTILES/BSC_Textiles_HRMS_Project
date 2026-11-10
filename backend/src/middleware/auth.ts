@@ -17,6 +17,14 @@ export interface AuthRequest extends Request {
   headers: any;
   ip: any;
   socket: any;
+  method: string;
+  originalUrl: string;
+  baseUrl: string;
+  path: string;
+  get: (header: string) => any;
+  header: (header: string) => any;
+  metrics?: any;
+  cookies: any;
   user?: {
     id: string;
     email: string;
