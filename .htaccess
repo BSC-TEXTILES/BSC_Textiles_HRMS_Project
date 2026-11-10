@@ -1,0 +1,20 @@
+# ==============================================================================
+# BSC Textiles HRMS — LiteSpeed / Apache Reverse Proxy Configuration
+# ==============================================================================
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Disable Directory Browsing
+  Options -Indexes
+
+  # Forward Backend API & WebSockets to Backend Service (:4000)
+  RewriteRule ^api/(.*) http://127.0.0.1:4000/api/$1 [P,L]
+  RewriteRule ^socket.io/(.*) http://127.0.0.1:4000/socket.io/$1 [P,L]
+
+  # Forward All Other Traffic to Next.js Web Server (:3000)
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^(.*)$ http://127.0.0.1:3000/$1 [P,L]
+</IfModule>
