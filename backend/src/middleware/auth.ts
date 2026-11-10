@@ -11,6 +11,12 @@ import { readAccessToken, verifyCsrfBinding } from '../services/authCookies.js';
 import { verifyAccessToken, issueAccessToken, type AccessTokenClaims } from '../services/tokenService.js';
 
 export interface AuthRequest extends Request {
+  body: any;
+  query: any;
+  params: any;
+  headers: any;
+  ip: any;
+  socket: any;
   user?: {
     id: string;
     email: string;
