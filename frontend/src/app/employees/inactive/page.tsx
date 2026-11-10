@@ -125,18 +125,7 @@ export default function InactiveEmployeesPage() {
     setFloors(flr.data?.floors || []);
     setSections(sec.data?.sections || []);
     const apiShifts: any[] = shf.data?.shifts || [];
-    const merged = [...apiShifts];
-    if (typeof window !== 'undefined') {
-      try {
-        const localCustom: any[] = JSON.parse(localStorage.getItem('bsc_custom_shifts') || '[]');
-        for (const c of localCustom) {
-          if (!merged.some((s) => s.id === c.id || (s.name && c.name && s.name.toLowerCase() === c.name.toLowerCase()))) {
-            merged.push(c);
-          }
-        }
-      } catch {}
-    }
-    setShifts(merged);
+    setShifts(apiShifts);
   }, []);
 
   useEffect(() => {

@@ -187,13 +187,25 @@ export default function EmployeeProfileDossierPage() {
   const canEditProfile = isElevatedRole || isOwnProfile;
 
   // Load cached photo from localStorage if present
+  // Check server for profile photo on mount/id change
   useEffect(() => {
-    if (typeof window !== 'undefined' && id) {
-      const cached = localStorage.getItem(`bsc_avatar_${id}`);
-      if (cached) {
-        setProfilePhoto(cached);
-      }
-    }
+    if (!id) return;
+    let isCancelled = false;
+    api
+      .get(`/employees/${id}/photo`, { responseType: 'blob' })
+      .then((res) => {
+        if (!isCancelled && res.status === 200 && res.data.size > 0) {
+          setProfilePhoto(`/api/employees/${id}/photo?t=${Date.now()}`);
+        }
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setProfilePhoto(null);
+        }
+      });
+    return () => {
+      isCancelled = true;
+    };
   }, [id]);
 
   const [diagnosticSync, setDiagnosticSync] = useState<any>(null);
@@ -417,21 +429,12 @@ export default function EmployeeProfileDossierPage() {
       setIsUploadingPhoto(true);
       setPhotoUploadError(null);
 
-      // Save locally first for instantaneous responsiveness
-      setProfilePhoto(tempPhotoUrl);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`bsc_avatar_${id}`, tempPhotoUrl);
-      }
+      // Upload directly to backend API
+      await api.post(`/employees/${id}/photo`, {
+        photoBase64: tempPhotoUrl,
+      });
 
-      // Upload to backend API
-      try {
-        await api.post(`/employees/${id}/photo`, {
-          photoBase64: tempPhotoUrl,
-        });
-      } catch (err: any) {
-        console.warn('Backend photo upload fallback:', err?.message);
-      }
-
+      setProfilePhoto(`/api/employees/${id}/photo?t=${Date.now()}`);
       toast.success('Profile photo updated successfully!');
       setPhotoCropModalOpen(false);
       setTempPhotoUrl(null);
@@ -448,12 +451,7 @@ export default function EmployeeProfileDossierPage() {
   const handleRemovePhoto = async () => {
     try {
       setProfilePhoto(null);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(`bsc_avatar_${id}`);
-      }
-      try {
-        await api.delete(`/employees/${id}/photo`);
-      } catch {}
+      await api.delete(`/employees/${id}/photo`);
 
       toast.success('Profile photo removed. Reverted to initials avatar.');
       setIsRemovePhotoConfirmOpen(false);

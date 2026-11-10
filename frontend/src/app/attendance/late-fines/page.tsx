@@ -154,22 +154,7 @@ export default function LateFinesPage() {
       setDepartments(deptRes.data?.departments || []);
 
       const apiShifts: any[] = shiftRes.data?.shifts || [];
-      const merged = [...apiShifts];
-      if (typeof window !== 'undefined') {
-        try {
-          const localCustom: any[] = JSON.parse(localStorage.getItem('bsc_custom_shifts') || '[]');
-          for (const c of localCustom) {
-            if (!merged.some((s) => s.id === c.id || (s.name && c.name && s.name.toLowerCase() === c.name.toLowerCase()))) {
-              merged.push({
-                ...c,
-                startTime: c.punchIn || c.startTime,
-                endTime: c.punchOut || c.endTime,
-              });
-            }
-          }
-        } catch {}
-      }
-      setShifts(merged);
+      setShifts(apiShifts);
       await fetchPolicy();
     } catch (err) {
       console.error('Error loading filter data:', err);
