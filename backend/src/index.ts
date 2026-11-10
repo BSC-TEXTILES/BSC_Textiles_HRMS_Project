@@ -115,15 +115,20 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(compression());
-app.use(process.env.NODE_ENV === 'production' ? morgan('combined') : morgan('dev'));
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  compression()(req, res, next);
+});
+const morganLogger = process.env.NODE_ENV === 'production' ? morgan('combined') : morgan('dev');
+app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+  morganLogger(req, res, next);
+});
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
 // Resolves the real client IP once, from trusted proxy hops only, so every
 // guard and log line below agrees on who is calling.
-app.use((req, _res, next) => {
+app.use((req: express.Request, _res: express.Response, next: express.NextFunction) => {
   (req as any).clientIp = clientIpOf(req as any);
   next();
 });
