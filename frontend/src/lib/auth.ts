@@ -70,8 +70,9 @@ async function exchangeTicket(ticket: string): Promise<Record<string, unknown>> 
 }
 
 const IS_PROD = process.env.NODE_ENV === 'production';
+const effectiveSecret = process.env.NEXTAUTH_SECRET || process.env.JWT_SECRET;
 
-if (IS_PROD && !process.env.NEXTAUTH_SECRET) {
+if (IS_PROD && !effectiveSecret) {
   throw new Error('NEXTAUTH_SECRET is required in production.');
 }
 
@@ -134,7 +135,7 @@ export const authOptions: NextAuthOptions = {
   // without a real one. The dev value is deliberately non-secret-looking and
   // length-stable so local JWTs stay valid across restarts.
   secret:
-    process.env.NEXTAUTH_SECRET ||
+    effectiveSecret ||
     (process.env.NODE_ENV === 'production'
       ? (() => {
           throw new Error('NEXTAUTH_SECRET is required in production');

@@ -1,12 +1,6 @@
 import path from 'node:path';
 import type { NextConfig } from 'next';
-
-// Ensure production build environment is strictly enforced during next build
-if (process.argv.some(arg => arg.includes('build'))) {
-  (process.env as Record<string, string>).NODE_ENV = 'production';
-}
-
-const API_URL = process.env.BACKEND_URL || 'http://localhost:4000';
+import { loadEnvConfig } from '@next/env';
 
 /**
  * This repository is the workspace root — not the drive root.
@@ -19,6 +13,17 @@ const API_URL = process.env.BACKEND_URL || 'http://localhost:4000';
  * else's lockfile would not be.
  */
 const WORKSPACE_ROOT = path.resolve(process.cwd(), '..');
+
+// Load environment variables from the single root .env file so the frontend
+// stays synchronized with the database, auth secrets, and server configuration
+loadEnvConfig(WORKSPACE_ROOT);
+
+// Ensure production build environment is strictly enforced during next build
+if (process.argv.some(arg => arg.includes('build'))) {
+  (process.env as Record<string, string>).NODE_ENV = 'production';
+}
+
+const API_URL = process.env.BACKEND_URL || 'http://localhost:4000';
 
 /**
  * Content-Security-Policy for the browser-facing app.
@@ -126,6 +131,15 @@ const backendRoutes = [
 ];
 
 const nextConfig: NextConfig = {
+  env: {
+    NEXTAUTH_SECRET:
+      process.env.NEXTAUTH_SECRET ||
+      process.env.JWT_SECRET ||
+      'bsc-textiles-hrms-super-secret-jwt-key-2024-production-ready-32chars',
+    NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'https://hrms.bsctextiles.in',
+    BACKEND_URL: process.env.BACKEND_URL || 'http://127.0.0.1:4000',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api',
+  },
   reactStrictMode: true,
   poweredByHeader: false,
   transpilePackages: ['recharts'],
