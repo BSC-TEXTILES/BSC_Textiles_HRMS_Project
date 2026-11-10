@@ -32,7 +32,7 @@ const LABELS = ['very weak', 'weak', 'fair', 'strong', 'excellent'];
 
 function ChangePasswordContent() {
   const searchParams = useSearchParams();
-  const forced = searchParams.get('forced') === '1';
+  const forced = searchParams?.get('forced') === '1';
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');

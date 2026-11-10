@@ -9,7 +9,7 @@ import { ShieldAlert, LayoutDashboard, User, LogOut } from 'lucide-react';
 
 function ForbiddenContent() {
   const searchParams = useSearchParams();
-  const attemptedPath = searchParams.get('from') || '';
+  const attemptedPath = searchParams?.get('from') || '';
   const { data: session } = useSession();
 
   const userRole = session?.user?.role?.replace(/_/g, ' ') || 'Authenticated User';

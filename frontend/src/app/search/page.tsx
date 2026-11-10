@@ -55,7 +55,7 @@ function SearchPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const initialQuery = searchParams.get('q') || '';
+  const initialQuery = searchParams?.get('q') || '';
   const [query, setQuery] = useState(initialQuery);
   const [activeTab, setActiveTab] = useState<string>('all');
   const [loading, setLoading] = useState(false);
@@ -88,7 +88,7 @@ function SearchPageContent() {
   }, []);
 
   useEffect(() => {
-    const q = searchParams.get('q') || '';
+    const q = searchParams?.get('q') || '';
     setQuery(q);
     fetchSearchResults(q);
   }, [searchParams, fetchSearchResults]);

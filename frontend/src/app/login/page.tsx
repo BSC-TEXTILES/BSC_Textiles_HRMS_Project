@@ -75,7 +75,7 @@ function LoginFormContent() {
 
   // Safe same-origin redirect
   const callbackUrl = useMemo(
-    () => sanitizeCallbackUrl(searchParams.get('callbackUrl'), getRoleHomePath(session?.user?.role)),
+    () => sanitizeCallbackUrl(searchParams?.get('callbackUrl'), getRoleHomePath(session?.user?.role)),
     [searchParams, session?.user?.role]
   );
 
@@ -94,7 +94,7 @@ function LoginFormContent() {
   // Auto-redirect only when NextAuth reports a live session and the backend
   // agrees (the cookie is what actually authorises requests).
   useEffect(() => {
-    if (searchParams.get('callbackUrl')) return;
+    if (searchParams?.get('callbackUrl')) return;
     if (status === 'authenticated' && session?.user) {
       window.location.href = getRoleHomePath(session.user.role);
     }
@@ -144,7 +144,7 @@ function LoginFormContent() {
       return;
     }
     toast.success('Signed in successfully');
-    window.location.href = sanitizeCallbackUrl(searchParams.get('callbackUrl'), getRoleHomePath(fallbackRole));
+    window.location.href = sanitizeCallbackUrl(searchParams?.get('callbackUrl'), getRoleHomePath(fallbackRole));
   };
 
   const onSubmit = async (data: LoginForm) => {
