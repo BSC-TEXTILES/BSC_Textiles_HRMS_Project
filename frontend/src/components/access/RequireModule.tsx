@@ -20,7 +20,7 @@ export function RequireModule({ module, children }: { module: string; children: 
   const denied = !access.loading && access.source === 'rbac' && !canViewModule(access, module);
 
   useEffect(() => {
-    if (denied) router.replace(`/403?from=${encodeURIComponent(pathname)}`);
+    if (denied) router.replace(`/403?from=${encodeURIComponent(pathname || '')}`);
   }, [denied, pathname, router]);
 
   if (access.loading) {

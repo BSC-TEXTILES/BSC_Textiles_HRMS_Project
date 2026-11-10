@@ -459,14 +459,15 @@ export function buildVisibleNavigation(
  * route such as `/employees/profile/emp_bsc_1604` highlights the deepest
  * matching entry.
  */
-export function computeActiveHref(pathname: string, sections: NavSectionConfig[]): string | null {
+export function computeActiveHref(pathname: string | null | undefined, sections: NavSectionConfig[]): string | null {
+  const safePath = pathname || '';
   let best: string | null = null;
   let bestLen = -1;
 
   for (const section of sections) {
     for (const item of section.items) {
       const itemPath = item.href.split('?')[0];
-      const matches = pathname === itemPath || pathname.startsWith(`${itemPath}/`);
+      const matches = safePath === itemPath || safePath.startsWith(`${itemPath}/`);
       if (matches && itemPath.length > bestLen) {
         bestLen = itemPath.length;
         best = item.href;
@@ -478,7 +479,8 @@ export function computeActiveHref(pathname: string, sections: NavSectionConfig[]
 }
 
 /** Kept for backwards compatibility with any page importing the old helper. */
-export function isNavItemActive(pathname: string, itemHref: string): boolean {
+export function isNavItemActive(pathname: string | null | undefined, itemHref: string): boolean {
+  const safePath = pathname || '';
   const itemPath = itemHref.split('?')[0];
-  return pathname === itemPath || pathname.startsWith(`${itemPath}/`);
+  return safePath === itemPath || safePath.startsWith(`${itemPath}/`);
 }

@@ -190,11 +190,11 @@ export function DashboardLayoutFullShell({
       .get('/session/status', { timeout: 8000 })
       .then((response) => {
         if (!cancelled && !response.data?.authenticated) {
-          window.location.href = `/login?callbackUrl=${encodeURIComponent(pathname)}`;
+          window.location.href = `/login?callbackUrl=${encodeURIComponent(pathname || '')}`;
         }
       })
       .catch(() => {
-        if (!cancelled) window.location.href = `/login?callbackUrl=${encodeURIComponent(pathname)}`;
+        if (!cancelled) window.location.href = `/login?callbackUrl=${encodeURIComponent(pathname || '')}`;
       });
     return () => {
       cancelled = true;
@@ -309,7 +309,7 @@ export function DashboardLayoutFullShell({
   };
 
   const handleLinkClick = (href: string, e: React.MouseEvent) => {
-    const isCurrent = pathname === href || (href === '/dashboard' && pathname === '/dashboard');
+    const isCurrent = (pathname || '') === href || (href === '/dashboard' && (pathname || '') === '/dashboard');
     if (isCurrent) {
       e.preventDefault();
       return;

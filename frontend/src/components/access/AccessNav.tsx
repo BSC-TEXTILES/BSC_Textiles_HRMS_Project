@@ -22,6 +22,7 @@ const LINKS = [
  */
 export function AccessNav({ access }: { access: MyAccess }) {
   const pathname = usePathname();
+  const safePathname = pathname ?? '';
   const visible = LINKS.filter((link) => (access.source !== 'rbac' ? true : access.access[link.moduleKey] !== 'none'));
   if (visible.length === 0) return null;
 
@@ -31,7 +32,7 @@ export function AccessNav({ access }: { access: MyAccess }) {
       className="-mx-1 flex gap-1 overflow-x-auto border-b border-gray-200 px-1 pb-px dark:border-slate-700"
     >
       {visible.map((link) => {
-        const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+        const active = safePathname === link.href || safePathname.startsWith(`${link.href}/`);
         const Icon = link.icon;
         return (
           <Link
