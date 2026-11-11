@@ -81,7 +81,10 @@ async function startBackend() {
   });
 
   backendProcess.on('exit', async (code, signal) => {
-    if (isShuttingDown) return;
+    if (isShuttingDown || code === 0) {
+      console.log(`[Hostinger Server] Backend process exited cleanly (code ${code}). Standing by.`);
+      return;
+    }
     const stillRunning = await probeBackendActive(BACKEND_PORT);
     if (stillRunning) {
       console.log(`[Hostinger Server] Port ${BACKEND_PORT} is actively served by a companion worker. Standing by.`);

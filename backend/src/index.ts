@@ -324,7 +324,7 @@ io.on('connection', (socket) => {
 });
 
 import { shardManager } from './core/sharding/index.js';
-import { startHiringOutboxWorker } from './services/hiring/hiringOutbox.js';
+import { startHiringOutboxWorker, stopHiringOutboxWorker } from './services/hiring/hiringOutbox.js';
 
 const PORT = Number(process.env.BACKEND_PORT) || (process.env.PORT && process.env.PORT !== '3000' ? Number(process.env.PORT) : 4000);
 
@@ -418,7 +418,10 @@ if (!process.env.VERCEL) {
       });
     });
 
-    // 2. Shut down shard manager and database pools
+    // 2. Shut down background workers & shard manager
+    try {
+      stopHiringOutboxWorker();
+    } catch {}
     try {
       await shardManager.shutdown();
     } catch (err: any) {
