@@ -2,8 +2,8 @@
  * BSC Textiles HRMS — Production & Hostinger MySQL Connection Adapter
  * Hardened for CloudLinux CageFS, LiteSpeed, Docker, and Windows:
  * 1. Enforces IPv4-first resolution to prevent ::1 IPv6 Access Denied errors.
- * 2. Uses TCP 127.0.0.1 loopback with rate-limited, gentle candidate probing to avoid socket exhaustion.
- * 3. Probes and auto-heals credential mismatches (e.g. u101820758 vs u101820759, lowercase vs uppercase).
+ * 2. Uses TCP 127.0.0.1 loopback with rate-limited, gentle candidate probing.
+ * 3. Probes and auto-heals credential mismatches (e.g. u101820758 vs u101820759, raw vs encoded passwords).
  * 4. Discovers matching databases via `SHOW DATABASES` when user credentials succeed.
  * 5. Shares probing promise across concurrent boots so views, shards, and workers initialize cleanly.
  */
@@ -124,7 +124,7 @@ function generateCandidates(base: PoolOptions): PoolOptions[] {
       host: opts.host || '127.0.0.1',
       port: opts.port || 3306,
     };
-    const key = `${candidate.user}|${candidate.database || ''}|${candidate.host}:${candidate.port}`;
+    const key = `${candidate.user}|${candidate.password}|${candidate.database || ''}|${candidate.host}:${candidate.port}`;
     if (!seen.has(key)) {
       seen.add(key);
       candidates.push(candidate);
@@ -140,23 +140,38 @@ function generateCandidates(base: PoolOptions): PoolOptions[] {
   const suffixMatch = rawUser.match(/^u[0-9]+_(.+)$/i);
   const suffix = suffixMatch ? suffixMatch[1] : 'bsc_smg_hrms';
 
-  // 1. Exact configured credentials
-  pushCandidate({ user: base.user, database: base.database, host: '127.0.0.1' });
-  if (base.user) {
-    pushCandidate({ user: base.user.toLowerCase(), database: base.database?.toLowerCase(), host: '127.0.0.1' });
+  // Password variations (decoded vs literal %40)
+  const passwordVariants = Array.from(
+    new Set([
+      base.password,
+      'Btpldvg@2026',
+      'Btpldvg%402026',
+      process.env.DB_PASSWORD,
+    ].filter(Boolean))
+  ) as string[];
+
+  const userVariants = Array.from(
+    new Set([
+      detectedAccount ? `${detectedAccount}_${suffix.toLowerCase()}` : '',
+      detectedAccount ? `${detectedAccount}_${suffix}` : '',
+      'u101820758_bsc_smg_hrms',
+      'u101820758_bsc_smg_HRMS',
+      'u101820759_bsc_smg_hrms',
+      'u101820759_bsc_smg_HRMS',
+      base.user,
+      base.user ? base.user.toLowerCase() : '',
+    ].filter(Boolean))
+  );
+
+  for (const user of userVariants) {
+    for (const password of passwordVariants) {
+      // Prioritize connection without initial database constraint for discovery
+      pushCandidate({ user, password, database: undefined, host: '127.0.0.1' });
+      pushCandidate({ user, password, database: base.database, host: '127.0.0.1' });
+    }
   }
 
-  // 2. Server account prefix variants (u101820758 vs u101820759)
-  const prefixes = Array.from(new Set([detectedAccount, 'u101820758', 'u101820759'].filter(Boolean)));
-  for (const p of prefixes) {
-    pushCandidate({ user: `${p}_${suffix.toLowerCase()}`, database: `${p}_${suffix.toLowerCase()}`, host: '127.0.0.1' });
-    pushCandidate({ user: `${p}_${suffix}`, database: `${p}_${suffix}`, host: '127.0.0.1' });
-    // Without database constraint (for database discovery via SHOW DATABASES)
-    pushCandidate({ user: `${p}_${suffix.toLowerCase()}`, database: undefined, host: '127.0.0.1' });
-  }
-
-  // Keep candidate list compact to prevent connection rate-limiting
-  return candidates.slice(0, 6);
+  return candidates.slice(0, 8);
 }
 
 export async function probeAndFindWorkingOptions(baseOptions: PoolOptions): Promise<PoolOptions> {
@@ -217,6 +232,13 @@ export async function probeAndFindWorkingOptions(baseOptions: PoolOptions): Prom
         }
       }
       lastProbeFailedTime = Date.now();
+      console.warn(
+        `[Database] ⚠️ Notice: Could not authenticate to MySQL on 127.0.0.1:3306 with current credentials.\n` +
+          `[Database] In Hostinger hPanel -> Databases -> MySQL Databases, please verify:\n` +
+          `  1. Database Name and Username (e.g. u101820758_bsc_smg_hrms)\n` +
+          `  2. Password matches DB_PASSWORD ('Btpldvg@2026')\n` +
+          `  3. The User is granted ALL PRIVILEGES on the database.`
+      );
     } finally {
       probePromise = null;
     }

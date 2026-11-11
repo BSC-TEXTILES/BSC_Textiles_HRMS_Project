@@ -421,8 +421,10 @@ export function startHiringOutboxWorker(intervalMs = HIRING_OUTBOX_INTERVAL_MS):
       outboxConsecutiveErrors += 1;
       const now = Date.now();
       const msg = err?.message || String(err);
-      // Log immediately on first error, then throttle repeat identical errors to once per minute
-      if (outboxConsecutiveErrors === 1 || msg !== lastOutboxErrorMessage || now - lastOutboxErrorTime > 60_000) {
+      // Throttle repeat identical errors: standard errors every 60s, auth/connection errors every 5m
+      const isAuthError = /access denied|auth|password|database.*not found|control shard is unavailable/i.test(msg);
+      const throttleMs = isAuthError ? 300_000 : 60_000;
+      if (outboxConsecutiveErrors === 1 || msg !== lastOutboxErrorMessage || now - lastOutboxErrorTime > throttleMs) {
         console.warn(`[hiringOutbox] worker tick failed (attempt #${outboxConsecutiveErrors}):`, msg);
         lastOutboxErrorTime = now;
         lastOutboxErrorMessage = msg;
