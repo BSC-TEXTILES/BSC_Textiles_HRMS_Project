@@ -1,46 +1,30 @@
 /**
- * BSC Textiles HRMS — Hostinger & Production MySQL Connection Adapter
- * Ensures zero-error connectivity across Linux/Hostinger cPanel, Docker, and Windows:
- * 1. Enforces IPv4-first DNS resolution to eliminate IPv6 ::1 Access Denied errors.
- * 2. Auto-detects Linux local MySQL Unix Domain Sockets (/var/lib/mysql/mysql.sock, /tmp/mysql.sock).
- * 3. Automatically recovers from ER_ACCESS_DENIED_ERROR by testing lowercase usernames,
- *    cPanel account prefixes (e.g. u101820758 vs u101820759), and socket vs TCP loopback.
- * 4. Transparently proxies Pool.query / execute / getConnection with auto-healing.
+ * BSC Textiles HRMS — Production & Hostinger MySQL Connection Adapter
+ * Hardened for CloudLinux CageFS, LiteSpeed, Docker, and Windows:
+ * 1. Enforces IPv4-first resolution to prevent ::1 IPv6 Access Denied errors.
+ * 2. Uses robust TCP 127.0.0.1 loopback, avoiding system sockets that trigger EPERM in CageFS.
+ * 3. Probes and auto-heals credential mismatches (e.g. u101820758 vs u101820759, lowercase vs uppercase).
+ * 4. Shares probing promise across concurrent boots so views, shards, and workers initialize cleanly.
  */
 
 import mysql, { Pool, PoolOptions, ConnectionOptions } from 'mysql2/promise';
 import fs from 'node:fs';
 import dns from 'node:dns';
 
-// Enforce IPv4-first resolution globally
 try {
   dns.setDefaultResultOrder('ipv4first');
-} catch {
-  // Ignored in runtimes without setDefaultResultOrder
-}
-
-const COMMON_UNIX_SOCKETS = [
-  process.env.DB_SOCKET,
-  process.env.MYSQL_UNIX_PORT,
-  '/var/lib/mysql/mysql.sock',
-  '/tmp/mysql.sock',
-  '/var/run/mysqld/mysqld.sock',
-  '/var/run/mysql/mysql.sock',
-].filter(Boolean) as string[];
+} catch {}
 
 let cachedWorkingConfig: PoolOptions | null = null;
-let isProbing = false;
+let probePromise: Promise<PoolOptions> | null = null;
 
-export function getDetectedUnixSocket(): string | undefined {
+export function getExplicitUnixSocket(): string | undefined {
   if (process.platform === 'win32') return undefined;
-  for (const socketPath of COMMON_UNIX_SOCKETS) {
+  const envSocket = process.env.DB_SOCKET || process.env.MYSQL_UNIX_PORT;
+  if (envSocket) {
     try {
-      if (fs.existsSync(socketPath)) {
-        return socketPath;
-      }
-    } catch {
-      // Ignore filesystem permission checks
-    }
+      if (fs.existsSync(envSocket)) return envSocket;
+    } catch {}
   }
   return undefined;
 }
@@ -64,7 +48,6 @@ export function parseDatabaseUri(uri: string): {
     const db = parsed.pathname.replace(/^\//, '');
     if (db) result.database = db;
   } catch {
-    // URL parsing failed; fallback to manual regex
     const match = uri.match(/^mysql2?:\/\/([^:]+):([^@]+)@([^:/]+)(?::(\d+))?\/(.+)$/);
     if (match) {
       result.user = decodeURIComponent(match[1]);
@@ -88,7 +71,7 @@ export function buildMysqlPoolOptions(uriOrConfig?: string, fallbackDb = 'bsc_te
   const rawUri = uriOrConfig || process.env.DATABASE_URL || '';
   const parsed = parseDatabaseUri(rawUri);
 
-  const detectedSocket = getDetectedUnixSocket();
+  const explicitSocket = getExplicitUnixSocket();
 
   let host = parsed.host || process.env.DB_HOST || '127.0.0.1';
   if (host === 'localhost' || host === '::1') {
@@ -117,8 +100,8 @@ export function buildMysqlPoolOptions(uriOrConfig?: string, fallbackDb = 'bsc_te
     multipleStatements: true,
   };
 
-  if (detectedSocket) {
-    options.socketPath = detectedSocket;
+  if (explicitSocket) {
+    options.socketPath = explicitSocket;
   } else {
     options.host = host;
     options.port = port;
@@ -132,64 +115,58 @@ function generateCandidates(base: PoolOptions): PoolOptions[] {
   const seen = new Set<string>();
 
   const pushCandidate = (opts: Partial<PoolOptions>) => {
-    const candidate: PoolOptions = { ...base, ...opts };
-    const key = `${candidate.user}|${candidate.database}|${candidate.socketPath || candidate.host}|${candidate.port || ''}`;
+    const candidate: PoolOptions = {
+      ...base,
+      ...opts,
+      socketPath: opts.socketPath !== undefined ? opts.socketPath : undefined,
+      host: opts.host || '127.0.0.1',
+      port: opts.port || 3306,
+    };
+    const key = `${candidate.user}|${candidate.database}|${candidate.host}:${candidate.port}`;
     if (!seen.has(key)) {
       seen.add(key);
       candidates.push(candidate);
     }
   };
 
-  // 1. Primary configured options
-  pushCandidate({});
-
-  const detectedSocket = getDetectedUnixSocket();
-
-  // 2. If primary had no socketPath, try with detected socket
-  if (!base.socketPath && detectedSocket) {
-    pushCandidate({ socketPath: detectedSocket, host: undefined, port: undefined });
-  }
-
-  // 3. Lowercase username & database
-  if (base.user) {
-    const lowerUser = base.user.toLowerCase();
-    const lowerDb = base.database?.toLowerCase();
-    pushCandidate({ user: lowerUser, database: lowerDb });
-    if (detectedSocket) {
-      pushCandidate({ user: lowerUser, database: lowerDb, socketPath: detectedSocket, host: undefined, port: undefined });
-    }
-  }
-
-  // 4. Detect cPanel home directory account (e.g. /home/u101820758/...)
+  // Detect account user from environment or process path (e.g. /home/u101820758/...)
   const homePath = process.env.HOME || process.cwd() || __dirname;
   const cpanelMatch = homePath.match(/\/home\/(u[0-9]+)/i);
   const detectedCpanelAccount = cpanelMatch ? cpanelMatch[1].toLowerCase() : (process.env.USER || '').toLowerCase();
 
-  if (detectedCpanelAccount && base.user) {
-    const userPrefixMatch = base.user.match(/^(u[0-9]+)_(.+)$/i);
-    if (userPrefixMatch) {
-      const currentPrefix = userPrefixMatch[1].toLowerCase();
-      const suffix = userPrefixMatch[2];
-      if (currentPrefix !== detectedCpanelAccount) {
-        const adaptedUser = `${detectedCpanelAccount}_${suffix}`;
-        const adaptedDb = base.database ? base.database.replace(new RegExp(`^${userPrefixMatch[1]}_`, 'i'), `${detectedCpanelAccount}_`) : undefined;
-        
-        pushCandidate({ user: adaptedUser, database: adaptedDb });
-        pushCandidate({ user: adaptedUser.toLowerCase(), database: adaptedDb?.toLowerCase() });
-        if (detectedSocket) {
-          pushCandidate({ user: adaptedUser, database: adaptedDb, socketPath: detectedSocket, host: undefined, port: undefined });
-          pushCandidate({ user: adaptedUser.toLowerCase(), database: adaptedDb?.toLowerCase(), socketPath: detectedSocket, host: undefined, port: undefined });
-        }
-      }
-    }
+  const accountPrefixes = Array.from(
+    new Set([detectedCpanelAccount, 'u101820758', 'u101820759'].filter(Boolean))
+  );
+
+  const rawUser = base.user || '';
+  const suffixMatch = rawUser.match(/^u[0-9]+_(.+)$/i);
+  const suffix = suffixMatch ? suffixMatch[1] : 'bsc_smg_hrms';
+
+  // 1. Account prefix variants via TCP loopback (both lowercase and original casing)
+  for (const prefix of accountPrefixes) {
+    const userLower = `${prefix}_${suffix.toLowerCase()}`;
+    const userUpper = `${prefix}_${suffix}`;
+    const dbLower = `${prefix}_${suffix.toLowerCase()}`;
+    const dbUpper = `${prefix}_${suffix}`;
+
+    pushCandidate({ user: userLower, database: dbLower, host: '127.0.0.1' });
+    pushCandidate({ user: userUpper, database: dbUpper, host: '127.0.0.1' });
+    pushCandidate({ user: userLower, database: dbUpper, host: '127.0.0.1' });
+    pushCandidate({ user: userUpper, database: dbLower, host: '127.0.0.1' });
+
+    // Try without database constraint (discovers database name if user exists)
+    pushCandidate({ user: userLower, database: undefined, host: '127.0.0.1' });
+    pushCandidate({ user: userUpper, database: undefined, host: '127.0.0.1' });
+
+    // Also try on host: localhost
+    pushCandidate({ user: userLower, database: dbLower, host: 'localhost' });
+    pushCandidate({ user: userUpper, database: dbUpper, host: 'localhost' });
   }
 
-  // 5. Try explicit IPv4 loopback without socket (in case Unix socket has file permission limits)
-  if (base.socketPath) {
-    pushCandidate({ socketPath: undefined, host: '127.0.0.1', port: 3306 });
-    if (base.user) {
-      pushCandidate({ socketPath: undefined, host: '127.0.0.1', port: 3306, user: base.user.toLowerCase(), database: base.database?.toLowerCase() });
-    }
+  // 2. Exact configured credentials via TCP 127.0.0.1
+  pushCandidate({ user: base.user, database: base.database, host: '127.0.0.1' });
+  if (base.user) {
+    pushCandidate({ user: base.user.toLowerCase(), database: base.database?.toLowerCase(), host: '127.0.0.1' });
   }
 
   return candidates;
@@ -197,55 +174,88 @@ function generateCandidates(base: PoolOptions): PoolOptions[] {
 
 export async function probeAndFindWorkingOptions(baseOptions: PoolOptions): Promise<PoolOptions> {
   if (cachedWorkingConfig) return cachedWorkingConfig;
-  if (isProbing) return baseOptions;
-  isProbing = true;
+  if (probePromise) return probePromise;
 
-  try {
-    const candidates = generateCandidates(baseOptions);
-    for (const cand of candidates) {
-      let testConn: mysql.Connection | null = null;
-      try {
-        const connOpts: ConnectionOptions = {
-          user: cand.user,
-          password: cand.password,
-          database: cand.database,
-          host: cand.host,
-          port: cand.port,
-          socketPath: cand.socketPath,
-          connectTimeout: 2000,
-        };
-        testConn = await mysql.createConnection(connOpts);
-        await testConn.query('SELECT 1');
-        await testConn.end();
+  probePromise = (async () => {
+    try {
+      const candidates = generateCandidates(baseOptions);
+      for (const cand of candidates) {
+        let testConn: mysql.Connection | null = null;
+        try {
+          const connOpts: ConnectionOptions = {
+            user: cand.user,
+            password: cand.password,
+            database: cand.database,
+            host: cand.host || '127.0.0.1',
+            port: cand.port || 3306,
+            connectTimeout: 2000,
+          };
+          testConn = await mysql.createConnection(connOpts);
 
-        cachedWorkingConfig = cand;
-        const targetDesc = cand.socketPath ? `Unix socket [${cand.socketPath}]` : `TCP [${cand.host}:${cand.port}]`;
-        console.log(`[Database] ✅ Successfully verified MySQL connection for user '${cand.user}' on database '${cand.database}' via ${targetDesc}`);
-        return cand;
-      } catch {
-        if (testConn) {
-          try { await testConn.end(); } catch {}
+          // If no database specified, discover matching database name
+          if (!cand.database) {
+            try {
+              const [dbs]: any = await testConn.query('SHOW DATABASES');
+              const match = Array.isArray(dbs)
+                ? dbs.find((d: any) => /bsc_smg/i.test(d?.Database || ''))
+                : null;
+              if (match?.Database) {
+                cand.database = match.Database;
+              }
+            } catch {}
+          }
+
+          await testConn.query('SELECT 1');
+          await testConn.end();
+
+          cachedWorkingConfig = cand;
+          console.log(
+            `[Database] ✅ Successfully verified MySQL connection for user '${cand.user}' on database '${cand.database || baseOptions.database}' via TCP [${cand.host}:${cand.port}]`
+          );
+          return cand;
+        } catch {
+          if (testConn) {
+            try {
+              await testConn.end();
+            } catch {}
+          }
         }
       }
+    } finally {
+      probePromise = null;
     }
-  } finally {
-    isProbing = false;
-  }
 
-  return baseOptions;
+    return baseOptions;
+  })();
+
+  return probePromise;
+}
+
+function isConnectionError(err: any): boolean {
+  if (!err) return false;
+  const code = String(err.code || '');
+  const msg = String(err.message || '');
+  return (
+    code === 'ER_ACCESS_DENIED_ERROR' ||
+    code === 'ECONNREFUSED' ||
+    code === 'EPERM' ||
+    code === 'ER_DBACCESS_DENIED_ERROR' ||
+    code === 'ENOTFOUND' ||
+    code === 'EHOSTUNREACH' ||
+    /access denied/i.test(msg) ||
+    /connect eperm/i.test(msg) ||
+    /connect econnrefused/i.test(msg)
+  );
 }
 
 export function createAdaptiveMysqlPool(uriOrConfig?: string, fallbackDb = 'bsc_textiles_hrms'): Pool {
   let initialOptions = buildMysqlPoolOptions(uriOrConfig, fallbackDb);
   let activePool = mysql.createPool(initialOptions);
 
-  let hasRecovered = false;
-
   async function ensureWorkingPool(): Promise<Pool> {
-    if (hasRecovered || cachedWorkingConfig) return activePool;
+    if (cachedWorkingConfig && activePool) return activePool;
     const workingOptions = await probeAndFindWorkingOptions(initialOptions);
-    if (workingOptions !== initialOptions) {
-      hasRecovered = true;
+    if (workingOptions && workingOptions !== initialOptions) {
       try {
         await activePool.end();
       } catch {}
@@ -261,8 +271,10 @@ export function createAdaptiveMysqlPool(uriOrConfig?: string, fallbackDb = 'bsc_
           try {
             return await (activePool as any)[prop](...args);
           } catch (err: any) {
-            if (err?.code === 'ER_ACCESS_DENIED_ERROR' || err?.code === 'ECONNREFUSED') {
-              console.warn(`[Database] Recovering from MySQL error (${err.code}): probing valid credentials/socket...`);
+            if (isConnectionError(err)) {
+              console.warn(
+                `[Database] Recovering from connection issue (${err.code || err.message}): probing valid MySQL credentials via TCP...`
+              );
               const pool = await ensureWorkingPool();
               return await (pool as any)[prop](...args);
             }
@@ -276,8 +288,10 @@ export function createAdaptiveMysqlPool(uriOrConfig?: string, fallbackDb = 'bsc_
           try {
             return await activePool.getConnection();
           } catch (err: any) {
-            if (err?.code === 'ER_ACCESS_DENIED_ERROR' || err?.code === 'ECONNREFUSED') {
-              console.warn(`[Database] Recovering from MySQL getConnection error (${err.code}): probing valid credentials/socket...`);
+            if (isConnectionError(err)) {
+              console.warn(
+                `[Database] Recovering from getConnection issue (${err.code || err.message}): probing valid MySQL credentials via TCP...`
+              );
               const pool = await ensureWorkingPool();
               return await pool.getConnection();
             }

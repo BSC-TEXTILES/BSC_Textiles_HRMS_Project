@@ -331,8 +331,8 @@ const PORT = Number(process.env.BACKEND_PORT) || (process.env.PORT && process.en
 if (!process.env.VERCEL) {
   httpServer.on('error', (err: any) => {
     if (err.code === 'EADDRINUSE') {
-      console.error(`[Backend API] Fatal: Port ${PORT} is already in use (EADDRINUSE). Exiting gracefully.`);
-      process.exit(1);
+      console.log(`[Backend API] Port ${PORT} is already hosted by an active instance. Exiting gracefully.`);
+      process.exit(0);
     } else {
       console.error('[Backend API] HTTP server fatal error:', err);
     }

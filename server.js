@@ -10,6 +10,7 @@
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
+const net = require('net');
 const dns = require('dns');
 const { fork } = require('child_process');
 
@@ -35,10 +36,33 @@ let isShuttingDown = false;
 let restartAttempts = 0;
 const backendEntry = path.resolve(__dirname, 'backend/dist/index.js');
 
-function startBackend() {
+function probeBackendActive(port, host = '127.0.0.1') {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ port, host, timeout: 800 });
+    socket.once('connect', () => {
+      socket.end();
+      resolve(true);
+    });
+    socket.once('error', () => {
+      resolve(false);
+    });
+    socket.once('timeout', () => {
+      socket.destroy();
+      resolve(false);
+    });
+  });
+}
+
+async function startBackend() {
   if (isShuttingDown) return;
   if (!fs.existsSync(backendEntry)) {
     console.warn(`[Hostinger Server] Backend build not found at ${backendEntry}. Backend API was not spawned.`);
+    return;
+  }
+
+  const isAlreadyActive = await probeBackendActive(BACKEND_PORT);
+  if (isAlreadyActive) {
+    console.log(`[Hostinger Server] Backend API is already active on port ${BACKEND_PORT}. Serving requests via active instance.`);
     return;
   }
 
@@ -56,8 +80,13 @@ function startBackend() {
     console.error('[Hostinger Server] Backend process encountered an error:', err);
   });
 
-  backendProcess.on('exit', (code, signal) => {
+  backendProcess.on('exit', async (code, signal) => {
     if (isShuttingDown) return;
+    const stillRunning = await probeBackendActive(BACKEND_PORT);
+    if (stillRunning) {
+      console.log(`[Hostinger Server] Port ${BACKEND_PORT} is actively served by a companion worker. Standing by.`);
+      return;
+    }
     restartAttempts++;
     const delay = Math.min(30000, 2000 * Math.pow(1.5, Math.min(restartAttempts, 10)));
     console.warn(`[Hostinger Server] Backend process exited with code ${code}, signal ${signal}. Respawning in ${(delay / 1000).toFixed(1)}s (attempt ${restartAttempts})...`);
