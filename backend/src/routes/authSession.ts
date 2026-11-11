@@ -44,6 +44,21 @@ function uaOf(req: Request): string {
 }
 
 function fail(res: Response, error: any, fallback = 'Request failed'): void {
+  const isDbError =
+    error?.code === 'ER_ACCESS_DENIED_ERROR' ||
+    error?.code === 'ECONNREFUSED' ||
+    error?.code === 'EPERM' ||
+    /access denied/i.test(error?.message || '') ||
+    /connect econnrefused/i.test(error?.message || '');
+
+  if (isDbError) {
+    return void res.status(503).json({
+      error: 'Database connection initializing',
+      message: 'Database connection is initializing. Please verify credentials or retry in a few seconds.',
+      code: 'DB_INITIALIZING',
+    });
+  }
+
   const status = error?.status || (error?.code === 'CREDENTIALS_ADMIN_ONLY' ? 403 : 500);
   if (status >= 500) console.error('[session]', error);
   res.status(status === 404 ? 404 : status).json({ error: fallback, message: error?.message || fallback, code: error?.code });

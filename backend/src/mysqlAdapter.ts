@@ -28,6 +28,12 @@ export function getExplicitUnixSocket(): string | undefined {
       if (fs.existsSync(envSocket)) return envSocket;
     } catch { }
   }
+  const standardPaths = ['/tmp/mysql.sock', '/var/run/mysqld/mysqld.sock'];
+  for (const p of standardPaths) {
+    try {
+      if (fs.existsSync(p)) return p;
+    } catch { }
+  }
   return undefined;
 }
 

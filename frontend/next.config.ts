@@ -23,7 +23,7 @@ if (process.argv.some(arg => arg.includes('build'))) {
   (process.env as Record<string, string>).NODE_ENV = 'production';
 }
 
-const API_URL = process.env.BACKEND_URL || 'http://localhost:4000';
+const API_URL = process.env.BACKEND_URL || 'http://127.0.0.1:4000';
 
 /**
  * Content-Security-Policy for the browser-facing app.
