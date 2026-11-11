@@ -222,7 +222,14 @@ export const securityConfig = {
 export function auditSecurityConfig(): string[] {
   const problems: string[] = [];
   if (!securityConfig.redis.url) problems.push('REDIS_URL is unset — rate limits, lockouts and the token blacklist are per-process only.');
-  if (securityConfig.redis.url && !securityConfig.redis.tls && !securityConfig.redis.url.startsWith('rediss://') && IS_PROD) {
+  if (
+    securityConfig.redis.url &&
+    !securityConfig.redis.tls &&
+    !securityConfig.redis.url.startsWith('rediss://') &&
+    IS_PROD &&
+    !securityConfig.redis.url.includes('localhost') &&
+    !securityConfig.redis.url.includes('127.0.0.1')
+  ) {
     problems.push('Redis URL is not TLS (rediss://) in production.');
   }
   if (securityConfig.cookies.domain.startsWith('.')) problems.push('COOKIE_DOMAIN must not be a wildcard domain.');

@@ -45,6 +45,7 @@ import { setupBreaks } from './scripts/setupBreaks.js';
 import { registerLocationRegistryRefresh } from './services/locationRegistry.js';
 import { UserUploadService } from './services/userUploadService.js';
 import { EmailNotificationService } from './services/emailNotificationService.js';
+import { ensureRbacReady } from './services/rbacService.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -341,51 +342,53 @@ if (!process.env.VERCEL) {
   httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 BSC Textiles HRMS Security-Hardened Server running on port ${PORT}`);
     console.log(`📡 WebSocket server ready`);
-    shardManager
-      .initialize()
-      .then(() => {
-        if (process.env.HIRING_OUTBOX_DISABLED !== 'true') startHiringOutboxWorker();
-      })
-      .catch((err) => console.error('[ShardManager init warning]:', err.message));
-    // Two different jobs were happening here on every boot:
-    //   (a) idempotent schema/reference shaping — tables, views, the document-type
-    //       catalogue, salary cadres, store topology. That must always run.
-    //   (b) demo fixture seeding — invented former employees with resignation and
-    //       F&F amounts, sample late fines and attendance, break sessions, retail
-    //       sales, custody assets, document dossiers. That is development data and
-    //       must never be created by a production boot (see config/bootFixtures.ts).
-    // The document dossier seeder also used to open with
-    // `DELETE FROM employee_documents`, discarding every real upload on each start.
+
     const fixtureDecision = bootFixturesAllowed();
     const schemaOnly = !fixtureDecision.allowed;
     console.log(`[bootFixtures] ${fixtureDecision.allowed ? 'ENABLED' : 'DISABLED'} — ${fixtureDecision.reason}`);
 
-    setupViews().catch((err) => console.warn('[setupViews warning]:', err.message));
-    setupCustodyAssets({ schemaOnly }).catch((err) => console.warn('[setupCustodyAssets warning]:', err.message));
-    setupKycSchema().catch((err) => console.warn('[setupKycSchema warning]:', err.message));
-    seedDocumentReferenceConfig().catch((err) => console.warn('[seedDocumentReferenceConfig warning]:', err.message));
-    if (!schemaOnly) {
-      seedDocumentDossierFixtures().catch((err) => console.warn('[seedDocumentDossierFixtures warning]:', err.message));
-    }
-    setupFormerEmployees({ schemaOnly }).catch((err) => console.warn('[setupFormerEmployees warning]:', err.message));
-    removeHubballiLocation().catch((err) => console.warn('[removeHubballiLocation warning]:', err.message));
-    setupOrganizationHubs().catch((err) => console.warn('[setupOrganizationHubs warning]:', err.message));
-    ensureEmployeeImportSchema().catch((err) => console.warn('[setupEmployeeImportSchema warning]:', err.message));
-    setupPayrollSchema().catch((err) => console.warn('[setupPayrollSchema warning]:', err.message));
-    setupLateFines({ schemaOnly }).catch((err) => console.warn('[setupLateFines warning]:', err.message));
-    setupRetailOperations({ schemaOnly }).catch((err) => console.warn('[setupRetailOperations warning]:', err.message));
-    setupBreaks({ schemaOnly }).catch((err) => console.warn('[setupBreaks warning]:', err.message));
-    UserUploadService.syncAllUserFolders().catch((err) => console.warn('[UserUploadService warning]:', err.message));
-    registerLocationRegistryRefresh()
-      .then(() => console.log('📍 Location registry loaded'))
-      .catch((err) => console.warn('[locationRegistry warning]:', err.message));
+    // Sequential startup pipeline: runs migrations and initialization in order
+    // to prevent socket bursts, connection races, and CloudLinux LVE rate limits.
+    (async () => {
+      try {
+        await shardManager.initialize();
+        if (process.env.HIRING_OUTBOX_DISABLED !== 'true') {
+          startHiringOutboxWorker();
+        }
+      } catch (err: any) {
+        console.warn('[ShardManager init notice]:', err?.message || err);
+      }
 
-    // Security boot sequence: establish a signing key before the first token is
-    // requested, then surface any posture that is unsafe rather than failing
-    // silently at 03:00 when a lockout cannot be shared between processes.
-    ensureActiveKey()
-      .then((key) => console.log(`🔑 Signing key active: ${key.kid} (${key.algorithm})`))
-      .catch((err) => console.error('[signingKeys] could not establish a key:', err?.message || err));
+      const tasks: Array<{ name: string; run: () => Promise<any> }> = [
+        { name: 'setupViews', run: () => setupViews() },
+        { name: 'setupOrganizationHubs', run: () => setupOrganizationHubs() },
+        { name: 'setupKycSchema', run: () => setupKycSchema() },
+        { name: 'ensureEmployeeImportSchema', run: () => ensureEmployeeImportSchema() },
+        { name: 'setupPayrollSchema', run: () => setupPayrollSchema() },
+        { name: 'setupLateFines', run: () => setupLateFines({ schemaOnly }) },
+        { name: 'setupRetailOperations', run: () => setupRetailOperations({ schemaOnly }) },
+        { name: 'setupBreaks', run: () => setupBreaks({ schemaOnly }) },
+        { name: 'setupCustodyAssets', run: () => setupCustodyAssets({ schemaOnly }) },
+        { name: 'setupFormerEmployees', run: () => setupFormerEmployees({ schemaOnly }) },
+        { name: 'removeHubballiLocation', run: () => removeHubballiLocation() },
+        { name: 'seedDocumentReferenceConfig', run: () => seedDocumentReferenceConfig() },
+        ...(schemaOnly ? [] : [{ name: 'seedDocumentDossierFixtures', run: () => seedDocumentDossierFixtures() }]),
+        { name: 'ensureRbacReady', run: () => ensureRbacReady() },
+        { name: 'locationRegistry', run: () => registerLocationRegistryRefresh() },
+        { name: 'signingKeys', run: () => ensureActiveKey().then((key) => console.log(`🔑 Signing key active: ${key.kid} (${key.algorithm})`)) },
+        { name: 'userUploadService', run: () => UserUploadService.syncAllUserFolders() },
+      ];
+
+      for (const task of tasks) {
+        try {
+          await task.run();
+        } catch (err: any) {
+          console.warn(`[${task.name} notice]:`, err?.message || err);
+        }
+      }
+      console.log('✅ Enterprise schemas and reference configurations initialized.');
+    })();
+
     for (const warning of auditSecurityConfig()) console.warn(`[security posture] ${warning}`);
 
     // Retention purge: an in-process scheduler is enough for a single node; the

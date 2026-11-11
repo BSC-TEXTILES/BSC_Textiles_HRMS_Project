@@ -550,9 +550,5 @@ router.put('/rbac/users/:userId/roles', requireRoleAdmin, async (req: AuthReques
   }
 });
 
-// Warm the RBAC schema/seed once at boot so the first request is fast.
-ensureRbacReady().catch((err) => {
-  console.warn('RBAC schema bootstrap deferred (database unreachable at boot):', err?.message || err);
-});
-
+// Note: ensureRbacReady is called sequentially during database bootstrap in index.ts
 export default router;
