@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { signIn, useSession } from 'next-auth/react';
 import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
   Eye,
@@ -107,7 +106,26 @@ function LoginFormContent() {
     watch,
     formState: { errors },
   } = useForm<LoginForm>({
-    resolver: zodResolver(loginSchema),
+    resolver: async (values) => {
+      const fieldErrors: Record<string, { type: string; message: string }> = {};
+      const email = (values.email || '').trim();
+      const password = values.password || '';
+
+      if (!email) {
+        fieldErrors.email = { type: 'required', message: 'Email or Employee Code is required' };
+      } else if (email.includes('@') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        fieldErrors.email = { type: 'pattern', message: 'Please enter a valid email address' };
+      }
+
+      if (!password) {
+        fieldErrors.password = { type: 'required', message: 'Password is required' };
+      }
+
+      return {
+        values: Object.keys(fieldErrors).length === 0 ? values : {},
+        errors: fieldErrors,
+      };
+    },
     defaultValues: { email: '', password: '' },
     mode: 'onTouched',
   });

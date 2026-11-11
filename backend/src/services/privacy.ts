@@ -54,10 +54,12 @@ export async function readConsent(req: any, visitorId: string): Promise<ConsentS
     };
   }
 
-  const [rows]: any = await pool.query(
-    'SELECT `analytics`, `preferences` FROM `cookie_consent` WHERE `visitorId` = ? AND `policyVersion` = ? LIMIT 1',
-    [visitorId, CONSENT_POLICY_VERSION]
-  );
+  const [rows]: any = await pool
+    .query(
+      'SELECT `analytics`, `preferences` FROM `cookie_consent` WHERE `visitorId` = ? AND `policyVersion` = ? LIMIT 1',
+      [visitorId, CONSENT_POLICY_VERSION]
+    )
+    .catch(() => [[]]);
   if (rows?.length) {
     return {
       necessary: true,

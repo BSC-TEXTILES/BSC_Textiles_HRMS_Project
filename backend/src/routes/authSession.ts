@@ -309,39 +309,78 @@ router.post('/refresh', sensitiveRateLimit, async (req: Request, res: Response) 
 // Session status and idle extension (drives the warning modal)
 // ---------------------------------------------------------------------------
 
-router.get('/status', authenticate, async (req: AuthRequest, res: Response) => {
-  const session = req.user?.sessionId ? await SessionService.peekSession(req.user.sessionId) : null;
+router.get('/status', async (req: Request, res: Response) => {
+  try {
+    const token = readAccessToken(req);
+    if (!token) {
+      return res.json({
+        authenticated: false,
+        idleTimeoutSeconds: securityConfig.session.idleTimeoutSeconds,
+        absoluteTimeoutSeconds: securityConfig.session.absoluteTimeoutSeconds,
+        warningSeconds: securityConfig.session.warningSeconds,
+        serverTime: new Date().toISOString(),
+      });
+    }
 
-  // Re-bind the CSRF token on every poll. The guard compares a readable cookie
-  // against a server-side binding, and that binding is lost whenever the API
-  // restarts with the in-process store (or the cookie is cleared while the
-  // database session survives) — at which point every POST, PUT and DELETE
-  // fails with CSRF_FAILED and the user has no way to recover short of signing
-  // out. This endpoint is already called on a timer by SessionGuard, so
-  // re-issuing here makes that dead end self-healing. issueCsrfToken reuses the
-  // value already in the cookie, so a healthy session sees no churn.
-  const csrfToken = await issueCsrfToken(res, req, req.user?.sessionId ?? null);
+    let claims;
+    try {
+      claims = await verifyAccessToken(token);
+    } catch {
+      return res.json({
+        authenticated: false,
+        idleTimeoutSeconds: securityConfig.session.idleTimeoutSeconds,
+        absoluteTimeoutSeconds: securityConfig.session.absoluteTimeoutSeconds,
+        warningSeconds: securityConfig.session.warningSeconds,
+        serverTime: new Date().toISOString(),
+      });
+    }
 
-  res.json({
-    authenticated: true,
-    user: {
-      id: req.user!.id,
-      email: req.user!.email,
-      fullName: req.user!.fullName,
-      role: req.user!.role,
-      loginId: req.user!.loginId ?? null,
-    },
-    mustChangePassword: Boolean(req.user!.mustChangePassword),
-    passwordExpiresAt: req.user!.passwordExpiresAt ?? null,
-    sessionId: req.user!.sessionId ?? null,
-    csrfToken,
-    idleTimeoutSeconds: securityConfig.session.idleTimeoutSeconds,
-    absoluteTimeoutSeconds: securityConfig.session.absoluteTimeoutSeconds,
-    warningSeconds: securityConfig.session.warningSeconds,
-    expiresAt: session?.expiresAt ?? null,
-    idleExpiresAt: session?.idleExpiresAt ?? null,
-    serverTime: new Date().toISOString(),
-  });
+    const [rows]: any = await pool
+      .query(
+        'SELECT id, email, loginId, fullName, role, mustChangePassword, passwordExpiresAt, isActive, status FROM `user` WHERE id = ? LIMIT 1',
+        [claims.sub]
+      )
+      .catch(() => [[]]);
+
+    const user = rows?.[0];
+    if (!user || !user.isActive || (user.status && user.status !== 'ACTIVE')) {
+      return res.json({
+        authenticated: false,
+        idleTimeoutSeconds: securityConfig.session.idleTimeoutSeconds,
+        serverTime: new Date().toISOString(),
+      });
+    }
+
+    const session = claims.sid ? await SessionService.peekSession(claims.sid).catch(() => null) : null;
+    const csrfToken = await issueCsrfToken(res, req, claims.sid ?? null).catch(() => null);
+
+    return res.json({
+      authenticated: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        loginId: user.loginId ?? null,
+      },
+      mustChangePassword: Boolean(user.mustChangePassword),
+      passwordExpiresAt: user.passwordExpiresAt ?? null,
+      sessionId: claims.sid ?? null,
+      csrfToken,
+      idleTimeoutSeconds: securityConfig.session.idleTimeoutSeconds,
+      absoluteTimeoutSeconds: securityConfig.session.absoluteTimeoutSeconds,
+      warningSeconds: securityConfig.session.warningSeconds,
+      expiresAt: session?.expiresAt ?? null,
+      idleExpiresAt: session?.idleExpiresAt ?? null,
+      serverTime: new Date().toISOString(),
+    });
+  } catch (error) {
+    return res.json({
+      authenticated: false,
+      idleTimeoutSeconds: securityConfig.session.idleTimeoutSeconds,
+      serverTime: new Date().toISOString(),
+    });
+  }
 });
 
 /** "Stay signed in" — extends the idle deadline, never the absolute one. */
@@ -409,7 +448,18 @@ router.post('/password/evaluate', authenticate, async (req: AuthRequest, res: Re
 // ---------------------------------------------------------------------------
 
 router.get('/consent', async (req: Request, res: Response) => {
-  res.json(await readConsent(req, visitorId(req, res)));
+  try {
+    res.json(await readConsent(req, visitorId(req, res)));
+  } catch (error) {
+    res.json({
+      necessary: true,
+      analytics: false,
+      preferences: false,
+      version: '2026-10',
+      recorded: false,
+      visitorId: visitorId(req, res),
+    });
+  }
 });
 
 router.post('/consent', async (req: Request, res: Response) => {
