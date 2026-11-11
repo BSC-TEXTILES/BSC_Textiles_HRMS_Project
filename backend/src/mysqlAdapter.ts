@@ -14,7 +14,7 @@ import dns from 'node:dns';
 
 try {
   dns.setDefaultResultOrder('ipv4first');
-} catch {}
+} catch { }
 
 let cachedWorkingConfig: PoolOptions | null = null;
 let probePromise: Promise<PoolOptions> | null = null;
@@ -26,7 +26,7 @@ export function getExplicitUnixSocket(): string | undefined {
   if (envSocket) {
     try {
       if (fs.existsSync(envSocket)) return envSocket;
-    } catch {}
+    } catch { }
   }
   return undefined;
 }
@@ -150,28 +150,36 @@ function generateCandidates(base: PoolOptions): PoolOptions[] {
     ].filter(Boolean))
   ) as string[];
 
+  // Prioritize configured user, detected account variations (standard, truncated, short names)
   const userVariants = Array.from(
     new Set([
-      detectedAccount ? `${detectedAccount}_${suffix.toLowerCase()}` : '',
-      detectedAccount ? `${detectedAccount}_${suffix}` : '',
-      'u101820758_bsc_smg_hrms',
-      'u101820758_bsc_smg_HRMS',
-      'u101820759_bsc_smg_hrms',
-      'u101820759_bsc_smg_HRMS',
       base.user,
       base.user ? base.user.toLowerCase() : '',
+      detectedAccount ? `${detectedAccount}_${suffix.toLowerCase()}` : '',
+      detectedAccount ? `${detectedAccount}_${suffix}` : '',
+      detectedAccount ? `${detectedAccount}_hrms` : '',
+      detectedAccount ? `${detectedAccount}_bsc` : '',
+      detectedAccount ? `${detectedAccount}_admin` : '',
+      detectedAccount ? `${detectedAccount}_bsc_s` : '', // 16-char truncation
+      'u101820758_bsc_smg_hrms',
+      'u101820758_hrms',
+      'u101820758_bsc',
+      'u101820758_admin',
+      'u101820759_bsc_smg_HRMS',
+      'u101820759_bsc_smg_hrms',
+      'u101820759_hrms',
+      'u101820759_bsc',
     ].filter(Boolean))
   );
 
   for (const user of userVariants) {
     for (const password of passwordVariants) {
-      // Prioritize connection without initial database constraint for discovery
+      // Connect without initial database so MySQL accepts the user and we can run SHOW DATABASES
       pushCandidate({ user, password, database: undefined, host: '127.0.0.1' });
-      pushCandidate({ user, password, database: base.database, host: '127.0.0.1' });
     }
   }
 
-  return candidates.slice(0, 8);
+  return candidates.slice(0, 12);
 }
 
 export async function probeAndFindWorkingOptions(baseOptions: PoolOptions): Promise<PoolOptions> {
@@ -188,13 +196,16 @@ export async function probeAndFindWorkingOptions(baseOptions: PoolOptions): Prom
       for (const cand of candidates) {
         let testConn: mysql.Connection | null = null;
         try {
+          // Pause 200ms between probes to prevent CloudLinux LVE local socket rate-limiting
+          await new Promise((r) => setTimeout(r, 200));
+
           const connOpts: ConnectionOptions = {
             user: cand.user,
             password: cand.password,
             database: cand.database,
             host: cand.host || '127.0.0.1',
             port: cand.port || 3306,
-            connectTimeout: 2500,
+            connectTimeout: 2000,
           };
           testConn = await mysql.createConnection(connOpts);
 
@@ -203,14 +214,17 @@ export async function probeAndFindWorkingOptions(baseOptions: PoolOptions): Prom
             try {
               const [dbs]: any = await testConn.query('SHOW DATABASES');
               if (Array.isArray(dbs)) {
-                const match = dbs.find((d: any) => /bsc_smg|hrms/i.test(d?.Database || ''));
+                const match = dbs.find((d: any) => /bsc|hrms/i.test(d?.Database || ''));
                 if (match?.Database) {
                   cand.database = match.Database;
                 }
               }
-            } catch {}
+            } catch { }
           }
 
+          if (cand.database) {
+            await testConn.query(`USE \`${cand.database}\``);
+          }
           await testConn.query('SELECT 1');
           await testConn.end();
 
@@ -221,23 +235,23 @@ export async function probeAndFindWorkingOptions(baseOptions: PoolOptions): Prom
           return cand;
         } catch (err: any) {
           console.warn(
-            `[Database Probe] Candidate ${cand.user}@${cand.host}:${cand.port} on db '${cand.database || '(none)'}' failed:`,
+            `[Database Probe] Candidate ${cand.user}@${cand.host}:${cand.port} failed:`,
             err?.message || err
           );
           if (testConn) {
             try {
               await testConn.end();
-            } catch {}
+            } catch { }
           }
         }
       }
       lastProbeFailedTime = Date.now();
       console.warn(
         `[Database] ⚠️ Notice: Could not authenticate to MySQL on 127.0.0.1:3306 with current credentials.\n` +
-          `[Database] In Hostinger hPanel -> Databases -> MySQL Databases, please verify:\n` +
-          `  1. Database Name and Username (e.g. u101820758_bsc_smg_hrms)\n` +
-          `  2. Password matches DB_PASSWORD ('Btpldvg@2026')\n` +
-          `  3. The User is granted ALL PRIVILEGES on the database.`
+        `[Database] In Hostinger hPanel -> Databases -> MySQL Databases, please verify:\n` +
+        `  1. Database Name and Username (e.g. u101820758_bsc_smg_hrms)\n` +
+        `  2. Password matches DB_PASSWORD ('Btpldvg@2026')\n` +
+        `  3. The User is granted ALL PRIVILEGES on the database.`
       );
     } finally {
       probePromise = null;
@@ -276,11 +290,13 @@ export function createAdaptiveMysqlPool(uriOrConfig?: string, fallbackDb = 'bsc_
     if (workingOptions && workingOptions !== initialOptions) {
       try {
         await activePool.end();
-      } catch {}
+      } catch { }
       activePool = mysql.createPool(workingOptions);
     }
     return activePool;
   }
+
+  let lastRecoveryLogTime = 0;
 
   const poolProxy = new Proxy(activePool, {
     get(_target, prop: string | symbol) {
@@ -290,11 +306,17 @@ export function createAdaptiveMysqlPool(uriOrConfig?: string, fallbackDb = 'bsc_
             return await (activePool as any)[prop](...args);
           } catch (err: any) {
             if (isConnectionError(err)) {
-              console.warn(
-                `[Database] Recovering from connection issue (${err.code || err.message}): verifying valid MySQL connection...`
-              );
+              const now = Date.now();
+              if (now - lastRecoveryLogTime > 60_000) {
+                lastRecoveryLogTime = now;
+                console.warn(
+                  `[Database] MySQL connection issue (${err.code || err.message}). Probing active instance...`
+                );
+              }
               const pool = await ensureWorkingPool();
-              return await (pool as any)[prop](...args);
+              if (cachedWorkingConfig && pool) {
+                return await (pool as any)[prop](...args);
+              }
             }
             throw err;
           }
@@ -307,11 +329,17 @@ export function createAdaptiveMysqlPool(uriOrConfig?: string, fallbackDb = 'bsc_
             return await activePool.getConnection();
           } catch (err: any) {
             if (isConnectionError(err)) {
-              console.warn(
-                `[Database] Recovering from getConnection issue (${err.code || err.message}): verifying valid MySQL connection...`
-              );
+              const now = Date.now();
+              if (now - lastRecoveryLogTime > 60_000) {
+                lastRecoveryLogTime = now;
+                console.warn(
+                  `[Database] MySQL getConnection issue (${err.code || err.message}). Probing active instance...`
+                );
+              }
               const pool = await ensureWorkingPool();
-              return await pool.getConnection();
+              if (cachedWorkingConfig && pool) {
+                return await pool.getConnection();
+              }
             }
             throw err;
           }
