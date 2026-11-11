@@ -42,17 +42,33 @@ export class ShardConnectionManager {
     console.log('[ShardConnectionManager] Initializing Multi-Tenant Shard Connections...');
     
     // 1. Establish control database pool first
-    const controlPool = this.createPoolForDatabase(
-      process.env.DATABASE_URL_HQ || process.env.DATABASE_URL || 'mysql://localhost:3306/bsc_textiles_hrms',
-      'bsc_textiles_hrms'
-    );
+    let controlUri =
+      process.env.DATABASE_URL_HQ || process.env.DATABASE_URL || 'mysql://localhost:3306/bsc_textiles_hrms';
+    let controlPool = this.createPoolForDatabase(controlUri, 'bsc_textiles_hrms');
     this.pools.set(this.controlDatabaseId, controlPool);
 
     // 2. Fetch registered shards from control database
     try {
-      const [rows]: any = await controlPool.query(
-        'SELECT * FROM `database_shards` ORDER BY is_control_shard DESC, database_id ASC'
-      );
+      let rows: any;
+      try {
+        const [r]: any = await controlPool.query(
+          'SELECT * FROM `database_shards` ORDER BY is_control_shard DESC, database_id ASC'
+        );
+        rows = r;
+      } catch (poolErr: any) {
+        if (poolErr?.code === 'ER_ACCESS_DENIED_ERROR' && controlUri.includes('127.0.0.1')) {
+          console.warn('[ShardConnectionManager] Access denied on 127.0.0.1; adapting to localhost...');
+          controlUri = controlUri.replace('@127.0.0.1:', '@localhost:');
+          controlPool = this.createPoolForDatabase(controlUri, 'bsc_textiles_hrms');
+          this.pools.set(this.controlDatabaseId, controlPool);
+          const [r]: any = await controlPool.query(
+            'SELECT * FROM `database_shards` ORDER BY is_control_shard DESC, database_id ASC'
+          );
+          rows = r;
+        } else {
+          throw poolErr;
+        }
+      }
 
       for (const shard of rows as DatabaseShard[]) {
         this.shardConfigs.set(shard.database_id, shard);
@@ -62,8 +78,16 @@ export class ShardConnectionManager {
         }
 
         // Resolve connection string from env secret_reference or base database URL
-        const connString = this.resolveShardUri(shard);
-        const shardPool = this.createPoolForDatabase(connString, shard.database_name);
+        let connString = this.resolveShardUri(shard);
+        let shardPool = this.createPoolForDatabase(connString, shard.database_name);
+        try {
+          await shardPool.query('SELECT 1');
+        } catch (sErr: any) {
+          if (sErr?.code === 'ER_ACCESS_DENIED_ERROR' && connString.includes('127.0.0.1')) {
+            connString = connString.replace('@127.0.0.1:', '@localhost:');
+            shardPool = this.createPoolForDatabase(connString, shard.database_name);
+          }
+        }
         this.pools.set(shard.database_id, shardPool);
 
         console.log(

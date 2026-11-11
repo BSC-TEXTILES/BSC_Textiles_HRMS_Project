@@ -37,9 +37,13 @@ if (process.env.NODE_ENV === 'production' && isMysql && !rawUri.trim()) {
   );
 }
 
+const normalizedUri = isMysql && (process.env.DB_HOST === 'localhost' || rawUri.includes('127.0.0.1'))
+  ? rawUri.replace('@127.0.0.1:', '@localhost:')
+  : rawUri;
+
 const connectionUri = isPostgres
   ? process.env.SUPABASE_POOLER_URL || process.env.SUPABASE_DB_URL || rawUri
-  : rawUri || 'mysql://localhost:3306/bsc_textiles_hrms';
+  : normalizedUri || 'mysql://localhost:3306/bsc_textiles_hrms';
 
 console.log(
   `[Database] Engine: ${isPostgres ? 'PostgreSQL (Supabase Cloud)' : isMysql ? 'MySQL' : 'SQLite'} (DB_TYPE=${dbType || '<unset>'}, VERCEL=${Boolean(process.env.VERCEL)})`
