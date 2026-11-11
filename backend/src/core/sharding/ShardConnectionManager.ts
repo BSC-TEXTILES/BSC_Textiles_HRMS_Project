@@ -10,6 +10,7 @@ import dotenv from 'dotenv';
 import path from 'node:path';
 import type { DatabaseShard, ShardHealthReport, ShardHealthStatus, ShardStatus } from './types.js';
 
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 dotenv.config();
 

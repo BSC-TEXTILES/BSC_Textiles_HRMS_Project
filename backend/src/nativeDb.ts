@@ -10,6 +10,7 @@ import crypto from 'node:crypto';
 import { sqlitePool } from './sqliteDb.js';
 import { postgresPool } from './postgresDb.js';
 
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
 dotenv.config();
 

@@ -26,9 +26,17 @@ console.log('================================================================');
 
 // 1. Launch Backend API Service
 let backendProcess = null;
+let isShuttingDown = false;
+let restartAttempts = 0;
 const backendEntry = path.resolve(__dirname, 'backend/dist/index.js');
 
-if (fs.existsSync(backendEntry)) {
+function startBackend() {
+  if (isShuttingDown) return;
+  if (!fs.existsSync(backendEntry)) {
+    console.warn(`[Hostinger Server] Backend build not found at ${backendEntry}. Backend API was not spawned.`);
+    return;
+  }
+
   console.log(`[Hostinger Server] Starting backend API process from ${backendEntry}...`);
   backendProcess = fork(backendEntry, [], {
     env: {
@@ -44,11 +52,17 @@ if (fs.existsSync(backendEntry)) {
   });
 
   backendProcess.on('exit', (code, signal) => {
-    console.warn(`[Hostinger Server] Backend process exited with code ${code}, signal ${signal}`);
+    if (isShuttingDown) return;
+    restartAttempts++;
+    const delay = Math.min(30000, 2000 * Math.pow(1.5, Math.min(restartAttempts, 10)));
+    console.warn(`[Hostinger Server] Backend process exited with code ${code}, signal ${signal}. Respawning in ${(delay / 1000).toFixed(1)}s (attempt ${restartAttempts})...`);
+    setTimeout(() => {
+      startBackend();
+    }, delay);
   });
-} else {
-  console.warn(`[Hostinger Server] Backend build not found at ${backendEntry}. Backend API was not spawned.`);
 }
+
+startBackend();
 
 // 2. Launch Next.js Web Frontend
 const next = require('next');
@@ -82,6 +96,7 @@ app
     // Graceful Shutdown
     const shutdown = (signal) => {
       console.log(`\n[Hostinger Server] Received ${signal}. Initiating graceful shutdown...`);
+      isShuttingDown = true;
       server.close(() => {
         console.log('[Hostinger Server] HTTP web server closed.');
         if (backendProcess) {

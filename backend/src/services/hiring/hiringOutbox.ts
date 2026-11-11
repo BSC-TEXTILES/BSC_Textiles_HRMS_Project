@@ -392,6 +392,9 @@ export async function getHiringOutboxStats(): Promise<HiringOutboxStats> {
 
 let workerTimer: ReturnType<typeof setInterval> | null = null;
 let processing = false;
+let lastOutboxErrorTime = 0;
+let lastOutboxErrorMessage = '';
+let outboxConsecutiveErrors = 0;
 
 export const HIRING_OUTBOX_INTERVAL_MS = Number(process.env.HIRING_OUTBOX_INTERVAL_MS) || 15_000;
 
@@ -403,6 +406,11 @@ export function startHiringOutboxWorker(intervalMs = HIRING_OUTBOX_INTERVAL_MS):
     processing = true;
     try {
       let batch = await processOutboxBatch();
+      if (outboxConsecutiveErrors > 0) {
+        console.log(`[hiringOutbox] worker recovered successfully after ${outboxConsecutiveErrors} failed tick(s).`);
+        outboxConsecutiveErrors = 0;
+        lastOutboxErrorMessage = '';
+      }
       // Drain quickly while there is a backlog, but stay gentle on the DB.
       let guard = 0;
       while (batch.picked >= 25 && guard < 10) {
@@ -410,7 +418,15 @@ export function startHiringOutboxWorker(intervalMs = HIRING_OUTBOX_INTERVAL_MS):
         guard += 1;
       }
     } catch (err: any) {
-      console.warn('[hiringOutbox] worker tick failed:', err.message);
+      outboxConsecutiveErrors += 1;
+      const now = Date.now();
+      const msg = err?.message || String(err);
+      // Log immediately on first error, then throttle repeat identical errors to once per minute
+      if (outboxConsecutiveErrors === 1 || msg !== lastOutboxErrorMessage || now - lastOutboxErrorTime > 60_000) {
+        console.warn(`[hiringOutbox] worker tick failed (attempt #${outboxConsecutiveErrors}):`, msg);
+        lastOutboxErrorTime = now;
+        lastOutboxErrorMessage = msg;
+      }
     } finally {
       processing = false;
     }

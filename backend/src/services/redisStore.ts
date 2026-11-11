@@ -345,15 +345,22 @@ async function buildStore(): Promise<KeyValueStore> {
       lazyConnect: true,
       enableOfflineQueue: false,
       maxRetriesPerRequest: 2,
-      retryStrategy: (tries: number) => (tries > 5 ? null : Math.min(tries * 200, 2000)),
+      retryStrategy: (tries: number) => (tries > 2 ? null : Math.min(tries * 200, 1000)),
     });
-    await client.connect();
-    await client.ping();
     client.on('error', (err: Error) => {
       lastError = err.message;
     });
-    lastError = null;
-    return new RedisStore(client);
+    try {
+      await client.connect();
+      await client.ping();
+      lastError = null;
+      return new RedisStore(client);
+    } catch (connErr) {
+      try {
+        client.disconnect();
+      } catch {}
+      throw connErr;
+    }
   } catch (err: any) {
     lastError = err?.message || String(err);
     if (required) throw new Error(`[redis] required but unreachable: ${lastError}`);
