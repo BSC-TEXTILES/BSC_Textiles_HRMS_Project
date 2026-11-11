@@ -1,3 +1,7 @@
+import dns from 'node:dns';
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch {}
 import dotenv from 'dotenv';
 dotenv.config();
 dotenv.config({ path: '../.env' });
@@ -325,6 +329,15 @@ import { startHiringOutboxWorker } from './services/hiring/hiringOutbox.js';
 const PORT = Number(process.env.BACKEND_PORT) || (process.env.PORT && process.env.PORT !== '3000' ? Number(process.env.PORT) : 4000);
 
 if (!process.env.VERCEL) {
+  httpServer.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`[Backend API] Fatal: Port ${PORT} is already in use (EADDRINUSE). Exiting gracefully.`);
+      process.exit(1);
+    } else {
+      console.error('[Backend API] HTTP server fatal error:', err);
+    }
+  });
+
   httpServer.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 BSC Textiles HRMS Security-Hardened Server running on port ${PORT}`);
     console.log(`📡 WebSocket server ready`);
@@ -391,17 +404,41 @@ if (!process.env.VERCEL) {
     if (typeof purge.unref === 'function') purge.unref();
   });
 
-  process.on('SIGINT', async () => {
-    await shardManager.shutdown();
-    await prisma.$disconnect?.();
-    process.exit(0);
-  });
+  let isShuttingDown = false;
+  const gracefulShutdown = async (signal: string) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+    console.log(`[Backend API] Received ${signal}. Closing HTTP listener and shutting down cleanly...`);
 
-  process.on('SIGTERM', async () => {
-    await shardManager.shutdown();
-    await prisma.$disconnect?.();
+    // 1. Release listening socket immediately so port is freed
+    await new Promise<void>((resolve) => {
+      httpServer.close((err) => {
+        if (err) console.warn('[Backend API] Error closing HTTP server:', err.message);
+        resolve();
+      });
+    });
+
+    // 2. Shut down shard manager and database pools
+    try {
+      await shardManager.shutdown();
+    } catch (err: any) {
+      console.warn('[Backend API] ShardManager shutdown warning:', err?.message || err);
+    }
+
+    try {
+      if (typeof prisma.$disconnect === 'function') {
+        await prisma.$disconnect();
+      }
+    } catch (err: any) {
+      console.warn('[Backend API] Database disconnect warning:', err?.message || err);
+    }
+
+    console.log('[Backend API] Clean exit complete.');
     process.exit(0);
-  });
+  };
+
+  process.on('SIGINT', () => void gracefulShutdown('SIGINT'));
+  process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
 }
 
 // Universal module export for Vercel Serverless / Express framework

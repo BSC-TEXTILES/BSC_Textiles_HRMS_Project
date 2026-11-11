@@ -9,6 +9,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { sqlitePool } from './sqliteDb.js';
 import { postgresPool } from './postgresDb.js';
+import { createAdaptiveMysqlPool } from './mysqlAdapter.js';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
@@ -50,32 +51,7 @@ console.log(
 );
 
 export const mysqlPool: Pool = isMysql
-  ? mysql.createPool({
-      uri: connectionUri,
-      waitForConnections: true,
-      connectionLimit: 25,
-      maxIdle: 10,
-      idleTimeout: 60000,
-      queueLimit: 0,
-      enableKeepAlive: true,
-      keepAliveInitialDelay: 10000,
-      decimalNumbers: true,
-      /**
-       * Return DATE columns as plain 'YYYY-MM-DD' strings.
-       *
-       * With dateStrings disabled, mysql2 materialises a DATE as midnight in the
-       * connection timezone (+05:30 here), and JSON.stringify then shifts it back
-       * to UTC — so an attendanceDate of 2026-10-17 leaves the API as
-       * "2026-10-16T18:30:00.000Z". Any client that derives a calendar date from
-       * that string lands on the previous day and silently loses the record.
-       *
-       * Scoped to DATE only: DATETIME and TIMESTAMP still come back as Date
-       * objects, so punch timestamps keep their existing behaviour.
-       */
-      dateStrings: ['DATE'],
-      timezone: '+05:30',
-      multipleStatements: true,
-    })
+  ? createAdaptiveMysqlPool(connectionUri)
   : (null as unknown as Pool);
 
 export const pool: Pool = isPostgres
@@ -1216,6 +1192,28 @@ export class NativeMySQLClient {
     return this.$executeRaw(query, ...values);
   }
 
+  async $connect(): Promise<void> {
+    try {
+      const client = await this.connectionGetter();
+      if (client && typeof client.query === 'function') {
+        await client.query('SELECT 1');
+      }
+    } catch {
+      // Safe no-op if database is offline during inspection
+    }
+  }
+
+  async $disconnect(): Promise<void> {
+    try {
+      const client = await this.connectionGetter();
+      if (client && typeof client.end === 'function') {
+        await client.end();
+      }
+    } catch {
+      // Safe no-op
+    }
+  }
+
   async $transaction(input: any[] | ((tx: any) => Promise<any>)): Promise<any> {
     if (Array.isArray(input)) {
       return Promise.all(input);
@@ -1243,6 +1241,12 @@ export class NativeMySQLClient {
 export function createProxyClient(nativeClient: NativeMySQLClient): any {
   return new Proxy(nativeClient, {
     get(target, prop: string) {
+      if (prop === '$connect') {
+        return () => target.$connect();
+      }
+      if (prop === '$disconnect') {
+        return () => target.$disconnect();
+      }
       if (prop in target) {
         return (target as any)[prop];
       }

@@ -10,7 +10,12 @@
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
+const dns = require('dns');
 const { fork } = require('child_process');
+
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch (e) {}
 
 // Load environment variables from .env
 require('dotenv').config();
@@ -99,8 +104,21 @@ app
       isShuttingDown = true;
       server.close(() => {
         console.log('[Hostinger Server] HTTP web server closed.');
-        if (backendProcess) {
+        if (backendProcess && !backendProcess.killed) {
+          console.log('[Hostinger Server] Terminating backend API process...');
           backendProcess.kill('SIGTERM');
+          const killTimer = setTimeout(() => {
+            try {
+              backendProcess.kill('SIGKILL');
+            } catch (e) {}
+            process.exit(0);
+          }, 3500);
+          backendProcess.on('exit', () => {
+            clearTimeout(killTimer);
+            console.log('[Hostinger Server] Backend API process terminated cleanly.');
+            process.exit(0);
+          });
+          return;
         }
         process.exit(0);
       });

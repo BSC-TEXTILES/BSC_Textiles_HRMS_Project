@@ -9,6 +9,7 @@ import mysql, { Pool, PoolConnection } from 'mysql2/promise';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import type { DatabaseShard, ShardHealthReport, ShardHealthStatus, ShardStatus } from './types.js';
+import { createAdaptiveMysqlPool } from '../../mysqlAdapter.js';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 dotenv.config({ path: path.resolve(process.cwd(), '../.env') });
@@ -42,33 +43,16 @@ export class ShardConnectionManager {
     console.log('[ShardConnectionManager] Initializing Multi-Tenant Shard Connections...');
     
     // 1. Establish control database pool first
-    let controlUri =
+    const controlUri =
       process.env.DATABASE_URL_HQ || process.env.DATABASE_URL || 'mysql://localhost:3306/bsc_textiles_hrms';
-    let controlPool = this.createPoolForDatabase(controlUri, 'bsc_textiles_hrms');
+    const controlPool = this.createPoolForDatabase(controlUri, 'bsc_textiles_hrms');
     this.pools.set(this.controlDatabaseId, controlPool);
 
     // 2. Fetch registered shards from control database
     try {
-      let rows: any;
-      try {
-        const [r]: any = await controlPool.query(
-          'SELECT * FROM `database_shards` ORDER BY is_control_shard DESC, database_id ASC'
-        );
-        rows = r;
-      } catch (poolErr: any) {
-        if (poolErr?.code === 'ER_ACCESS_DENIED_ERROR' && controlUri.includes('127.0.0.1')) {
-          console.warn('[ShardConnectionManager] Access denied on 127.0.0.1; adapting to localhost...');
-          controlUri = controlUri.replace('@127.0.0.1:', '@localhost:');
-          controlPool = this.createPoolForDatabase(controlUri, 'bsc_textiles_hrms');
-          this.pools.set(this.controlDatabaseId, controlPool);
-          const [r]: any = await controlPool.query(
-            'SELECT * FROM `database_shards` ORDER BY is_control_shard DESC, database_id ASC'
-          );
-          rows = r;
-        } else {
-          throw poolErr;
-        }
-      }
+      const [rows]: any = await controlPool.query(
+        'SELECT * FROM `database_shards` ORDER BY is_control_shard DESC, database_id ASC'
+      );
 
       for (const shard of rows as DatabaseShard[]) {
         this.shardConfigs.set(shard.database_id, shard);
@@ -78,16 +62,8 @@ export class ShardConnectionManager {
         }
 
         // Resolve connection string from env secret_reference or base database URL
-        let connString = this.resolveShardUri(shard);
-        let shardPool = this.createPoolForDatabase(connString, shard.database_name);
-        try {
-          await shardPool.query('SELECT 1');
-        } catch (sErr: any) {
-          if (sErr?.code === 'ER_ACCESS_DENIED_ERROR' && connString.includes('127.0.0.1')) {
-            connString = connString.replace('@127.0.0.1:', '@localhost:');
-            shardPool = this.createPoolForDatabase(connString, shard.database_name);
-          }
-        }
+        const connString = this.resolveShardUri(shard);
+        const shardPool = this.createPoolForDatabase(connString, shard.database_name);
         this.pools.set(shard.database_id, shardPool);
 
         console.log(
@@ -140,20 +116,7 @@ export class ShardConnectionManager {
    * Creates a dedicated MySQL2 pool for a specific database
    */
   private createPoolForDatabase(uri: string, databaseName: string): Pool {
-    return mysql.createPool({
-      uri,
-      waitForConnections: true,
-      connectionLimit: 20,
-      maxIdle: 8,
-      idleTimeout: 30000,
-      queueLimit: 0,
-      enableKeepAlive: true,
-      keepAliveInitialDelay: 10000,
-      decimalNumbers: true,
-      dateStrings: false,
-      timezone: '+05:30',
-      multipleStatements: true,
-    });
+    return createAdaptiveMysqlPool(uri, databaseName);
   }
 
   /**
