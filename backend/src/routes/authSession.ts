@@ -44,6 +44,15 @@ function uaOf(req: Request): string {
 }
 
 function fail(res: Response, error: any, fallback = 'Request failed'): void {
+  if (error?.code === 'ER_NO_SUCH_TABLE' || error?.code === 'ER_BAD_FIELD_ERROR') {
+    console.error('[session] Required database schema is missing; run npm run db:migrate on the deployed database.', error.code);
+    res.status(503).json({
+      error: 'Service setup incomplete',
+      message: 'The service database setup is incomplete. Please contact your administrator.',
+      code: 'DATABASE_SCHEMA_NOT_READY',
+    });
+    return;
+  }
   const isDbError =
     error?.code === 'ER_ACCESS_DENIED_ERROR' ||
     error?.code === 'ECONNREFUSED' ||

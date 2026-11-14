@@ -26,6 +26,7 @@ export function CookieConsentBanner() {
   const [preferences, setPreferences] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,9 +50,12 @@ export function CookieConsentBanner() {
 
   const persist = async (next: { analytics: boolean; preferences: boolean }) => {
     setSaving(true);
+    setSaveError(null);
     try {
       const { data } = await api.post('/session/consent', next);
       setState(data);
+    } catch {
+      setSaveError('Your cookie choice could not be saved. Please try again shortly.');
     } finally {
       setSaving(false);
     }
@@ -84,6 +88,7 @@ export function CookieConsentBanner() {
             .
           </p>
 
+          {saveError && <p role="alert" className="mt-2 text-xs text-red-600">{saveError}</p>}
           {showDetails && (
             <div className="mt-3 space-y-2">
               <label className="flex items-start gap-2 text-xs text-gray-700 dark:text-slate-200">

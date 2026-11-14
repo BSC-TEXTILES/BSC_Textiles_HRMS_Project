@@ -11,6 +11,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
+import { assertSessionSchema } from './services/sessionSchema.js';
 import { createServer, type Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
 import { prisma, pool } from './db.js';
@@ -210,7 +211,7 @@ app.get('/api/health/email', async (req, res) => {
 // Deep readiness probe for Kubernetes / load balancers
 app.get(['/ready', '/api/ready'], async (req, res) => {
   try {
-    await pool.query('SELECT 1');
+    await assertSessionSchema((sql) => pool.query(sql));
     res.json({
       status: 'ready',
       timestamp: new Date().toISOString(),
@@ -223,7 +224,7 @@ app.get(['/ready', '/api/ready'], async (req, res) => {
       status: 'unready',
       timestamp: new Date().toISOString(),
       database: 'error',
-      message: err.message,
+      message: 'Database connection or required session schema is unavailable.',
     });
   }
 });

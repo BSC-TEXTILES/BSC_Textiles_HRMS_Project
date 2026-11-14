@@ -212,6 +212,13 @@ async function migrate() {
     console.log(`  ✔ Applied ${file} (${Date.now() - startTime}ms${note})`);
   }
 
+  // Older runs could record a migration after skipping a missing-table error.
+  // Do not report a usable deployment when the core login tables are absent.
+  await pool.query('SELECT id, loginId, passwordHash, status, tokenVersion FROM `user` LIMIT 0');
+  for (const table of ['cookie_consent', 'session', 'refresh_token']) {
+    await pool.query(`SELECT id FROM \`${table}\` LIMIT 0`);
+  }
+  await pool.query('SELECT kid FROM `jwt_signing_key` LIMIT 0');
   console.log(`\n🎉 Migrations evaluated: ${appliedCount} applied, ${skippedCount} already recorded.`);
   console.log('================================================================\n');
   await pool.end();

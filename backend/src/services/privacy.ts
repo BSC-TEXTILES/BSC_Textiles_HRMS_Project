@@ -90,14 +90,6 @@ export async function saveConsent(
     visitorId,
   };
 
-  res.cookie(CONSENT_COOKIE, cookieValue(state), {
-    httpOnly: false,
-    sameSite: 'lax',
-    secure: securityConfig.cookies.secure,
-    path: '/',
-    maxAge: 330 * 24 * 60 * 60 * 1000,
-  });
-
   await pool.query(
     `INSERT INTO \`cookie_consent\`
        (\`id\`, \`visitorId\`, \`userId\`, \`policyVersion\`, \`necessary\`, \`analytics\`, \`preferences\`, \`ipAddress\`, \`userAgent\`, \`createdAt\`, \`updatedAt\`)
@@ -115,6 +107,15 @@ export async function saveConsent(
       String(req.headers['user-agent'] || '').slice(0, 255),
     ]
   );
+
+  // Only acknowledge consent after its database record is durable.
+  res.cookie(CONSENT_COOKIE, cookieValue(state), {
+    httpOnly: false,
+    sameSite: 'lax',
+    secure: securityConfig.cookies.secure,
+    path: '/',
+    maxAge: 330 * 24 * 60 * 60 * 1000,
+  });
 
   return state;
 }

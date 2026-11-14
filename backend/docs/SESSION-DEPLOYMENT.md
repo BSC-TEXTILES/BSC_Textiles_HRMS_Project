@@ -1,5 +1,29 @@
 # Deploying the session fixes
 
+## Missing tables after connecting to MySQL
+
+`ER_NO_SUCH_TABLE` for `user` or `cookie_consent` means the application can
+connect, but the selected database does not contain the required schema.
+A code push alone cannot restore those tables or existing employee accounts.
+First confirm that DATABASE_URL selects the intended HRMS database. If it should
+contain existing records, restore the verified backup or select the populated
+database before running migrations. Do not seed demo accounts into production.
+
+For the intended new database, run from the deployed repository root with the
+Hostinger environment configured:
+
+```sh
+npm run db:migrate
+npm run build
+```
+
+`npm run build:hostinger` combines these steps for a hosting build environment
+that has database access. Restart the application after successful completion.
+The migration command now verifies the core session schema before reporting
+success; `/api/ready` also checks the schema rather than just the connection.
+Existing migrations do not restore missing user data. A new installation needs
+an authorized administrator account provisioned separately.
+
 The unified Hostinger application starts with `npm start` (root `server.js`).
 Build both workspaces with `npm run build` before restarting it. The unified
 server binds `PORT` immediately and runs Express, Next.js and Socket.IO in one
