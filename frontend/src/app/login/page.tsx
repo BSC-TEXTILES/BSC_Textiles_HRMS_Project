@@ -204,7 +204,9 @@ function LoginFormContent() {
 
       // Every failure path refreshes the challenge: it is single-use, so a
       // retry without a fresh one would simply fail again.
-      if (payload?.locked || response.status === 429) {
+      if (response.status >= 500) {
+        setErrorMessage('The authentication service is temporarily unavailable. Please try again shortly.');
+      } else if (payload?.locked || response.status === 429) {
         setLockSecondsLeft(Number(payload?.retryAfterSeconds || 180));
         setErrorMessage(
           `Too many failed attempts. This sign-in is blocked for ${payload?.retryAfterSeconds || 180} seconds.`
@@ -216,7 +218,7 @@ function LoginFormContent() {
       if (payload?.captchaRequired) await loadCaptcha();
       else if (captcha) await loadCaptcha();
     } catch {
-      const message = 'The authentication service is unreachable. Start the API on port 4000 and try again.';
+      const message = 'The authentication service is unreachable. Please try again shortly.';
       setErrorMessage(message);
       toast.error(message);
     } finally {

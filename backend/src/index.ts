@@ -11,7 +11,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
-import { createServer } from 'http';
+import { createServer, type Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
 import { prisma, pool } from './db.js';
 import { readBiometricHealth } from './services/biometricService.js';
@@ -48,7 +48,7 @@ import { EmailNotificationService } from './services/emailNotificationService.js
 import { ensureRbacReady } from './services/rbacService.js';
 
 const app = express();
-const httpServer = createServer(app);
+const httpServer: HttpServer = (globalThis as any).__HRMS_HTTP_SERVER || createServer(app);
 
 // 0. Strict CORS: an explicit allowlist, credentials only for listed origins.
 //    The previous handler accepted any localhost/192.168 origin and everything
@@ -339,7 +339,7 @@ if (!process.env.VERCEL) {
     }
   });
 
-  httpServer.listen(PORT, '0.0.0.0', () => {
+  const initializeServices = () => {
     console.log(`🚀 BSC Textiles HRMS Security-Hardened Server running on port ${PORT}`);
     console.log(`📡 WebSocket server ready`);
 
@@ -405,7 +405,9 @@ if (!process.env.VERCEL) {
       Math.max(securityConfig.privacy.purgeIntervalHours, 1) * 3600_000
     );
     if (typeof purge.unref === 'function') purge.unref();
-  });
+  };
+  if ((globalThis as any).__HRMS_HTTP_SERVER) initializeServices();
+  else httpServer.listen(PORT, '0.0.0.0', initializeServices);
 
   let isShuttingDown = false;
   const gracefulShutdown = async (signal: string) => {

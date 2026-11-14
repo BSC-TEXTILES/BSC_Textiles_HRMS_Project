@@ -12,7 +12,7 @@ import { loadEnvConfig } from '@next/env';
  * `node_modules` from the image. Pinning it here is the fix; deleting someone
  * else's lockfile would not be.
  */
-const WORKSPACE_ROOT = path.resolve(process.cwd(), '..');
+const WORKSPACE_ROOT = path.resolve(__dirname, '..');
 
 // Load environment variables from the single root .env file so the frontend
 // stays synchronized with the database, auth secrets, and server configuration
@@ -23,7 +23,7 @@ if (process.argv.some(arg => arg.includes('build'))) {
   (process.env as Record<string, string>).NODE_ENV = 'production';
 }
 
-const API_URL = process.env.BACKEND_URL || 'http://127.0.0.1:4000';
+const API_URL = (process.env.BACKEND_URL || `http://127.0.0.1:${process.env.BACKEND_PORT || '4000'}`).replace(/\/+$/, '');
 
 /**
  * Content-Security-Policy for the browser-facing app.
