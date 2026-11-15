@@ -1,53 +1,54 @@
-# Documentation index
+# HRMS documentation library
 
-BSC Textiles HRMS — Belagavi/Shivamogga silk retail, Karnataka. What the system
-does: it turns face-recognition events from eSSL MB160 terminals into attendance,
-and attendance into payroll-visible numbers, with every step attributable.
+Start with the [project README](../../README.md) for the current modules, operating modes, architecture, data flow diagrams, configuration and commands.
 
-## Start here
+## Workspace guides
 
-| Document | Read it when |
-|---|---|
-| [../README.md](../README.md) | setting the project up, running it, finding a route |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | you need the module map and the two-source-of-truth rule |
-| [ATTENDANCE_FLOW.md](ATTENDANCE_FLOW.md) | you need to know how a punch becomes a day |
-| [DEVICE_SETUP.md](DEVICE_SETUP.md) | you are installing, registering or debugging a terminal |
-| [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | something looks wrong on screen |
-| [../SECURITY.md](../SECURITY.md) | you are deploying, or deciding what a screen may claim |
-| [RBAC.md](RBAC.md) | you are granting or auditing module permissions |
-| [TESTING.md](TESTING.md) | you are changing attendance, export or device code |
+- [Frontend](../../frontend/README.md)
+- [Backend](../README.md)
+- [Database and migrations](../../database/README.md)
+- [LAN edge connector](../connector/README.md)
+- [Root security policy](../../SECURITY.md)
 
-## Deeper dives
+## Deployment and operations
 
-| Document | Subject |
-|---|---|
-| [BIOMETRIC_MB160.md](BIOMETRIC_MB160.md) | terminal integration notes and firmware findings |
-| [ESSL_MB160_BIOMETRIC_INTEGRATION.md](ESSL_MB160_BIOMETRIC_INTEGRATION.md) | the original integration write-up |
-| [BIOMETRIC_IOT_INTEGRATION_REPORT.md](BIOMETRIC_IOT_INTEGRATION_REPORT.md) | audit report for the IoT layer |
-| [DATABASE_SHARDING_ARCHITECTURE.md](DATABASE_SHARDING_ARCHITECTURE.md) | hiring shard topology and the shard guard |
-| [LOCAL_DATABASE.md](LOCAL_DATABASE.md), [BACKUP_RESTORE.md](BACKUP_RESTORE.md) | local MySQL setup, backups |
-| [OFFLINE_MODE.md](OFFLINE_MODE.md) | the desktop/offline variant |
-| [HOSTINGER_DEPLOYMENT_GUIDE.md](HOSTINGER_DEPLOYMENT_GUIDE.md) | cloud deployment and the ADMS push path |
-| [OPTIMIZATION_REPORT.md](OPTIMIZATION_REPORT.md) | performance findings |
-| [CHANGELOG.md](CHANGELOG.md), [PROJECT_MEMORY.md](PROJECT_MEMORY.md) | history and decisions |
+| Guide | Use |
+| --- | --- |
+| [Current session and Hostinger fixes](SESSION-DEPLOYMENT.md) | Shared-listener startup, database/schema recovery and session checks |
+| [Hostinger deployment](HOSTINGER_DEPLOYMENT_GUIDE.md) | Hosting background; prefer the current repair guide for changed startup behavior |
+| [Installation](INSTALLATION.md) | Installation background; verify commands against current package.json |
+| [Local database](LOCAL_DATABASE.md) | Local storage/development context |
+| [Backup and restore](BACKUP_RESTORE.md) | Procedures to adapt to actual databases, shards and storage |
+| [Troubleshooting](TROUBLESHOOTING.md) | Operational diagnosis |
+| [Testing](TESTING.md) | Test prerequisites and workflows |
+| [Offline mode](OFFLINE_MODE.md) | Historical design context; current scripts do not package a desktop installer |
 
-## The rule the whole system is built around
+## Architecture and functional guides
 
-A screen may display only what exists in the database. If a terminal did not
-report it, the UI says `—`, `Unknown`, `Not reported by device` or `NO_RECORD`
-instead of showing a plausible value. Concretely:
+- [Architecture](ARCHITECTURE.md) and [root architecture notes](../../ARCHITECTURE.md)
+- [Database sharding](DATABASE_SHARDING_ARCHITECTURE.md)
+- [Attendance flow](ATTENDANCE_FLOW.md)
+- [Bulk employee import](bulk_employee_import_guide.md)
+- [RBAC](RBAC.md) and [security notes](SECURITY.md)
+- [Device setup](DEVICE_SETUP.md)
+- [Biometric MB160](BIOMETRIC_MB160.md)
+- [eSSL integration](ESSL_MB160_BIOMETRIC_INTEGRATION.md)
+- [Biometric IoT report](BIOMETRIC_IOT_INTEGRATION_REPORT.md)
 
-* no face-match percentage is displayed unless the device sent `matchValue`
-  (the MB160 firmware in use sends none — every stored `matchValue` is `NULL`);
-* no punch row is generated to fill an empty ledger;
-* an enrolled ID that matches no employee stays in the exception queue and never
-  borrows someone else's identity;
-* weekly off, holiday, approved leave and absent come from their own records and
-  are not inferred from each other or from the weekday;
-* statuses are what the server observed: a device whose IP answers a ping but
-  fails the ZK handshake is `DISCONNECTED`, not `SYNCED`.
+## Reports and history
 
-Related source: `backend/src/services/biometric/verifyMode.ts`,
-`backend/src/services/biometric/ingest.ts`,
-`backend/src/services/attendance/attendanceWorkbook.ts`,
-`backend/src/routes/attendanceExports.ts`.
+- [API documentation report](reports/API_DOCUMENTATION.md)
+- [Security architecture report](reports/SECURITY_ARCHITECTURE.md)
+- [Organization module report](reports/ORGANIZATION_MODULE_DELIVERY.md)
+- [Optimization report](OPTIMIZATION_REPORT.md)
+- [Project memory](PROJECT_MEMORY.md)
+- [Documentation changelog](CHANGELOG.md) and [root changelog](../../CHANGELOG.md)
+- [Hiring change note](change-memory/2026-10-17-001-candidate-hiring-module.md)
+
+Reports and change-memory entries are point-in-time records. Executable scripts, route registration and migrations take precedence over older instructions. A historical test result is not evidence that the current live deployment passes.
+
+## Data accuracy and recent coverage
+
+Screens must represent actual database/device evidence. Unknown enrollments need exception handling. Ping is not authenticated synchronization. Do not invent punches or verification percentages. Keep weekly off, holiday, leave and absence distinct. Verify schema readiness, authorized login and real device ingestion separately.
+
+The workspace READMEs cover unified startup, explicit MySQL configuration, session proxy routing, missing-schema handling, retryable consent saves, device modes, hiring/outbox flow and migrations through 048. The root README contains the overall flow diagrams.

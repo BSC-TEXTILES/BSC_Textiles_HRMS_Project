@@ -1,1723 +1,275 @@
 # BSC Textiles HRMS
 
-### Next Generation Workforce Management System
-
-```text
-BSC Textiles Pvt Ltd
-Weaving Dreams, Building Futures
-```
-
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3-blue.svg?style=flat&logo=typescript)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-18.2-61dafb.svg?style=flat&logo=react)](https://react.dev/)
-[![Next.js](https://img.shields.io/badge/Next.js-14.0-black.svg?style=flat&logo=next.js)](https://nextjs.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg?style=flat&logo=node.js)](https://nodejs.org/)
-[![Express](https://img.shields.io/badge/Express-4.18-lightgrey.svg?style=flat&logo=express)](https://expressjs.com/)
-[![MySQL](https://img.shields.io/badge/MySQL-8.0-00758F.svg?style=flat&logo=mysql)](https://www.mysql.com/)
-[![Socket.IO](https://img.shields.io/badge/Socket.IO-4.7-black.svg?style=flat&logo=socket.io)](https://socket.io/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.3-38B2AC.svg?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
-[![Version](https://img.shields.io/badge/Version-1.0.0-purple.svg?style=flat)](package.json)
-[![License](https://img.shields.io/badge/License-Proprietary-red.svg?style=flat)](LICENSE)
-
----
-
-### 📚 Authoritative Architecture & Technical Documentation
-- 🖥️ **[Standalone Desktop Architecture (docs/ARCHITECTURE.md)](docs/ARCHITECTURE.md)**
-- 💽 **[Local SQLite Database Guide (docs/LOCAL_DATABASE.md)](docs/LOCAL_DATABASE.md)**
-- 📦 **[Windows Installation & Setup Guide (docs/INSTALLATION.md)](docs/INSTALLATION.md)**
-- ✈️ **[Complete Offline Mode Guide (docs/OFFLINE_MODE.md)](docs/OFFLINE_MODE.md)**
-- 🔄 **[Backup, Restore & Migration Guide (docs/BACKUP_RESTORE.md)](docs/BACKUP_RESTORE.md)**
-- 🛡️ **[Desktop Security Architecture (docs/SECURITY.md)](docs/SECURITY.md)**
-- 🧪 **[QA & Offline Test Report (docs/TESTING.md)](docs/TESTING.md)**
-- 📋 **[Release Changelog (docs/CHANGELOG.md)](docs/CHANGELOG.md)**
-- 🧠 **[Project Memory & Architectural Ledger (docs/PROJECT_MEMORY.md)](docs/PROJECT_MEMORY.md)**
-- 🔐 **[Role-Based Access Control — model, API & permission matrix (docs/RBAC.md)](docs/RBAC.md)**
-- 🧬 **[eSSL MB160 Biometric Sync & Attendance Pipeline (docs/BIOMETRIC_MB160.md)](docs/BIOMETRIC_MB160.md)**
-
----
-
-## 🖥️ Single-Computer Standalone Desktop Edition
-
-BSC Textiles HRMS is packaged as a **100% offline, standalone Windows desktop application** running on a single computer or laptop without requiring internet connectivity, cloud servers, or an external database.
-
-* **Target OS:** Windows 10 / Windows 11 (64-bit)
-* **Installer Executable:** `release/BSC-Textiles-Setup-1.0.0.exe`
-* **Local Database:** Embedded **SQLite 3 (WAL mode)** stored persistently at `%APPDATA%\BSCTextiles\data\bsc_textiles.db`
-* **Desktop Shell:** Electron with context isolation, native window frames, Start Menu & Desktop shortcuts
-* **Zero Post-Install Dependencies:** Runs directly upon installation with zero command line, VS Code, or dev tools required.
-
-### Desktop Commands
-```powershell
-# Run desktop app in development
-npm run dev:desktop
-
-# Package unpacked desktop executable
-npm run build:desktop
-
-# Compile distributable Windows NSIS installer
-npm run package:installer
-
-# One-click data migration from MySQL to SQLite
-npm run db:migrate-to-sqlite
-```
-
-## Table of Contents
-
-1. [Project Overview](#1-project-overview)
-2. [Product Vision](#2-product-vision)
-3. [Key Capabilities](#3-key-capabilities)
-4. [System Architecture](#4-system-architecture)
-5. [Technology Stack](#5-technology-stack)
-6. [Project Structure](#6-project-structure)
-7. [Functional Modules](#7-functional-modules)
-8. [User & Role Architecture](#8-user--role-architecture)
-9. [Location-Based Security](#9-location-based-security)
-10. [End-to-End System Flow](#10-end-to-end-system-flow)
-11. [Data Processing Architecture](#11-data-processing-architecture)
-12. [Database Architecture](#12-database-architecture)
-13. [API Architecture](#13-api-architecture)
-14. [Authentication Flow](#14-authentication-flow)
-15. [Authorization Flow](#15-authorization-flow)
-16. [Employee Flow](#16-employee-flow)
-17. [Attendance Flow](#17-attendance-flow)
-18. [Break Management Flow](#18-break-management-flow)
-19. [Face Verification Flow](#19-face-verification-flow)
-21. [Incentive Flow](#21-incentive-flow)
-22. [Payroll Flow](#22-payroll-flow)
-23. [Observation Flow](#23-observation-flow)
-24. [Live Streaming Flow](#24-live-streaming-flow)
-25. [Notification Flow](#25-notification-flow)
-26. [Realtime Architecture](#26-realtime-architecture)
-27. [Background Jobs](#27-background-jobs)
-28. [File & Media Processing](#28-file--media-processing)
-29. [Security Architecture](#29-security-architecture)
-30. [Error Handling](#30-error-handling)
-31. [Logging & Audit](#31-logging--audit)
-32. [Reporting Architecture](#32-reporting-architecture)
-33. [Environment Configuration](#33-environment-configuration)
-34. [Local Development](#34-local-development)
-35. [Database Setup](#35-database-setup)
-36. [Database Migrations & Seeds](#36-database-migrations--seeds)
-37. [Seed Data](#37-seed-data)
-38. [Testing](#38-testing)
-39. [Deployment](#39-deployment)
-40. [Production Checklist](#40-production-checklist)
-41. [Backup & Recovery](#41-backup--recovery)
-42. [Troubleshooting](#42-troubleshooting)
-43. [Maintenance](#43-maintenance)
-44. [Scalability](#44-scalability)
-45. [Future Modules](#45-future-modules)
-46. [Contribution Guidelines](#46-contribution-guidelines)
-47. [Support / Ownership](#47-support--ownership)
-48. [License](#48-license)
-
----
-
-## 1. Project Overview
-
-**BSC Textiles HRMS** is an enterprise-grade, multi-location workforce operations platform engineered specifically for **BSC Textiles Pvt Ltd** retail chain stores, flagship garment showrooms, and regional distribution hubs.
-
-Retail textile operations face unique workforce dynamics: high floor-staff counts, staggered shifts across morning, general, and evening windows, tight floor-coverage requirements, distinct lunch and tea break durations, and demanding sales target incentives. Legacy generic HRMS platforms fail in retail environments because they rely on batch daily punch cards, lack sub-second incentive calculations, permit proxy attendance, and offer zero visibility into real-time retail floor occupancy.
-
-BSC Textiles HRMS solves these operational bottlenecks by providing:
-- **Centralized Administrative Governance with Rigid Multi-Branch Isolation:** Super Administrators control all corporate policies, whereas branch managers (e.g., Belagavi, Davanagere, Shivamogga) only access their local personnel and roster records.
-- **Biometric & Cryptographic Fraud Prevention:** Server-validated face verification with a configurable match threshold (default $\ge 85.0\%$).
-- **Sub-Second Precision Incentive Engine:** Calculates on-time and early-arrival incentives at an authoritative ₹1.00/minute rate with mathematical explainability.
-- **Real-Time Break & Occupancy Oversight:** Sub-second WebSocket break countdowns with strict gendered duration allowances and automated overrun penalties.
-- **Supervisory Live Streaming & Floor Observations:** Live in-store stream broadcasts with timecoded performance feedback notes and incident tags.
-- **Transparent Multi-Branch Payroll Processing:** Consolidated gross-to-net salary derivation accounting for basic pay, allowances, incentives, break deductions, and attendance penalties.
-
----
-
-## 2. Product Vision
-
-The long-term vision of BSC Textiles HRMS is to serve as the unified operating system for all workforce, retail floor execution, and talent intelligence across BSC Textiles Pvt Ltd:
-
-1. **Zero Mock Policy:** Eliminating simulated or client-cached state in favor of fully normalized, ACID-compliant database transactions.
-2. **Deterministic Fairness:** Ensuring every incentive rupee, penalty deduction, and break allowance is mathematically traceable to the exact second.
-3. **Enterprise Scalability:** Scaling horizontally to 50+ retail branches across Karnataka and Southern India without redesigning schema relationships or security scoping.
-4. **Ecosystem Foundation:** Serving as the identity, organizational hierarchy, and auth provider for upcoming BSC Textiles enterprise extensions (Wedding CRM, Telecaller, Live Showroom TV, Visual Merchandising, and Customer Feedback).
-
----
-
-## 3. Key Capabilities
-
-| Capability Domain | Operational Description | Enterprise Impact |
-|---|---|---|
-| **Multi-Location Hierarchy** | 6-Tier Hierarchy: Location $\rightarrow$ Floor $\rightarrow$ Department $\rightarrow$ Section $\rightarrow$ Selling Point $\rightarrow$ Staff | Eliminates branch data leakage while allowing cross-store analytics |
-| **Biometric Face Verification** | Canvas capture matched against enrolled profile baseline ($\ge 85.0\%$ threshold) | Eliminates buddy punching and proxy card swapping |
-| **Early Login Incentives** | Configurable per-minute calculation (e.g., ₹1/min before scheduled shift start) | Drives prompt showroom readiness and opening compliance |
-| **Grace & Late Penalties** | Configurable grace windows (e.g., 5 min) with second-level penalty accruals | Standardizes punctuality enforcement transparently |
-| **Gendered Break Countdown** | Dynamic DB rules (Male Lunch: 100m, Female Lunch: 40m, Male Tea: 20m, Female Tea: 15m) | Accommodates operational retail realities while halting floor abandonment |
-| **Floor Live Streaming** | WebRTC/HLS/RTMP camera feeds with live chat and timecoded observations | Enables executive floor audits without physical travel |
-| **Payroll Auto-Generation** | Multi-branch draft-to-published salary runs aggregating incentives & penalties | Replaces error-prone monthly manual spreadsheet reconciliations |
-| **Audit Trail Logging** | Immutable transaction recording of auth, role changes, overrides, and scans | Ensures statutory labor compliance and non-repudiation |
-
----
-
-## 4. System Architecture
-
-The BSC Textiles HRMS architecture follows a decoupled client-server model with a real-time WebSocket communication bus, an Express API gateway, a high-performance native MySQL 8.0 connection pool (`mysql2/promise`), and a normalized relational cluster.
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280', 'secondaryColor': '#2E9D59', 'tertiaryColor': '#F3F4F6' }}}%%
-graph TB
-    subgraph CLIENT["Client Tier (Next.js 14 App Router)"]
-        UI_DESK["Employee Self-Service (My Desk)"]:::cBlue
-        UI_MGR["Manager & Floor Portals"]:::cBlue
-        UI_ADMIN["Super Admin Central Dashboard"]:::cBlue
-    end
-
-    subgraph GATEWAY["Security & Ingress Gateway"]
-        HELMET["Helmet & Security Headers"]:::cDark
-        CORS["Strict Origin CORS & Cookies"]:::cDark
-        RATELIMIT["Rate Limiter (1000 req/15m)"]:::cDark
-        AUTH_MW["JWT Verification & Location Scoping"]:::cBlue
-    end
-
-    subgraph API_TIER["Express Application Server (Node 20 / TS)"]
-        API_ROUTER["26 Domain REST API Routes"]:::cBlue
-        BIZ_RULES["Calculation Engines (Incentive/Penalty/Payroll)"]:::cOrange
-        SOCKET_SRV["Socket.IO Realtime Gateway"]:::cPurple
-    end
-
-    subgraph DATA_TIER["Persistence & Storage Tier"]
-        MYSQL_POOL["Native MySQL 8.0 Pool (mysql2)"]:::cDark
-        MYSQL[("MySQL 8.0 Normalized Database")]:::cDb
-        UPLOADS[("Local Media / Upload Storage")]:::cTeal
-    end
-
-    subgraph EXT_TIER["External Integrations (Future-Ready)"]
-        BIOMETRIC["Biometric Hardware Devices"]:::cTeal
-        STREAM_ENG["RTSP / RTMP Video Ingest Engine"]:::cTeal
-        MESSAGING["SMS & WhatsApp Notification Gateways"]:::cTeal
-    end
-
-    UI_DESK --> HELMET
-    UI_MGR --> HELMET
-    UI_ADMIN --> HELMET
-
-    HELMET --> CORS --> RATELIMIT --> AUTH_MW
-    AUTH_MW --> API_ROUTER
-    UI_MGR <--> SOCKET_SRV
-    UI_DESK <--> SOCKET_SRV
-
-    API_ROUTER --> BIZ_RULES
-    BIZ_RULES --> MYSQL_POOL
-    MYSQL_POOL --> MYSQL
-    API_ROUTER --> UPLOADS
-    API_ROUTER <--> EXT_TIER
-
-    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
-    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
-    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
-    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
-    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
-    classDef cTeal fill:#009688,stroke:#00675B,stroke-width:2px,color:#FFFFFF;
-    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
-    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
-```
-
----
-
-## 5. Technology Stack
-
-### Frontend Architecture
-- **Framework:** Next.js 14 (App Router architecture)
-- **Library:** React 18.2 (Functional components & Hooks)
-- **Language:** TypeScript 5.3
-- **Styling:** Tailwind CSS 3.3 + PostCSS + Autoprefixer
-- **State & Data Fetching:** React Hooks + Axios 1.6 + React Query patterns
-- **Forms & Validation:** React Hook Form 7.49 + Zod 3.22
-- **Real-Time Client:** Socket.IO Client 4.7
-- **UI Icons & Visuals:** Lucide React 0.294
-- **Charts & Data Viz:** Recharts 2.10
-- **Exporting & Printing:** jsPDF 2.5 + html2canvas 1.4
-
-### Backend API Server
-- **Runtime:** Node.js 20.x LTS
-- **Server Framework:** Express 4.18
-- **Language:** TypeScript 5.3 (Executed natively with `tsx`)
-- **Database Client:** Native MySQL 8.0 Driver (`mysql2/promise` connection pool)
-- **Authentication:** JSON Web Tokens (`jsonwebtoken` 9.0) + `bcryptjs` 2.4 (12 salt rounds)
-- **Security Hardening:** Helmet 7.1, CORS 2.8, Express Rate Limit 7.1, Cookie Parser 1.4
-- **Real-Time Messaging:** Socket.IO 4.7
-- **Utility Engines:** QRCode 1.5, Compression 1.7, Morgan 1.10
-
-### Database & Persistence
-- **RDBMS:** MySQL 8.0 Enterprise Community Server
-- **Schema Management:** Native DDL Schema & Sequential Migration Engine
-- **Normalization:** 3NF Schema with 38 relational tables & strict referential integrity
-
----
-
-## 6. Project Structure
-
-```text
-BSC-Textiles-HRMS/
-│
-├── frontend/                     # Next.js 14 Frontend Application
-│   ├── public/                   # Static branding, logos, icons
-│   ├── src/
-│   │   ├── app/                  # Next.js App Router (32+ functional pages)
-│   │   │   ├── admin/            # Platform administration (Audit, Backup, Roles)
-│   │   │   ├── attendance/       # Daily muster roll, shifts, live tracking
-│   │   │   ├── dashboard/        # Executive and role-specific analytics
-│   │   │   ├── employees/        # Employee profiles, onboarding, directories
-│   │   │   ├── incentives/       # Incentives and penalty management
-│   │   │   ├── leaves/           # Leave requests, balances, approvals
-│   │   │   ├── login/            # Authentication with 1-click test personas
-│   │   │   ├── my-desk/          # Employee self-service workspace
-│   │   │   ├── operations/       # Break & shift policy ops, floor live streams, observations
-│   │   │   ├── organization/     # Locations, floors, sections, selling points
-│   │   │   ├── payroll/          # Salary batches, payslips, draft calculations
-│   │   │   ├── reports/          # Multi-branch exportable business intelligence
-│   │   │   ├── layout.tsx        # Global shell and responsive sidebar layout
-│   │   │   └── providers.tsx     # Context providers (Auth, Socket, Toast)
-│   │   ├── components/           # Reusable UI component design system
-│   │   │   ├── AttendanceCountdown.tsx # Real-time sub-second break widget
-│   │   │   ├── Badge.tsx         # Color-coded status pills
-│   │   │   ├── Button.tsx        # Styled interactive buttons
-│   │   │   ├── Card.tsx          # Card container wrappers
-│   │   │   ├── DataTable.tsx     # Sortable, searchable data tables
-│   │   │   ├── FaceVerificationModal.tsx # WebCam biometric modal
-│   │   │   ├── LiveStreamPlayer.tsx # HLS/WebRTC stream player with chat
-│   │   │   ├── Modal.tsx         # Accessible overlay dialogue modals
-│   │   │   └── Sidebar.tsx       # Navigation drawer with RBAC route filtering
-│   │   └── lib/                  # Frontend utilities, Axios instance, Socket client
-│   ├── package.json
-│   ├── tailwind.config.js
-│   └── tsconfig.json
-│
-├── backend/                      # Express TypeScript Backend Server
-│   ├── src/
-│   │   ├── config/               # Server configuration & environment variables
-│   │   ├── middleware/           # Middleware pipeline
-│   │   │   ├── auth.ts           # JWT authentication, RBAC, location scoping
-│   │   │   └── validate.ts       # Zod request payload schema validation
-│   │   ├── routes/               # 26 Modular domain API routers
-│   │   │   ├── attendance.ts     # Check-in, check-out, status tracking
-│   │   │   ├── audit.ts          # Audit logs retrieval
-│   │   │   ├── auth.ts           # Login, logout, refresh, registration
-│   │   │   ├── breaks.ts         # Break start/stop, duration calculations
-│   │   │   ├── departments.ts    # Department organizational units
-│   │   │   ├── devices.ts        # Biometric hardware & scanner integration
-│   │   │   ├── employees.ts      # Staff directory, creation, lifecycle
-│   │   │   ├── faceVerification.ts # Biometric matching and score evaluation
-│   │   │   ├── floors.ts         # Showroom floor management
-│   │   │   ├── holidays.ts       # Branch holiday calendar
-│   │   │   ├── incentives.ts     # Calculation formulas, slabs, grants
-│   │   │   ├── liveStreams.ts    # RTMP/HLS broadcast channels & chat
-│   │   │   ├── locations.ts      # Multi-branch stores and regional hubs
-│   │   │   ├── notifications.ts  # In-app notifications & alerts
-│   │   │   ├── observations.ts   # Floor observation notes and tags
-│   │   │   ├── payroll.ts        # Payroll runs, salary computation, slips
-│   │   │   ├── penalties.ts      # Punctuality and behavioral deductions
-│   │   │   ├── reports.ts        # Aggregated attendance, payroll & HR reports
-│   │   │   ├── roles.ts          # Role configurations & permission matrices
-│   │   │   ├── sections.ts       # Retail sections within departments
-│   │   │   ├── sellingPoints.ts  # Cash registers & sales counters
-│   │   │   ├── settings.ts       # Location-specific system parameters
-│   │   │   ├── shifts.ts         # Shift windows & timing definitions
-│   │   │   ├── users.ts          # System user accounts & login credentials
-│   │   │   └── weeklyOffs.ts     # Roster weekly off assignments
-│   │   ├── tests/                # Automated integration test suite (PRD Sec. 60)
-│   │   │   ├── attendance.test.ts
-│   │   │   ├── breaks.test.ts
-│   │   │   ├── faceVerification.test.ts
-│   │   │   ├── incentives.test.ts
-│   │   │   ├── permissionsAndLocation.test.ts
-│   │   │   ├── runAllTests.ts    # Master runner executing all test suites
-│   │   │   └── security.test.ts
-│   │   └── index.ts              # Express HTTP + Socket.IO server initialization
-│   ├── package.json
-│   └── tsconfig.json
-│
-├── database/                     # Pure Native MySQL 8.0 Engine
-│   ├── migrations/               # 10 DDL SQL Migration files
-│   ├── seeds/                    # Enterprise multi-branch SQL seed files
-│   ├── src/                      # Connection pool (mysql2/promise)
-│   └── package.json
-│
-├── .env                          # Root environment configuration
-└── README.md                     # Master Technical Documentation System
-```
-
----
-
-## 7. Functional Modules
-
-The application is decomposed into 27 cohesive functional modules:
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-graph LR
-    subgraph CORE["1. Core Infrastructure"]
-        M01["Auth & Security"]:::cDark
-        M02["User Management"]:::cDark
-        M03["Location Scoping"]:::cDark
-        M04["Audit Logging"]:::cDark
-    end
-
-    subgraph ORG["2. Organization Hierarchy"]
-        M05["Locations / Stores"]:::cBlue
-        M06["Floors"]:::cBlue
-        M07["Departments"]:::cBlue
-        M08["Sections"]:::cBlue
-        M09["Selling Points"]:::cBlue
-    end
-
-    subgraph TIME["3. Time & Attendance"]
-        M10["Shifts & Rosters"]:::cGreen
-        M11["Muster Roll"]:::cGreen
-        M12["Break Counters"]:::cGreen
-        M13["Weekly Offs & Leaves"]:::cGreen
-    end
-
-    subgraph VERIFY["4. Identity & Verification"]
-        M14["Face Match Engine"]:::cTeal
-    end
-
-    subgraph COMP["5. Compensation & Operations"]
-        M17["Incentives (₹/sec)"]:::cOrange
-        M18["Penalty Accrual"]:::cOrange
-        M19["Payroll Processing"]:::cOrange
-        M20["Live Streams & Chat"]:::cPurple
-        M21["Floor Observations"]:::cPurple
-        M22["Reports & Analytics"]:::cBlue
-    end
-
-    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
-    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
-    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
-    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
-    classDef cTeal fill:#009688,stroke:#00675B,stroke-width:2px,color:#FFFFFF;
-    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
-```
-
----
-
-## 8. User & Role Architecture
-
-The system enforces strict Role-Based Access Control (RBAC) across 14 system roles. Each role is paired with explicit granular permissions (`VIEW`, `ADD`, `EDIT`, `DELETE`, `APPROVE`, `REJECT`, `ASSIGN`, `EXPORT`, `IMPORT`, `CONFIGURE`, `MANAGE`, `RECORD`, `UPLOAD`, `PUBLISH`, `SCAN`, `VIEW_SENSITIVE_DATA`).
-
-### Pre-Configured Personas & Default Test Accounts
-All pre-configured testing personas use the uniform password: `password123`.
-
-| Role Identifier | Representative Persona | Primary Scope | System Privileges |
-|---|---|---|---|
-| `SUPER_ADMIN` | `admin@bsctextiles.com` | **Global (All Locations)** | Unrestricted platform authority, database backups, policy tuning, master audit log access. |
-| `ADMIN` | `admin.bel@bsctextiles.com` | Assigned Branch | Full management of assigned store operations, user creation, and local reporting. |
-| `HR_MANAGER` | `kavita.bhat@bsctextiles.com` | Belagavi (`BEL`) | Full employee directory management, attendance regularizations, leave approvals, payroll runs. |
-| `HR_MANAGER` | `vikram.singh@bsctextiles.com` | Shivamogga (`SHI`) | Shivamogga branch staff management, leave approvals, and local muster audit. |
-| `HR_EXECUTIVE` | `deepa.nair@bsctextiles.com` | Assigned Branch | Daily punch review, leave entry, employee onboarding documentation. |
-| `PAYROLL_MANAGER` | `payroll@bsctextiles.com` | Assigned Branch | Salary calculation batches, bonus approval, deduction audit, slip generation. |
-| `LOCATION_MANAGER` | `store.bel@bsctextiles.com` | Belagavi (`BEL`) | Store-wide operational oversight, shift planning, floor management. |
-| `FLOOR_MANAGER` | `amit.patel@bsctextiles.com` | Ground Floor (`BEL`) | Live floor staff occupancy, selling point assignments, live stream observation notes. |
-| `DEPARTMENT_MANAGER`| `dept.mens@bsctextiles.com` | Men's Wear Dept | Departmental staff scheduling, target monitoring, sales incentive approvals. |
-| `TEAM_LEAD` | `lead.sarees@bsctextiles.com`| Saree Section | Shift attendance verification, break discipline, counter coaching. |
-| `SALES_EMPLOYEE` | `rajesh.kumar@bsctextiles.com`| Ground Floor Counter | Self-service My Desk portal, punch check-in, payslip view. |
-| `T_SHOP_OWNER` | `ramesh.gowda@bsctextiles.com` | Refreshment Area | Refreshment zone operations and break token supervision. |
-| `TEA_BREAK_MANAGER` | `break.mgr@bsctextiles.com` | Refreshment Area | Refreshment zone queue monitoring, overrun verification, manual break adjustments. |
-| `HR_AUDITOR` | `auditor@bsctextiles.com` | Assigned Branch | Read-only compliance auditor access for labor muster records and incentive audit logs. |
-
----
-
-## 9. Location-Based Security
-
-Data isolation across regional BSC Textiles showrooms is enforced strictly at the API and database levels.
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+A multi-location human resources and showroom operations web application covering employees, biometric attendance, leave, payroll, hiring, organization management and administrative access.
+
+This guide describes the source as of **15 November 2026**. Features present in source still require configured databases, permissions, devices and external services. A successful build does not establish production readiness.
+
+## Documentation
+
+- [Frontend](frontend/README.md), [backend](backend/README.md) and [database](database/README.md) workspace guides.
+- [Documentation library](backend/docs/README.md) for detailed functional and operational guides.
+- [Current Hostinger/session recovery](backend/docs/SESSION-DEPLOYMENT.md).
+- [Edge connector](backend/connector/README.md), [security policy](SECURITY.md) and [change history](CHANGELOG.md).
+
+## Technology and layout
+
+| Layer | Implementation |
+| --- | --- |
+| Web UI | Next.js 15.5.29 App Router, React 18.3.1, TypeScript, Tailwind CSS |
+| API | Express, Node.js 20+, TypeScript |
+| Live updates | Socket.IO |
+| Primary database deployment | MySQL with mysql2 and native SQL migrations |
+| Additional adapters | Backend PostgreSQL and SQLite paths; provisioning is engine-specific |
+| Authentication | Backend session/token services and NextAuth browser integration |
+| Shared security state | Redis when configured; process-local fallback differs in durability and multi-instance behavior |
+| Hardware | eSSL/ZKTeco protocol adapter, ADMS push, separate device worker/connector |
+| Exports | ExcelJS and PDFKit |
+| Packages | npm workspaces; packageManager specifies npm 10.8.2 |
+
+~~~text
+server.js                  Unified production startup and HTTP listener
+server-routing.js          Dispatch between Express and Next.js
+frontend/src/app/          Screens, layouts and Next API handlers
+frontend/src/components/   Shared and domain UI components
+backend/src/routes/        Business and administrative HTTP endpoints
+backend/src/services/      Domain, security, biometric and hiring services
+backend/src/core/          Shared infrastructure and sharding
+backend/src/tests/         Regression and integration suites
+backend/connector/         Showroom LAN-to-cloud punch forwarder
+backend/docs/              Operational guides, design notes and reports
+database/migrations/       Versioned MySQL changes
+database/scripts/          Migration, schema, seed and maintenance commands
+storage/ and uploads/      Runtime file storage
+.env.example               Configuration template; real secrets stay private
+~~~
+
+## Modules
+
+Screen availability depends on role permissions and organization/location scope. The API remains authoritative for access checks.
+
+| Module | Functionality | Screens |
+| --- | --- | --- |
+| Dashboard | Workforce summaries and live operational activity | /dashboard |
+| Employees | Active, inactive and former staff; profiles, history, analysis, imports and documents | /employees |
+| Organization | Locations, departments, designations, floor managers, holidays and approvals | /organization |
+| Attendance | Punches, register, muster, shifts, calculations, corrections, missed punches, breaks, late fines and exports | /attendance |
+| Devices | Terminal registry, sync diagnostics, enrollment mapping and mismatch investigation | /attendance/devices |
+| Leave | Leave requests and approval workflows | /leaves |
+| Payroll | Salary structures, payroll views, payslips, reports and floor overview | /payroll |
+| Incentives | Incentive records and calculations | /incentives |
+| Operations | Selling points, shifts, observations, breaks, live attendance, streams, KYC and face verification | /operations |
+| Hiring | Forms, candidate lists/details and settings | /hiring |
+| Public applications | Application form reached by published code | /apply/[code] |
+| Self-service | Personal work area and employee profile | /my-desk, /profile |
+| Administration | Users, roles, module access, credentials, security, audit, settings, shards and database tools | /admin |
+| Search/reporting | Cross-module search and reports | /search, /reports |
+| Privacy/account | Login, password changes, consent and policy pages | /login, /change-password and policy routes |
+
+See [RBAC](backend/docs/RBAC.md) for permissions. Financial results depend on validated attendance and configured policies; generating an export does not mean a payroll period has been approved.
+
+## Architecture and data flows
+
+### Production request flow
+
+~~~mermaid
 flowchart TD
-    REQ["Incoming API Request"]:::cBlue --> EXTRACT["Extract JWT Claims (userId, role, locationId)"]:::cDark
-    EXTRACT --> IS_SUPER{"Role == SUPER_ADMIN?"}:::cOrange
+    Browser[Browser] --> HTTPS[Hosting HTTPS endpoint]
+    HTTPS --> Server[server.js shared PORT listener]
+    Server --> Router[server-routing.js]
+    Router --> Web[Next.js pages and selected APIs]
+    Router --> API[Express API]
+    API --> Guard[Session, permission and scope checks]
+    Guard --> Services[Domain services]
+    Services --> DB[(Database and configured shards)]
+    Services --> Files[(Uploads and storage)]
+    Services --> Redis[(Redis when configured)]
+    Services --> Events[Notifications and activity events]
+    Events --> Socket[Socket.IO on shared listener]
+    Socket --> Browser
+    Web --> Browser
+~~~
 
-    IS_SUPER -- "YES" --> UNRESTRICTED["Permit Global Query Access (No location filter applied)"]:::cGreen
-    IS_SUPER -- "NO" --> CHECK_SCOPE{"Target Resource Matches req.user.locationId?"}:::cOrange
+Unified production runs Next.js, Express and Socket.IO in one process on one listener. The listener binds early and returns temporary 503 responses while initialization completes. It does not spawn a separate API process on port 4000.
 
-    CHECK_SCOPE -- "MATCH / OWN BRANCH" --> INJECT_FILTER["Force locationId Filter in MySQL Query"]:::cGreen
-    CHECK_SCOPE -- "MISMATCH / TAMPERING" --> REJECT_403["Reject: 403 Forbidden ('Access denied to this location')"]:::cRed
+Most /api requests go to Express. /api/auth belongs to NextAuth; selected dashboard read APIs stay with Next.js. [server-routing.js](server-routing.js) defines the exceptions. Express is also mounted under /api/v1. ADMS /iclock, health/readiness, attendance uploads and signing-key discovery have explicit backend routing.
 
-    INJECT_FILTER --> EXECUTE_DB["Execute Query on MySQL (Branch Records Only)"]:::cDb
+### Login and authorization
 
-    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
-    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
-    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
-    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
-    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
-    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
-```
-
-### Pre-Configured Store Locations
-1. **Belagavi (`BEL`):** Head Store / Primary Regional Hub
-2. **Davanagere (`DAV`):** Central Karnataka Showroom
-3. **Shivamogga (`SHI`):** Malnad Flagship Showroom
-
-### Anti-Tampering Rules:
-- An HR Manager assigned to **Shivamogga (`SHI`)** attempting to fetch `/api/employees?locationId=BEL` will have the query overridden or rejected with a `403 Forbidden`.
-- Direct ID references (e.g. `PATCH /api/employees/emp_bel_001`) are cross-checked against the employee's parent `locationId`.
-
----
-
-## 10. End-to-End System Flow
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+~~~mermaid
 sequenceDiagram
-    autonumber
-    actor Staff as Sales Employee
-    actor Scanner as T-Shop Scanner
-    actor Mgr as Floor / HR Manager
-    participant App as Web Frontend
-    participant API as Express API
-    participant Engine as Calculation Engine
-    participant DB as MySQL Database
-    participant Sock as Socket.IO Hub
+    participant U as Browser
+    participant A as Express session API
+    participant D as Database / security store
+    participant N as NextAuth
+    U->>A: POST /api/session/login
+    A->>D: Verify account, password, login protection and optional MFA
+    D-->>A: Authentication result
+    A-->>U: Backend session cookies and exchange ticket on success
+    U->>N: Complete browser session using ticket
+    N->>A: Exchange one-use ticket
+    A-->>N: Validated session information
+    N-->>U: Browser session
+    U->>A: Protected request with cookies
+    A->>A: Validate session, action permission and record scope
+    A-->>U: Authorized result or rejection
+~~~
 
-    Staff->>App: Check-in (Webcam Face Verification)
-    App->>API: POST /api/attendance/check-in {faceMatchScore: 92.4}
-    API->>Engine: Evaluate Shift Timing (Punctuality vs 10:30 AM)
-    Engine-->>API: Early by 600s -> +₹600.00 Incentive
-    API->>DB: INSERT Attendance Record (PRESENT, ₹600 incentive)
-    API->>Sock: Emit 'attendance.updated'
-    Sock-->>Mgr: Update Floor Presence Widget
+Backend access/refresh tokens use HttpOnly cookies. NextAuth supplies browser session integration, while backend authorization protects business data. In standalone frontend deployments the session proxy forwards to BACKEND_URL; unified production dispatches session requests directly to Express.
 
-    Staff->>App: Start Break at Refreshment Zone
-    App->>API: POST /api/breaks/start {employeeId, breakType: 'TEA'}
-    API->>DB: Lookup Policy & Start Break Clock
-    API->>Sock: Emit 'break.started' {duration: 1200s}
-    Sock-->>Staff: Launch My Desk Countdown Timer
+### Biometric attendance
 
-    Note over Staff,App: 20 Minutes Pass...
-    Staff->>App: End Break upon Return
-    App->>API: POST /api/breaks/end {breakId}
-    API->>Engine: Calculate Elapsed Duration & Overrun
-    Engine-->>API: 0s Overrun -> Status: COMPLETED
-    API->>DB: UPDATE Break Record (COMPLETED)
-    API->>Sock: Emit 'break.ended'
-```
-
----
-
-## 11. Data Processing Architecture
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+~~~mermaid
 flowchart TD
-    IN["User Input Event (Form / Scanner / Camera)"]:::cBlue --> VAL_FE["Frontend Zod Validation & Typecheck"]:::cBlue
-    VAL_FE --> HTTP["Encrypted HTTPS / Cookie-Bearer Dispatch"]:::cBlue
-
-    HTTP --> SEC_MW["Express Middleware: Helmet, CORS, RateLimit"]:::cDark
-    SEC_MW --> AUTH_MW["JWT Verification & Fresh DB Permissions Query"]:::cDark
-
-    AUTH_MW -- "Invalid Auth" --> ERR_AUTH["HTTP 401 Unauthorized"]:::cRed
-    AUTH_MW -- "Valid Auth" --> LOC_MW["Location Isolation & Role Permission Gate"]:::cDark
-
-    LOC_MW -- "Unauthorized Scope" --> ERR_PERM["HTTP 403 Forbidden"]:::cRed
-    LOC_MW -- "Authorized" --> SCHEMA_VAL["Backend Zod Body & Query Validation"]:::cDark
-
-    SCHEMA_VAL -- "Malformed Schema" --> ERR_VAL["HTTP 400 Bad Request"]:::cRed
-    SCHEMA_VAL -- "Valid" --> BIZ_CTRL["Domain Business Controller Execution"]:::cGreen
-
-    BIZ_CTRL --> CALC["Mathematical Rules Engine (Incentive / Break / Overtime)"]:::cOrange
-    CALC --> DB_TX["MySQL Multi-Table ACID Transaction"]:::cDb
-
-    DB_TX --> WRITE_AUDIT["Append-Only Audit Log Transaction Record"]:::cDb
-    DB_TX --> DISPATCH_WS["Socket.IO Event Broadcast to Location Room"]:::cPurple
-    DISPATCH_WS --> RESP["HTTP 200/201 JSON Response with Explainability Metadata"]:::cGreen
-
-    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
-    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
-    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
-    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
-    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
-    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
-    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
-```
-
----
-
-## 12. Database Architecture
-
-The data tier is structured around 38 relational tables on Native MySQL 8.0:
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#00758F', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-erDiagram
-    LOCATION ||--o{ FLOOR : contains
-    FLOOR ||--o{ DEPARTMENT : houses
-    DEPARTMENT ||--o{ SECTION : divides
-    SECTION ||--o{ SELLING_POINT : designates
-    LOCATION ||--o{ EMPLOYEE : employs
-    LOCATION ||--o{ USER : scopes
-    USER ||--o| EMPLOYEE : profiles
-
-    EMPLOYEE ||--o{ ATTENDANCE : logs
-    EMPLOYEE ||--o{ BREAK : takes
-    EMPLOYEE ||--o{ FACE_LOG : submits
-    EMPLOYEE ||--o{ INCENTIVE_GRANT : earns
-    EMPLOYEE ||--o{ PENALTY_RECORD : incurs
-    EMPLOYEE ||--o{ OBSERVATION : receives
-
-    PAYROLL_RUN ||--o{ PAYROLL_ITEM : contains
-    EMPLOYEE ||--o{ PAYROLL_ITEM : pays
-
-    USER ||--o{ AUDIT_LOG : audits
-    LOCATION ||--o{ LIVE_STREAM : broadcasts
-```
-
-### Core Normalized Models
-
-| Model | Primary Keys / Indexes | Purpose |
-|---|---|---|
-| `Location` | `id` (CUID), `code` (Unique: `BEL`, `DAV`, etc.) | Showrooms, distribution hubs, corporate headquarters. |
-| `Floor` | `id`, `locationId` | Physical architectural floors within a showroom. |
-| `Department` | `id`, `locationId`, `floorId` | Functional divisions (e.g., Men's, Women's, Sarees). |
-| `Section` | `id`, `departmentId` | Dedicated display aisles and counters. |
-| `SellingPoint`| `id`, `sectionId`, `code` (Unique) | Physical checkout terminals and sales counters. |
-| `Employee` | `id`, `employeeCode` (Unique), `locationId` | Master personnel file, biometric baseline, base pay. |
-| `User` | `id`, `email` (Unique), `employeeId` | System authentication account, role, permissions. |
-| `Attendance` | `id`, `employeeId`, `attendanceDate`, `locationId` | Daily muster record, punch in/out, calculated incentives. |
-| `Break` | `id`, `employeeId`, `attendanceId`, `type`, `status` | Individual break clock instance, duration, overrun. |
-| `QRCode` | `id`, `employeeId`, `token` (Unique), `validDate` | Ephemeral daily QR token and scan validity state. |
-| `IncentiveGrant`| `id`, `employeeId`, `ruleId` | Itemized monetary rewards with formula explainability. |
-| `PayrollRun` | `id`, `periodStart`, `periodEnd`, `status` | Monthly salary calculation batch. |
-| `PayrollItem`| `id`, `payrollRunId`, `employeeId` | Itemized net pay calculation for an individual employee. |
-| `AuditLog` | `id`, `userId`, `action`, `tableName`, `createdAt` | Immutable compliance and non-repudiation ledger. |
-
----
-
-## 13. API Architecture
-
-The backend exposes 26 RESTful resource domains grouped under the `/api` root:
-
-| Resource Domain | Base Route | Key Endpoints | Purpose |
-|---|---|---|---|
-| **Authentication** | `/api/auth` | `POST /login`, `POST /logout`, `GET /me` | JWT lifecycle and active user claims. |
-| **Users** | `/api/users` | `GET /`, `POST /`, `PATCH /:id`, `DELETE /:id` | User directory and credential management. |
-| **Locations** | `/api/locations` | `GET /`, `POST /`, `GET /:id` | Showroom and branch store master records. |
-| **Floors** | `/api/floors` | `GET /`, `POST /`, `PATCH /:id` | Store floor management and manager assignments. |
-| **Departments** | `/api/departments` | `GET /`, `POST /`, `PATCH /:id` | Departmental sections and supervision. |
-| **Selling Points** | `/api/selling-points`| `GET /`, `POST /`, `PATCH /:id` | Sales counter and checkout terminal mapping. |
-| **Employees** | `/api/employees` | `GET /`, `POST /`, `GET /:id`, `PATCH /:id` | Staff directory, onboarding, biometric baselines. |
-| **Shifts** | `/api/shifts` | `GET /`, `POST /`, `PATCH /:id` | Shift templates, start/end times, grace windows. |
-| **Attendance** | `/api/attendance` | `GET /muster`, `POST /check-in`, `POST /check-out` | Muster roll and punch calculations. |
-| **Breaks** | `/api/breaks` | `GET /active`, `POST /start`, `POST /end` | Real-time break timers and overrun records. |
-| **Face Verification**| `/api/face-verification` | `POST /verify`, `GET /logs` | Biometric image comparison and match logs. |
-| **Incentives** | `/api/incentives` | `GET /rules`, `POST /calculate`, `GET /summary` | Sub-second early login & target bonus calculations. |
-| **Penalties** | `/api/penalties` | `GET /`, `POST /record`, `PATCH /:id/waive` | Late arrival and break overage deductions. |
-| **Payroll** | `/api/payroll` | `GET /runs`, `POST /generate`, `POST /publish` | Batch payroll calculation and payslip generation. |
-| **Observations** | `/api/observations` | `GET /`, `POST /`, `POST /:id/reactions` | Supervisory floor feedback, video notes, tags. |
-| **Live Streams** | `/api/live-streams` | `GET /active`, `POST /start`, `POST /messages` | In-store stream channels, chat, and observations. |
-| **Notifications** | `/api/notifications`| `GET /`, `PATCH /:id/read`, `POST /mark-all-read` | Bell feed in the top header; realtime socket push. |
-| **Audit Logs** | `/api/audit` | `GET /`, `GET /export` | Immutable audit trail query and CSV export. |
-| **Reports** | `/api/reports` | `GET /attendance`, `GET /payroll`, `GET /performance`| Business intelligence reports with PDF/Excel export. |
-
----
-
-## 14. Authentication Flow
-
-The BSC Textiles HRMS implements a multi-tier, zero-trust authentication architecture combining **NextAuth.js (App Router)** on the client, **stateless JSON Web Tokens (JWT)** on the API gateway, **HttpOnly/SameSite session cookies**, and fresh database-backed permission validation on every protected request.
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-graph TB
-    subgraph CLIENT_AUTH["1. Client Layer (Next.js 14 / NextAuth)"]
-        UI_LOGIN["Login Form (/login)"]:::cBlue
-        PERSONAS["1-Click Test Persona Selector"]:::cBlue
-        NEXTAUTH_CRED["NextAuth CredentialsProvider"]:::cBlue
-        SESSION_STORE["NextAuth JWT Session Store"]:::cBlue
-        AXIOS_INTERCEPT["Axios Bearer Interceptor"]:::cBlue
-    end
-
-    subgraph API_AUTH["2. Ingress & Auth Gateway (/api/auth)"]
-        RATE_LIMIT["Rate Limiter (1,000 req / 15 min)"]:::cDark
-        ZOD_LOGIN["Zod Body Validation (email, password >= 6)"]:::cDark
-        BCRYPT_EVAL["Bcrypt Hash Verification (12 Salt Rounds)"]:::cOrange
-        JWT_ISSUER_ENG["JWT Token Generator (TTL: 12h, ISS: bsc-textiles-hrms)"]:::cDark
-    end
-
-    subgraph DB_AUTH["3. Persistence & Audit Layer (MySQL 8.0)"]
-        USER_TABLE[("User Master Table")]:::cDb
-        EMP_TABLE[("Linked Employee Record")]:::cDb
-        AUDIT_LOGIN[("AuditLog (Action: LOGIN / LOGOUT)")]:::cDb
-    end
-
-    UI_LOGIN --> NEXTAUTH_CRED
-    PERSONAS --> NEXTAUTH_CRED
-    NEXTAUTH_CRED --> RATE_LIMIT --> ZOD_LOGIN --> BCRYPT_EVAL
-    BCRYPT_EVAL <--> USER_TABLE
-    USER_TABLE <--> EMP_TABLE
-    BCRYPT_EVAL --> JWT_ISSUER_ENG
-    JWT_ISSUER_ENG --> AUDIT_LOGIN
-    JWT_ISSUER_ENG --> SESSION_STORE
-    SESSION_STORE --> AXIOS_INTERCEPT
-
-    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
-    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
-    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
-    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
-    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
-    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
-```
-
----
-
-### 14.1 Complete Login Sequence & Audit Flow
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-sequenceDiagram
-    autonumber
-    actor User as User / Store Staff
-    participant Browser as Browser Client (/login)
-    participant NextAuth as NextAuth Gateway
-    participant AuthAPI as Express API (/api/auth)
-    participant DB as MySQL Database
-
-    User->>Browser: Enters email and password (or selects 1-click persona)
-    Browser->>NextAuth: signIn('credentials', { email, password })
-    NextAuth->>AuthAPI: POST /api/auth/login { email, password }
-    AuthAPI->>AuthAPI: Zod Schema Validation (email format, password min length)
-    alt Invalid Schema Format
-        AuthAPI-->>NextAuth: 400 Bad Request ({ error: "Invalid email or password format" })
-        NextAuth-->>Browser: Display Validation Error Toast
-    end
-
-    AuthAPI->>DB: SELECT * FROM User WHERE email = ? (include employee)
-    alt User Not Found OR User.isActive == false
-        DB-->>AuthAPI: null or isActive=false
-        AuthAPI-->>NextAuth: 401 Unauthorized ("Invalid credentials")
-        NextAuth-->>Browser: Display: "Invalid email or password"
-    end
-
-    AuthAPI->>AuthAPI: bcrypt.compare(password, user.passwordHash)
-    alt Password Hash Mismatch
-        AuthAPI-->>NextAuth: 401 Unauthorized ("Invalid credentials")
-        NextAuth-->>Browser: Display: "Invalid email or password"
-    else Password Hash Verified
-        AuthAPI->>AuthAPI: jwt.sign({ userId: user.id, iss: 'bsc-textiles-hrms' }, JWT_SECRET, { expiresIn: '12h' })
-        AuthAPI->>DB: UPDATE User SET lastLoginAt = NOW() WHERE id = user.id
-        AuthAPI->>DB: INSERT INTO AuditLog (userId, action: 'LOGIN', entityType: 'User', ipAddress, userAgent)
-        AuthAPI-->>NextAuth: 200 OK + Set-Cookie: token=... (HttpOnly, SameSite=Lax, Secure)<br/>JSON: { user: { id, email, fullName, role, permissions, locationId, employeeId }, token }
-        NextAuth->>Browser: Session Cookie Established (JWT Strategy)
-        Browser-->>User: Redirect to Authorized Workspace (/dashboard or /my-desk)
-    end
-```
-
----
-
-### 14.2 Session Hydration & Current User Profile (`GET /api/auth/me`)
-
-When an authenticated client mounts or navigates, the app validates session state against `/api/auth/me`:
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-flowchart TD
-    APP_MOUNT["Client Component Mount / Navigation"]:::cBlue --> REQ_ME["GET /api/auth/me (Bearer Token or Cookie)"]:::cBlue
-    REQ_ME --> VERIFY_TOKEN{"jwt.verify(token, JWT_SECRET)"}:::cDark
-
-    VERIFY_TOKEN -- "Invalid / Expired" --> RET_401["401 Unauthorized<br/>Purge Client Session & Redirect /login"]:::cRed
-    VERIFY_TOKEN -- "Valid Signature" --> FETCH_USER["Query MySQL: User + Employee + Location + Shift"]:::cDb
-
-    FETCH_USER --> USER_ACTIVE{"user.isActive == true?"}:::cOrange
-    USER_ACTIVE -- "NO (Deactivated)" --> RET_INACTIVE["401 User Inactive"]:::cRed
-    USER_ACTIVE -- "YES" --> HYDRATE_CLIENT["200 OK: Return Enriched User Profile<br/>(fullName, role, permissions, location, floor, department, shift)"]:::cGreen
-
-    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
-    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
-    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
-    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
-    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
-    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
-```
-
----
-
-### 14.3 Token Lifecycle & Rolling Session Refresh (`POST /api/auth/refresh`)
-
-To prevent abrupt mid-shift session expiration while maintaining strict token TTLs:
-1. Tokens carry a **12-hour expiration window** (`JWT_EXPIRES_IN="12h"`).
-2. The client or background worker sends a `POST /api/auth/refresh` request before expiration.
-3. The server validates the existing token, re-reads the latest permissions from MySQL, and issues a fresh token with an updated 12-hour expiration window and updated `HttpOnly` cookie.
-
----
-
-### 14.4 Logout & Session Revocation (`POST /api/auth/logout`)
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-sequenceDiagram
-    autonumber
-    actor User as Staff Member
-    participant Client as Web App Shell
-    participant AuthAPI as /api/auth/logout
-    participant DB as MySQL Audit Ledger
-
-    User->>Client: Clicks "Sign Out"
-    Client->>AuthAPI: POST /api/auth/logout (Bearer Token or Cookie)
-    AuthAPI->>DB: INSERT INTO AuditLog (userId, action: 'LOGOUT', ipAddress, userAgent)
-    AuthAPI-->>Client: Clear-Cookie: token=; Max-Age=0<br/>JSON: { message: "Logged out successfully" }
-    Client->>Client: NextAuth signOut({ redirect: true, callbackUrl: '/login' })
-    Client-->>User: Redirect to /login
-```
-
----
-
-### 14.5 Password Rotation & Security Policy (`PUT /api/auth/change-password`)
-
-- Requires active authentication via `authenticate` middleware.
-- Validates current password against `user.passwordHash` via bcrypt.
-- Enforces new password minimum length ($\ge 6$ characters).
-- Computes new bcrypt hash using **12 salt rounds**.
-- Commits update to MySQL and records an immutable `AuditLog` entry (`action: 'UPDATE'`).
-
----
-
-### 14.6 Authentication Security Matrix & Error Handling
-
-| Scenario | HTTP Status | Response Contract | Security Action |
-|---|---|---|---|
-| **Invalid Email / Non-Existent Account** | `401 Unauthorized` | `{"error": "Invalid credentials"}` | Generic message prevents username enumeration. |
-| **Incorrect Password** | `401 Unauthorized` | `{"error": "Invalid credentials"}` | Increments failed attempts; preserves non-disclosure. |
-| **Account Deactivated (`isActive: false`)** | `401 Unauthorized` | `{"error": "User not found or inactive"}` | Blocks login even with correct password credentials. |
-| **Missing Token on Protected Route** | `401 Unauthorized` | `{"error": "Authentication required"}` | Rejects request before reaching business logic controllers. |
-| **Forged or Tampered JWT Signature** | `401 Unauthorized` | `{"error": "Invalid token"}` | Rejected by `jwt.verify` cryptographic signature check. |
-| **Expired JWT Token** | `401 Unauthorized` | `{"error": "Invalid token"}` | Client Axios interceptor redirects user to `/login`. |
-| **Rate Limit Threshold Exceeded** | `429 Too Many Requests` | `{"error": "Too many requests, please try again later"}` | Ingress rate limiter caps requests at 1,000 per 15-minute window. |
-
-
----
-
-## 15. Authorization Flow
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-flowchart TD
-    REQ["Incoming Protected Request"]:::cBlue --> TOKEN_CHECK{"Cookie or Bearer Token Present?"}:::cDark
-
-    TOKEN_CHECK -- "NO" --> ERR_401["HTTP 401: Authentication required"]:::cRed
-    TOKEN_CHECK -- "YES" --> VERIFY_JWT["Verify Signature against JWT_SECRET"]:::cDark
-
-    VERIFY_JWT -- "Invalid / Expired" --> ERR_INVALID["HTTP 401: Invalid token"]:::cRed
-    VERIFY_JWT -- "Valid Signature" --> DB_LOOKUP["Fetch Fresh User Privileges from MySQL"]:::cDb
-
-    DB_LOOKUP -- "Inactive / Deleted" --> ERR_INACTIVE["HTTP 401: User inactive"]:::cRed
-    DB_LOOKUP -- "Active" --> ATTACH_USER["Attach req.user {id, email, fullName, role, permissions, locationId}"]:::cBlue
-
-    ATTACH_USER --> PERM_CHECK{"authorize(...requiredPermissions)"}:::cOrange
-
-    PERM_CHECK -- "Role == SUPER_ADMIN" --> PASS_GATE["Permit Execution"]:::cGreen
-    PERM_CHECK -- "Lacks Required Permission" --> ERR_403["HTTP 403: Insufficient permissions"]:::cRed
-    PERM_CHECK -- "All Permissions Present" --> LOC_GATE{"authorizeLocation Scope"}:::cOrange
-
-    LOC_GATE -- "Target Location != req.user.locationId" --> ERR_LOC["HTTP 403: Access denied to this location"]:::cRed
-    LOC_GATE -- "Location Matches / Global" --> PASS_GATE
-
-    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
-    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
-    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
-    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
-    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
-    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
-```
-
----
-
-## 16. Employee Flow
-
-The complete staff lifecycle is tracked in a unified pipeline:
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
+    Terminal[eSSL / ZKTeco terminal] -->|ADMS push| ADMS[/iclock routes]
+    Terminal -->|LAN protocol| Poll[Local worker or edge connector]
+    Poll -->|Connector upload| Ingest[/api/devices/ingest-raw]
+    ADMS --> Process[Validate terminal, normalize time and deduplicate]
+    Ingest --> Process
+    Poll -->|Worker processing| Process
+    Process --> Raw[(Raw punch evidence)]
+    Raw --> Map[Map enrollment to employee]
+    Map -->|Known employee| Attendance[Attendance and shift calculations]
+    Map -->|Unknown or inconsistent| Review[Exception review]
+    Attendance --> Views[Registers, live screens and exports]
+    Attendance --> Payroll[Payroll inputs]
+~~~
+
+Reachability, device authentication, downloaded punches, employee mapping and attendance calculation are separate states. Ping alone does not prove synchronization. Unknown enrollments require review; do not invent punches or biometric match percentages. Holiday, weekly-off, leave and absence classifications remain distinct.
+
+### Hiring and business processing
+
+~~~mermaid
 flowchart LR
-    ONBOARD["1. Onboarding & Registration"]:::cBlue --> ENROLL["2. Biometric Photo Enrollment"]:::cTeal
-    ENROLL --> ASSIGN["3. Branch, Floor & Selling Point Assignment"]:::cBlue
-    ASSIGN --> ACTIVE["4. Active Duty (Daily Attendance)"]:::cGreen
-    ACTIVE --> PERF["5. Performance & Observation Feedback"]:::cPurple
-    PERF --> PAY["6. Monthly Payroll Disbursement"]:::cOrange
-    ACTIVE --> SEPARATION["7. Resignation / Separation"]:::cDark
-
-    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
-    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
-    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
-    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
-    classDef cTeal fill:#009688,stroke:#00675B,stroke-width:2px,color:#FFFFFF;
-    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
-```
-
----
-
-## 17. Attendance Flow
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-flowchart TD
-    PUNCH["Employee Punch Request"]:::cBlue --> FACE_GATE{"Face Match >= 85.0%?"}:::cTeal
-
-    FACE_GATE -- "NO (< 85%)" --> LOG_FAIL["Log FAILED Biometric Event & Block Punch"]:::cRed
-    FACE_GATE -- "YES (>= 85%)" --> CHECK_TIME{"Check Server Clock vs Shift Start (e.g. 10:30 AM)"}:::cOrange
-
-    CHECK_TIME -- "Arrived Earlier than Shift Start" --> CALC_EARLY["Calculate Early Minutes * ₹1.00/min<br/>(e.g., 10 mins = ₹10.00 Incentive)"]:::cGreen
-    CHECK_TIME -- "Within Grace Window (<= 5 min)" --> GRACE["Mark Status: PRESENT<br/>₹0 Penalty (Grace Protected)"]:::cGreen
-    CHECK_TIME -- "Arrived Past Grace (> 5 min)" --> CALC_LATE["Calculate Late Seconds * Penalty Policy<br/>Status: LATE"]:::cOrange
-
-    CALC_EARLY --> PERSIST["Write Attendance Record to MySQL"]:::cDb
-    GRACE --> PERSIST
-    CALC_LATE --> PERSIST
-
-    PERSIST --> BROADCAST["Socket.IO Emit: 'attendance.updated'"]:::cPurple
-
-    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
-    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
-    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
-    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
-    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
-    classDef cTeal fill:#009688,stroke:#00675B,stroke-width:2px,color:#FFFFFF;
-    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
-```
-
-### Attendance Calculation Transparency Rules
-1. **Early Login Incentive Rate:** Authoritative server calculation at `₹1.00 / minute`.
-   $$\text{Early Minutes} = \max(0, (\text{Scheduled Start} - \text{Punch In}) / 60)$$
-   $$\text{Early Incentive (₹)} = \text{Early Minutes} \times ₹1.00$$
-2. **Grace Period Protection:** Arrival within 5 minutes (`300 seconds`) past scheduled shift start incurs `₹0.00` penalty.
-3. **Late Arrival Penalties:** Arrival exceeding the 5-minute grace window calculates penalty based on total elapsed lateness from shift start.
-
----
-
-## 18. Break Management Flow
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-flowchart TD
-    START_REQ["Start Break (Refreshment Zone Check-In)"]:::cBlue --> GET_POLICY["Lookup Gender & Break Type Policy"]:::cOrange
-
-    GET_POLICY --> CHECK_TYPE{"Break Type & Gender"}:::cOrange
-    CHECK_TYPE -- "Male Lunch" --> M_LUNCH["Allowed: 100 Minutes (6,000s)"]:::cBlue
-    CHECK_TYPE -- "Female Lunch" --> F_LUNCH["Allowed: 40 Minutes (2,400s)"]:::cBlue
-    CHECK_TYPE -- "Male Tea" --> M_TEA["Allowed: 20 Minutes (1,200s)"]:::cBlue
-    CHECK_TYPE -- "Female Tea" --> F_TEA["Allowed: 15 Minutes (900s)"]:::cBlue
-
-    M_LUNCH --> CREATE_BRK["Insert Break Record (status: ACTIVE)"]:::cDb
-    F_LUNCH --> CREATE_BRK
-    M_TEA --> CREATE_BRK
-    F_TEA --> CREATE_BRK
-
-    CREATE_BRK --> LIVE_WS["Broadcast 'break.started' with Allocated Duration"]:::cPurple
-    LIVE_WS --> COUNTDOWN["Real-Time Browser Countdown Timer Running"]:::cPurple
-
-    COUNTDOWN --> END_REQ["End Break (Return Check-In)"]:::cBlue
-    END_REQ --> CALC_DIFF{"Actual Seconds <= Allowed Seconds?"}:::cOrange
-
-    CALC_DIFF -- "YES (Within Policy)" --> COMPLETE["Status: COMPLETED (0 Overrun)"]:::cGreen
-    CALC_DIFF -- "NO (Overrun)" --> EXCEED["Status: EXCEEDED<br/>Log Overrun Seconds & Penalty"]:::cRed
-
-    COMPLETE --> SAVE_BRK["UPDATE Break Record in MySQL"]:::cDb
-    EXCEED --> SAVE_BRK
-    SAVE_BRK --> EMIT_END["Broadcast 'break.ended'"]:::cPurple
-
-    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
-    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
-    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
-    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
-    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
-    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
-```
-
----
-
-## 19. Face Verification Flow
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-flowchart TD
-    CAMERA["Browser WebCam Capture (Base64 JPEG)"]:::cBlue --> ENROLL_CHECK{"Employee Has Enrolled Baseline Photo?"}:::cDark
-
-    ENROLL_CHECK -- "NO" --> ERR_ENROLL["400 Bad Request: No biometric enrollment on file"]:::cRed
-    ENROLL_CHECK -- "YES" --> COMPARISON["Biometric Feature Extraction & Comparison"]:::cTeal
-
-    COMPARISON --> SCORE["Compute Confidence Match Score (0.00% to 100.00%)"]:::cTeal
-    SCORE --> THRESHOLD{"Match Score >= 85.0%?"}:::cOrange
-
-    THRESHOLD -- "NO (< 85.0%)" --> LOG_FAIL["Status: FAILED<br/>Record Audit & Reject Check-in"]:::cRed
-    THRESHOLD -- "YES (>= 85.0%)" --> LOG_PASS["Status: VERIFIED<br/>Record Match Score & Allow Check-in"]:::cGreen
-
-    LOG_FAIL --> DB_LOG["INSERT INTO FaceVerificationLog"]:::cDb
-    LOG_PASS --> DB_LOG
-    DB_LOG --> WS_EV["Emit 'face.verified' with Confidence Score"]:::cPurple
-
-    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
-    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
-    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
-    classDef cRed fill:#D64545,stroke:#9E2B2B,stroke-width:2px,color:#FFFFFF;
-    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
-    classDef cTeal fill:#009688,stroke:#00675B,stroke-width:2px,color:#FFFFFF;
-    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
-    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
-```
-
----
-
-## 20. Incentive Flow
-
-Incentives in BSC Textiles HRMS provide transparent mathematical explainability:
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-flowchart TD
-    TRIGGER["Incentive Trigger Event"]:::cBlue --> ROUTE{"Trigger Category"}:::cOrange
-
-    ROUTE -- "Punctuality" --> EARLY["Early Login Calculation:<br/>(Scheduled - Actual Punch) * Rate/sec"]:::cGreen
-    ROUTE -- "Sales Milestone" --> MILESTONE["Milestone Achievement Slab Bonus"]:::cGreen
-    ROUTE -- "Target Percentage" --> TARGET["Percentage of Gross Sales Slabs"]:::cGreen
-    ROUTE -- "Perfect Attendance" --> STREAK["Monthly Zero-Deficit Streak Bonus"]:::cGreen
-
-    EARLY --> RECORD["Construct Grant Record with Detailed Calculation Formula"]:::cOrange
-    MILESTONE --> RECORD
-    TARGET --> RECORD
-    STREAK --> RECORD
-
-    RECORD --> PERSIST_INC["INSERT INTO IncentiveGrant in MySQL"]:::cDb
-    PERSIST_INC --> ACCRUE["Accrue into Monthly Payroll Net Calculation"]:::cDb
-
-    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
-    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
-    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
-    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
-```
-
----
-
-## 21. Payroll Flow & Digital Payslip Generation
-
-The BSC Textiles HRMS Payroll module provides a complete end-to-end statutory wage ledger adhering to the **Karnataka Shops & Commercial Establishments Act (Form T)**:
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-sequenceDiagram
-    autonumber
-    actor HR as HR / Payroll Manager
-    participant UI as Payroll Portal (/payroll/payslips)
-    participant API as /api/payroll
-    participant PDF as PDFKit Form T Engine
-    participant SMTP as Nodemailer SMTP Service
-    participant DB as MySQL Database
-    actor Emp as Employee
-
-    HR->>UI: Select Month & Location (e.g., Oct 2024, Belagavi Flagship)
-    UI->>API: POST /api/payroll/runs (Generate Cycle Run)
-    API->>DB: Compute base wages, incentives (₹1/min), OT, and statutory deductions
-    API->>DB: INSERT INTO payrollitem (Status: PENDING, EmailStatus: NOT_SENT)
-    API-->>UI: Interactive Ledger Table Rendered
-
-    alt HR Custom Adjustments & Dynamic Sections
-        HR->>UI: Click "Edit" on Employee Payslip
-        HR->>UI: Adjust Basic, HRA, Allowances, Deductions, or Add Custom Dynamic Blocks
-        UI->>API: PUT /api/payroll/payslip/:id (Persist adjusted amounts & custom sections)
-        API->>DB: UPDATE payrollitem SET basicSalary, hra, customSections, netPay, remarks
-        API-->>UI: 200 OK (Recalculated Net Pay)
-    end
-
-    HR->>UI: Click "Finalize & Auto-Email"
-    UI->>API: POST /api/payroll/payslip/:id/finalize
-    API->>DB: UPDATE payrollitem SET status = 'APPROVED', finalizedBy, finalizedAt = NOW()
-    API->>PDF: generatePayslipPdf(payslipData, companySettings)
-    PDF-->>API: Stream Form T Binary Buffer (%PDF)
-    API->>SMTP: sendPayslipEmail(pdfBuffer, employeeEmail)
-    SMTP-->>API: Delivery Receipt (MessageId / Simulated)
-    API->>DB: INSERT INTO payroll_email_log & UPDATE payrollitem.emailStatus = 'SENT'
-    API-->>UI: 200 OK: Payslip Finalized & Email Dispatched
-
-    Emp->>UI: Opens /payroll/payslips (Self-Service View)
-    Emp->>UI: Clicks "Download PDF"
-    UI->>API: GET /api/payroll/payslip/:id/pdf
-    API-->>Emp: Downloads Certified Form T Payslip PDF
-```
-
-### -1.1 RBAC Enforcement in Payroll
-- **Admin (`SUPER_ADMIN`, `ADMIN`)**: Full global access to all branches, master wage runs, salary cadre configurations, and statutory reports.
-- **HR (`HR_MANAGER`, `HR_EXECUTIVE`, `PAYROLL_MANAGER`)**: Can generate wage cycles for assigned stores, edit payslip line items, add reusable custom sections, finalize payslips, download PDFs, and manually resend emails.
-- **Employee (`EMPLOYEE`, `SALES_EMPLOYEE`)**: Strictly self-service access to view and download their own Form T payslips. Cross-employee payslip access is blocked via IDOR middleware.
-
-### -1.2 Net Pay Derivation Formula
-$$\text{Gross Earnings} = \text{Base Salary} + \text{HRA} + \text{Allowances} + \text{Performance Bonus} + \text{Early Login Incentives} + \text{Sales Incentives} + \text{Overtime} + \sum \text{Custom Section Earnings}$$
-$$\text{Total Deductions} = \text{PF (12\%)} + \text{TDS / Income Tax} + \text{Loss of Pay (LOP)} + \text{Late Penalties} + \sum \text{Custom Section Deductions}$$
-$$\mathbf{\text{Net Salary}} = \mathbf{\text{Gross Earnings}} - \mathbf{\text{Total Deductions}}$$
-
-### -1.3 SMTP & Email Configuration
-Configure standard SMTP credentials in `.env` for production email dispatch:
-```env
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT=587
-SMTP_SECURE="false"
-SMTP_USER="payroll@bsctextiles.com"
-SMTP_PASS="your-app-specific-password"
-SMTP_FROM="BSC Textiles Payroll <payroll@bsctextiles.com>"
-```
-*Note: In local development, if SMTP credentials are unconfigured, the system safely operates a simulated delivery transporter that verifies PDF compilation and records audit logs in `payroll_email_log` without crashing.*
-
----
-
-## 22. Observation Flow
-
-Floor Managers record timecoded observation notes and coaching feedback during showroom hours:
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-flowchart LR
-    MGR["Floor Manager Observes Staff"]:::cBlue --> NOTE["Create Observation Note (Rating, Tags, Video URL)"]:::cPurple
-    NOTE --> SUBMIT["POST /api/observations"]:::cBlue
-    SUBMIT --> DB_NOTE["Store Observation in MySQL"]:::cDb
-    DB_NOTE --> PUSH_STAFF["Realtime In-App Notification to Employee"]:::cPurple
-    PUSH_STAFF --> ACK["Employee Reviews & Acknowledges Feedback"]:::cGreen
-
-    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
-    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
-    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
-    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
-```
-
----
-
-## 23. Live Streaming Flow
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-flowchart TD
-    CAMERA["In-Store IP / RTSP / WebCam Stream"]:::cTeal --> INGEST["Video Ingest & Transcoding Engine"]:::cTeal
-    INGEST --> PLAYBACK["HLS / WebRTC Player in Dashboard"]:::cBlue
-    PLAYBACK --> CHAT["Live Room Chat (Socket.IO Room: stream:id)"]:::cPurple
-    PLAYBACK --> TAG["Timecoded Observation Pinning during Broadcast"]:::cOrange
-    TAG --> PERSIST_OBS["Save Observation with Video Timestamp (e.g. 00:14:32)"]:::cDb
-
-    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
-    classDef cOrange fill:#F2994A,stroke:#C26D22,stroke-width:2px,color:#FFFFFF;
-    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
-    classDef cTeal fill:#009688,stroke:#00675B,stroke-width:2px,color:#FFFFFF;
-    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
-```
-
----
-
-## 24. Notification Flow
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1F6FEB', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-flowchart TD
-    EVENT["System Trigger (Break Overrun / Shift Alert / Approval)"]:::cBlue --> PUBLISH["publishEvent (backend service)"]:::cDark
-    PUBLISH --> DB_NOTIF["INSERT INTO Notification (read=false)"]:::cDb
-    DB_NOTIF --> WS_DISPATCH["Socket.IO Emit to target user / location channel"]:::cPurple
-    WS_DISPATCH --> BELL["Header Bell Dropdown (top bar)"]:::cPurple
-    BELL --> MARK_READ["User Clicks → Opens Record & Acknowledges"]:::cGreen
-
-    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
-    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
-    classDef cPurple fill:#7B61FF,stroke:#523BC7,stroke-width:2px,color:#FFFFFF;
-    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
-    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
-```
-
----
-
-## 25. Realtime Architecture
-
-Real-time communication is established over WebSocket connections via Socket.IO:
-
-| Socket Event | Origin $\rightarrow$ Target | Payload Schema Summary | Trigger Condition |
-|---|---|---|---|
-| `join-location` | Client $\rightarrow$ Server | `locationId: string` | Client joins branch room upon authenticated mount. |
-| `join-stream` | Client $\rightarrow$ Server | `streamId: string` | Client enters a specific showroom live stream channel. |
-| `attendance.updated` | Server $\rightarrow$ Location Room | `{employeeId, status, punchTime, incentive}` | Real-time punch in/out execution. |
-| `break.started` | Server $\rightarrow$ Location Room | `{employeeId, type, allocatedSeconds, startTime}` | Staff starts a break at the refreshment zone. |
-| `break.ended` | Server $\rightarrow$ Location Room | `{employeeId, durationSeconds, overrunSeconds}` | Staff returns and ends the break. |
-| `face.verified` | Server $\rightarrow$ Location Room | `{employeeId, confidenceScore, status}` | Biometric evaluation completion. |
-| `stream.message` | Bi-Directional | `{streamId, senderName, text, timestamp}` | Broadcast chat message. |
-| `stream.observation` | Bi-Directional | `{streamId, employeeId, note, timestampSeconds}` | Manager logs timecoded observation. |
-| `notification.created`| Server $\rightarrow$ Target User | `{id, title, message, severity, link}` | High-priority system alert dispatch. |
-
----
-
-## 26. Background Jobs
-
-Automated background jobs and cron workers maintain system consistency:
-1. **Break Overrun Auto-Flagging:** Scans active breaks exceeding maximum thresholds by $> 15$ minutes and flags managerial alerts.
-2. **Daily Muster Roll Finalization (Nightly 23:59:00):** Identifies rostered employees with zero punches and marks them as `ABSENT`.
-3. **Shift Transition Reconciliation:** Automatically closes lingering active shifts and checks for scheduled weekly offs.
-
----
-
-## 27. File & Media Processing
-
-- **Storage Location:** Configured via `UPLOAD_DIR` (`./uploads`) with per-location directory isolation.
-- **Allowed MIME Types:** `image/jpeg`, `image/png`, `image/webp`, `video/mp4`, `application/pdf`.
-- **Maximum File Ceiling:** 10MB (`10,485,760 bytes`).
-- **Sanitization:** Strict UUID/CUID filename sanitization preventing directory traversal attacks.
-
----
-
-## 28. Security Architecture
-
-```mermaid
-%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#263238', 'primaryTextColor': '#FFFFFF', 'primaryBorderColor': '#173A5E', 'lineColor': '#6B7280' }}}%%
-flowchart TD
-    subgraph INGRESS["1. Transport & Ingress Security"]
-        TLS["Strict TLS 1.3 Encryption"]:::cDark
-        HELMET_SEC["Helmet (XSS, CSP, HSTS, Sniff-Protection)"]:::cDark
-        CORS_SEC["Strict Origin Whitelisting (FRONTEND_URL)"]:::cDark
-        RATE_SEC["IP Rate Limiting (1,000 req / 15 min)"]:::cDark
-    end
-
-    subgraph AUTH_SEC["2. Authentication & Identity"]
-        BCRYPT_SEC["Bcrypt Password Hashing (12 Salt Rounds)"]:::cBlue
-        JWT_SEC["Cryptographic JWT Signing (Secret >= 32 chars)"]:::cBlue
-        COOKIE_SEC["HttpOnly, SameSite=Lax, Secure Session Cookies"]:::cBlue
-    end
-
-    subgraph APP_SEC["3. Application & Query Isolation"]
-        RBAC_SEC["Strict Permission Matrices (14 Roles, 16 Permissions)"]:::cGreen
-        LOC_SEC["Database-Level Location Scoping Filter Injection"]:::cGreen
-        ZOD_SEC["Zod Input Validation on All JSON Payloads"]:::cGreen
-    end
-
-    subgraph AUDIT_SEC["4. Non-Repudiation & Audit Trail"]
-        AUDIT_LOGS["Append-Only Audit Log Ledger in MySQL"]:::cDb
-        ERR_MASK["Production Error Stack Sanitization"]:::cDark
-    end
-
-    INGRESS --> AUTH_SEC --> APP_SEC --> AUDIT_SEC
-
-    classDef cBlue fill:#1F6FEB,stroke:#173A5E,stroke-width:2px,color:#FFFFFF;
-    classDef cGreen fill:#2E9D59,stroke:#1E6B3D,stroke-width:2px,color:#FFFFFF;
-    classDef cDark fill:#263238,stroke:#10171A,stroke-width:2px,color:#FFFFFF;
-    classDef cDb fill:#00758F,stroke:#004A5B,stroke-width:2px,color:#FFFFFF;
-```
-
----
-
-## 29. Error Handling
-
-Errors follow a uniform, standardized JSON error contract:
-
-```json
-{
-  "error": "Short human-readable error title",
-  "message": "Detailed context or validation explanation",
-  "statusCode": 400,
-  "timestamp": "2026-10-08T11:45:00.000Z"
-}
-```
-
-### Standard HTTP Status Code Conventions
-- `200 OK`: Successful read or idempotent update.
-- `201 Created`: Resource successfully created.
-- `400 Bad Request`: Zod validation failure, malformed payload, or domain rule violation.
-- `401 Unauthorized`: Missing, expired, or invalid JWT token.
-- `403 Forbidden`: Insufficient user permissions or cross-branch location tampering.
-- `404 Not Found`: Resource ID does not exist in the database.
-- `500 Internal Server Error`: Unhandled server exception with internal stack hidden in production.
-
----
-
-## 30. Logging & Audit
-
-Every significant action generates an append-only `AuditLog` database entry:
-- **Recorded Properties:** `userId`, `action` (`CREATE`, `UPDATE`, `DELETE`, `LOGIN`, `OVERRIDE`, `SCAN`), `tableName`, `recordId`, `ipAddress`, `userAgent`, `timestamp`.
-- **Console Transport:** Unified HTTP request logging powered by `morgan('combined')`.
-
----
-
-## 31. Reporting Architecture
-
-The reporting module provides aggregated business intelligence across corporate and branch operations:
-- **Attendance Muster Reports:** Monthly cross-tabulated present, late, absent, and holiday statistics.
-- **Incentive & Penalty Audit Sheets:** Itemized breakdown of early arrivals vs punctuality deductions.
-- **Floor Occupancy & Break Utilization:** Peak break hours and overrun heatmaps.
-- **Export Capabilities:** One-click CSV and printable PDF downloads powered by `jsPDF` and `html2canvas`.
-
----
-
-## 32. Environment Configuration
-
-The application requires configuration across three primary tiers. Store these in `.env`:
-
-```env
-# ==============================================================================
-# BSC TEXTILES HRMS - MASTER PRODUCTION CONFIGURATION
-# ==============================================================================
-
-# 1. DATABASE CONFIGURATION (MySQL 8.0)
-DATABASE_URL="mysql://app_user:<STRONG_PASSWORD>@localhost:3306/bsc_textiles_hrms?connection_limit=20"
-
-# 2. AUTHENTICATION & SECURITY
-# Must be at least 32 characters in length (generate with crypto.randomBytes(48).toString('base64url'))
-JWT_SECRET="<GENERATE_A_CRYPTOGRAPHICALLY_RANDOM_SECRET_MIN_32_CHARS>"
-JWT_EXPIRES_IN="12h"
-
-# 3. SERVER PORTS (unified server.js: web on PORT, API on BACKEND_PORT)
-NODE_ENV="production"
-PORT=3000
-BACKEND_PORT=4000
-FRONTEND_URL="http://localhost:3000"
-
-# 4. FRONTEND APPLICATION (Next.js 15)
-NEXT_PUBLIC_API_URL="http://localhost:4000/api"
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="<GENERATE_A_CRYPTOGRAPHICALLY_RANDOM_SECRET_MIN_32_CHARS>"
-
-# 5. STORAGE & FILE HANDLING
-UPLOAD_DIR="./uploads"
-```
-
----
-
-## 33. Local Development
-
-### System Prerequisites
-- **Node.js:** v20 LTS or higher. **v22 LTS is the recommended version** and is what `.nvmrc` pins — prebuilt native modules (`@node-rs/argon2`) are published against LTS ABIs.
-- **MySQL:** v8.0 or higher
-- **npm:** v10.x or higher (v11.12.1 is what the verified install was run with)
-- **Git:** v2.40 or higher
-
-One package manager, one lockfile: `package-lock.json` at the repository root. There is no `yarn.lock`, `pnpm-lock.yaml` or `bun.lock` in this repository. `frontend`, `backend` and `database` are npm **workspaces** — dependencies are hoisted to the root, so install once from the root and never run `npm install` inside a workspace folder.
-
-### Step-by-Step Installation
-
-```bash
-# 1. Clone repository
-git clone https://github.com/BSC-TEXTILES/BSC_Textiles_HRMS_Project.git
-cd BSC_Textiles_HRMS_Project
-
-# 2. Configure Environment File
-cp .env.example .env
-# Ensure DATABASE_URL, JWT_SECRET, and PORT are configured
-
-# 3. Install every workspace from the lockfile (run from the repository root)
+    Form[Public application] --> Validate[Submission validation]
+    Validate --> Hiring[Hiring service and protected candidate data]
+    Hiring --> Store[(Configured hiring storage)]
+    Hiring --> Outbox[(Outbox work)]
+    Outbox --> Worker[Hiring outbox worker]
+    Worker --> Followup[Configured follow-up processing]
+    Staff[Authorized hiring staff] --> Hiring
+    Org[Organization and employees] --> Rules[Scopes, shifts and policies]
+    Rules --> Attendance[Attendance and leave]
+    Attendance --> Pay[Payroll and incentives]
+    Pay --> Reports[Reports and exports]
+~~~
+
+Outbox processing depends on working database access. Preserve encryption keys and validate shard routing against the [sharding guide](backend/docs/DATABASE_SHARDING_ARCHITECTURE.md). These diagrams describe logical flows, not every table or foreign key.
+
+## Operating modes
+
+Deployment mode, database engine and device synchronization mode are independent settings.
+
+| Mode | Command/configuration | Behavior |
+| --- | --- | --- |
+| Local development | npm run dev | Frontend 3000 and standalone API 4000 by default |
+| Unified production / Hostinger | npm run build then npm start | Shared hosting-assigned PORT |
+| Development with device worker | npm run dev:all | Adds supervised polling/monitoring worker |
+| Separate frontend/API | Workspace start commands after build | Requires explicit backend URL and proxy/cookie configuration |
+| MySQL | DB_TYPE=mysql | Primary documented installation; database scripts target MySQL |
+| PostgreSQL / SQLite | Backend adapter selection | Requires separate engine-specific schema validation |
+
+Historical desktop/offline notes remain in the repository. Current package scripts do not provide an Electron installer or desktop packaging commands. SQLite support alone does not make every feature available offline.
+
+| DEVICE_SYNC_MODE | Intended environment | Transport |
+| --- | --- | --- |
+| cloud_push | Cloud hosting | ADMS pushes; avoid polling unreachable showroom private IPs |
+| local_lan | Authorized computer on terminal LAN | Native protocol polling |
+| hybrid | Environment supporting both | ADMS plus LAN polling; verify worker ownership and deduplication |
+
+The biometric worker runs separately with npm run worker:supervised. The edge connector is another LAN-to-cloud option; read its [limitations](backend/connector/README.md) before deployment.
+
+## Local setup
+
+Use an isolated development database. From the repository root:
+
+~~~powershell
 npm ci
+Copy-Item .env.example .env
+~~~
 
-# 4. Apply database migrations
+Edit .env privately. Set NODE_ENV=development; configure your database; set FRONTEND_URL and NEXTAUTH_URL to http://localhost:3000, BACKEND_URL to http://127.0.0.1:4000 and API_URL to http://127.0.0.1:4000/api. Keep NEXT_PUBLIC_API_URL=/api. Match HTTPS/cookie and CORS settings to local HTTP. Set HRMS_BOOT_FIXTURES=false if development sample data is unwanted.
+
+~~~powershell
 npm run db:migrate
-```
-
-### Launching everything (API :4000, web :3000, supervised device worker)
-```bash
 npm run dev
-```
+~~~
 
-### Or launch the processes separately
-```bash
-# Backend API — port 4000
-npm run dev:backend
+Demo seed commands are separate and must only target isolated demo/test databases. They are not production login recovery commands. A new production database needs an authorized administrator provisioned separately; existing users need their original records and compatible password secrets.
 
-# Frontend web application — port 3000
-npm run dev:frontend
+## Environment configuration
 
-# Biometric sync worker (needed for device polling / cloud push ingestion)
-npm run worker:supervised
-```
+[.env.example](.env.example) is the full template, not a ready-to-use production configuration.
 
-Open `http://localhost:3000` in your web browser.
+| Group | Variables | Purpose |
+| --- | --- | --- |
+| Runtime | NODE_ENV, PORT, BACKEND_PORT | Shared listener or standalone API |
+| Database | DATABASE_URL, DB_TYPE, DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME | Exact account/server/database; keep tool-specific fields consistent |
+| Shards | DATABASE_URL_HQ, DATABASE_URL_BEL, DATABASE_URL_DAV, DATABASE_URL_SHI | Central and showroom stores |
+| Web/API | FRONTEND_URL, NEXTAUTH_URL, NEXTAUTH_SECRET, BACKEND_URL, API_URL, NEXT_PUBLIC_API_URL | Public origin, browser sessions and internal calls |
+| Secrets | PASSWORD_PEPPER, TOKEN_KEY_ENCRYPTION_KEY, JWT_SECRET, HIRING_ENCRYPTION_KEY | Password verification, tokens and encrypted data |
+| Transport | CORS_ALLOWLIST, TRUST_PROXY_HOPS, REQUIRE_HTTPS, COOKIE_SECURE, COOKIE_SAME_SITE | Actual HTTPS/proxy topology |
+| Shared state | REDIS_URL, REDIS_REQUIRED | Shared security counters/cache and related state |
+| Devices | DEVICE_SYNC_MODE, BIOMETRIC_CONNECTOR_KEY, polling overrides | Device transport and connector access |
+| Background | HIRING_OUTBOX_DISABLED, HIRING_OUTBOX_INTERVAL_MS, HRMS_BOOT_FIXTURES | Scheduling and fixture policy |
+| Storage/email | UPLOAD_DIR, SMTP_* | File persistence and notification delivery |
 
-`docs/INSTALLATION.md` section 6 records the exact clean-install commands, the real output of each one, and the native-binary matrix for Linux deployment.
+Keep .env out of Git. Percent-encode reserved characters in database URI credentials. Do not log passwords. Preserve existing encryption keys and password pepper across deployments. Coordinate rotation of credentials exposed in logs with the corresponding application configuration update.
 
----
+## Production deployment
 
-## 34. Database Setup
+1. Confirm the intended populated database or intended new installation. Back up existing data before schema changes.
+2. Supply real database credentials, stable secrets, public HTTPS origins, cookie settings and required Redis/shards. Replace demo URLs.
+3. Run npm ci and npm run db:migrate against the intended database.
+4. Run npm run build. npm run build:hostinger combines migrations and build when the build environment has database access.
+5. Start/restart with npm start. The root server derives internal API addresses from the hosting-assigned PORT.
+6. Verify /api/ready, anonymous /api/session/status, consent retrieval/save, authorized login/logout and real device ingestion separately.
 
-Ensure MySQL 8.0 is running locally or accessible via network:
+A push delivers source code; it does not update hosting secrets, restore database records or prove deployment success. Follow the [current recovery guide](backend/docs/SESSION-DEPLOYMENT.md) when older hosting notes differ.
 
-```sql
-CREATE DATABASE IF NOT EXISTS bsc_textiles_hrms
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-```
+| Symptom | Next check |
+| --- | --- |
+| ER_ACCESS_DENIED_ERROR | Exact database account, password, host and grants |
+| Missing user or cookie_consent table | Wrong/incomplete database; select/restore intended data or migrate an intended new database |
+| DATABASE_SCHEMA_NOT_READY / readiness 503 | Required session schema and migration output |
+| AUTH_SERVICE_UNAVAILABLE | Standalone frontend backend URL and API availability |
+| Startup 503 | Temporary initialization; persistent failures need startup logs |
+| Port 4000 respawn loop / spawn EAGAIN | Old child-process startup path; verify deployed revision and running processes |
+| Consent save failure | Retryable UI error; inspect underlying API/database failure |
+| No attendance | Transport, registry, real punches, enrollment mapping and worker state |
 
----
+## Commands and verification
 
-## 35. Database Migrations & Native MySQL Setup
+| Command | Purpose |
+| --- | --- |
+| npm run dev / dev:all | Development without/with device worker |
+| npm run build / npm start | Build / unified production start |
+| npm run db:migrate | MySQL migrations and core session schema verification |
+| npm run worker:supervised | Device worker supervisor |
+| npm run connector | Edge connector entry point; see its README limitations |
+| npm run diagnose | Backend diagnostics |
+| npm run typecheck / lint | Available workspace checks |
+| npm test | Backend runner; inspect prerequisites first |
+| npm run test:rbac / test:security / test:biometric | Focused backend suites |
+| npm run secret-scan | Repository secret scan |
 
-The data persistence layer operates purely on **Native MySQL 8.0** using connection pooling via `mysql2/promise`.
+Startup/session regression checks:
 
-From the project root:
-
-```bash
-# Automated setup (executes all SQL migrations and provisions multi-branch seed data)
-npm run db:setup
-```
-
-Or execute discrete migration and seeding steps:
-
-```bash
-# Apply schema migrations (DDL SQL files in database/migrations)
-npm run db:migrate
-
-# Seed synthetic retail branches, rosters, and test personas
-npm run db:seed
-```
-
----
-
-## 36. Seed Data & Test Personas
-
-The seed script provisions complete synthetic store locations, departments, selling points, employee rosters, and test accounts:
-
-```bash
-npm run db:seed
-```
-
-This provisions:
-- **3 Karnataka Retail Flagship Hubs:** `Belagavi (BEL-01)`, `Davanagere (DAV-02)`, `Shivamogga (SHI-03)`
-- **12 Showroom floors, departments, and selling point registers**
-- **36 Enterprise users & employees** across all operational personas
-- **Complete historical attendance punches, biometric face verification logs, and break records**
-
-### Standard Testing Credentials:
-| Persona / Role | Email | Password | Location Scope |
-| :--- | :--- | :--- | :--- |
-| **Super Admin** | `admin@bsctextiles.com` | `password123` | **Global (All 3 Hubs)** |
-| **Belagavi HR** | `kavita.bhat@bsctextiles.com` | `password123` | **Belagavi Flagship (BEL-01)** |
-| **Shivamogga HR** | `vikram.singh@bsctextiles.com` | `password123` | **Shivamogga Apex (SHI-03)** |
-| **Floor Manager** | `amit.patel@bsctextiles.com` | `password123` | **Belagavi Floor 1** |
-| **T-Shop Scanner** | `ramesh.gowda@bsctextiles.com` | `password123` | **Belagavi Tea Point** |
-| **Sales Employee** | `rajesh.kumar@bsctextiles.com` | `password123` | **Belagavi Men's Wear** |
-
----
-
-## 37. Testing
-
-The repository contains an automated integration test runner compliant with **PRD Section 60**:
-
-```bash
-npm run test --workspace=backend
-```
-
-### Verified Test Categories (19 Suites — 207 / 207 Passed — 100% Pass Rate):
-1. **Attendance Suite:** On-time calculation, ₹1/min early incentive formula, 5-minute grace protection, late penalties, overtime accumulation.
-2. **Breaks Suite:** Gendered break durations (100m, 40m, 20m, 15m), countdown timer calculations, break overrun penalties.
-3. **Face Verification Suite:** Match score thresholding ($\ge 85.0\% \rightarrow \text{VERIFIED}$, $< 85.0\% \rightarrow \text{FAILED}$), boundary compliance, non-fabricated score validation.
-4. **Permissions & Location Isolation Suite:** Super Admin global visibility, Belagavi HR data isolation, Shivamogga HR isolation, URL tampering interception, role privilege gating.
-5. **Incentives & Penalties Suite:** Per-second, milestone, and target calculations with formula explainability metadata against seeded rules.
-6. **Security & Auth Suite:** Bcrypt salt verification, invalid credential rejection, forged JWT signature blocking, Zod request body validation.
-7. **Enterprise Security Core Suite:** Argon2id hashing, password policy/history, enumeration defense, registration workflow, MFA backup codes, session revocation, CSRF tokens, security headers, malware magic-byte checks, tamper-evident audit chain.
-8. **KYC & DigiLocker Suite:** Aadhaar masking, consent lifecycle, PKCE OAuth URL generation, verified fetch, manual fallback review, location-scoped HR review.
-9. **Full & Final / Leaves / Mobile Suite:** Leave types and balances, ex-employee settlement dashboard, mobile profile and geofenced punching.
-10. **Floor Operations Suite:** Floor hierarchy metrics, salesmen directory, billing reconciliation, staff assignment, transaction audit, showroom scoping.
-11. **Late Attendance & Fine Management Suite:** Dashboard KPIs, grace periods, ₹1/min formulas, waiver/approval lifecycle, payroll idempotence, employee history.
-12. **Employee Document Management Suite:** Dashboard metrics, dossier checklist, upload validation, secure streaming, rejection/verification, versioning, location security, verification queue.
-13. **Attendance & Shifts Board Suite:** Shift-window math (including overnight), display status derivation, filters, pagination, export CSV, department/shift scoping (unit + API).
-14. **My Desk Self-Service Suite:** Summary metrics, monthly velocity, punch in/out, tea-break cycles, asset acknowledgement, corrections.
-15. **HR Analytics Suite:** Date-range presets, summary/timeline/hourly distributions, location and punctuality analysis, drilldown pagination.
-16. **Bulk Employee Import Suite:** 49-column template contract, BSC-EMP-XXXX ID allocation, data-quality audit, preview matching, export and history endpoints.
-17. **Biometric IoT Suite:** Device registry and IP subnets, SDK status reporting, SHA-256 dedupe idempotence, connector-key auth, unmapped enrollment preservation, sync audit history.
-18. **Hiring Validators Suite:** Phone/email/pincode/PAN/Aadhaar (Verhoeff) formats, file type and magic-byte rules, conditional logic, submission sanitization, stage transition rules.
-19. **Candidate Hiring API Suite:** Scoped dashboard, draft/publish/versioning, share links, captcha + consent, public submission and duplicate handling, pipeline stage moves, interviews, masked dossier aggregation, link analytics, CSV export, shard registry and outbox stats.
-
----
-
-## 38. Deployment
-
-### Production Build Steps
-
-```bash
-# 1. Typecheck all workspaces
-npm run typecheck
-
-# 2. Build Backend Server
-cd backend
+~~~powershell
+node --test server-runtime.test.js
+npx tsx --test backend/src/tests/mysqlAdapter.test.ts frontend/src/tests/sessionProxy.test.ts backend/src/tests/sessionSchema.test.ts
 npm run build
+~~~
 
-# 3. Build Next.js Production Bundle
-cd ../frontend
-npm run build
-```
+Live and seed-based tests require isolated test data and their external services. Builds do not verify production credentials, physical hardware or payroll accuracy.
 
-### PM2 Process Manager Configuration (`ecosystem.config.cjs`)
-```javascript
-module.exports = {
-  apps: [
-    {
-      name: 'bsc-hrms-api',
-      script: './backend/dist/index.js',
-      instances: 'max',
-      exec_mode: 'cluster',
-      env: {
-        NODE_ENV: 'production',
-        PORT: 4000
-      }
-    },
-    {
-      name: 'bsc-hrms-web',
-      script: 'npm',
-      args: 'start --prefix ./frontend',
-      instances: 2,
-      exec_mode: 'cluster',
-      env: {
-        NODE_ENV: 'production',
-        PORT: 3000
-      }
-    }
-  ]
-};
-```
+## Recent changes in this checkout
 
----
+- Early shared-listener Hostinger startup replaces backend process respawning.
+- Explicit session routing and standalone proxy return controlled API-unavailable responses.
+- MySQL uses configured credentials; removed guessed accounts and automatic database selection.
+- Readiness and migrations check core session schema; missing session tables/columns produce controlled errors.
+- Consent failures remain visible/retryable; cookies are written after successful persistence.
+- Device mode controls, fixture flags and quarantine changes distinguish production evidence from test state.
+- Later migrations cover hiring, workforce events, employee identifier reconciliation, custody assets and Super Admin role reconciliation, currently through 048.
 
-## 39. Production Checklist
-
-- [ ] `NODE_ENV` is set to `production` in all production environments.
-- [ ] `JWT_SECRET` is generated using a secure random generator with length $\ge 48$ characters.
-- [ ] MySQL database user has restricted privileges (no root user in production).
-- [ ] CORS `FRONTEND_URL` is set strictly to production domain (no wildcard origins).
-- [ ] Reverse proxy (Nginx or Cloudflare) enforces HTTPS with valid TLS 1.3 certificates.
-- [ ] Rate limiting is verified and active on the API gateway (`1000 requests / 15 minutes`).
-- [ ] Database backup cron schedule is registered and tested.
-- [ ] Error stacks are masked from API JSON responses in production.
-
----
-
-## 40. Backup & Recovery
-
-### Automated Daily MySQL Dump
-```bash
-# Create timestamped SQL archive
-mysqldump -u bsc_admin -p \
-  --single-transaction \
-  --quick \
-  --lock-tables=false \
-  bsc_textiles_hrms > /var/backups/bsc_hrms_$(date +%Y%m%d_%H%M%S).sql
-```
-
-### Full Disaster Restoration
-```bash
-mysql -u bsc_admin -p -e "CREATE DATABASE IF NOT EXISTS bsc_textiles_hrms;"
-mysql -u bsc_admin -p bsc_textiles_hrms < /var/backups/bsc_hrms_20261008_120000.sql
-```
-
----
-
-## 41. Troubleshooting
-
-| Symptom | Root Cause | Remediation Step |
-|---|---|---|
-| `MySQL Connection Error: Can't reach database server` | MySQL server stopped or `DATABASE_URL` misconfigured | Verify MySQL service status (`systemctl status mysql`) and confirm credentials in `.env`. |
-| `JWT secret is set to a committed placeholder value` | Server refused to boot in production with default test secret | Generate a cryptographically random secret with `crypto.randomBytes(48).toString('base64url')`. |
-| `Cross-Origin Request Blocked (CORS)` | Origin mismatch between frontend and backend | Update `FRONTEND_URL` in `.env` to match the exact frontend URL (including port/protocol). |
-| `403 Forbidden: Access denied to this location` | User attempting to query resource outside assigned store branch | Ensure user possesses `SUPER_ADMIN` role or restrict queries to their assigned `locationId`. |
-| `Socket.IO connection failed` | Port 4000 blocked by firewall or reverse proxy missing WebSocket headers | Configure Nginx reverse proxy with `proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection "upgrade";`. |
-
----
-
-## 42. Maintenance
-
-- **Log Rotation:** Configure `logrotate` for PM2 log outputs (`/root/.pm2/logs/*.log`) retaining 14 days of logs.
-- **Database Migrations:** Always execute schema updates via `npm run db:migrate` in production environments.
-- **Index Optimization:** Monitor high-frequency query indexes on `Attendance(employeeId, attendanceDate)`.
-
----
-
-## 43. Scalability
-
-- **Horizontal API Scaling:** Stateless Express REST APIs allow horizontal scaling behind an Nginx or AWS Application Load Balancer.
-- **Socket.IO Redis Adapter:** When clustering backend instances across multiple servers, attach `@socket.io/redis-adapter` for inter-node room message synchronization.
-- **Database Read Replicas:** Read-heavy reporting endpoints (`/api/reports/*`) can be routed to a MySQL read replica.
-
----
-
-## 44. Future Modules
-
-The system's modular architecture is designed to integrate seamlessly with future BSC Textiles enterprise systems:
-1. **Wedding CRM:** Customer bridal registry, VIP shopping appointments, and commission linking.
-2. **Telecaller Operations:** Inbound customer order inquiries and showroom visit bookings.
-3. **Visual Merchandising (VM):** Daily mannequin and display rack compliance audits via photo uploads.
-4. **Live Showroom TV:** Centralized digital signage and daily achievement leaderboards.
-
----
-
-## 45. Contribution Guidelines
-
-1. **Branching Model:** Branch off `main` using descriptive prefixes (`feature/`, `fix/`, `docs/`, `refactor/`).
-2. **Code Conventions:** Adhere to strict TypeScript typing. Do not bypass types with `any` without documented architectural rationale.
-3. **Commit Messages:** Follow Conventional Commits format (e.g., `feat(attendance): add grace window evaluation`).
-4. **Testing Requirement:** Ensure all 43 automated integration tests pass (`npm test`) before submitting pull requests.
-
----
-
-## 46. Support & Ownership
-
-**Platform Engineering Team**  
-**BSC Textiles Pvt Ltd**  
-*Corporate Headquarters, Belagavi, Karnataka, India*  
-- **Technical Inquiries:** `tech@bsctextiles.com`  
-- **HR Operations:** `hr@bsctextiles.com`  
-- **Internal Portal:** `https://hrms.bsctextiles.com`
-
----
-
-## 48. Employee Aadhaar e-KYC & DigiLocker Document Management
-
-### 49.1 Architecture & Regulatory Compliance
-BSC Textiles HRMS integrates an enterprise-grade **Employee KYC and DigiLocker Document Management module** fully compliant with:
-- **UIDAI Section 29 & Aadhaar Act (2016):** Strict 12-digit Aadhaar number masking (`XXXX-XXXX-1234`). Only the last 4 digits are stored or displayed in user interfaces. Biometric templates and Aadhaar OTPs are **never stored** on application servers.
-- **Digital Personal Data Protection (DPDP) Act 2023:** Explicit employee consent tracking with granular scopes (`doc_fetch:ADHAR`, `doc_fetch:PANCR`, `doc_fetch:DRVLC`), 365-day validity, purpose explanation, and revocation support.
-- **National DigiLocker Requester API (OAuth 2.0 PKCE):** Standardized RFC 7636 Authorization Code Flow using `code_challenge_method=S256` (cryptographically random 32-byte verifier) preventing authorization code interception.
-
-### 49.2 Key Capabilities
-1. **Employee Profile — KYC Digital Vault (`/employees/profile/:id`):**
-   - Live synchronization with `/api/kyc/employee/:id`.
-   - **"Connect DigiLocker"** action modal with explicit legal notice and consent checkbox.
-   - 1-click retrieval of verified Aadhaar and PAN documents with government digital seals.
-   - **"Upload Physical Scan Fallback"** modal for employees without DigiLocker.
-   - Document inspection drawer and authorized download token generator (`/api/kyc/download/:id`).
-2. **HR & Admin KYC Dashboard (`/operations/kyc`):**
-   - KPI metrics: Total Documents, Verified & Sealed, Pending Attestation, Rejected.
-   - Filters: Store Hub, Document Type, Attestation Status, Channel Source.
-   - Document Decision Review Drawer: Approve & Seal or Reject with statutory reason.
-   - Super Admin DigiLocker Requester Settings modal.
-   - Location-based scoping: Store HR managers can only review documents for employees in their assigned hub.
-
-### 49.3 MySQL Database Tables
-- `kyc_documents`: Encrypted document metadata, masked identifier, issuing authority, cryptographic URI, verification audit trail.
-- `kyc_consents`: Explicit consent ledger, purpose, requested scopes, IP address, user-agent, expiry timestamp.
-- `kyc_settings`: Organization Requester ID, Client ID, API URLs, Sandbox toggle, and masking rules.
-
-### 49.4 External Onboarding & Production Clearance Notice
-> [!IMPORTANT]
-> To activate live DigiLocker production synchronization:
-> 1. Complete Organization Onboarding on the official [DigiLocker Requester Portal](https://partners.digitallocker.gov.in).
-> 2. Submit enterprise KYC and authorized signatory details to MeitY (Ministry of Electronics & Information Technology).
-> 3. Register production redirect URIs and configure `DIGILOCKER_CLIENT_ID` and `DIGILOCKER_CLIENT_SECRET` in protected server environment variables.
-> 4. In development and staging environments, the system operates in sandbox simulation mode to prevent real data exposure.
-
----
-
-## 49. OOP Architecture & Service Container
-
-The BSC Textiles HRMS business logic is structured on pure **Object-Oriented Programming (OOP)** principles:
-- **Encapsulation:** All business state, calculation rules, and database access are strictly encapsulated in typed service and repository classes.
-- **Abstraction:** Database persistence is abstracted through `BaseRepository<T>`, providing connection-pooled prepared statements, query logging, and transactions.
-- **Inversion of Control & Dependency Injection:** The central `ServiceContainer` (`backend/src/core/container/ServiceContainer.ts`) manages singleton lifecycles and injects dependencies across:
-  - `EmployeeService` & `EmployeeRepository`
-  - `EmployeeExitService` & `EmployeeExitRepository`
-  - `FullFinalSettlementService` & `SettlementRepository`
-  - `SettlementCalculationService` & `SettlementPdfService`
-  - `PayrollService` & `SalarySlipService` & `SalarySlipPdfService`
-  - `LeaveManagementService`, `LeaveBalanceService`, `LeaveApprovalService` & `LeaveRepository`
-  - `AttendanceService` & `AttendanceRepository`
-  - `HrmDashboardService` & `HrmReportService`
-  - `NotificationService`, `AuditLogService`, and `MobileApiService`
-
----
-
-## 50. Full & Final Settlement (F&F) Module
-
-A complete exit management lifecycle designed for compliance with the Karnataka Shops & Commercial Establishments Act and Payment of Gratuity Act:
-
-### -1.1 Former Employees Dashboard (`/employees/former`)
-- **10 Aggregated KPI Cards:** Total Former Employees, Resigned, Terminated, Retired, Awaiting Clearance, Awaiting Calculation, Pending HR Review, Pending Approval, Ready for Payment, Closed & Paid, Overdue (>30d).
-- **Searchable & Filterable Table:** Filter by Location, Department, Exit Type, and Clearance Status.
-
-### -1.2 Exit Clearance Workflow
-1. **Initiation:** HR records resignation or termination with notice period (default 30 days) and approved last working day (LWD).
-2. **Department Clearance Tasks:** 5 multi-department checklists:
-   - `IT`: Email & biometric revocation, POS credentials disabled.
-   - `ACCOUNTS`: Advance recovery, travel bills, loan balance check.
-   - `HR`: ID badge returned, exit interview.
-   - `STORE_OPS`: Register drawer audit, store keys, uniform handover.
-   - `SECURITY`: Gate pass & biometric template revoked.
-3. **Transparent F&F Calculation:**
-   $$\text{Net F\&F Settlement} = \text{Total Eligible Earnings} - \text{Authorized Deductions}$$
-   - **Earnings:** Unpaid final month salary, Leave encashment ($(\text{EL} \times \text{Daily Basic})$), Gratuity ($(\text{Years} \times 15 \times \text{Daily Basic})$), Incentives.
-   - **Deductions:** Notice period shortfall recovery, outstanding salary advances, department dues, statutory PF/TDS.
-4. **Audit History & HR Edits:** Every adjustment requires a mandatory documented reason, logged in `fnf_adjustments` and displayed in audit history.
-5. **Statement PDF Generation:** Official BSC-branded PDF statements streamed via `/api/exits/settlement/:id/statement-pdf`.
-6. **Payment Disbursement:** Bank UTR reference, payment mode (NEFT/RTGS/Cheque), and date recorded before marking closed.
-
----
-
-## 51. Automatic Form T PDF Salary Slips
-
-- **Automated Generation:** Payroll finalization generates Form T payslips using PDFKit.
-- **Employee View-Only Access (`/payroll/payslips`):** Employees can view their own payslips via `/api/payroll/payslips/my-slips` and preview/download PDFs. Editing buttons are hidden and backend-enforced against IDOR.
-- **HR Salary Slip Editing:** Authorized HR staff can adjust basic salary, allowances, and deductions with mandatory audit remarks. The system recalculates dependent net pay, increments the version number, and stores superseded versions in `payslip_versions`.
-
----
-
-## 52. Complete Leave Management System (`/leaves`)
-
-- **Configurable Leave Types:** Casual Leave (`CL`), Sick Leave (`SL`), Earned Leave (`EL`), and Loss of Pay (`LOP`).
-- **Live Annual Quotas:** Real-time balances with used, pending, and remaining days.
-- **Employee Application:** Support for half-day options (Morning / Afternoon shift), date validation, and overlap protection.
-- **Manager & HR Approvals:** One-tap approve and reject actions with mandatory documented reasons.
-- **Payroll Integration:** Approved LOP deductions integrate directly into monthly payroll items.
-
----
-
-## 53. Mobile Application — Android and iOS (`mobile/`)
-
-Built using **React Native with Expo**, integrating directly with the shared backend API (`/api/mobile/*`):
-- **Employee Features:** Biometric geofenced check-in/out, leave application & balance tracking, Form T payslip breakdown & PDF download, ex-employee clearance status, profile dossier.
-- **Supervisor Features:** Supervisor action center with real-time pending leave requests queue and one-tap approval/rejection.
-- **Configuration & EAS Build:** Configured via `mobile/app.json` with iOS bundle `com.bsctextiles.hrms` and Android package `com.bsctextiles.hrms`.
-
----
-
-## 54. Automated Verification & Performance Benchmarks
-
-### 54.1 Test Execution Results (100% Passing)
-```text
-================================================================
-📊 TEST EXECUTION SUMMARY REPORT (212/212 PASSED)
-================================================================
-📁 [ATTENDANCE]                    7/7 Passed  (Sub-millisecond)
-📁 [BREAKS]                        6/6 Passed  (Sub-millisecond)
-📁 [FACE VERIFICATION]             5/5 Passed  (Threshold boundary validated)
-📁 [PERMISSIONS & LOCATION]        6/6 Passed  (Multi-tenant hub isolated)
-📁 [INCENTIVES & PENALTIES]        8/8 Passed  (₹1/min transparent math)
-📁 [SECURITY & AUTH]               6/6 Passed  (bcrypt, JWT, XSS protected)
-📁 [ENTERPRISE SECURITY CORE]     12/12 Passed (Argon2id, MFA, CSRF, tamper-proof audit)
-📁 [KYC & DIGILOCKER]              8/8 Passed  (PKCE OAuth S256, UID masked)
-📁 [FULL & FINAL & LEAVES]         6/6 Passed  (Sub-25ms indexed DB queries)
-📁 [FLOOR OPERATIONS]              6/6 Passed  (Selling-point attribution)
-📁 [LATE ATTENDANCE & FINES]      12/12 Passed (Fine lifecycle & payroll idempotence)
-📁 [EMPLOYEE DOCUMENTS]           12/12 Passed (Versioning, masking, dossier security)
-📁 [ATTENDANCE BOARD]             41/41 Passed (Shift math, filters, CSV export)
-📁 [MY-DESK]                       6/6 Passed  (Self-service punches & corrections)
-📁 [HR ANALYSIS MODULE]            8/8 Passed  (Connected-dot analytics & drilldown)
-📁 [BULK EMPLOYEE IMPORT]         11/11 Passed (49-column contract & ID policy)
-📁 [BIOMETRIC-IOT]                 6/6 Passed  (SHA-256 dedupe, connector auth)
-📁 [HIRING VALIDATORS]            17/17 Passed (Verhoeff Aadhaar, PAN, conditional logic)
-📁 [CANDIDATE HIRING (API)]       24/24 Passed (Public funnel, pipeline, shard isolation)
-----------------------------------------------------------------
-Total Tests Run: 212 | Passed: 212 (100.0%) | Failed: 0
-```
-
-### 54.2 Performance Benchmarks
-- **Indexed Database Reads:** 11–24 ms (Target: <100 ms)
-- **Aggregated F&F Dashboard Stats:** 14 ms
-- **Form T PDF Generation Time:** ~120 ms
-- **Mobile API Geofenced Punch Response:** 11 ms
-
----
-
-## 55. Candidate Hiring Module (`/hiring` & Public `/apply`)
-
-End-to-end recruitment: from branded public application forms to a sharded candidate pipeline.
-
-- **Recruitment Dashboard (`/hiring`):** Location-scoped KPIs, stage funnel, shard summaries and upcoming interviews.
-- **Form Builder (`/hiring/forms`):** Draft → publish workflow with versioned JSON schema, folders, templates, archive/close/reopen/duplicate and share links with per-link analytics (views, submissions).
-- **Candidate Directory & Dossier (`/hiring/candidates`):** Scoped list with masked identifiers; detail view aggregates applications, uploaded documents, interview timeline, star rating and notes. Aadhaar/PAN are stored AES-256-GCM encrypted and never exposed raw.
-- **Pipeline Management:** Validated stage transitions (terminal-stage moves blocked), bulk stage moves, interview scheduling/completion with audit trail.
-- **Public Apply Page (`/apply/[code]`):** Mobile-first form with captcha, consent enforcement, multi-location selection, conditional fields, magic-byte-validated uploads, field-level validation errors and a reference number on success.
-- **Sharded Storage:** Control database owns hiring structure (forms, links, settings, templates); each showroom shard (`bsc_shard_<code>`) owns candidate data. Provision with `npm run provision:hiring-shards`; an outbox worker tracks cross-shard writes (`/api/hiring/outbox/stats`).
-- **Public API Rate Limiting:** `HIRING_PUBLIC_SUBMIT_MAX` (default 5 per 15 minutes per IP; 200 in dev/test).
-
----
-
-## 56. License
-
-Proprietary enterprise software owned by **BSC Textiles Pvt Ltd**.  
-All rights reserved. Unauthorized reproduction, modification, distribution, or decompilation of this software is strictly prohibited.
-
-```text
-© 2026 BSC Textiles Pvt Ltd. All Rights Reserved.
-```
+See [migrations](database/migrations), [change history](CHANGELOG.md) and [documentation](backend/docs/README.md). Historical reports are point-in-time records, not current production certification.

@@ -1,108 +1,65 @@
-# BSC Textiles HRMS — Biometric Hardware Edge Connector
+# Biometric showroom edge connector
 
-## Overview
+[Project overview](../../README.md) · [Device setup](../docs/DEVICE_SETUP.md)
 
-The **BSC Textiles Biometric Hardware Edge Connector** is a lightweight, supervised daemon designed to run on a local PC within each BSC Textiles showroom LAN:
-- **Belagavi Flagship (BEL)**: `192.168.0.136:4370` (SN: `JNP2252300795`)
-- **Davanagere Mega Store (DAV)**: `192.168.0.131:4370` (SN: `JNPJNP2252300802`)
-- **Shivamogga Flagship (SHI)**: `192.168.30.131:4370` (SN: `JNP2252300797`)
+## Purpose and current status
 
-It securely bridges isolated showroom subnets to the authoritative Cloud MySQL HRMS without requiring incoming firewall holes on the biometric terminals.
+The connector polls eSSL/ZKTeco terminals from a computer on their LAN and forwards punches to the HRMS API. It is separate from the backend device worker and direct ADMS cloud push.
 
----
+**Known source limitation:** bscBiometricConnector.ts imports adapters through ../backend/src/... from this directory. Those paths do not match the repository layout: the services are under ../src/.... Resolve and validate the imports before deploying this connector. This guide describes its implemented configuration and flow, not a successful hardware test.
 
-## Architecture Flow
+## Data flow
 
-```
-┌─────────────────────────────────┐
-│ Showroom LAN (e.g. 192.168.0.x) │
-│                                 │
-│  [eSSL SilkBio-101TC Terminal]  │
-│         (Port 4370 TCP/UDP)     │
-│                 │               │
-│                 ▼               │
-│    [Local Edge Connector]       │
-│     - ZK Binary Protocol        │
-│     - Offline Queue (JSON)      │
-│     - SHA256 Deduplication      │
-│     - Health Server (:4371)     │
-└─────────────────┬───────────────┘
-                  │ Outbound HTTPS (TLS 1.3)
-                  ▼
-┌─────────────────────────────────┐
-│ Cloud / Datacenter Infrastructure│
-│                                 │
-│  [BSC Textiles HRMS API]        │
-│     POST /api/devices/ingest-raw│
-│     Dual-Key Auth               │
-│                 │               │
-│                 ▼               │
-│   [Cloud MySQL 8.0 Database]    │
-│     - biometric_raw_punches     │
-│     - attendance (real-time)    │
-│     - audit_logs                │
-└─────────────────────────────────┘
-```
+~~~mermaid
+flowchart TD
+    API[HRMS API] -->|GET /api/devices registry| Connector[LAN connector]
+    Terminal[Registered terminal] -->|ZK protocol polling| Connector
+    Connector --> Queue[(offline-punch-queue.json)]
+    Queue -->|POST /api/devices/ingest-raw| API
+    API --> Processing[Server validation and attendance processing]
+    Connector --> Health[Health endpoint]
+~~~
 
----
+Terminal IP, port, communication key, timezone and polling cadence come from the API registry. CONNECTOR_LOCATION_CODE filters the registry to a showroom. The old DEVICE_IP, DEVICE_SERIAL and SHOWROOM_CODE setup examples do not configure this implementation.
 
-## Setup & Running Instructions
+## Configuration and startup
 
-### 1. Requirements
-- Node.js v20+ or v22+
-- Network reachability to the local eSSL terminal (`Test-NetConnection -ComputerName <IP> -Port 4370`)
-- Outbound internet access to the Cloud HRMS URL (e.g., `https://hrms.bsctextiles.com/api` or `http://localhost:4000/api`)
+Set variables in the process environment; this entry point does not itself load dotenv.
 
-### 2. Quick Run (PowerShell)
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| CLOUD_API_URL | http://localhost:4000/api | API base including /api; use deployed HTTPS for cloud |
+| BIOMETRIC_CONNECTOR_KEY | Empty | Credential sent in x-connector-key and Bearer headers |
+| CONNECTOR_LOCATION_CODE | Empty / all | Registry location filter |
+| CONNECTOR_HEALTH_PORT | 4371 | Health HTTP listener |
+| CONNECTOR_REFRESH_MS | 30000 | Registry refresh milliseconds |
+| CONNECTOR_POLL_INTERVAL | 2500 | Fallback polling milliseconds |
 
-```powershell
-# For Belagavi
-$env:CLOUD_API_URL = "http://localhost:4000/api"
-$env:DEVICE_IP = "192.168.0.136"
-$env:DEVICE_SERIAL = "JNP2252300795"
-$env:SHOWROOM_CODE = "BEL"
-npx tsx connector/bscBiometricConnector.ts
+The key must be accepted by both registry and ingestion endpoints. Investigate API authorization for 401/403 responses. Register real terminals and employee enrollment mappings before testing.
 
-# For Davanagere
-$env:CLOUD_API_URL = "http://localhost:4000/api"
-$env:DEVICE_IP = "192.168.0.131"
-$env:DEVICE_SERIAL = "JNPJNP2252300802"
-$env:SHOWROOM_CODE = "DAV"
-npx tsx connector/bscBiometricConnector.ts
+After resolving the source limitation above, run from the repository root:
 
-# For Shivamogga
-$env:CLOUD_API_URL = "http://localhost:4000/api"
-$env:DEVICE_IP = "192.168.30.131"
-$env:DEVICE_SERIAL = "JNP2252300797"
-$env:SHOWROOM_CODE = "SHI"
-npx tsx connector/bscBiometricConnector.ts
-```
+~~~powershell
+$env:CLOUD_API_URL = 'https://your-hrms-host.example/api'
+$env:CONNECTOR_LOCATION_CODE = 'YOUR_LOCATION_CODE'
+# Supply BIOMETRIC_CONNECTOR_KEY through the protected process environment.
+npm run connector
+~~~
 
-### 3. Diagnostic Health Server
-Once running, the connector exposes a local HTTP health check at:
-```
-http://localhost:4371/health
-```
-Example response:
-```json
-{
-  "status": "HEALTHY",
-  "connectorName": "BSC Textiles Biometric Hardware Edge Connector",
-  "version": "1.2.0-prod",
-  "lastPollTimestamp": "2026-10-15T14:15:00.000Z",
-  "lastSyncSuccessTimestamp": "2026-10-15T14:15:02.000Z",
-  "totalPunchesIngested": 128,
-  "queuedPunches": 0,
-  "consecutiveFailures": 0
-}
-```
+Use a stable working directory: the queue path is resolved against the working directory, not the script directory. Use an appropriate supervisor for unattended operation; the entry point does not install a Windows service.
 
----
+## Buffering and health limitations
 
-## Alternative: eSSL ADMS Cloud Push (Zero Middleware)
-If the eSSL SilkBio terminal has ADMS enabled in its firmware:
-1. On the terminal: Go to **Comm.** -> **Cloud Server / ADMS**.
-2. Set **Server Address**: `your-cloud-ip-or-domain`.
-3. Set **Server Port**: `4000` (or `443` for HTTPS).
-4. Set **Enable Domain Name**: `OFF` (or `ON` if using domain name).
-5. The terminal will directly push punches to `GET/POST /iclock/cdata` without needing this local connector!
+- The JSON queue is capped at 20,000 entries. Older excess records are trimmed; buffering is not unlimited or lossless.
+- Poll watermarks are in memory and reset on restart. A one-second overlap can resend records; verify server deduplication.
+- Upload failures retain the queue. A successful HTTP response clears the submitted queue, so server acceptance semantics matter.
+- A fresh start needs a successful registry fetch to discover terminals; a punch queue is not an offline device registry.
+- /health, /healthz and / return registryError, registryDevices, lastPollAt, lastUploadAt, queuedPunches and consecutiveUploadFailures.
+- HEALTHY is based on upload failure count; it does not prove terminal reachability or successful ingestion of every punch.
+- The health listener does not explicitly bind to loopback. Restrict exposure to the intended management network.
+
+## Alternative transports
+
+ADMS-capable terminals can push directly to deployed /iclock endpoints. Use the public host and transport/port supported by the firmware; unified production has no separate API listener on port 4000.
+
+For backend-worker LAN polling, see DEVICE_SYNC_MODE=local_lan or hybrid in the [project README](../../README.md). Avoid assigning multiple pollers to the same terminal unintentionally.

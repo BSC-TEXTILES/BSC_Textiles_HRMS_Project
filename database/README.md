@@ -1,113 +1,83 @@
-# BSC Textiles HRMS — Pure Native MySQL 8.0 Architecture (Zero Prisma)
+# HRMS database workspace
 
-Welcome to the **Native MySQL 8.0 Persistence Engine** for **BSC Textiles HRMS**.
+[Project overview](../README.md) · [Backend](../backend/README.md) · [Deployment recovery](../backend/docs/SESSION-DEPLOYMENT.md)
 
-This package provides a zero-ORM, high-performance database tier built with native SQL, parameterized queries, and the `mysql2/promise` connection pool.
+## Scope and data domains
 
----
+This workspace supplies native MySQL connectivity, sequential SQL migrations and schema/seed/maintenance scripts. The backend has a Prisma-like compatibility facade, but schema changes here use native SQL rather than Prisma CLI migrations. These scripts do not automatically provision the alternate PostgreSQL or SQLite adapters.
 
-## 1. Architecture Highlights
+| Domain | Records and dependencies |
+| --- | --- |
+| Identity/security | Users, roles, permissions/scopes, sessions, refresh tokens, signing keys, consent and audit |
+| Organization | Locations, departments, floors, sections, designations and approvals |
+| Workforce | Employees, enrollment mappings, documents, status/history and workforce events |
+| Attendance | Devices, raw punches, shifts, attendance, breaks, corrections and exceptions |
+| Pay/policy | Leave, holidays, weekly offs, fines, incentives, payroll and exit records |
+| Hiring | Forms, candidate data, shard/routing registry and outbox work |
+| Operations | Showroom activities, notifications, selling points and custody assets |
 
-- **Zero ORM Overhead:** Zero Prisma, TypeORM, or Sequelize runtime layers. All queries use direct parameterized SQL with `mysql2/promise`.
-- **InnoDB Engine:** Full transactional ACID guarantees, foreign key cascade/restrict integrity, and `ROW_FORMAT=DYNAMIC`.
-- **Sub-Second Precision:** All temporal fields (`punch_in`, `punch_out`, `start_time`, `end_time`) store timestamps as `DATETIME(3)` for accurate millisecond and sub-second attendance tracking.
-- **Enterprise Connection Pool:** Configured for 25 concurrent connections with keep-alive, auto-reconnect, and native `Asia/Kolkata` (+05:30) timezone alignment.
-- **Sequential Migration System:** Lightweight migration runner that tracks executed versions via `_migrations`.
-- **Repository Pattern:** Clean, decoupled data access repositories for users, employees, attendance, breaks, QR codes, face recognition, incentives, and audit logs.
+~~~mermaid
+flowchart LR
+    Identity[Users and roles] --> Access[Permissions and scopes]
+    Org[Organization / locations] --> Employee[Employees]
+    Employee --> Mapping[Enrollment mapping]
+    Devices[Terminal registry] --> Raw[Raw punches]
+    Raw --> Mapping
+    Mapping --> Attendance[Attendance]
+    Rules[Shifts, leave and calendars] --> Attendance
+    Attendance --> Payroll[Payroll and incentives]
+    Hiring[Hiring applications] --> Candidate[Candidate storage]
+    Access --> Services[Authorized services]
+    Services --> Audit[Audit records]
+~~~
 
----
+This is a conceptual dependency diagram, not a complete foreign-key ERD. Migrations define exact names, constraints and compatibility views. See [sharding architecture](../backend/docs/DATABASE_SHARDING_ARCHITECTURE.md) for central/location/hiring storage.
 
-## 2. Directory Layout
+## Configuration and commands
 
-```text
-database/
-├── migrations/                           # Versioned sequential SQL migrations
-│   ├── 001_create_enums_and_extensions.sql
-│   ├── 002_create_organization_tables.sql
-│   ├── 003_create_user_and_employee_tables.sql
-│   ├── 004_create_attendance_and_break_tables.sql
-│   ├── 005_create_qr_and_face_tables.sql
-│   ├── 006_create_incentive_and_payroll_tables.sql
-│   ├── 007_create_operations_and_stream_tables.sql
-│   ├── 008_create_audit_and_notification_tables.sql
-│   └── 009_create_stored_procedures_and_indexes.sql
-├── seeds/                                # Versioned seed datasets
-│   ├── 01_locations_and_organization.sql
-│   ├── 02_shifts_and_break_policies.sql
-│   ├── 03_users_and_test_personas.sql
-│   └── 04_sample_attendance_and_roster.sql
-├── scripts/
-│   ├── migrate.ts                        # Sequential migration runner
-│   ├── seed.ts                           # Sequential seed executor
-│   ├── backup.sh                         # Native mysqldump wrapper
-│   └── restore.sh                        # Native mysql restore wrapper
-├── src/
-│   ├── pool.ts                           # mysql2/promise connection pool
-│   ├── transaction.ts                    # Transaction manager (withTransaction)
-│   └── repositories/                     # Type-safe repository layer
-│       ├── UserRepository.ts
-│       ├── EmployeeRepository.ts
-│       ├── AttendanceRepository.ts
-│       ├── BreakRepository.ts
-│       ├── QRCodeRepository.ts
-│       ├── FaceRepository.ts
-│       ├── IncentiveRepository.ts
-│       ├── PayrollRepository.ts
-│       └── AuditRepository.ts
-├── schema.sql                            # Consolidated full DDL schema
-├── seed.sql                              # Consolidated baseline seed data
-├── package.json
-└── README.md
-```
+Set DATABASE_URL to the exact MySQL host, port, account and database. Percent-encode reserved characters in URI credentials. Keep DB_HOST, DB_PORT, DB_USER, DB_PASSWORD and DB_NAME consistent for tools using discrete values. Inspect [src/pool.ts](src/pool.ts) and the specific script for its inputs. Keep .env, credentials and real dumps out of Git.
 
----
+Run commands from the repository root:
 
-## 3. Quick Setup & Execution
+| Command | Effect |
+| --- | --- |
+| npm run db:migrate | Apply pending migrations and verify core session schema |
+| npm run db:schema | Execute consolidated baseline; use only on a suitable empty database |
+| npm run db:seed | Seed/demo records; inspect before use |
+| npm run db:setup | Migrate then seed; not production login recovery |
+| npm run db:seed:biometric-demo | Biometric demo fixtures |
+| npm run db:seed:rbac-demo | RBAC demo fixtures |
+| npm run setup:local | Baseline, migrations and demo seeds; isolated local setup only |
+| npm run typecheck --workspace=database | Check TypeScript scripts |
 
-### Prerequisites
-- MySQL 8.0 running on `localhost:3306`
-- Database created: `CREATE DATABASE bsc_textiles_hrms CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;`
+Do not rerun the baseline as a populated database repair. It overlaps early migrations and contains creation statements that can conflict with existing schemas.
 
-### Setup Commands
-```bash
-# From workspace root:
-npm run db:setup
+## Migration lifecycle
 
-# Or inside database/ folder:
-npm run db:migrate       # Apply all 9 sequential migrations
-npm run db:seed          # Populate all 4 seed datasets
-npm run db:schema        # Apply full consolidated schema.sql
-```
+[scripts/migrate.ts](scripts/migrate.ts) tracks versioned SQL files in _migrations. MySQL DDL can auto-commit; a failed file is not guaranteed to roll back atomically. The compatibility retry path tolerates selected errors, including some missing-object errors. Review output and resulting schema rather than assuming every statement ran.
 
----
+The runner finishes by verifying required session structures. This detects unusable authentication schemas but does not certify every module or shard.
 
-## 4. Default Seed Personas
+| Range | Main evolution |
+| --- | --- |
+| 001–010 | Identity, employees, attendance, payroll, operations, audit and workflows |
+| 011–017 | Password security, leave/exit support, indexes, RBAC, imports, biometric integration and sharding |
+| 018–029 | Device registry, organization scopes, roster/identifier compatibility and punch changes |
+| 030–035 | Action permissions, widgets, self-service grants, credentials/tokens and privacy/configuration |
+| 036–042 | Hiring, registry/permission reconciliation, device mismatches, workforce events and dual device modes |
+| 043–046 | Numeric employee identifiers/sequences, fixture flags and test-state quarantine |
+| 047–048 | Custody assets and Super Admin role ID reconciliation |
 
-All seeded personas use the password: `password123`
+Some numeric prefixes have multiple files. Filenames and the ledger are authoritative; do not rename applied migrations.
 
-| Persona | Email | Role | Location |
-|---|---|---|---|
-| Super Admin | `admin@bsctextiles.com` | SUPER_ADMIN | Belagavi |
-| Belagavi HR | `kavita.bhat@bsctextiles.com` | HR_MANAGER | Belagavi |
-| Shivamogga HR | `vikram.singh@bsctextiles.com` | HR_MANAGER | Shivamogga |
-| Floor Manager | `amit.patel@bsctextiles.com` | FLOOR_MANAGER | Belagavi |
-| T-Shop Scanner | `ramesh.gowda@bsctextiles.com` | T_SHOP_OWNER | Belagavi |
-| Sales Specialist | `rajesh.kumar@bsctextiles.com` | SALES_EMPLOYEE | Belagavi |
-| Sales Staff | `priya.d@bsctextiles.com` | EMPLOYEE | Belagavi |
+## Installation and recovery
 
----
+1. Confirm the target database and take a verified backup before modifying an existing installation. Some migrations reconcile or alter existing data.
+2. Use credentials with required migration privileges and run npm run db:migrate.
+3. Review output and final schema verification, then deploy/restart the application.
+4. Check /api/ready and authorized login. Test affected business modules separately.
+5. Provision an authorized administrator separately for a new production installation. Do not seed demo users into production.
 
-## 5. Repository Usage Example
+ER_ACCESS_DENIED_ERROR means account/host authentication failed. Missing user or cookie_consent tables mean the selected database lacks required schema. If existing employee/account data should be present, select the correct populated database or restore a verified backup. Migrations do not recover lost records.
 
-```typescript
-import { UserRepository } from './repositories/UserRepository.js';
-import { withTransaction } from './transaction.js';
-
-// Query user by email
-const user = await UserRepository.findByEmail('admin@bsctextiles.com');
-
-// Atomic transaction
-await withTransaction(async (conn) => {
-  await conn.query('UPDATE users SET is_active = ? WHERE id = ?', [true, user.id]);
-});
-```
+Read [backup/restore](../backend/docs/BACKUP_RESTORE.md). Include actual shards, uploaded files and stable password/encryption secrets in recovery planning; test restoration for the deployed environment.
