@@ -25,6 +25,7 @@
     "recharts": "^2.15.1",
     "socket.io-client": "^4.7.5",
     "tailwind-merge": "^2.1.0",
+    "typescript": "^5.3.3",
     "zod": "^4.6.7"
   },
   "overrides": {
@@ -40,7 +41,6 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "15.5.29",
     "postcss": "^8.5.29",
-    "tailwindcss": "^3.3.6",
-    "typescript": "^5.3.3"
+    "tailwindcss": "^3.3.6"
   }
 }
