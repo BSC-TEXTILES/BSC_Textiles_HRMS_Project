@@ -50,6 +50,7 @@ import { registerLocationRegistryRefresh } from './services/locationRegistry.js'
 import { UserUploadService } from './services/userUploadService.js';
 import { EmailNotificationService } from './services/emailNotificationService.js';
 import { ensureRbacReady } from './services/rbacService.js';
+import { ensureBaselineAccounts } from './services/baselineAccounts.js';
 
 const app = express();
 const httpServer: HttpServer = (globalThis as any).__HRMS_HTTP_SERVER || createServer(app);
@@ -373,6 +374,7 @@ if (!process.env.VERCEL) {
         { name: 'seedDocumentReferenceConfig', run: () => seedDocumentReferenceConfig() },
         ...(schemaOnly ? [] : [{ name: 'seedDocumentDossierFixtures', run: () => seedDocumentDossierFixtures() }]),
         { name: 'ensureRbacReady', run: () => ensureRbacReady() },
+        { name: 'baselineAccounts', run: () => ensureBaselineAccounts() },
         { name: 'locationRegistry', run: () => registerLocationRegistryRefresh() },
         { name: 'signingKeys', run: () => ensureActiveKey().then((key) => console.log(`🔑 Signing key active: ${key.kid} (${key.algorithm})`)) },
         { name: 'userUploadService', run: () => UserUploadService.syncAllUserFolders() },
