@@ -179,12 +179,46 @@ export async function applyResilient(target: SqlRunner, file: string, sql: strin
 }
 
 /** Applies the consolidated baseline; every CREATE TABLE is made idempotent. */
-export async function applyBaselineSchema(target: SqlRunner, databaseDir: string) {
+export async function applyBaselineSchema(target: SqlRunner, databaseDir: string, log: Log = console.log) {
   const schemaPath = path.join(databaseDir, 'schema.sql');
   if (!fs.existsSync(schemaPath)) throw new Error(`Schema file not found at: ${schemaPath}`);
   const sql = fs.readFileSync(schemaPath, 'utf-8')
     .replace(/\bCREATE TABLE\s+(?!IF\s+NOT\s+EXISTS\b)/gi, 'CREATE TABLE IF NOT EXISTS ');
-  await target.query(sql);
+  await applyResilient(target, 'schema.sql', sql, log);
+}
+
+/** Seeds baseline organization, shifts, and default personas if user table is empty. */
+export async function seedBaselineIfEmpty(target: SqlRunner, databaseDir: string, log: Log = console.log) {
+  try {
+    const [userRows]: any = await target.query('SELECT COUNT(*) AS n FROM `user`').catch(() => [[{ n: 0 }]]);
+    if (Number(userRows?.[0]?.n || 0) > 0) {
+      log('[schema] Existing users found in database. Preserving business data (skipping seed).');
+      return;
+    }
+
+    const seedsDir = path.join(databaseDir, 'seeds');
+    if (!fs.existsSync(seedsDir)) return;
+
+    const seedFiles = [
+      '01_locations_and_organization.sql',
+      '02_shifts_and_break_policies.sql',
+      '03_users_and_test_personas.sql',
+    ];
+
+    for (const file of seedFiles) {
+      const filePath = path.join(seedsDir, file);
+      if (fs.existsSync(filePath)) {
+        log(`[schema] Seeding initial baseline: ${file}...`);
+        const sql = fs.readFileSync(filePath, 'utf-8');
+        await applyResilient(target, file, sql, log).catch((err: any) => {
+          log(`[schema] Seed ${file} notice: ${err?.message || err}`);
+        });
+      }
+    }
+    log('[schema] ✔ Baseline accounts and roles seeded successfully.');
+  } catch (err: any) {
+    log(`[schema] Baseline seed notice: ${err?.message || err}`);
+  }
 }
 
 /** Applies every unrecorded migration in filename order, tracking them in `_migrations`. */
@@ -241,9 +275,14 @@ export function locateDatabaseDir(): string | null {
   const here = typeof __dirname === 'string' ? __dirname : process.cwd();
   const candidates = [
     process.env.HRMS_DATABASE_DIR,
-    path.resolve(here, '../../../database'), // backend/{src,dist}/services
     path.resolve(process.cwd(), 'database'),
     path.resolve(process.cwd(), '../database'),
+    path.resolve(__dirname, '../../../database'),
+    path.resolve(__dirname, '../../database'),
+    path.resolve(__dirname, '../database'),
+    path.resolve(here, '../../../database'),
+    path.resolve(here, '../../database'),
+    path.resolve(here, '../database'),
   ].filter((dir): dir is string => Boolean(dir));
   return candidates.find((dir) =>
     fs.existsSync(path.join(dir, 'schema.sql')) && fs.existsSync(path.join(dir, 'migrations'))) ?? null;
@@ -259,12 +298,8 @@ export interface BootstrapConnection extends SqlRunner {
 }
 
 /**
- * Installs the schema on a database that has none.
- *
- * Runs only when the database is empty, or already carries this app's
- * `_migrations` ledger (a previous partial install). A non-empty database
- * without that ledger is probably the wrong database, so it is left untouched.
- * A MySQL named lock keeps concurrent starts from migrating at the same time.
+ * Installs or auto-heals the schema on the configured MySQL database.
+ * Uses CREATE TABLE IF NOT EXISTS throughout so it is 100% idempotent and safe.
  */
 export async function bootstrapDatabaseSchema(
   getConnection: () => Promise<BootstrapConnection>,
@@ -283,16 +318,31 @@ export async function bootstrapDatabaseSchema(
         "SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'",
       );
       const names = new Set<string>(tables.map((row: any) => String(row.name).toLowerCase()));
-      if (names.size > 0 && !names.has('_migrations')) {
+      const hasCore = names.has('user') && names.has('employee') && names.has('location');
+
+      const HRMS_KNOWN_TABLES = new Set([
+        '_migrations', 'user', 'employee', 'location', 'department', 'shift', 'payrollitem',
+        'database_shards', 'cookie_consent', 'late_attendance_record', 'kyc_records', 'custody_asset'
+      ]);
+      const isHrmsDatabase = names.size === 0 || Array.from(names).some((t) => HRMS_KNOWN_TABLES.has(t));
+
+      if (!isHrmsDatabase) {
         return {
           status: 'skipped',
-          reason: `the database holds ${names.size} table(s) but no _migrations ledger; confirm DATABASE_URL selects the HRMS database`,
+          reason: `the database holds ${names.size} unrelated table(s) but no HRMS tables or _migrations ledger; confirm DATABASE_URL selects the HRMS database`,
         };
       }
 
-      log(`[schema] ${names.size === 0 ? 'Empty database' : 'Partial install'} detected; applying baseline schema and migrations...`);
-      await applyBaselineSchema(conn, databaseDir);
-      const { applied, skipped } = await applyMigrations(conn, databaseDir, () => {});
+      if (hasCore && names.has('_migrations')) {
+        const { applied, skipped } = await applyMigrations(conn, databaseDir, log);
+        await verifyCoreSchema(conn);
+        return { status: 'installed', applied, skipped };
+      }
+
+      log(`[schema] Auto-healing database schema (${names.size} existing tables, core present=${hasCore})...`);
+      await applyBaselineSchema(conn, databaseDir, log);
+      const { applied, skipped } = await applyMigrations(conn, databaseDir, log);
+      await seedBaselineIfEmpty(conn, databaseDir, log);
       await verifyCoreSchema(conn);
       return { status: 'installed', applied, skipped };
     } finally {

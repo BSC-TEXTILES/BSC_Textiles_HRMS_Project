@@ -8,7 +8,8 @@
  * both paths share `performLogin`, so the accept/reject decision is identical.
  */
 import { Router, Request, Response } from 'express';
-import { pool } from '../nativeDb.js';
+import { pool, mysqlPool } from '../nativeDb.js';
+import { bootstrapDatabaseSchema } from '../services/schemaBootstrap.js';
 import { securityConfig } from '../config/security.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { sensitiveRateLimit, captchaRateLimit } from '../middleware/securityGuards.js';
@@ -150,6 +151,16 @@ router.post('/login', sensitiveRateLimit, async (req: Request, res: Response) =>
     const outcome = await performLogin(request);
     await respondWithSession(res, req, outcome);
   } catch (error: any) {
+    if ((error?.code === 'ER_NO_SUCH_TABLE' || error?.errno === 1146) && mysqlPool) {
+      console.log('[session] Missing table detected during login. Triggering immediate on-demand schema bootstrap...');
+      try {
+        await bootstrapDatabaseSchema(() => mysqlPool.getConnection());
+        const retryOutcome = await performLogin(request);
+        return await respondWithSession(res, req, retryOutcome);
+      } catch (autoErr) {
+        console.error('[session] Auto-bootstrap retry failed:', autoErr);
+      }
+    }
     fail(res, error, 'Sign-in failed');
   }
 });
