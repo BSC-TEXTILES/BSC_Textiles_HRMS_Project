@@ -2,6 +2,22 @@
 
 ## Database authentication and startup diagnostics
 
+The hosting account supplied on 15 November 2026 uses database
+`u101820758_hrms` and MySQL user `u101820758_hrms_bsc`. The `1 MB` shown
+beside the database in hPanel is its size, not part of its name. The environment
+template now uses these distinct names and password placeholders. The local
+private environment preserves its existing password until the new account's
+password is supplied. The hostname was not supplied with the account details;
+the retained `127.0.0.1:3306` must be confirmed for the hosting environment.
+
+For this deployment the HQ/BEL/DAV/SHI aliases intentionally select the same
+database. Replace the password in all five URL values and in DB_PASSWORD and
+MYSQL_PASSWORD when changing credentials. Do not copy placeholder passwords
+from the example into a live deployment. After authenticating to the new
+database, run `npm run db:migrate` on the host, check `/api/ready`, and provision
+an authorized administrator or restore the intended existing records. Creating
+a new empty database does not transfer previous employees or accounts.
+
 `DATABASE_URL_HQ` overrides `DATABASE_URL` for the shard registry and hiring
 outbox. Update it together with the main URL, or leave it empty to use the main
 URL. Also review `DATABASE_URL_BEL`, `DATABASE_URL_DAV` and `DATABASE_URL_SHI`:
