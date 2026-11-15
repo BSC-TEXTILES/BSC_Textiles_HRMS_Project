@@ -49,7 +49,15 @@ async function exchangeTicket(ticket: string): Promise<Record<string, unknown>> 
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data?.user) {
       // An invalid or spent ticket is an answer, not a transport failure.
-      throw new Error(data?.error === 'Invalid exchange' ? 'Your sign-in step expired. Please try again.' : 'Sign-in failed');
+      if (data?.error === 'Invalid exchange') {
+        console.warn(`[auth] Ticket rejected by ${base}/session/exchange (HTTP ${response.status}).`);
+        throw new Error('Your sign-in step expired. Please try again.');
+      }
+      // Anything else (404 from a different service, 5xx, an HTML page) means
+      // this base is not the HRMS API; try the next one instead of failing.
+      lastError = `HTTP ${response.status} from ${base}${data?.error ? ` (${data.error})` : ''}`;
+      console.warn(`[auth] Session exchange failed: ${lastError}`);
+      continue;
     }
 
     const user = data.user;

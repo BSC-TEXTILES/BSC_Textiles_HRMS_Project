@@ -28,7 +28,7 @@ import {
   privilegedLoginCidrs,
 } from './systemSettings.js';
 import { ipMatches } from '../middleware/securityGuards.js';
-import { storeSet, storeGet, storeDel, KEY_PREFIX } from './redisStore.js';
+import { storeSet, storeGet, storeSetNx, KEY_PREFIX } from './redisStore.js';
 import { isExpired as passwordIsExpired } from './passwordPolicy.js';
 
 export interface LoginRequest {
@@ -367,12 +367,7 @@ async function performLoginInner(request: LoginRequest): Promise<LoginOutcome> {
 
   const sessionId = await createSession(user, ip, request.userAgent, Boolean(user.mfaVerified));
   const tokens = await issueFor(user, sessionId, ip, request.userAgent, user.mfaEnabled ? 'pwd+mfa' : 'pwd');
-  const ticket = crypto.randomBytes(24).toString('base64url');
-  await storeSet(
-    `${KEY_PREFIX.session}ticket:${ticket}`,
-    JSON.stringify({ userId: user.id, sessionId, ip, userAgent: request.userAgent }),
-    60_000
-  );
+  const ticket = issueTicket(user.id, sessionId);
 
   await clearLoginGuard(identifier, ip);
   await PasswordService.resetFailedLogins(user.id).catch(() => undefined);
@@ -466,8 +461,7 @@ export async function exchangeMfaChallenge(challengeId: string, userId: string, 
 
   const sessionId = await createSession(user, ip, userAgent, true);
   const tokens = await issueFor(user, sessionId, ip, userAgent, 'pwd+mfa');
-  const ticket = crypto.randomBytes(24).toString('base64url');
-  await storeSet(`${KEY_PREFIX.session}ticket:${ticket}`, JSON.stringify({ userId: user.id, sessionId, ip, userAgent }), 60_000);
+  const ticket = issueTicket(user.id, sessionId);
 
   await AuditService.log({
     userId: user.id,
@@ -491,18 +485,48 @@ export async function exchangeMfaChallenge(challengeId: string, userId: string, 
   };
 }
 
-/** Single-use ticket so the Next.js session layer never sees a password. */
+const TICKET_TTL_MS = 60_000;
+
+function ticketKey(): Buffer {
+  return crypto.createHmac('sha256', securityConfig.password.pepper).update('hrms-session-ticket-v1').digest();
+}
+
+/**
+ * Single-use ticket so the Next.js session layer never sees a password.
+ *
+ * The ticket is self-verifying (HMAC over user, session, expiry and a nonce)
+ * instead of a random key looked up in the session store. With the in-memory
+ * store fallback, the login request and the NextAuth callback can be served by
+ * different worker processes; a store-only ticket then does not exist in the
+ * process that consumes it, and sign-in fails with a 401 on
+ * /api/auth/callback/credentials. The nonce is still burned in the store, so a
+ * replay is rejected wherever the store is shared.
+ */
+export function issueTicket(userId: string, sessionId: string): string {
+  const payload = Buffer.from(
+    JSON.stringify({ u: userId, s: sessionId, e: Date.now() + TICKET_TTL_MS, j: crypto.randomBytes(16).toString('base64url') })
+  ).toString('base64url');
+  const sig = crypto.createHmac('sha256', ticketKey()).update(payload).digest('base64url');
+  return `v1.${payload}.${sig}`;
+}
+
 export async function consumeTicket(ticket: string, _ip?: string, _userAgent?: string): Promise<{ userId: string; sessionId: string } | null> {
-  const key = `${KEY_PREFIX.session}ticket:${ticket}`;
-  const raw = await storeGet(key);
-  if (!raw) return null;
-  await storeDel(key);
+  const parts = String(ticket || '').split('.');
+  if (parts.length !== 3 || parts[0] !== 'v1') return null;
+  const [, payload, sig] = parts;
+  const expected = crypto.createHmac('sha256', ticketKey()).update(payload).digest();
+  const given = Buffer.from(sig, 'base64url');
+  if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) return null;
+  let parsed: { u?: string; s?: string; e?: number; j?: string };
   try {
-    const parsed = JSON.parse(raw);
-    return { userId: parsed.userId, sessionId: parsed.sessionId };
+    parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
   } catch {
     return null;
   }
+  if (!parsed.u || !parsed.s || !parsed.j || typeof parsed.e !== 'number' || parsed.e < Date.now()) return null;
+  const fresh = await storeSetNx(`${KEY_PREFIX.session}ticket-used:${parsed.j}`, '1', TICKET_TTL_MS * 2);
+  if (!fresh) return null;
+  return { userId: parsed.u, sessionId: parsed.s };
 }
 
 /** Used by the first-login flow: bumping the version invalidates the temp token. */
