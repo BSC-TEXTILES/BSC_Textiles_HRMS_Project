@@ -7,7 +7,7 @@ function genId(prefix = 'c') {
 
 export async function setupRetailOperations(options?: { schemaOnly?: boolean }) {
   const conn = pool;
-  console.log('Connected to MySQL via pool for retail operations...');
+  console.log('Preparing retail operations schema...');
 
   // 1. Create tables
   await conn.query(`

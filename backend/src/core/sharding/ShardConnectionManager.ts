@@ -87,9 +87,10 @@ export class ShardConnectionManager {
         this.healthCheckInterval.unref();
       }
     } catch (err: any) {
-      console.error('[ShardConnectionManager] Failed to load shard registry:', err.message);
-      // Fallback: Ensure control pool is at least accessible
-      this.isInitialized = true;
+      console.error('[ShardConnectionManager] Failed to initialize shard registry:', err?.code || 'SHARD_INITIALIZATION_ERROR');
+      // Do not retain a failed initialization or let workers use rejected credentials.
+      await this.shutdown();
+      throw err;
     }
   }
 

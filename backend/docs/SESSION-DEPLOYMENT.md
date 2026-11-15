@@ -1,5 +1,32 @@
 # Deploying the session fixes
 
+## Database authentication and startup diagnostics
+
+`DATABASE_URL_HQ` overrides `DATABASE_URL` for the shard registry and hiring
+outbox. Update it together with the main URL, or leave it empty to use the main
+URL. Also review `DATABASE_URL_BEL`, `DATABASE_URL_DAV` and `DATABASE_URL_SHI`:
+an intentional single-database deployment uses the same target for all aliases;
+separate shards need their own valid database credentials. Keep discrete DB_*
+and MYSQL_* account fields consistent for maintenance tools. Never print the
+password or commit the private `.env` file.
+
+Hostinger environment variables can override `.env`; a Git push does not update
+those values. Replace stale hosting values and restart. If the correct username
+still receives `ER_ACCESS_DENIED_ERROR`, reset/verify that MySQL user's password
+and grants in hPanel and update the private runtime configuration. Code cannot
+repair a rejected server-side password.
+
+Startup now checks database connectivity before running database setup tasks.
+A failed shard registry is cleaned up and does not start the hiring outbox.
+Failed tasks are reported as incomplete instead of an unconditional success.
+The backend startup log reports the actual shared listener port.
+
+The Redis fallback message means the configured Redis service is unavailable.
+Configure a reachable Redis URL if shared state is required. For an intentionally
+single-process installation using memory, leave REDIS_URL empty and keep
+REDIS_REQUIRED=false; counters then reset on restart and are not shared across
+instances. Do not disable required Redis merely to hide connection failures.
+
 ## Missing tables after connecting to MySQL
 
 `ER_NO_SUCH_TABLE` for `user` or `cookie_consent` means the application can

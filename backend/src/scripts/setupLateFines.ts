@@ -7,7 +7,7 @@ function genId(prefix = 'lar') {
 
 export async function setupLateFines(options?: { schemaOnly?: boolean }) {
   const conn = pool;
-  console.log('Connected to MySQL database via pool...');
+  console.log('Preparing late attendance schema...');
 
   // 1. Create late_attendance_record table (or use pre-bootstrapped SQLite schema)
   try {
@@ -47,7 +47,7 @@ export async function setupLateFines(options?: { schemaOnly?: boolean }) {
     `);
     console.log('late_attendance_record table ready.');
   } catch (err: any) {
-    console.log('late_attendance_record schema ready (existing).');
+    throw err; // CREATE IF NOT EXISTS already handles an existing table; other failures are real.
   }
 
   // 2. Fetch active employees and shifts

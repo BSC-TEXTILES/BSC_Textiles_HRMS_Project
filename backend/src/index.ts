@@ -11,6 +11,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
+import { runStartupChecks } from './services/startupChecks.js';
 import { assertSessionSchema } from './services/sessionSchema.js';
 import { createServer, type Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
@@ -341,7 +342,9 @@ if (!process.env.VERCEL) {
   });
 
   const initializeServices = () => {
-    console.log(`🚀 BSC Textiles HRMS Security-Hardened Server running on port ${PORT}`);
+    const address = httpServer.address();
+    const listeningPort = address && typeof address === 'object' ? address.port : PORT;
+    console.log(`[Backend API] HTTP listener active on port ${listeningPort}`);
     console.log(`📡 WebSocket server ready`);
 
     const fixtureDecision = bootFixturesAllowed();
@@ -351,16 +354,8 @@ if (!process.env.VERCEL) {
     // Sequential startup pipeline: runs migrations and initialization in order
     // to prevent socket bursts, connection races, and CloudLinux LVE rate limits.
     (async () => {
-      try {
-        await shardManager.initialize();
-        if (process.env.HIRING_OUTBOX_DISABLED !== 'true') {
-          startHiringOutboxWorker();
-        }
-      } catch (err: any) {
-        console.warn('[ShardManager init notice]:', err?.message || err);
-      }
-
       const tasks: Array<{ name: string; run: () => Promise<any> }> = [
+        { name: 'shardRegistry', run: () => shardManager.initialize() },
         { name: 'setupViews', run: () => setupViews() },
         { name: 'setupOrganizationHubs', run: () => setupOrganizationHubs() },
         { name: 'setupKycSchema', run: () => setupKycSchema() },
@@ -380,15 +375,24 @@ if (!process.env.VERCEL) {
         { name: 'userUploadService', run: () => UserUploadService.syncAllUserFolders() },
       ];
 
-      for (const task of tasks) {
-        try {
-          await task.run();
-        } catch (err: any) {
-          console.warn(`[${task.name} notice]:`, err?.message || err);
-        }
+      const failed = await runStartupChecks(
+        () => pool.query('SELECT 1'),
+        tasks,
+      );
+      // A registry failure must not start a worker against an unusable control pool.
+      if (!failed.includes('shardRegistry')) {
+        if (process.env.HIRING_OUTBOX_DISABLED !== 'true') startHiringOutboxWorker();
+      } else {
+        console.warn('[startup] Hiring outbox was not started. Check DATABASE_URL_HQ (or DATABASE_URL when HQ is unset).');
       }
-      console.log('✅ Enterprise schemas and reference configurations initialized.');
-    })();
+      if (failed.length) {
+        console.warn('[startup] Initialization incomplete: ' + failed.join(', '));
+      } else {
+        console.log('[startup] Schema/reference initialization tasks completed.');
+      }
+    })().catch((err: any) => {
+      console.error('[startup] Database preflight failed (' + (err?.code || 'DATABASE_UNAVAILABLE') + '). Database initialization and hiring outbox were not started. Verify DATABASE_URL credentials and grants, then restart.');
+    });
 
     for (const warning of auditSecurityConfig()) console.warn(`[security posture] ${warning}`);
 
