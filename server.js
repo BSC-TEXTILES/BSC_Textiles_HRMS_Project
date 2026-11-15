@@ -5,6 +5,17 @@ const { isBackendRequest } = require('./server-routing');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 process.env.NODE_ENV = 'production';
 const port = Number(process.env.PORT) || 3000;
+
+/** One line that shows which code is live, so a stale build is obvious in the log. */
+function buildInfo() {
+  const fs = require('node:fs');
+  const read = (p) => { try { return fs.readFileSync(path.join(__dirname, p), 'utf8').trim(); } catch { return null; } };
+  const mtime = (p) => { try { return fs.statSync(path.join(__dirname, p)).mtime.toISOString(); } catch { return 'MISSING'; } };
+  let commit = read('.git/HEAD');
+  if (commit && commit.startsWith('ref: ')) commit = read('.git/' + commit.slice(5)) || commit;
+  return `commit=${(commit || 'unknown').slice(0, 7)} backend-build=${mtime('backend/dist/index.js')} frontend-build=${mtime('frontend/.next/BUILD_ID')}`;
+}
+console.log('[server] ' + buildInfo());
 let backend = null;
 let handleFrontend = null;
 
