@@ -16,6 +16,8 @@ import { assertSessionSchema } from './services/sessionSchema.js';
 import { createServer, type Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
 import { prisma, pool } from './db.js';
+import { mysqlPool } from './nativeDb.js';
+import { bootstrapDatabaseSchema, isMissingSchemaError, CORE_TABLES } from './services/schemaBootstrap.js';
 import { readBiometricHealth } from './services/biometricService.js';
 import { apiV1Router } from './api/v1/index.js';
 import { docsRouter } from './api/docs/index.js';
@@ -376,10 +378,29 @@ if (!process.env.VERCEL) {
         { name: 'userUploadService', run: () => UserUploadService.syncAllUserFolders() },
       ];
 
-      const failed = await runStartupChecks(async () => {
+      const checkCoreTables = async () => {
         await pool.query('SELECT 1');
-        for (const table of ['employee', 'location', 'department', 'shift', 'payrollitem', 'database_shards']) {
+        for (const table of CORE_TABLES) {
           await pool.query(`SELECT 1 FROM \`${table}\` LIMIT 0`);
+        }
+      };
+      const failed = await runStartupChecks(async () => {
+        try {
+          await checkCoreTables();
+        } catch (err: any) {
+          // A freshly created hosting database has no tables; install the schema
+          // instead of waiting for someone to run db:schema/db:migrate by hand.
+          if (!isMissingSchemaError(err) || !mysqlPool || process.env.DB_AUTO_MIGRATE === 'false') throw err;
+          const outcome = await bootstrapDatabaseSchema(() => mysqlPool.getConnection()).catch((installErr: any) => {
+            console.error(`[schema] Automatic schema install failed: ${installErr?.message || installErr?.code || installErr}`);
+            throw installErr;
+          });
+          if (outcome.status === 'skipped') {
+            console.warn(`[schema] Automatic schema install skipped: ${outcome.reason}.`);
+            throw err;
+          }
+          console.log(`[schema] Schema installed (${outcome.applied} migration(s) applied, ${outcome.skipped} already recorded).`);
+          await checkCoreTables();
         }
       }, tasks);
       // A registry failure must not start a worker against an unusable control pool.
@@ -395,8 +416,7 @@ if (!process.env.VERCEL) {
       }
     })().catch((err: any) => {
       const code = err?.code || 'DATABASE_UNAVAILABLE';
-      const missingSchema = code === 'ER_NO_SUCH_TABLE' || code === 'ER_BAD_TABLE_ERROR';
-      const nextStep = missingSchema
+      const nextStep = isMissingSchemaError(err)
         ? 'Run npm run db:schema and npm run db:migrate against the configured database.'
         : 'Verify DATABASE_URL credentials and grants.';
       console.error(`[startup] Database preflight failed (${code}). Database initialization and hiring outbox were not started. ${nextStep}`);

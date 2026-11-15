@@ -60,6 +60,19 @@ npm run db:migrate
 npm run build
 ```
 
+### Automatic schema install at startup
+
+When the startup preflight hits `ER_NO_SUCH_TABLE`, the backend now applies
+`database/schema.sql` and every unrecorded migration itself, using the same
+engine as `npm run db:migrate`, then re-runs the preflight. It only does this
+when the selected database is completely empty, or already has this app's
+`_migrations` ledger (a previous partial install). A database that holds other
+tables but no ledger is treated as the wrong database and left untouched, with a
+`[schema] Automatic schema install skipped` warning. A MySQL named lock prevents
+concurrent installs. Set `DB_AUTO_MIGRATE=false` to disable this and keep
+running the commands by hand. No accounts or demo data are seeded. Provision an
+administrator separately.
+
 `npm run build:hostinger` combines these steps for a hosting build environment
 that has database access. Restart the application after successful completion.
 The migration command now verifies the core session schema before reporting
