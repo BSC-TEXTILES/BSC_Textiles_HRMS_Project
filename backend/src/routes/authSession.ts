@@ -221,6 +221,11 @@ router.post('/exchange', async (req: Request, res: Response) => {
     );
     if (!rows?.length) return void res.status(401).json({ error: 'Invalid exchange' });
     const user = rows[0];
+    let permissions = user.permissions;
+    if (typeof permissions === 'string') {
+      try { permissions = JSON.parse(permissions); } catch { permissions = []; }
+    }
+    if (!Array.isArray(permissions)) permissions = [];
     res.json({
       user: {
         id: user.id,
@@ -228,7 +233,7 @@ router.post('/exchange', async (req: Request, res: Response) => {
         loginId: user.loginId,
         fullName: user.fullName,
         role: user.role,
-        permissions: Array.isArray(user.permissions) ? user.permissions : [],
+        permissions,
         locationId: user.locationId,
         employeeId: user.employeeId,
         mfaEnabled: Boolean(user.mfaEnabled),

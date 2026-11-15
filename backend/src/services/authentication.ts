@@ -492,14 +492,13 @@ export async function exchangeMfaChallenge(challengeId: string, userId: string, 
 }
 
 /** Single-use ticket so the Next.js session layer never sees a password. */
-export async function consumeTicket(ticket: string, ip: string, userAgent: string): Promise<{ userId: string; sessionId: string } | null> {
+export async function consumeTicket(ticket: string, _ip?: string, _userAgent?: string): Promise<{ userId: string; sessionId: string } | null> {
   const key = `${KEY_PREFIX.session}ticket:${ticket}`;
   const raw = await storeGet(key);
   if (!raw) return null;
   await storeDel(key);
   try {
     const parsed = JSON.parse(raw);
-    if (parsed.ip && parsed.ip !== ip) return null;
     return { userId: parsed.userId, sessionId: parsed.sessionId };
   } catch {
     return null;

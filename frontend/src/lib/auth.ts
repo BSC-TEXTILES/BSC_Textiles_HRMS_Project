@@ -11,9 +11,10 @@ const CredentialsProvider: typeof _CredentialsProvider =
 const API_BASES = [
   process.env.BACKEND_URL ? `${process.env.BACKEND_URL.replace(/\/+$/, '')}/api` : null,
   process.env.API_URL?.trim() || null,
-  process.env.NEXT_PUBLIC_API_URL?.trim() || null,
+  process.env.INTERNAL_API_URL?.trim() || null,
   'http://127.0.0.1:4000/api',
-].filter(Boolean) as string[];
+  'http://localhost:4000/api',
+].filter((url): url is string => Boolean(url && /^https?:\/\//i.test(url)));
 
 /**
  * NextAuth holds only the UI's view of who is signed in.
