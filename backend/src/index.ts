@@ -351,8 +351,9 @@ if (!process.env.VERCEL) {
     const schemaOnly = !fixtureDecision.allowed;
     console.log(`[bootFixtures] ${fixtureDecision.allowed ? 'ENABLED' : 'DISABLED'} — ${fixtureDecision.reason}`);
 
-    // Sequential startup pipeline: runs migrations and initialization in order
-    // to prevent socket bursts, connection races, and CloudLinux LVE rate limits.
+    // Schema migrations run during deployment; startup verifies the baseline
+    // before applying module-specific schema/reference initialization.
+    // Keep this pipeline sequential to avoid connection bursts and races.
     (async () => {
       const tasks: Array<{ name: string; run: () => Promise<any> }> = [
         { name: 'shardRegistry', run: () => shardManager.initialize() },
@@ -375,10 +376,12 @@ if (!process.env.VERCEL) {
         { name: 'userUploadService', run: () => UserUploadService.syncAllUserFolders() },
       ];
 
-      const failed = await runStartupChecks(
-        () => pool.query('SELECT 1'),
-        tasks,
-      );
+      const failed = await runStartupChecks(async () => {
+        await pool.query('SELECT 1');
+        for (const table of ['employee', 'location', 'department', 'shift', 'payrollitem', 'database_shards']) {
+          await pool.query(`SELECT 1 FROM \`${table}\` LIMIT 0`);
+        }
+      }, tasks);
       // A registry failure must not start a worker against an unusable control pool.
       if (!failed.includes('shardRegistry')) {
         if (process.env.HIRING_OUTBOX_DISABLED !== 'true') startHiringOutboxWorker();
@@ -391,7 +394,12 @@ if (!process.env.VERCEL) {
         console.log('[startup] Schema/reference initialization tasks completed.');
       }
     })().catch((err: any) => {
-      console.error('[startup] Database preflight failed (' + (err?.code || 'DATABASE_UNAVAILABLE') + '). Database initialization and hiring outbox were not started. Verify DATABASE_URL credentials and grants, then restart.');
+      const code = err?.code || 'DATABASE_UNAVAILABLE';
+      const missingSchema = code === 'ER_NO_SUCH_TABLE' || code === 'ER_BAD_TABLE_ERROR';
+      const nextStep = missingSchema
+        ? 'Run npm run db:schema and npm run db:migrate against the configured database.'
+        : 'Verify DATABASE_URL credentials and grants.';
+      console.error(`[startup] Database preflight failed (${code}). Database initialization and hiring outbox were not started. ${nextStep}`);
     });
 
     for (const warning of auditSecurityConfig()) console.warn(`[security posture] ${warning}`);

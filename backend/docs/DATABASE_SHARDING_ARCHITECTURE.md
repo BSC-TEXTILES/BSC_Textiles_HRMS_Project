@@ -141,8 +141,9 @@ Accessible at `/admin/shards` by authorized Super Admins:
 
 ### Windows / Local Development Setup
 1. Ensure MySQL 8.0 is running locally on port 3306 (`.\start-mysql.ps1` or Windows Service).
-2. Apply database migrations:
+2. Apply the consolidated baseline and database migrations:
    ```powershell
+   npm run db:schema
    npm run db:migrate --workspace=database
    ```
 3. Provision operational shards and backfill data:

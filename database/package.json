@@ -8,7 +8,7 @@
     "build": "echo 'Database workspace uses native SQL - no build step required'",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
-    "db:setup": "tsx scripts/migrate.ts && tsx scripts/seed.ts",
+    "db:setup": "tsx scripts/schema.ts && tsx scripts/migrate.ts && tsx scripts/seed.ts",
     "db:schema": "tsx scripts/schema.ts",
     "typecheck": "tsc --noEmit",
     "db:seed:biometric-demo": "tsx scripts/seedBiometricDemo.ts",

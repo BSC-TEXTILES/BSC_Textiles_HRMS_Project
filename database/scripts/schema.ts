@@ -17,7 +17,8 @@ async function runSchema() {
     throw new Error(`Schema file not found at: ${schemaPath}`);
   }
 
-  const sql = fs.readFileSync(schemaPath, 'utf-8');
+  const sql = fs.readFileSync(schemaPath, 'utf-8')
+    .replace(/\bCREATE TABLE\s+(?!IF\s+NOT\s+EXISTS\b)/gi, 'CREATE TABLE IF NOT EXISTS ');
   console.log('Reading schema.sql definitions...');
   console.log('Applying 38 normalized tables to MySQL database...');
 

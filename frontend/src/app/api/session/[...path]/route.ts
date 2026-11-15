@@ -18,9 +18,18 @@ async function proxySession(request: Request): Promise<Response> {
     const origin = process.env.BACKEND_URL?.trim()
       || process.env.API_URL?.trim().replace(/\/api\/?$/, '')
       || `http://127.0.0.1:${process.env.BACKEND_PORT || '4000'}`;
-    const target = new URL(origin);
-    if (!['http:', 'https:'].includes(target.protocol) || target.origin === incoming.origin) {
+    let target = new URL(origin);
+    if (!['http:', 'https:'].includes(target.protocol)) {
       throw new Error('Session backend must be a separate HTTP API origin');
+    }
+    if (target.origin === incoming.origin) {
+      if (process.env.NODE_ENV !== 'development') {
+        throw new Error('Session backend must be a separate HTTP API origin');
+      }
+      target = new URL(`http://127.0.0.1:${process.env.BACKEND_PORT || '4000'}`);
+      if (target.origin === incoming.origin) {
+        throw new Error('Session backend must be a separate HTTP API origin');
+      }
     }
     target.pathname = incoming.pathname;
     target.search = incoming.search;

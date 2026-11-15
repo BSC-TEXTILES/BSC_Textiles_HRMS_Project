@@ -213,7 +213,10 @@ async function migrate() {
   }
 
   // Older runs could record a migration after skipping a missing-table error.
-  // Do not report a usable deployment when the core login tables are absent.
+  // Verify the core tables used by startup before reporting a usable deployment.
+  for (const table of ['employee', 'location', 'department', 'shift', 'payrollitem', 'database_shards']) {
+    await pool.query(`SELECT 1 FROM \`${table}\` LIMIT 0`);
+  }
   await pool.query('SELECT id, loginId, passwordHash, status, tokenVersion FROM `user` LIMIT 0');
   for (const table of ['cookie_consent', 'session', 'refresh_token']) {
     await pool.query(`SELECT id FROM \`${table}\` LIMIT 0`);

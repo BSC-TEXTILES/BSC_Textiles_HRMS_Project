@@ -190,6 +190,7 @@ Copy-Item .env.example .env
 Edit .env privately. Set NODE_ENV=development; configure your database; set FRONTEND_URL and NEXTAUTH_URL to http://localhost:3000, BACKEND_URL to http://127.0.0.1:4000 and API_URL to http://127.0.0.1:4000/api. Keep NEXT_PUBLIC_API_URL=/api. Match HTTPS/cookie and CORS settings to local HTTP. Set HRMS_BOOT_FIXTURES=false if development sample data is unwanted.
 
 ~~~powershell
+npm run db:schema
 npm run db:migrate
 npm run dev
 ~~~
@@ -219,8 +220,8 @@ Keep .env out of Git. Percent-encode reserved characters in database URI credent
 
 1. Confirm the intended populated database or intended new installation. Back up existing data before schema changes.
 2. Supply real database credentials, stable secrets, public HTTPS origins, cookie settings and required Redis/shards. Replace demo URLs.
-3. Run npm ci and npm run db:migrate against the intended database.
-4. Run npm run build. npm run build:hostinger combines migrations and build when the build environment has database access.
+3. Run npm ci, then apply the consolidated baseline and migrations against the intended database with `npm run db:schema` followed by `npm run db:migrate`. Back up existing data first.
+4. Run npm run build. npm run build:hostinger applies the baseline, migrations and build when the build environment has database access.
 5. Start/restart with npm start. The root server derives internal API addresses from the hosting-assigned PORT.
 6. Verify /api/ready, anonymous /api/session/status, consent retrieval/save, authorized login/logout and real device ingestion separately.
 
@@ -243,7 +244,8 @@ A push delivers source code; it does not update hosting secrets, restore databas
 | --- | --- |
 | npm run dev / dev:all | Development without/with device worker |
 | npm run build / npm start | Build / unified production start |
-| npm run db:migrate | MySQL migrations and core session schema verification |
+| npm run db:schema | Ensure the consolidated MySQL baseline tables exist |
+| npm run db:migrate | Apply MySQL migrations and verify core startup/session tables |
 | npm run worker:supervised | Device worker supervisor |
 | npm run connector | Edge connector entry point; see its README limitations |
 | npm run diagnose | Backend diagnostics |

@@ -45,7 +45,7 @@ function uaOf(req: Request): string {
 
 function fail(res: Response, error: any, fallback = 'Request failed'): void {
   if (error?.code === 'ER_NO_SUCH_TABLE' || error?.code === 'ER_BAD_FIELD_ERROR') {
-    console.error('[session] Required database schema is missing; run npm run db:migrate on the deployed database.', error.code);
+    console.error('[session] Required database schema is missing; run npm run db:schema and npm run db:migrate on the configured database.', error.code);
     res.status(503).json({
       error: 'Service setup incomplete',
       message: 'The service database setup is incomplete. Please contact your administrator.',

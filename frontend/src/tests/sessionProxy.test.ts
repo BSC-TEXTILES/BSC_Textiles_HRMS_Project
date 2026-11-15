@@ -5,6 +5,7 @@ import { GET, POST } from '../app/api/session/[...path]/route';
 
 test('session proxy uses runtime configuration and preserves authentication semantics', async () => {
   const previous = process.env.BACKEND_URL;
+  const previousNodeEnv = process.env.NODE_ENV;
   const server = createServer(async (req, res) => {
     assert.equal(req.headers.cookie, 'bsc_access=existing');
     if (req.url === '/api/session/login') {
@@ -47,6 +48,7 @@ test('session proxy uses runtime configuration and preserves authentication sema
     const unavailable = await GET(new Request('https://hrms.example/api/session/status'));
     assert.equal(unavailable.status, 503);
     assert.equal((await unavailable.json()).code, 'AUTH_SERVICE_UNAVAILABLE');
+    Reflect.set(process.env, 'NODE_ENV', 'production');
     process.env.BACKEND_URL = 'https://hrms.example';
     const loop = await GET(new Request('https://hrms.example/api/session/status'));
     assert.equal(loop.status, 503);
@@ -54,5 +56,40 @@ test('session proxy uses runtime configuration and preserves authentication sema
     server.close();
     if (previous === undefined) delete process.env.BACKEND_URL;
     else process.env.BACKEND_URL = previous;
+    if (previousNodeEnv === undefined) Reflect.deleteProperty(process.env, 'NODE_ENV');
+    else Reflect.set(process.env, 'NODE_ENV', previousNodeEnv);
+  }
+});
+
+test('development session proxy bypasses a frontend-origin BACKEND_URL', async () => {
+  const previousBackendUrl = process.env.BACKEND_URL;
+  const previousBackendPort = process.env.BACKEND_PORT;
+  const previousNodeEnv = process.env.NODE_ENV;
+  const backend = createServer((req, res) => {
+    assert.equal(req.url, '/api/session/login');
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify({ routedToBackend: true }));
+  });
+  await new Promise<void>((resolve) => backend.listen(0, '127.0.0.1', resolve));
+  const backendPort = (backend.address() as { port: number }).port;
+  Reflect.set(process.env, 'NODE_ENV', 'development');
+  process.env.BACKEND_URL = 'http://localhost:3000';
+  process.env.BACKEND_PORT = String(backendPort);
+  try {
+    const response = await POST(new Request('http://localhost:3000/api/session/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ identifier: 'fixture', password: 'test-only' }),
+    }));
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { routedToBackend: true });
+  } finally {
+    await new Promise<void>((resolve, reject) => backend.close(err => err ? reject(err) : resolve()));
+    if (previousBackendUrl === undefined) delete process.env.BACKEND_URL;
+    else process.env.BACKEND_URL = previousBackendUrl;
+    if (previousBackendPort === undefined) delete process.env.BACKEND_PORT;
+    else process.env.BACKEND_PORT = previousBackendPort;
+    if (previousNodeEnv === undefined) Reflect.deleteProperty(process.env, 'NODE_ENV');
+    else Reflect.set(process.env, 'NODE_ENV', previousNodeEnv);
   }
 });

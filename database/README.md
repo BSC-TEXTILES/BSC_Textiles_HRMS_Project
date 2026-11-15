@@ -35,28 +35,28 @@ This is a conceptual dependency diagram, not a complete foreign-key ERD. Migrati
 
 ## Configuration and commands
 
-Set DATABASE_URL to the exact MySQL host, port, account and database. Percent-encode reserved characters in URI credentials. Keep DB_HOST, DB_PORT, DB_USER, DB_PASSWORD and DB_NAME consistent for tools using discrete values. Inspect [src/pool.ts](src/pool.ts) and the specific script for its inputs. Keep .env, credentials and real dumps out of Git.
+Set DATABASE_URL to the exact MySQL host, port, account and database. Percent-encode reserved characters in URI credentials. If DATABASE_URL_HQ is set, it must target this same control database: the backend uses it for the shard registry, while schema/migration commands use DATABASE_URL. Keep DB_HOST, DB_PORT, DB_USER, DB_PASSWORD and DB_NAME consistent for tools using discrete values. Inspect [src/pool.ts](src/pool.ts) and the specific script for its inputs. Keep .env, credentials and real dumps out of Git.
 
 Run commands from the repository root:
 
 | Command | Effect |
 | --- | --- |
-| npm run db:migrate | Apply pending migrations and verify core session schema |
-| npm run db:schema | Execute consolidated baseline; use only on a suitable empty database |
+| npm run db:schema | Ensure consolidated baseline tables exist; does not alter existing tables |
+| npm run db:migrate | Apply pending migrations and verify core startup/session schema |
 | npm run db:seed | Seed/demo records; inspect before use |
-| npm run db:setup | Migrate then seed; not production login recovery |
+| npm run db:setup | Apply baseline, migrate then seed; isolated setup only |
 | npm run db:seed:biometric-demo | Biometric demo fixtures |
 | npm run db:seed:rbac-demo | RBAC demo fixtures |
 | npm run setup:local | Baseline, migrations and demo seeds; isolated local setup only |
 | npm run typecheck --workspace=database | Check TypeScript scripts |
 
-Do not rerun the baseline as a populated database repair. It overlaps early migrations and contains creation statements that can conflict with existing schemas.
+Apply `npm run db:schema` before migrations on new installations and when recovering an incomplete baseline. Existing tables are left untouched; versioned migrations handle subsequent schema changes. Back up the database before applying migrations to populated installations.
 
 ## Migration lifecycle
 
 [scripts/migrate.ts](scripts/migrate.ts) tracks versioned SQL files in _migrations. MySQL DDL can auto-commit; a failed file is not guaranteed to roll back atomically. The compatibility retry path tolerates selected errors, including some missing-object errors. Review output and resulting schema rather than assuming every statement ran.
 
-The runner finishes by verifying required session structures. This detects unusable authentication schemas but does not certify every module or shard.
+The runner finishes by verifying core organization, employee, payroll, shard-registry, and session structures. This detects an incomplete baseline but does not certify every module or shard.
 
 | Range | Main evolution |
 | --- | --- |
@@ -73,7 +73,7 @@ Some numeric prefixes have multiple files. Filenames and the ledger are authorit
 ## Installation and recovery
 
 1. Confirm the target database and take a verified backup before modifying an existing installation. Some migrations reconcile or alter existing data.
-2. Use credentials with required migration privileges and run npm run db:migrate.
+2. Use credentials with required DDL privileges and run npm run db:schema followed by npm run db:migrate.
 3. Review output and final schema verification, then deploy/restart the application.
 4. Check /api/ready and authorized login. Test affected business modules separately.
 5. Provision an authorized administrator separately for a new production installation. Do not seed demo users into production.

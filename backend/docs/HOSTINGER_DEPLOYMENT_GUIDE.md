@@ -140,7 +140,8 @@ NEXT_PUBLIC_WS_URL="https://hrms.bsctextiles.com"
 ### Step 3: Run Database Migrations & Initial Seed
 ```bash
 npm ci --workspaces
-npm run db:migrate --workspace=database
+npm run db:schema
+npm run db:migrate
 ```
 
 ### Step 4: Build Backend & Frontend
