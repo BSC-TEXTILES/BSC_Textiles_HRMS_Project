@@ -5,9 +5,9 @@
   "packageManager": "npm@10.8.2",
   "scripts": {
     "dev": "next dev --turbo -p 3000",
-    "build": "next build",
+    "build": "npx next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "npx tsc --noEmit",
     "lint": "next lint"
   },
   "dependencies": {

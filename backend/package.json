@@ -5,9 +5,9 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch --exclude \"node_modules/**\" --exclude \"uploads/**\" --exclude \"dist/**\" --exclude \"logs/**\" src/index.ts",
-    "build": "tsc",
+    "build": "npx tsc",
     "start": "node dist/index.js",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "npx tsc --noEmit",
     "test": "tsx src/tests/runAllTests.ts",
     "benchmark": "tsx src/tests/benchmarkApis.ts",
     "worker": "tsx src/workers/biometricWorker.ts",
