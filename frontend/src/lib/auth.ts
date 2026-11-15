@@ -8,13 +8,20 @@ const CredentialsProvider: typeof _CredentialsProvider =
     ? (_CredentialsProvider as any).default
     : (_CredentialsProvider as any)?.default?.default || _CredentialsProvider;
 
-const API_BASES = [
-  process.env.BACKEND_URL ? `${process.env.BACKEND_URL.replace(/\/+$/, '')}/api` : null,
-  process.env.API_URL?.trim() || null,
-  process.env.INTERNAL_API_URL?.trim() || null,
-  'http://127.0.0.1:4000/api',
-  'http://localhost:4000/api',
-].filter((url): url is string => Boolean(url && /^https?:\/\//i.test(url)));
+function getApiBases(): string[] {
+  const port = process.env.PORT || 3000;
+  return [
+    process.env.INTERNAL_API_URL?.trim() || null,
+    process.env.BACKEND_URL ? `${process.env.BACKEND_URL.replace(/\/+$/, '')}/api` : null,
+    process.env.API_URL?.trim() || null,
+    `http://127.0.0.1:${port}/api`,
+    `http://localhost:${port}/api`,
+    'http://127.0.0.1:4000/api',
+    'http://localhost:4000/api',
+    process.env.NEXTAUTH_URL ? `${process.env.NEXTAUTH_URL.replace(/\/+$/, '')}/api` : null,
+    process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL.replace(/\/+$/, '')}/api` : null,
+  ].filter((url): url is string => Boolean(url && /^https?:\/\//i.test(url)));
+}
 
 /**
  * NextAuth holds only the UI's view of who is signed in.
@@ -30,9 +37,34 @@ const API_BASES = [
  *     session readable by client code is a token readable by client code.
  */
 async function exchangeTicket(ticket: string): Promise<Record<string, unknown>> {
+  // 1. Direct in-process exchange (unified production server on Hostinger)
+  if (typeof (globalThis as any).__HRMS_INTERNAL_EXCHANGE_TICKET === 'function') {
+    try {
+      const user = await (globalThis as any).__HRMS_INTERNAL_EXCHANGE_TICKET(ticket);
+      if (user) {
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.fullName || user.email,
+          role: user.role || 'EMPLOYEE',
+          permissions: Array.isArray(user.permissions) ? user.permissions : [],
+          locationId: user.locationId || undefined,
+          employeeId: user.employeeId || undefined,
+          loginId: user.loginId || undefined,
+          mustChangePassword: Boolean(user.mustChangePassword),
+          sessionId: user.sessionId,
+        };
+      }
+    } catch (err: any) {
+      console.warn('[auth] Direct in-process exchange notice:', err?.message || err);
+    }
+  }
+
+  // 2. HTTP candidate base URLs for separate process/container setups
+  const bases = getApiBases();
   let lastError = 'no backend reachable';
 
-  for (const base of API_BASES) {
+  for (const base of bases) {
     let response: Response;
     try {
       response = await fetch(`${base}/session/exchange`, {
@@ -53,8 +85,6 @@ async function exchangeTicket(ticket: string): Promise<Record<string, unknown>> 
         console.warn(`[auth] Ticket rejected by ${base}/session/exchange (HTTP ${response.status}).`);
         throw new Error('Your sign-in step expired. Please try again.');
       }
-      // Anything else (404 from a different service, 5xx, an HTML page) means
-      // this base is not the HRMS API; try the next one instead of failing.
       lastError = `HTTP ${response.status} from ${base}${data?.error ? ` (${data.error})` : ''}`;
       console.warn(`[auth] Session exchange failed: ${lastError}`);
       continue;

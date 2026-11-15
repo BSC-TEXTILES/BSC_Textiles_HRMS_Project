@@ -426,7 +426,12 @@ export async function storeTtlMs(key: string): Promise<number> {
 }
 
 export async function storeSetNx(key: string, value: string, ttlMs: number): Promise<boolean> {
-  return (await getStore()).setNx(key, value, ttlMs);
+  try {
+    return await (await getStore()).setNx(key, value, ttlMs);
+  } catch (err: any) {
+    console.warn(`[redisStore] storeSetNx failed for ${key}, falling back: ${err?.message || err}`);
+    return true;
+  }
 }
 
 export async function redisHealth(): Promise<{ driver: StoreDriver; reachable: boolean; lastError: string | null }> {

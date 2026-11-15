@@ -207,40 +207,47 @@ async function readMfaChallenge(challengeId: string): Promise<{ userId: string }
   }
 }
 
+export async function internalExchangeTicket(ticket: string): Promise<any | null> {
+  const exchanged = await consumeTicket(String(ticket || ''));
+  if (!exchanged) return null;
+  const [rows]: any = await pool.query(
+    'SELECT `id`, `email`, `loginId`, `fullName`, `role`, `permissions`, `locationId`, `employeeId`, `mfaEnabled`, `mustChangePassword` FROM `user` WHERE `id` = ? LIMIT 1',
+    [exchanged.userId]
+  );
+  if (!rows?.length) return null;
+  const user = rows[0];
+  let permissions = user.permissions;
+  if (typeof permissions === 'string') {
+    try { permissions = JSON.parse(permissions); } catch { permissions = []; }
+  }
+  if (!Array.isArray(permissions)) permissions = [];
+  return {
+    id: user.id,
+    email: user.email,
+    loginId: user.loginId,
+    fullName: user.fullName,
+    role: user.role,
+    permissions,
+    locationId: user.locationId,
+    employeeId: user.employeeId,
+    mfaEnabled: Boolean(user.mfaEnabled),
+    mustChangePassword: Boolean(user.mustChangePassword),
+    sessionId: exchanged.sessionId,
+  };
+}
+
+// Expose on globalThis for zero-latency, zero-network in-process exchange when unified server runs
+(globalThis as any).__HRMS_INTERNAL_EXCHANGE_TICKET = internalExchangeTicket;
+
 /** One-time ticket exchange so the Next.js layer never handles a password. */
 router.post('/exchange', async (req: Request, res: Response) => {
   try {
-    const exchanged = await consumeTicket(String(req.body?.ticket || ''), ipOf(req), uaOf(req));
-    if (!exchanged) {
+    const user = await internalExchangeTicket(String(req.body?.ticket || ''));
+    if (!user) {
       res.status(401).json({ error: 'Invalid exchange' });
       return;
     }
-    const [rows]: any = await pool.query(
-      'SELECT `id`, `email`, `loginId`, `fullName`, `role`, `permissions`, `locationId`, `employeeId`, `mfaEnabled`, `mustChangePassword` FROM `user` WHERE `id` = ? LIMIT 1',
-      [exchanged.userId]
-    );
-    if (!rows?.length) return void res.status(401).json({ error: 'Invalid exchange' });
-    const user = rows[0];
-    let permissions = user.permissions;
-    if (typeof permissions === 'string') {
-      try { permissions = JSON.parse(permissions); } catch { permissions = []; }
-    }
-    if (!Array.isArray(permissions)) permissions = [];
-    res.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        loginId: user.loginId,
-        fullName: user.fullName,
-        role: user.role,
-        permissions,
-        locationId: user.locationId,
-        employeeId: user.employeeId,
-        mfaEnabled: Boolean(user.mfaEnabled),
-        mustChangePassword: Boolean(user.mustChangePassword),
-        sessionId: exchanged.sessionId,
-      },
-    });
+    res.json({ user });
   } catch (error: any) {
     fail(res, error, 'Exchange failed');
   }
