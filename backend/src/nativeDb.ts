@@ -34,7 +34,7 @@ const isMysql = !isPostgres && !isSqlite;
 if (process.env.NODE_ENV === 'production' && isMysql && !rawUri.trim()) {
   throw new Error(
     '[Database] DATABASE_URL is required in production for MySQL. ' +
-      'Refusing to fall back to an unauthenticated localhost database.'
+    'Refusing to fall back to an unauthenticated localhost database.'
   );
 }
 
@@ -751,7 +751,7 @@ export class ModelDelegate {
     private modelName: string,
     private tableName: string,
     private getClient: () => Promise<any>
-  ) {}
+  ) { }
 
   async findUnique(args: { where: any; select?: any; include?: any }): Promise<any | null> {
     const client = await this.getClient();
@@ -1137,7 +1137,7 @@ export class ModelDelegate {
 export class NativeMySQLClient {
   private delegates = new Map<string, ModelDelegate>();
 
-  constructor(private connectionGetter: () => Promise<any> = async () => pool) {}
+  constructor(private connectionGetter: () => Promise<any> = async () => pool) { }
 
   getModel(modelName: string): ModelDelegate {
     if (!this.delegates.has(modelName)) {

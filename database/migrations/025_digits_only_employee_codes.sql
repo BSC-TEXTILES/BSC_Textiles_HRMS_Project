@@ -323,20 +323,22 @@ BEGIN
           MYSQL_ERRNO = 1644;
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM information_schema.CHECK_CONSTRAINTS
+  IF NOT EXISTS (SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
                   WHERE CONSTRAINT_SCHEMA = DATABASE()
+                    AND TABLE_NAME = 'employee'
                     AND CONSTRAINT_NAME = 'employee_employeeCode_digits_only') THEN
     ALTER TABLE `employee`
       ADD CONSTRAINT `employee_employeeCode_digits_only`
-          CHECK (`employeeCode` REGEXP '^[0-9]+$' AND CHAR_LENGTH(`employeeCode`) BETWEEN 1 AND 30) ENFORCED;
+          CHECK (`employeeCode` REGEXP '^[0-9]+$' AND CHAR_LENGTH(`employeeCode`) BETWEEN 1 AND 30);
   END IF;
 
-  IF NOT EXISTS (SELECT 1 FROM information_schema.CHECK_CONSTRAINTS
+  IF NOT EXISTS (SELECT 1 FROM information_schema.TABLE_CONSTRAINTS
                   WHERE CONSTRAINT_SCHEMA = DATABASE()
+                    AND TABLE_NAME = 'employee'
                     AND CONSTRAINT_NAME = 'employee_reviewedCode_keepsOriginal') THEN
     ALTER TABLE `employee`
       ADD CONSTRAINT `employee_reviewedCode_keepsOriginal`
-          CHECK (`requiresHrCodeReview` = 0 OR `legacyEmployeeCode` IS NOT NULL) ENFORCED;
+          CHECK (`requiresHrCodeReview` = 0 OR `legacyEmployeeCode` IS NOT NULL);
   END IF;
 END;
 

@@ -36,6 +36,8 @@ export const TOLERATED_ERROR_CODES = new Set<string>([
   'ER_NO_SUCH_TABLE',          // 1146 table absent in this database shape
   'ER_WRONG_OBJECT',           // 1347 object exists but is not the expected kind
   'ER_NO_REFERENCED_ROW_2',    // 1452 foreign key reference missing in partial seed
+  'ER_CHECK_CONSTRAINT_DUP_NAME', // 3822 check constraint already exists
+  '3822',
 ]);
 
 /** Tables startup depends on; missing any of them means the schema is not installed. */
@@ -43,6 +45,14 @@ export const CORE_TABLES = ['employee', 'location', 'department', 'shift', 'payr
 
 export function isMissingSchemaError(error: any): boolean {
   return error?.code === 'ER_NO_SUCH_TABLE' || error?.code === 'ER_BAD_TABLE_ERROR' || error?.errno === 1146;
+}
+
+/**
+ * Missing table OR missing column: both mean pending migrations on an
+ * otherwise-installed database (e.g. `user.tokenVersion` from 033).
+ */
+export function isOutdatedSchemaError(error: any): boolean {
+  return isMissingSchemaError(error) || error?.code === 'ER_BAD_FIELD_ERROR' || error?.errno === 1054;
 }
 
 /**

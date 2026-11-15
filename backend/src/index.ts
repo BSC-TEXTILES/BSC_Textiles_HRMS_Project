@@ -17,7 +17,7 @@ import { createServer, type Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
 import { prisma, pool } from './db.js';
 import { mysqlPool } from './nativeDb.js';
-import { bootstrapDatabaseSchema, isMissingSchemaError, CORE_TABLES } from './services/schemaBootstrap.js';
+import { bootstrapDatabaseSchema, isMissingSchemaError, isOutdatedSchemaError, CORE_TABLES } from './services/schemaBootstrap.js';
 import { readBiometricHealth } from './services/biometricService.js';
 import { apiV1Router } from './api/v1/index.js';
 import { docsRouter } from './api/docs/index.js';
@@ -383,6 +383,9 @@ if (!process.env.VERCEL) {
         for (const table of CORE_TABLES) {
           await pool.query(`SELECT 1 FROM \`${table}\` LIMIT 0`);
         }
+        // Core tables can exist while later migrations (session/token tables,
+        // user.tokenVersion) are still pending — login needs those too.
+        await assertSessionSchema((sql) => pool.query(sql));
       };
       const failed = await runStartupChecks(async () => {
         try {
@@ -390,7 +393,8 @@ if (!process.env.VERCEL) {
         } catch (err: any) {
           // A freshly created hosting database has no tables; install the schema
           // instead of waiting for someone to run db:schema/db:migrate by hand.
-          if (!isMissingSchemaError(err) || !mysqlPool || process.env.DB_AUTO_MIGRATE === 'false') throw err;
+          if (!isOutdatedSchemaError(err) || !mysqlPool || process.env.DB_AUTO_MIGRATE === 'false') throw err;
+          console.log(`[schema] Required schema incomplete (${err?.code}: ${err?.sqlMessage || err?.message}); applying pending schema/migrations...`);
           const outcome = await bootstrapDatabaseSchema(() => mysqlPool.getConnection()).catch((installErr: any) => {
             console.error(`[schema] Automatic schema install failed: ${installErr?.message || installErr?.code || installErr}`);
             throw installErr;

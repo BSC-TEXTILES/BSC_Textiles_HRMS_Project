@@ -9,7 +9,7 @@
  */
 import { Router, Request, Response } from 'express';
 import { pool, mysqlPool } from '../nativeDb.js';
-import { bootstrapDatabaseSchema } from '../services/schemaBootstrap.js';
+import { bootstrapDatabaseSchema, isOutdatedSchemaError } from '../services/schemaBootstrap.js';
 import { securityConfig } from '../config/security.js';
 import { authenticate, AuthRequest } from '../middleware/auth.js';
 import { sensitiveRateLimit, captchaRateLimit } from '../middleware/securityGuards.js';
@@ -151,10 +151,11 @@ router.post('/login', sensitiveRateLimit, async (req: Request, res: Response) =>
     const outcome = await performLogin(request);
     await respondWithSession(res, req, outcome);
   } catch (error: any) {
-    if ((error?.code === 'ER_NO_SUCH_TABLE' || error?.errno === 1146) && mysqlPool) {
-      console.log('[session] Missing table detected during login. Triggering immediate on-demand schema bootstrap...');
+    if (isOutdatedSchemaError(error) && mysqlPool && process.env.DB_AUTO_MIGRATE !== 'false') {
+      console.log(`[session] Schema incomplete during login (${error?.code}: ${error?.sqlMessage || error?.message}). Applying pending schema/migrations...`);
       try {
-        await bootstrapDatabaseSchema(() => mysqlPool.getConnection());
+        const outcome = await bootstrapDatabaseSchema(() => mysqlPool.getConnection());
+        if (outcome.status === 'skipped') console.warn(`[session] Schema bootstrap skipped: ${outcome.reason}`);
         const retryOutcome = await performLogin(request);
         return await respondWithSession(res, req, retryOutcome);
       } catch (autoErr) {
