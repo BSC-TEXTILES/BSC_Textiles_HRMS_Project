@@ -525,7 +525,7 @@ export class FaceRecognitionService {
           UNIQUE KEY \`KioskDevice_deviceCode_key\` (\`deviceCode\`),
           KEY \`KioskDevice_locationId_idx\` (\`locationId\`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-      `).catch(() => {});
+      `).catch(() => { });
 
       const [locRows]: any = await pool.query(
         "SELECT id FROM location WHERE code = 'DAV' OR name LIKE '%Davanagere%' LIMIT 1"
@@ -569,7 +569,7 @@ export class FaceRecognitionService {
       await pool.query(
         'UPDATE kiosk_device SET lastHeartbeat = NOW(3), pinHash = ? WHERE id = ?',
         [pinHash, device.id]
-      ).catch(() => {});
+      ).catch(() => { });
 
       return {
         success: true,

@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { Options } from 'express-rate-limit';
 
 /**
  * Standard safe handler returning 429 and Retry-After
@@ -14,17 +14,33 @@ const createHandler = (message: string) => (req: any, res: any) => {
 };
 
 /**
+ * Factory for hardened rate limiters that are completely immune to prototype pollution
+ * (such as Object.prototype.max = 1e9).
+ * It creates a null-prototype options object and always explicitly defines both `limit`
+ * and `max` as own properties.
+ */
+export function createSafeRateLimiter(options: Partial<Options> & { limit?: number; max?: number }): any {
+  const safeOptions: any = Object.create(null);
+  Object.assign(safeOptions, options);
+  const ceiling = options.limit ?? options.max ?? 60;
+  safeOptions.limit = ceiling;
+  safeOptions.max = ceiling;
+  return rateLimit(safeOptions);
+}
+
+/**
  * Auth Critical Limiter: Login, Register, MFA Verify
  * Maximum 10 attempts per 1 minute
  */
-export const authCriticalLimiter = rateLimit({
+export const authCriticalLimiter = createSafeRateLimiter({
   windowMs: 60 * 1000,
+  limit: 10,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   handler: createHandler('Too many authentication attempts. Maximum 10 attempts per minute allowed. Please wait before retrying.'),
   keyGenerator: (req) => {
-    const ip = req.ip || req.socket.remoteAddress || '127.0.0.1';
+    const ip = req.ip || req.socket?.remoteAddress || '127.0.0.1';
     const email = (req.body?.email || '').toLowerCase().trim();
     return `${ip}:${email}`;
   },
@@ -34,8 +50,9 @@ export const authCriticalLimiter = rateLimit({
  * Auth Sensitive Limiter: Forgot Password, Reset Password, Verify Email
  * Maximum 10 requests per 1 hour
  */
-export const authSensitiveLimiter = rateLimit({
+export const authSensitiveLimiter = createSafeRateLimiter({
   windowMs: 60 * 60 * 1000,
+  limit: 10,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
@@ -45,8 +62,9 @@ export const authSensitiveLimiter = rateLimit({
 /**
  * File Upload Limiter: Maximum 10 uploads/validations per 1 minute
  */
-export const uploadLimiter = rateLimit({
+export const uploadLimiter = createSafeRateLimiter({
   windowMs: 60 * 1000,
+  limit: 10,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
@@ -56,10 +74,12 @@ export const uploadLimiter = rateLimit({
 /**
  * Data Export Limiter: Maximum 10 exports/downloads per 1 minute
  */
-export const exportLimiter = rateLimit({
+export const exportLimiter = createSafeRateLimiter({
   windowMs: 60 * 1000,
+  limit: 10,
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
   handler: createHandler('Bulk export rate limit exceeded. Maximum 10 download attempts per minute allowed. Please allow the server to process current reports.'),
 });
+

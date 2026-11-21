@@ -28,6 +28,7 @@ import {
   storeHiringUpload,
 } from '../services/hiring/hiringUploadService.js';
 import { issueCaptcha } from '../services/captchaService.js';
+import { createSafeRateLimiter } from '../middleware/rateLimiting.js';
 
 const router = Router();
 
@@ -39,8 +40,9 @@ function limitHandler(message: string) {
   };
 }
 
-const publicReadLimiter = rateLimit({
+const publicReadLimiter = createSafeRateLimiter({
   windowMs: 60_000,
+  limit: 120,
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
@@ -55,8 +57,9 @@ const isLoopbackTest = (req: Request): boolean => {
   );
 };
 
-const publicUploadLimiter = rateLimit({
+const publicUploadLimiter = createSafeRateLimiter({
   windowMs: 60_000,
+  limit: 20,
   max: 20,
   skip: isLoopbackTest,
   standardHeaders: true,
@@ -64,17 +67,20 @@ const publicUploadLimiter = rateLimit({
   handler: limitHandler('Too many uploads. Please wait a moment before uploading again.'),
 });
 
-const publicSubmitLimiter = rateLimit({
+const submitCeiling = Number(process.env.HIRING_PUBLIC_SUBMIT_MAX) || 100;
+const publicSubmitLimiter = createSafeRateLimiter({
   windowMs: 15 * 60_000,
-  max: Number(process.env.HIRING_PUBLIC_SUBMIT_MAX) || 100,
+  limit: submitCeiling,
+  max: submitCeiling,
   skip: isLoopbackTest,
   standardHeaders: true,
   legacyHeaders: false,
   handler: limitHandler('Too many submission attempts. Please wait before trying again.'),
 });
 
-const captchaLimiter = rateLimit({
+const captchaLimiter = createSafeRateLimiter({
   windowMs: 60_000,
+  limit: 60,
   max: 60,
   skip: isLoopbackTest,
   standardHeaders: true,
