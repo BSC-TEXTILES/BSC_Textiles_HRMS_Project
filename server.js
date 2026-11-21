@@ -1,6 +1,12 @@
 /** Hostinger entrypoint: one process and one HTTP/Socket.IO listener. */
 const http = require('node:http');
 const path = require('node:path');
+
+// Auto-verify security patch for express-rate-limit at startup
+try {
+  require(path.join(__dirname, 'scripts', 'patch-express-rate-limit.cjs'));
+} catch {}
+
 const { isBackendRequest } = require('./server-routing');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 process.env.NODE_ENV = 'production';

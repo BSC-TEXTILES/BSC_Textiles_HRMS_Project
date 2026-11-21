@@ -5,6 +5,13 @@ const path = require('node:path');
 const rootDir = path.resolve(__dirname, '../..');
 const backendDir = path.resolve(__dirname, '..');
 
+// Ensure express-rate-limit prototype pollution patch is applied
+try {
+  require(path.join(rootDir, 'scripts', 'patch-express-rate-limit.cjs'));
+} catch (e) {
+  console.warn('[build] Note: patch-express-rate-limit skipped:', e.message);
+}
+
 try {
   require.resolve('typescript/bin/tsc');
 } catch {
