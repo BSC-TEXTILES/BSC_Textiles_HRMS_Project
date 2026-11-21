@@ -1,4 +1,6 @@
 import nodemailer, { type Transporter } from 'nodemailer';
+import crypto from 'node:crypto';
+import { pool } from '../nativeDb.js';
 
 export class EmailNotificationService {
   private static transporter: Transporter | null = null;
@@ -252,6 +254,212 @@ export class EmailNotificationService {
     `;
 
     return await this.send({ to: params.to, subject, text, html });
+  }
+
+  /**
+   * Queue email for asynchronous delivery with automatic retry.
+   */
+  public static async queueEmail(options: {
+    to: string;
+    recipientName?: string;
+    subject: string;
+    html: string;
+    eventType: string;
+  }): Promise<string> {
+    const queueId = `emq_${crypto.randomBytes(12).toString('hex')}`;
+    try {
+      await pool.query(
+        `INSERT INTO email_notification_queue (id, recipientEmail, recipientName, subject, bodyHtml, eventType, status, retryCount, maxRetries, scheduledAt, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, 'PENDING', 0, 3, NOW(3), NOW(3))`,
+        [queueId, options.to, options.recipientName || null, options.subject, options.html, options.eventType]
+      );
+    } catch (e) {
+      console.error('[EmailNotificationService] Failed to insert into email queue:', e);
+    }
+
+    // Attempt immediate opportunistic delivery
+    this.send({
+      to: options.to,
+      subject: options.subject,
+      text: options.subject,
+      html: options.html,
+    }).then(async (success) => {
+      try {
+        if (success) {
+          await pool.query('UPDATE email_notification_queue SET status = "SENT", sentAt = NOW(3) WHERE id = ?', [queueId]);
+        } else {
+          await pool.query('UPDATE email_notification_queue SET retryCount = retryCount + 1, lastError = "Delivery failed" WHERE id = ?', [queueId]);
+        }
+      } catch {
+        // Ignore
+      }
+    }).catch(() => {});
+
+    return queueId;
+  }
+
+  /**
+   * Process pending items in email queue with retry limit.
+   */
+  public static async processQueue(): Promise<{ processed: number; sent: number; failed: number }> {
+    let processed = 0;
+    let sent = 0;
+    let failed = 0;
+
+    try {
+      const [rows]: any = await pool.query(
+        `SELECT id, recipientEmail, subject, bodyHtml, retryCount, maxRetries 
+         FROM email_notification_queue 
+         WHERE status = 'PENDING' AND retryCount < maxRetries 
+         ORDER BY scheduledAt ASC LIMIT 25`
+      );
+
+      if (!rows || rows.length === 0) return { processed: 0, sent: 0, failed: 0 };
+
+      for (const row of rows) {
+        processed++;
+        const ok = await this.send({
+          to: row.recipientEmail,
+          subject: row.subject,
+          text: row.subject,
+          html: row.bodyHtml,
+        });
+
+        if (ok) {
+          sent++;
+          await pool.query('UPDATE email_notification_queue SET status = "SENT", sentAt = NOW(3) WHERE id = ?', [row.id]);
+        } else {
+          failed++;
+          const nextRetry = row.retryCount + 1;
+          const status = nextRetry >= row.maxRetries ? 'FAILED' : 'PENDING';
+          await pool.query(
+            'UPDATE email_notification_queue SET retryCount = ?, status = ?, lastError = "Delivery attempt failed" WHERE id = ?',
+            [nextRetry, status, row.id]
+          );
+        }
+      }
+    } catch (err) {
+      console.error('[EmailNotificationService] processQueue error:', err);
+    }
+
+    return { processed, sent, failed };
+  }
+
+  /**
+   * Notify new employee with login credentials and activation link.
+   */
+  public static async sendEmployeeWelcomeCredentials(params: {
+    to: string;
+    fullName: string;
+    employeeCode: string;
+    username: string;
+    tempPassword?: string;
+    activationToken?: string;
+  }): Promise<boolean> {
+    const activationLink = params.activationToken
+      ? `${this.APP_URL}/auth/activate?token=${encodeURIComponent(params.activationToken)}`
+      : `${this.APP_URL}/login`;
+
+    const subject = `Welcome to BSC Textiles — Your HRMS Login Credentials (${params.employeeCode})`;
+    const html = `
+      <div style="font-family: Arial, sans-serif; padding: 24px; color: #1E293B; max-width: 600px; margin: auto; border: 1px solid #E2E8F0; border-radius: 8px;">
+        <h2 style="color: #092B69; margin-top: 0;">BSC Textiles HRMS — Employee Onboarding</h2>
+        <p>Namaskara <strong>${params.fullName}</strong>,</p>
+        <p>Your employee profile has been officially created in the BSC Textiles Human Resource Management System.</p>
+        
+        <div style="background: #F8FAFC; border-left: 4px solid #0284C7; padding: 16px; margin: 20px 0;">
+          <p style="margin: 4px 0;"><strong>Employee Code:</strong> ${params.employeeCode}</p>
+          <p style="margin: 4px 0;"><strong>Username / Login:</strong> ${params.username}</p>
+          ${params.tempPassword ? `<p style="margin: 4px 0;"><strong>Temporary Password:</strong> <code style="background: #E2E8F0; padding: 2px 6px; border-radius: 4px;">${params.tempPassword}</code></p>` : ''}
+        </div>
+
+        <p style="margin: 24px 0;">
+          <a href="${activationLink}" style="background: #092B69; color: #FFFFFF; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Activate Account & Sign In</a>
+        </p>
+
+        <p style="color: #64748B; font-size: 13px;">Please change your password immediately upon your first sign-in. Never share your credentials with anyone.</p>
+      </div>
+    `;
+
+    await this.queueEmail({
+      to: params.to,
+      recipientName: params.fullName,
+      subject,
+      html,
+      eventType: 'ACCOUNT_ACTIVATION',
+    });
+
+    return true;
+  }
+
+  /**
+   * Alert employee and supervisor of missed punch beyond grace period.
+   */
+  public static async sendMissedPunchAlert(params: {
+    to: string;
+    fullName: string;
+    date: string;
+    punchType: 'CHECK_IN' | 'CHECK_OUT';
+    shiftName?: string;
+  }): Promise<boolean> {
+    const subject = `[Attendance Notice] Missed ${params.punchType === 'CHECK_IN' ? 'Check-In' : 'Check-Out'} on ${params.date}`;
+    const link = `${this.APP_URL}/my-desk`;
+    const html = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; color: #1E293B;">
+        <h2 style="color: #DC2626;">Missed Attendance Punch Notice</h2>
+        <p>Namaskara <strong>${params.fullName}</strong>,</p>
+        <p>Our biometric and attendance records indicate that your <strong>${params.punchType}</strong> punch for <strong>${params.date}</strong> was not recorded within the shift grace period.</p>
+        <p>If you were present on the floor, please submit an <strong>Attendance Correction Request</strong> through your employee portal:</p>
+        <p style="margin: 20px 0;">
+          <a href="${link}" style="background: #DC2626; color: #FFFFFF; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold;">Submit Punch Correction</a>
+        </p>
+      </div>
+    `;
+
+    await this.queueEmail({
+      to: params.to,
+      recipientName: params.fullName,
+      subject,
+      html,
+      eventType: 'MISSED_PUNCH',
+    });
+
+    return true;
+  }
+
+  /**
+   * Notify employee of monthly salary slip generation and availability.
+   */
+  public static async sendSalarySlipReady(params: {
+    to: string;
+    fullName: string;
+    month: string;
+    year: number;
+    netPay: number;
+  }): Promise<boolean> {
+    const subject = `Your BSC Textiles Salary Slip for ${params.month} ${params.year} is Ready`;
+    const link = `${this.APP_URL}/my-desk`;
+    const html = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; color: #1E293B;">
+        <h2 style="color: #092B69;">Salary Slip Available</h2>
+        <p>Namaskara <strong>${params.fullName}</strong>,</p>
+        <p>Your salary slip for <strong>${params.month} ${params.year}</strong> has been processed.</p>
+        <p><strong>Net Payable Amount:</strong> ₹${params.netPay.toLocaleString('en-IN')}</p>
+        <p style="margin: 20px 0;">
+          <a href="${link}" style="background: #092B69; color: #FFFFFF; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold;">Download Salary Slip PDF</a>
+        </p>
+      </div>
+    `;
+
+    await this.queueEmail({
+      to: params.to,
+      recipientName: params.fullName,
+      subject,
+      html,
+      eventType: 'PAYSLIP_GENERATED',
+    });
+
+    return true;
   }
 
   /**

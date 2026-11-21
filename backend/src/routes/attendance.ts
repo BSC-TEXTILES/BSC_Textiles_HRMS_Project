@@ -70,6 +70,33 @@ router.get('/monthly-matrix', authorize('VIEW'), async (req: AuthRequest, res) =
 
     const [employees]: any = await pool.query(empQuery, empParams);
 
+    // Query holidays in this month
+    const [holidays]: any = await pool.query(
+      `SELECT name, DATE_FORMAT(date, '%Y-%m-%d') as holDate, locationId, isNational
+       FROM holiday
+       WHERE date >= ? AND date <= ?`,
+      [startDateStr, endDateStr]
+    );
+    const holidayMap = new Map<string, string>();
+    for (const h of holidays) {
+      holidayMap.set(h.holDate, h.name);
+    }
+
+    // Query approved leaves in this month
+    const [leaves]: any = await pool.query(
+      `SELECT employeeId, leaveType, DATE_FORMAT(startDate, '%Y-%m-%d') as sDate, DATE_FORMAT(endDate, '%Y-%m-%d') as eDate
+       FROM leaverequest
+       WHERE status = 'APPROVED' AND startDate <= ? AND endDate >= ?`,
+      [endDateStr, startDateStr]
+    );
+
+    // Query weekly off configs
+    const [weeklyOffs]: any = await pool.query('SELECT employeeId, primaryDay FROM employee_weekly_off_config');
+    const weeklyOffMap = new Map<string, string>();
+    for (const w of weeklyOffs) {
+      weeklyOffMap.set(w.employeeId, String(w.primaryDay || 'SUNDAY').toUpperCase());
+    }
+
     // Query all existing attendance records for this month
     const [attRows]: any = await pool.query(
       `SELECT id, employeeId, DATE_FORMAT(attendanceDate, '%Y-%m-%d') as attDate,
@@ -79,29 +106,141 @@ router.get('/monthly-matrix', authorize('VIEW'), async (req: AuthRequest, res) =
       [startDateStr, endDateStr]
     );
 
-    // Group by employeeId and dayNum
-    const matrix: Record<string, Record<number, any>> = {};
+    const existingPunches: Record<string, Record<number, any>> = {};
     for (const row of attRows) {
-      if (!matrix[row.employeeId]) {
-        matrix[row.employeeId] = {};
-      }
-      let code = 'P';
-      if (row.status === 'WEEKLY_OFF') code = 'WO';
-      else if (row.status === 'LATE') code = 'L';
-      else if (row.status === 'ABSENT') code = 'A';
-      else if (row.notes?.includes('Earned Leave') || row.notes?.includes('EL')) code = 'EL';
-      else if (row.notes?.includes('Half Day') || row.notes?.includes('HD')) code = 'HD';
-      else if (row.notes?.includes('On Duty') || row.notes?.includes('OD')) code = 'OD';
+      if (!existingPunches[row.employeeId]) existingPunches[row.employeeId] = {};
+      existingPunches[row.employeeId][row.dayNum] = row;
+    }
 
-      matrix[row.employeeId][row.dayNum] = {
-        id: row.id,
-        date: row.attDate,
-        code,
-        status: row.status,
-        actualLogin: row.actualLogin ? new Date(row.actualLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null,
-        actualLogout: row.actualLogout ? new Date(row.actualLogout).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null,
-        notes: row.notes || '',
-      };
+    const todayYmdStr = new Date().toISOString().slice(0, 10);
+    const todayDayNum = (new Date().getFullYear() === year && (new Date().getMonth() + 1) === month)
+      ? new Date().getDate()
+      : (year < new Date().getFullYear() || (year === new Date().getFullYear() && month < (new Date().getMonth() + 1)))
+        ? 999
+        : -1;
+
+    const daysOfWeekNames = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+
+    // Group by employeeId and dayNum with all 8 color-coded statuses
+    const matrix: Record<string, Record<number, any>> = {};
+    for (const emp of employees) {
+      matrix[emp.id] = {};
+      const empOffDay = weeklyOffMap.get(emp.id) || 'SUNDAY';
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const dt = new Date(year, month - 1, d);
+        const dayName = daysOfWeekNames[dt.getDay()];
+        const isHol = holidayMap.has(dStr);
+        const isOff = dayName === empOffDay;
+
+        const punch = existingPunches[emp.id]?.[d];
+
+        // Check if employee had approved leave on this date
+        const empLeave = leaves.find((l: any) => l.employeeId === emp.id && l.sDate <= dStr && l.eDate >= dStr);
+
+        if (punch && (punch.actualLogin || punch.actualLogout || punch.status === 'PRESENT' || punch.status === 'HALF_DAY')) {
+          if (isHol) {
+            matrix[emp.id][d] = {
+              id: punch.id,
+              date: dStr,
+              code: 'HW',
+              status: 'HOLIDAY_WORKED',
+              color: 'orange',
+              label: 'Holiday Worked (2x Pay)',
+              actualLogin: punch.actualLogin ? new Date(punch.actualLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null,
+              actualLogout: punch.actualLogout ? new Date(punch.actualLogout).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null,
+              notes: holidayMap.get(dStr) || 'Holiday Worked',
+            };
+          } else {
+            matrix[emp.id][d] = {
+              id: punch.id,
+              date: dStr,
+              code: 'P',
+              status: 'PRESENT',
+              color: 'green',
+              label: 'Present',
+              actualLogin: punch.actualLogin ? new Date(punch.actualLogin).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null,
+              actualLogout: punch.actualLogout ? new Date(punch.actualLogout).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : null,
+              notes: punch.notes || '',
+            };
+          }
+        } else if (empLeave) {
+          const isPaid = empLeave.leaveType !== 'UNPAID';
+          matrix[emp.id][d] = {
+            id: null,
+            date: dStr,
+            code: isPaid ? 'PL' : 'AL',
+            status: isPaid ? 'PAID_LEAVE' : 'APPROVED_LEAVE',
+            color: isPaid ? 'lightgreen' : 'blue',
+            label: `${empLeave.leaveType} Leave`,
+            actualLogin: null,
+            actualLogout: null,
+            notes: `${empLeave.leaveType} Leave`,
+          };
+        } else if (isHol) {
+          matrix[emp.id][d] = {
+            id: null,
+            date: dStr,
+            code: 'CH',
+            status: 'HOLIDAY',
+            color: 'purple',
+            label: holidayMap.get(dStr) || 'Company Holiday',
+            actualLogin: null,
+            actualLogout: null,
+            notes: holidayMap.get(dStr) || 'Holiday',
+          };
+        } else if (isOff) {
+          matrix[emp.id][d] = {
+            id: null,
+            date: dStr,
+            code: 'WO',
+            status: 'WEEKLY_OFF',
+            color: 'grey',
+            label: 'Weekly Off',
+            actualLogin: null,
+            actualLogout: null,
+            notes: 'Weekly Off',
+          };
+        } else if (d < todayDayNum) {
+          // Automatic Absent after cutoff
+          matrix[emp.id][d] = {
+            id: null,
+            date: dStr,
+            code: 'A',
+            status: 'ABSENT',
+            color: 'red',
+            label: 'Absent',
+            actualLogin: null,
+            actualLogout: null,
+            notes: 'Unexcused Absence',
+          };
+        } else if (d === todayDayNum) {
+          matrix[emp.id][d] = {
+            id: null,
+            date: dStr,
+            code: 'PEN',
+            status: 'PENDING',
+            color: 'yellow',
+            label: 'Pending Punch',
+            actualLogin: null,
+            actualLogout: null,
+            notes: 'Pending',
+          };
+        } else {
+          matrix[emp.id][d] = {
+            id: null,
+            date: dStr,
+            code: '-',
+            status: 'SCHEDULED',
+            color: 'transparent',
+            label: 'Scheduled',
+            actualLogin: null,
+            actualLogout: null,
+            notes: '',
+          };
+        }
+      }
     }
 
     res.json({

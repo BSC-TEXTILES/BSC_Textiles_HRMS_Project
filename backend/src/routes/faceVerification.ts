@@ -3,8 +3,27 @@ import { z } from 'zod';
 import { prisma } from '../index.js';
 import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
+import { FaceRecognitionService } from '../services/faceRecognitionService.js';
 
 const router = Router();
+
+// Kiosk device PIN authentication (runs without employee user session)
+router.post('/kiosk/auth', async (req, res) => {
+  try {
+    const { deviceCode, pin } = req.body || {};
+    if (!deviceCode || !pin) {
+      return res.status(400).json({ error: 'deviceCode and pin are required' });
+    }
+    const result = await FaceRecognitionService.authenticateKiosk(String(deviceCode), String(pin));
+    if (!result.success) {
+      return res.status(401).json({ error: result.message });
+    }
+    return res.json(result);
+  } catch (error: any) {
+    console.error('Kiosk auth error:', error);
+    return res.status(500).json({ error: error?.message || 'Kiosk authentication failed' });
+  }
+});
 
 router.use(authenticate);
 
@@ -296,6 +315,107 @@ router.get(['/stats', '/stats/:locationId'], authorize('VIEW'), async (req: Auth
   } catch (error) {
     console.error('Get face verification stats error:', error);
     res.status(500).json({ error: 'Failed to get face verification stats' });
+  }
+});
+
+/**
+ * Multi-Angle Face Registration (Straight, Right, Left, Up/Down)
+ */
+router.post('/register-multi', authorize('RECORD'), async (req: AuthRequest, res) => {
+  try {
+    const { employeeId, samples } = req.body || {};
+    if (!employeeId || !Array.isArray(samples) || samples.length === 0) {
+      return res.status(400).json({ error: 'employeeId and at least one pose sample are required' });
+    }
+
+    const result = await FaceRecognitionService.registerMultiAngle(String(employeeId), samples);
+    return res.json(result);
+  } catch (error: any) {
+    console.error('Multi-angle face registration error:', error);
+    return res.status(500).json({ error: error?.message || 'Face registration failed' });
+  }
+});
+
+/**
+ * Get Enrolled Samples for an Employee
+ */
+router.get('/samples/:employeeId', authorize('VIEW'), async (req: AuthRequest, res) => {
+  try {
+    const { employeeId } = req.params;
+    const profile = await prisma.faceProfile.findUnique({
+      where: { employeeId },
+      include: {
+        employee: { select: { id: true, employeeCode: true, fullName: true, locationId: true } },
+      },
+    });
+
+    res.json({
+      enrolled: Boolean(profile?.isActive),
+      multiAngleEnrolled: Boolean((profile as any)?.multiAngleEnrolled),
+      threshold: Number((profile as any)?.threshold || 70.0),
+      enrolledAt: profile?.enrolledAt || null,
+      employee: profile?.employee || null,
+    });
+  } catch (error: any) {
+    console.error('Get face samples error:', error);
+    res.status(500).json({ error: 'Failed to get face registration samples' });
+  }
+});
+
+/**
+ * Execute Face Recognition Attendance Punch with Liveness, 70% threshold, and 5-min cooldown
+ */
+router.post('/punch', async (req: AuthRequest, res) => {
+  try {
+    const { employeeId, queryEmbedding, locationId, deviceId, sourceChannel, livenessData, forcedPunchType } = req.body || {};
+
+    const targetEmpId = employeeId || req.user?.employeeId;
+    const targetLocId = locationId || req.user?.locationId || 'loc_dav';
+
+    if (!Array.isArray(queryEmbedding) || queryEmbedding.length === 0) {
+      return res.status(400).json({ error: 'queryEmbedding vector is required for biometric face recognition' });
+    }
+
+    const result = await FaceRecognitionService.verifyAndPunch({
+      employeeId: targetEmpId,
+      queryEmbedding,
+      locationId: targetLocId,
+      deviceId,
+      sourceChannel: sourceChannel || 'WEB',
+      livenessData,
+      forcedPunchType,
+    });
+
+    if (!result.success) {
+      return res.status(result.isCooldownBlocked ? 429 : 400).json(result);
+    }
+
+    return res.json(result);
+  } catch (error: any) {
+    console.error('Face verification punch error:', error);
+    return res.status(500).json({ error: error?.message || 'Failed to process face attendance punch' });
+  }
+});
+
+/**
+ * Synchronize offline punches from Kiosk terminal
+ */
+router.post('/kiosk/sync', async (req: AuthRequest, res) => {
+  try {
+    const { deviceCode, punches } = req.body || {};
+    if (!deviceCode || !Array.isArray(punches)) {
+      return res.status(400).json({ error: 'deviceCode and punches array are required' });
+    }
+
+    const result = await FaceRecognitionService.syncOfflinePunches(String(deviceCode), punches);
+    return res.json({
+      success: true,
+      message: `Synchronized ${result.syncedCount} punches (${result.duplicateCount} duplicates skipped).`,
+      ...result,
+    });
+  } catch (error: any) {
+    console.error('Kiosk offline sync error:', error);
+    return res.status(500).json({ error: error?.message || 'Failed to sync offline punches' });
   }
 });
 

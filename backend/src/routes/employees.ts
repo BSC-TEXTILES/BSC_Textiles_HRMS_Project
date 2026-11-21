@@ -14,6 +14,7 @@ import path from 'node:path';
 import { EmployeeResetService } from '../services/employeeResetService.js';
 import { DatabaseBackupService } from '../services/databaseBackupService.js';
 import { AuditService } from '../services/auditService.js';
+import { EmailNotificationService } from '../services/emailNotificationService.js';
 import { validateEmployeeCode, EMPLOYEE_CODE_RULE } from '../validation/employeeCode.js';
 import crypto from 'node:crypto';
 
@@ -41,8 +42,10 @@ const ROLE_ENUM = z.enum(['SUPER_ADMIN', 'ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE', 
  * immutable — legacy corrections go through the HR data-quality review).
  */
 const employeeBody = z.object({
-  firstName: z.string().min(1).max(50),
-  lastName: z.string().min(1).max(50),
+  firstName: z.string().min(1).max(50).optional(),
+  lastName: z.string().min(1).max(50).optional(),
+  name: z.string().optional(),
+  fullName: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
   phone: z.string().optional(),
   gender: z.enum(['male', 'female', 'other']).optional(),
@@ -54,6 +57,15 @@ const employeeBody = z.object({
   designation: z.string().optional(),
   role: ROLE_ENUM.optional(),
   joiningDate: z.string().optional(),
+  employmentType: z.string().optional(),
+  reportingManager: z.string().optional(),
+  manager: z.string().optional(),
+  fixedGrossSalary: z.union([z.number(), z.string()]).optional(),
+  basicSalary: z.union([z.number(), z.string()]).optional(),
+  dailyRate: z.union([z.number(), z.string()]).optional(),
+  weeklyOff: z.string().optional(),
+  username: z.string().optional(),
+  tempPassword: z.string().optional(),
   /** Optional optimistic-concurrency guard: reject stale writes (409). */
   expectedUpdatedAt: z.string().optional(),
 });
@@ -448,13 +460,24 @@ router.post('/', authorize('ADD'), validate(employeeCreateSchema), async (req: A
       });
     }
     
-    const fullName = `${String(firstName).trim()} ${String(lastName).trim()}`;
+    const rawName = String(req.body.fullName || req.body.name || '').trim();
+    let finalFirst = String(firstName || '').trim();
+    let finalLast = String(lastName || '').trim();
+    if (!finalFirst && rawName) {
+      const parts = rawName.split(/\s+/);
+      finalFirst = parts[0] || 'Employee';
+      finalLast = parts.slice(1).join(' ') || 'Staff';
+    } else if (!finalFirst) {
+      finalFirst = 'Employee';
+      finalLast = finalLast || 'Staff';
+    }
+    const fullName = rawName || `${finalFirst} ${finalLast}`.trim();
     
     const employee = await prisma.employee.create({
       data: {
         employeeCode: finalCode,
-        firstName: String(firstName).trim(),
-        lastName: String(lastName).trim(),
+        firstName: finalFirst,
+        lastName: finalLast,
         fullName,
         email: trimmedEmail,
         phone: trimmedPhone || (phone ? String(phone).trim() : null),
@@ -470,30 +493,75 @@ router.post('/', authorize('ADD'), validate(employeeCreateSchema), async (req: A
         status: 'ACTIVE',
       },
     });
+
+    // Save compensation fields if provided
+    const grossVal = Number(req.body.fixedGrossSalary || req.body.salary || 0);
+    const basicVal = Number(req.body.basicSalary || (grossVal > 0 ? grossVal * 0.75 : 0));
+    const dailyRateVal = Number(req.body.dailyRate || (grossVal > 0 ? grossVal / 30.0 : 0));
+    if (grossVal > 0 || basicVal > 0) {
+      try {
+        await pool.query(
+          `UPDATE employee 
+           SET fixedGrossSalary = ?, basicSalary = ?, perDaySalary = ? 
+           WHERE id = ?`,
+          [grossVal, basicVal, dailyRateVal, employee.id]
+        );
+      } catch (err) {
+        console.warn('Could not update compensation fields on employee:', err);
+      }
+    }
+
+    // Save weekly off configuration if provided
+    const weeklyOffDay = String(req.body.weeklyOff || 'SUNDAY').toUpperCase().trim();
+    try {
+      const woffId = `woff_${crypto.randomBytes(8).toString('hex')}`;
+      await pool.query(
+        `INSERT INTO employee_weekly_off_config (id, employeeId, offType, primaryDay, createdAt, updatedAt)
+         VALUES (?, ?, 'FIXED', ?, NOW(3), NOW(3))
+         ON DUPLICATE KEY UPDATE primaryDay = VALUES(primaryDay), updatedAt = NOW(3)`,
+        [woffId, employee.id, weeklyOffDay]
+      );
+    } catch (err) {
+      console.warn('Could not save employee weekly off config:', err);
+    }
     
     // Automatically create employee directory in uploads
     UserUploadService.ensureUserFolder(fullName, finalCode);
 
-    // Create the HRMS account in PENDING_APPROVAL state: a new account must be
-    // approved by HR (POST /auth/approve/:userId) before it can log in, and the
-    // temporary password is random — never a shared default like 'password123'.
-    if (trimmedEmail) {
-      const tempPassword = crypto.randomBytes(18).toString('base64url');
-      const passwordHash = await PasswordService.hashPassword(tempPassword);
+    // Auto-create login user credentials linked to employee
+    const finalUsername = String(req.body.username || trimmedEmail || finalCode).trim();
+    const finalTempPassword = String(req.body.tempPassword || crypto.randomBytes(6).toString('hex') + 'A1!').trim();
+    const userEmail = trimmedEmail || `${finalUsername.replace(/[^a-zA-Z0-9]/g, '') || finalCode}@bsctextiles.in`;
 
-      await prisma.user.create({
+    let generatedUser: any = null;
+    try {
+      const passwordHash = await PasswordService.hashPassword(finalTempPassword);
+      generatedUser = await prisma.user.create({
         data: {
-          email: trimmedEmail,
+          email: userEmail,
           passwordHash,
           fullName,
-          role: role || 'SALES_EMPLOYEE',
+          role: role || 'EMPLOYEE',
           permissions: ['VIEW'],
           employeeId: employee.id,
           locationId: resolvedLocationId,
-          isActive: false,
-          status: 'PENDING_APPROVAL',
+          isActive: true,
+          status: 'ACTIVE',
         },
       });
+
+      // Dispatch welcome notification with credentials & activation link
+      if (trimmedEmail) {
+        await EmailNotificationService.sendEmployeeWelcomeCredentials({
+          to: trimmedEmail,
+          fullName,
+          employeeCode: finalCode,
+          username: finalUsername,
+          tempPassword: finalTempPassword,
+        });
+      }
+    } catch (userErr: any) {
+      console.warn('Auto-create user credential note:', userErr?.message);
     }
 
     await AuditService.log({

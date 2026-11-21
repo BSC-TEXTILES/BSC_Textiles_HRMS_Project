@@ -558,6 +558,37 @@ router.get('/load-or-calculate', async (req: AuthRequest, res) => {
       }
     }
 
+    // Query 2x Double Salary for working on calendar holidays
+    let holidayWorkedCount = 0;
+    let calculatedHolidayPay = 0;
+    try {
+      const [holRows]: any = await pool.query(`
+        SELECT a.id as attendanceId, a.attendanceDate, h.name as holidayName
+        FROM attendance a
+        JOIN holiday h ON (h.date = a.attendanceDate AND (h.locationId = a.locationId OR h.isNational = 1))
+        WHERE a.employeeId = ? AND a.attendanceDate >= ? AND a.attendanceDate <= ?
+          AND a.status IN ('PRESENT', 'HALF_DAY', 'LATE')
+      `, [emp.id, startDateStr, endDateStr]);
+
+      if (holRows && holRows.length > 0) {
+        holidayWorkedCount = holRows.length;
+        // Double Salary (2x daily payable amount for working on calendar holidays)
+        calculatedHolidayPay = Math.round(defaultPerDay * 2.0 * holidayWorkedCount);
+
+        // Record in holiday_working_record
+        for (const hr of holRows) {
+          const hwId = `hw_${emp.id}_${hr.attendanceDate instanceof Date ? hr.attendanceDate.toISOString().slice(0, 10) : String(hr.attendanceDate).slice(0, 10)}`;
+          await pool.query(`
+            INSERT INTO holiday_working_record (id, employeeId, attendanceId, holidayDate, holidayName, multiplier, baseDailyRate, holidayPayAmount, status, createdAt)
+            VALUES (?, ?, ?, ?, ?, 2.00, ?, ?, 'CALCULATED', NOW(3))
+            ON DUPLICATE KEY UPDATE holidayPayAmount = VALUES(holidayPayAmount)
+          `, [hwId, emp.id, hr.attendanceId, hr.attendanceDate, hr.holidayName || 'Holiday', defaultPerDay, Math.round(defaultPerDay * 2.0)]);
+        }
+      }
+    } catch (e) {
+      console.warn('Holiday working calculation check:', e);
+    }
+
     // Default statutory deductions
     const defaultEmpPf = Math.round(defaultPfPay * 0.12);
     const defaultEmpEsi = defaultFixedGross <= 21000 ? Math.round(defaultFixedGross * 0.0075) : 0;
@@ -567,7 +598,7 @@ router.get('/load-or-calculate', async (req: AuthRequest, res) => {
       { id: 'basic', label: 'BASIC PAY', amount: defaultBasic, enabled: true },
       { id: 'hra', label: 'HRA', amount: defaultHra, enabled: true },
       { id: 'ot', label: 'OT', amount: 0, enabled: true },
-      { id: 'govt_holiday', label: 'GOVT.HOLIDAY', amount: 0, enabled: true },
+      { id: 'govt_holiday', label: 'HOLIDAY WORKED (2X)', amount: calculatedHolidayPay, enabled: calculatedHolidayPay > 0 },
       { id: 'attendance_inc', label: 'ATTENDANCE INCENTIVE', amount: attIncentive, enabled: attIncentive > 0 },
       { id: 'special_allow', label: 'SPECIAL ALLOWANCE', amount: 0, enabled: false },
       { id: 'bonus', label: 'BONUS', amount: 0, enabled: false },

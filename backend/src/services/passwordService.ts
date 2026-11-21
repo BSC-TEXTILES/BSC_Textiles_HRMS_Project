@@ -1,8 +1,22 @@
-import { hash as argon2Hash, verify as argon2Verify } from '@node-rs/argon2';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import { prisma, pool } from '../db.js';
 import { securityConfig } from '../config/security.js';
+
+let argon2Module: any = null;
+let argon2LoadAttempted = false;
+
+async function getArgon2(): Promise<{ hash: Function; verify: Function } | null> {
+  if (!argon2LoadAttempted) {
+    argon2LoadAttempted = true;
+    try {
+      argon2Module = await import('@node-rs/argon2');
+    } catch {
+      argon2Module = null;
+    }
+  }
+  return argon2Module;
+}
 
 export interface PasswordValidationResult {
   isValid: boolean;
@@ -45,13 +59,15 @@ export class PasswordService {
    * Hash a plain password using Argon2id over the peppered value
    */
   public static async hashPassword(password: string): Promise<string> {
-    try {
-      return await argon2Hash(this.applyPepper(password), this.ARGON2_OPTIONS);
-    } catch (err) {
-      // Fallback to high-work-factor bcrypt if native module ever fails
-      console.warn('[PasswordService] Argon2 hashing failed, falling back to bcrypt:', err);
-      return await bcrypt.hash(this.applyPepper(password), 12);
+    const argon2 = await getArgon2();
+    if (argon2) {
+      try {
+        return await argon2.hash(this.applyPepper(password), this.ARGON2_OPTIONS);
+      } catch (err) {
+        // Fallback to high-work-factor bcrypt if native module fails
+      }
     }
+    return await bcrypt.hash(this.applyPepper(password), 12);
   }
 
   /**
@@ -72,10 +88,11 @@ export class PasswordService {
     }
 
     const peppered = this.applyPepper(password);
+    const argon2 = await getArgon2();
 
-    if (hash.startsWith('$argon2')) {
+    if (hash.startsWith('$argon2') && argon2) {
       try {
-        if (await argon2Verify(hash, peppered)) return { valid: true, isLegacyBcrypt: false, needsRehash: false };
+        if (await argon2.verify(hash, peppered)) return { valid: true, isLegacyBcrypt: false, needsRehash: false };
       } catch {
         /* fall through to the legacy formats */
       }
@@ -91,7 +108,7 @@ export class PasswordService {
 
     // Credentials hashed before the pepper was introduced.
     try {
-      if (hash.startsWith('$argon2') && (await argon2Verify(hash, password))) {
+      if (hash.startsWith('$argon2') && argon2 && (await argon2.verify(hash, password))) {
         return { valid: true, isLegacyBcrypt: false, needsRehash: true };
       }
       if (hash.startsWith('$2a$') || hash.startsWith('$2b$')) {

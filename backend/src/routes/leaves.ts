@@ -245,4 +245,122 @@ router.post('/applications/:id/cancel', authorize('RECORD'), async (req: AuthReq
   }
 });
 
+/**
+ * POST /api/leaves/import
+ * Bulk Import Leave Details & Historical Records
+ */
+router.post('/import', authorize('ADD'), async (req: AuthRequest, res) => {
+  try {
+    const { leaves } = req.body || {};
+    if (!Array.isArray(leaves) || leaves.length === 0) {
+      return res.status(400).json({ error: 'A non-empty leaves array is required' });
+    }
+
+    let importedCount = 0;
+    let skippedCount = 0;
+    const errors: Array<{ row: number; reason: string }> = [];
+
+    for (let i = 0; i < leaves.length; i++) {
+      const row = leaves[i];
+      try {
+        const empQuery = String(row.employeeId || row.employeeCode || '').trim();
+        if (!empQuery) {
+          skippedCount++;
+          errors.push({ row: i + 1, reason: 'Missing employee identifier' });
+          continue;
+        }
+
+        const employee = await prisma.employee.findFirst({
+          where: { OR: [{ id: empQuery }, { employeeCode: empQuery }] },
+          select: { id: true, locationId: true, fullName: true },
+        });
+
+        if (!employee) {
+          skippedCount++;
+          errors.push({ row: i + 1, reason: `Employee not found: ${empQuery}` });
+          continue;
+        }
+
+        const startDate = new Date(row.startDate);
+        const endDate = new Date(row.endDate || row.startDate);
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+          skippedCount++;
+          errors.push({ row: i + 1, reason: 'Invalid start or end date' });
+          continue;
+        }
+
+        const days = Number(row.days || 1);
+        const leaveType = ['CASUAL', 'SICK', 'EARNED', 'UNPAID'].includes(String(row.leaveType).toUpperCase())
+          ? String(row.leaveType).toUpperCase()
+          : 'CASUAL';
+
+        const status = ['APPROVED', 'PENDING', 'REJECTED'].includes(String(row.status).toUpperCase())
+          ? String(row.status).toUpperCase()
+          : 'APPROVED';
+
+        // Check duplicate
+        const existing = await prisma.leaveRequest.findFirst({
+          where: {
+            employeeId: employee.id,
+            startDate: { lte: endDate },
+            endDate: { gte: startDate },
+            status: { in: ['APPROVED', 'PENDING'] },
+          },
+        });
+
+        if (existing) {
+          skippedCount++;
+          errors.push({ row: i + 1, reason: `Overlapping leave request already exists on record` });
+          continue;
+        }
+
+        await prisma.leaveRequest.create({
+          data: {
+            employeeId: employee.id,
+            locationId: employee.locationId,
+            leaveType: leaveType as any,
+            startDate,
+            endDate,
+            days,
+            reason: String(row.reason || 'Imported historical leave record').slice(0, 190),
+            status: status as any,
+            appliedById: req.user?.id,
+            reviewedById: status === 'APPROVED' ? req.user?.id : null,
+          },
+        });
+
+        // If approved, update attendance status on those dates
+        if (status === 'APPROVED') {
+          const cur = new Date(startDate);
+          while (cur <= endDate) {
+            const ymd = cur.toISOString().slice(0, 10);
+            await prisma.attendance.updateMany({
+              where: { employeeId: employee.id, attendanceDate: ymd },
+              data: { status: 'ON_LEAVE' },
+            });
+            cur.setDate(cur.getDate() + 1);
+          }
+        }
+
+        importedCount++;
+      } catch (err: any) {
+        skippedCount++;
+        errors.push({ row: i + 1, reason: err?.message || 'Processing failed' });
+      }
+    }
+
+    res.json({
+      success: true,
+      totalRows: leaves.length,
+      importedCount,
+      skippedCount,
+      errors,
+      message: `Successfully imported ${importedCount} leave records (${skippedCount} skipped).`,
+    });
+  } catch (error: any) {
+    console.error('Leave import error:', error);
+    res.status(500).json({ error: 'Failed to import leave records', message: error.message });
+  }
+});
+
 export default router;

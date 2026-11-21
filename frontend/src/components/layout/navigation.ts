@@ -54,6 +54,9 @@ import {
   Briefcase,
   FileSpreadsheet,
   Cookie,
+  UserPlus,
+  Bell,
+  Lock,
 } from 'lucide-react';
 import type { MyAccess } from '@/lib/rbac';
 import { canAction, canEditModule, canViewModule } from '@/lib/rbac';
@@ -125,7 +128,7 @@ export const enterpriseNavigation: NavSectionConfig[] = [
     ],
   },
   {
-    title: 'Employee Records',
+    title: 'Employee Management',
     theme: theme(
       'text-emerald-200',
       'bg-emerald-400',
@@ -134,52 +137,19 @@ export const enterpriseNavigation: NavSectionConfig[] = [
       'text-emerald-300 group-hover:text-white'
     ),
     items: [
-      { title: 'Employee Details', href: '/employees', icon: Users, moduleKey: 'USERS', roles: WORKFORCE },
-      {
-        title: 'Active Employees',
-        href: '/employees/active',
-        icon: ListChecks,
-        moduleKey: 'USERS',
-        roles: WORKFORCE,
-        badge: 'On roster',
-      },
-      {
-        title: 'Inactive Employees',
-        href: '/employees/inactive',
-        icon: UserMinus,
-        roles: WORKFORCE,
-        badge: 'Exit / Block',
-      },
-      {
-        title: 'Employee History',
-        href: '/employees/history',
-        icon: History,
-        moduleKey: 'USERS',
-        roles: WORKFORCE,
-        badge: 'Exits',
-      },
-      { title: 'Profile 360 & Dossier', href: '/employees/profile', icon: Contact, moduleKey: 'MY_PROFILE' },
-      {
-        title: 'Analysis & Reports',
-        href: '/employees/analysis',
-        icon: BarChart3,
-        badge: 'Analytics',
-        roles: WORKFORCE,
-      },
-      {
-        title: 'Document Management',
-        href: '/employees/documents',
-        icon: FolderLock,
-        badge: 'Dossier',
-        moduleKey: 'DOCUMENT_MANAGEMENT',
-      },
-      {
-        title: 'Full & Final Settlement',
-        href: '/employees/former',
-        icon: Wallet,
-        badge: 'Settlement',
-        roles: [...WORKFORCE, ...PAYROLL],
-      },
+      { title: 'Employee Directory', href: '/employees', icon: Users, moduleKey: 'USERS', roles: WORKFORCE },
+      { title: 'Create Employee', href: '/employees/create', icon: UserPlus, moduleKey: 'USERS', roles: WORKFORCE, badge: 'New' },
+      { title: 'Employee Login Credentials', href: '/employees/credentials', icon: KeyRound, moduleKey: 'USERS', roles: WORKFORCE },
+      { title: 'Employee Profile', href: '/employees/profile', icon: Contact, moduleKey: 'MY_PROFILE' },
+      { title: 'Employee Documents', href: '/employees/documents', icon: FolderLock, badge: 'Dossier', moduleKey: 'DOCUMENT_MANAGEMENT', roles: WORKFORCE },
+      { title: 'Employee Attendance', href: '/employees/attendance', icon: ClipboardCheck, moduleKey: 'ATTENDANCE', roles: WORKFORCE },
+      { title: 'Face Recognition Registration', href: '/employees/face-registration', icon: ScanFace, moduleKey: 'USERS', roles: WORKFORCE, badge: 'Biometric' },
+      { title: 'Salary Details', href: '/employees/salary', icon: Wallet, moduleKey: 'SALARY_CADRES', roles: [...WORKFORCE, ...PAYROLL] },
+      { title: 'Salary Slips', href: '/employees/salary-slips', icon: Receipt, moduleKey: 'SALARY_CADRES', roles: [...WORKFORCE, ...PAYROLL] },
+      { title: 'Leave Details', href: '/employees/leaves', icon: CalendarClock, moduleKey: 'LEAVE_APPROVAL', roles: WORKFORCE },
+      { title: 'Reset Employee Credentials', href: '/employees/reset-credentials', icon: Lock, moduleKey: 'USERS', roles: WORKFORCE },
+      { title: 'Account Activation / Deactivation', href: '/employees/activation', icon: UserMinus, moduleKey: 'USERS', roles: WORKFORCE },
+      { title: 'Full & Final Settlement', href: '/employees/former', icon: Banknote, badge: 'Settlement', roles: [...WORKFORCE, ...PAYROLL] },
     ],
   },
   {
@@ -237,6 +207,13 @@ export const enterpriseNavigation: NavSectionConfig[] = [
         href: '/attendance/devices',
         icon: Cpu,
         badge: 'eSSL IoT',
+        roles: WORKFORCE,
+      },
+      {
+        title: 'Office Attendance Kiosk',
+        href: '/attendance/kiosk',
+        icon: ScanFace,
+        badge: 'Kiosk Mode',
         roles: WORKFORCE,
       },
     ],
@@ -441,10 +418,55 @@ export function isNavItemAllowed(
   return true;
 }
 
+export const employeeNavigation: NavSectionConfig[] = [
+  {
+    title: 'Employee Portal',
+    theme: theme(
+      'text-emerald-200',
+      'bg-emerald-400',
+      'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-emerald-300',
+      'hover:text-white hover:bg-white/10',
+      'text-emerald-300 group-hover:text-white'
+    ),
+    items: [
+      { title: 'My Attendance', href: '/my-desk?tab=attendance', icon: ClipboardCheck },
+      { title: 'Mark Attendance', href: '/my-desk?action=mark-attendance', icon: ScanFace, badge: 'Face Auth' },
+      { title: 'My Leave', href: '/my-desk?tab=leave', icon: CalendarClock },
+      { title: 'My Salary', href: '/my-desk?tab=salary', icon: Wallet },
+      { title: 'Download Salary Slip (PDF)', href: '/my-desk?tab=payslip', icon: Receipt },
+      { title: 'My Profile', href: '/employees/profile', icon: Contact },
+      { title: 'Attendance Correction Request', href: '/my-desk?tab=correction', icon: FileEdit },
+      { title: 'My Notifications', href: '/my-desk?tab=notifications', icon: Bell },
+    ],
+  },
+  {
+    title: 'Compliance & Legal',
+    theme: theme(
+      'text-teal-200',
+      'bg-teal-400',
+      'bg-[#092b69] text-white shadow-md border-l-[3.5px] border-teal-300',
+      'hover:text-white hover:bg-white/10',
+      'text-teal-300 group-hover:text-white'
+    ),
+    items: [
+      { title: 'Privacy Policy', href: '/privacy-policy', icon: ShieldCheck },
+      { title: 'Terms of Use', href: '/terms-of-use', icon: FileText },
+      { title: 'Cookie Policy', href: '/cookie-policy', icon: Cookie },
+      { title: 'Data Retention', href: '/data-retention', icon: Database },
+    ],
+  },
+];
+
 export function buildVisibleNavigation(
   role: string,
   access: MyAccess | null
 ): NavSectionConfig[] {
+  // If the signed-in user is a non-management employee, present the restricted Employee Dashboard navigation
+  const isManagement = roleInGroup(role, WORKFORCE_ROUTE_ROLES) || roleInGroup(role, ADMIN_ROLES);
+  if (!isManagement) {
+    return employeeNavigation;
+  }
+
   return enterpriseNavigation
     .map((section) => ({
       ...section,
