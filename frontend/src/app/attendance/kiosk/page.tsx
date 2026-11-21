@@ -301,24 +301,24 @@ export default function OfficeAttendanceKioskPage() {
               Enter the 4-digit device operator PIN to begin attendance terminal mode.
             </p>
 
-            <div className="space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); handleUnlock(); }} className="space-y-4">
               <input
                 type="password"
                 placeholder="Operator PIN"
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
+                autoComplete="current-password"
                 className="w-full text-center tracking-widest text-xl font-mono px-4 py-3 rounded-lg border border-slate-700 bg-slate-800 text-white"
               />
 
               <button
-                onClick={handleUnlock}
-                className="w-full py-3 bg-[#092B69] hover:bg-[#07204f] text-white rounded-lg font-semibold text-sm shadow transition-colors flex items-center justify-center gap-2"
+                type="submit"
+                className="w-full py-3 bg-[#092B69] hover:bg-[#07204f] text-white rounded-lg font-semibold text-sm shadow transition-colors flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Unlock className="w-4 h-4" />
                 Activate Terminal
               </button>
-            </div>
+            </form>
           </div>
         ) : (
           <div className="w-full max-w-4xl flex flex-col items-center">

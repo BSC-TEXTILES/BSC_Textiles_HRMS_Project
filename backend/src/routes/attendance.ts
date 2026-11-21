@@ -71,45 +71,70 @@ router.get('/monthly-matrix', authorize('VIEW'), async (req: AuthRequest, res) =
     const [employees]: any = await pool.query(empQuery, empParams);
 
     // Query holidays in this month
-    const [holidays]: any = await pool.query(
-      `SELECT name, DATE_FORMAT(date, '%Y-%m-%d') as holDate, locationId, isNational
-       FROM holiday
-       WHERE date >= ? AND date <= ?`,
-      [startDateStr, endDateStr]
-    );
     const holidayMap = new Map<string, string>();
-    for (const h of holidays) {
-      holidayMap.set(h.holDate, h.name);
+    try {
+      const [holidays]: any = await pool.query(
+        `SELECT name, DATE_FORMAT(date, '%Y-%m-%d') as holDate, locationId, isNational
+         FROM holiday
+         WHERE date >= ? AND date <= ?`,
+        [startDateStr, endDateStr]
+      );
+      for (const h of holidays || []) {
+        holidayMap.set(h.holDate, h.name);
+      }
+    } catch (e) {
+      // Holidays optional
     }
 
     // Query approved leaves in this month
-    const [leaves]: any = await pool.query(
-      `SELECT employeeId, leaveType, DATE_FORMAT(startDate, '%Y-%m-%d') as sDate, DATE_FORMAT(endDate, '%Y-%m-%d') as eDate
-       FROM leaverequest
-       WHERE status = 'APPROVED' AND startDate <= ? AND endDate >= ?`,
-      [endDateStr, startDateStr]
-    );
+    let leaves: any[] = [];
+    try {
+      const [lRows]: any = await pool.query(
+        `SELECT employeeId, leaveType, DATE_FORMAT(startDate, '%Y-%m-%d') as sDate, DATE_FORMAT(endDate, '%Y-%m-%d') as eDate
+         FROM leaverequest
+         WHERE status = 'APPROVED' AND startDate <= ? AND endDate >= ?`,
+        [endDateStr, startDateStr]
+      );
+      leaves = lRows || [];
+    } catch {
+      try {
+        const [laRows]: any = await pool.query(
+          `SELECT employee_id as employeeId, 'LEAVE' as leaveType, DATE_FORMAT(start_date, '%Y-%m-%d') as sDate, DATE_FORMAT(end_date, '%Y-%m-%d') as eDate
+           FROM leave_applications
+           WHERE status = 'APPROVED' AND start_date <= ? AND end_date >= ?`,
+          [endDateStr, startDateStr]
+        );
+        leaves = laRows || [];
+      } catch {}
+    }
 
     // Query weekly off configs
-    const [weeklyOffs]: any = await pool.query('SELECT employeeId, primaryDay FROM employee_weekly_off_config');
     const weeklyOffMap = new Map<string, string>();
-    for (const w of weeklyOffs) {
-      weeklyOffMap.set(w.employeeId, String(w.primaryDay || 'SUNDAY').toUpperCase());
+    try {
+      const [weeklyOffs]: any = await pool.query('SELECT employeeId, primaryDay FROM employee_weekly_off_config');
+      for (const w of weeklyOffs || []) {
+        weeklyOffMap.set(w.employeeId, String(w.primaryDay || 'SUNDAY').toUpperCase());
+      }
+    } catch (e) {
+      // Table may be bootstrapping or unconfigured
     }
 
     // Query all existing attendance records for this month
-    const [attRows]: any = await pool.query(
-      `SELECT id, employeeId, DATE_FORMAT(attendanceDate, '%Y-%m-%d') as attDate,
-              DAY(attendanceDate) as dayNum, actualLogin, actualLogout, status, notes
-       FROM attendance
-       WHERE attendanceDate >= ? AND attendanceDate <= ?`,
-      [startDateStr, endDateStr]
-    );
-
     const existingPunches: Record<string, Record<number, any>> = {};
-    for (const row of attRows) {
-      if (!existingPunches[row.employeeId]) existingPunches[row.employeeId] = {};
-      existingPunches[row.employeeId][row.dayNum] = row;
+    try {
+      const [attRows]: any = await pool.query(
+        `SELECT id, employeeId, DATE_FORMAT(attendanceDate, '%Y-%m-%d') as attDate,
+                DAY(attendanceDate) as dayNum, actualLogin, actualLogout, status, notes
+         FROM attendance
+         WHERE attendanceDate >= ? AND attendanceDate <= ?`,
+        [startDateStr, endDateStr]
+      );
+      for (const row of attRows || []) {
+        if (!existingPunches[row.employeeId]) existingPunches[row.employeeId] = {};
+        existingPunches[row.employeeId][row.dayNum] = row;
+      }
+    } catch (e) {
+      console.warn('[monthly-matrix] attendance query notice:', e);
     }
 
     const todayYmdStr = new Date().toISOString().slice(0, 10);

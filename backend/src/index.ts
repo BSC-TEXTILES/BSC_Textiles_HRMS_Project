@@ -46,6 +46,7 @@ import { setupPayrollSchema } from './scripts/setupPayrollSchema.js';
 import { setupLateFines } from './scripts/setupLateFines.js';
 import { setupRetailOperations } from './scripts/setupRetailOperations.js';
 import { setupBreaks } from './scripts/setupBreaks.js';
+import { setupAdvancedEmployeeFacePayroll } from './scripts/setupAdvancedEmployeeFacePayroll.js';
 import { registerLocationRegistryRefresh } from './services/locationRegistry.js';
 import { UserUploadService } from './services/userUploadService.js';
 import { EmailNotificationService } from './services/emailNotificationService.js';
@@ -369,6 +370,7 @@ if (!process.env.VERCEL) {
         { name: 'setupRetailOperations', run: () => setupRetailOperations({ schemaOnly }) },
         { name: 'setupBreaks', run: () => setupBreaks({ schemaOnly }) },
         { name: 'setupCustodyAssets', run: () => setupCustodyAssets({ schemaOnly }) },
+        { name: 'setupAdvancedEmployeeFacePayroll', run: () => setupAdvancedEmployeeFacePayroll({ schemaOnly }) },
         { name: 'setupFormerEmployees', run: () => setupFormerEmployees({ schemaOnly }) },
         { name: 'removeHubballiLocation', run: () => removeHubballiLocation() },
         { name: 'seedDocumentReferenceConfig', run: () => seedDocumentReferenceConfig() },
