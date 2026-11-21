@@ -214,7 +214,9 @@ export default function MyDeskPage() {
       );
     }
 
+    let activeStream: MediaStream | null = null;
     navigator.mediaDevices?.getUserMedia({ video: { facingMode: 'user' } }).then((stream) => {
+      activeStream = stream;
       if (faceVideoRef.current) {
         faceVideoRef.current.srcObject = stream;
         faceVideoRef.current.play();
@@ -222,8 +224,8 @@ export default function MyDeskPage() {
     }).catch((e) => console.warn('Mobile camera access error:', e));
 
     return () => {
-      if (faceVideoRef.current?.srcObject) {
-        (faceVideoRef.current.srcObject as MediaStream).getTracks().forEach((t) => t.stop());
+      if (activeStream) {
+        activeStream.getTracks().forEach((t) => t.stop());
       }
     };
   }, [isFacePunchModalOpen]);

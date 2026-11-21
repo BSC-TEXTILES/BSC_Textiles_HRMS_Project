@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { 
   ClipboardCheck, 
@@ -28,7 +28,7 @@ export default function EmployeeAttendancePage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
-  const fetchMatrix = async () => {
+  const fetchMatrix = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get('/attendance/monthly-matrix', {
@@ -41,7 +41,7 @@ export default function EmployeeAttendancePage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [year, month, locationId, search]);
 
   useEffect(() => {
     api.get('/locations/all').then((res) => {
@@ -52,7 +52,7 @@ export default function EmployeeAttendancePage() {
 
   useEffect(() => {
     fetchMatrix();
-  }, [year, month, locationId]);
+  }, [fetchMatrix]);
 
   const handlePrevMonth = () => {
     if (month === 1) {

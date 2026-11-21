@@ -50,11 +50,13 @@ export default function OfficeAttendanceKioskPage() {
   }, []);
 
   // Monitor network connection status
+  const syncQueueRef = useRef<() => Promise<void>>(async () => {});
+
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true);
       toast.success('Connection restored — device is ONLINE');
-      syncQueueToServer();
+      syncQueueRef.current();
     };
     const handleOffline = () => {
       setIsOnline(false);
@@ -178,6 +180,7 @@ export default function OfficeAttendanceKioskPage() {
       setSyncingOffline(false);
     }
   };
+  syncQueueRef.current = syncQueueToServer;
 
   // Execute Face Attendance Punch
   const handleRecognizeAndPunch = async () => {
