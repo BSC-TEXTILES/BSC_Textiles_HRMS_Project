@@ -19,7 +19,7 @@ const deptSchema = z.object({
   }),
 });
 
-router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
+router.get('/', async (req: AuthRequest, res) => {
   try {
     const { locationId, page = 1, limit = 20, search } = req.query;
     const scopedLocId = getScopedLocationId(req.user, locationId);

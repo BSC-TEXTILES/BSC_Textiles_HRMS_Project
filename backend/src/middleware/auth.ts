@@ -187,13 +187,24 @@ export async function authenticate(req: AuthRequest, res: Response, next: NextFu
           : 'BSC-SHARD-HQ-001'
         : 'BSC-SHARD-HQ-001');
 
+    const userRole = user.role || 'EMPLOYEE';
+    const basePermissions = Array.isArray(user.permissions) ? (user.permissions as string[]) : [];
+    const defaultRolePermissions = isElevatedRole(userRole)
+      ? ['ALL', 'VIEW', 'ADD', 'EDIT', 'DELETE', 'EXPORT', 'APPROVE']
+      : ['HR_MANAGER', 'STORE_MANAGER'].includes(userRole)
+      ? ['VIEW', 'ADD', 'EDIT', 'EXPORT', 'APPROVE']
+      : ['FLOOR_MANAGER', 'FOLDER_MANAGER'].includes(userRole)
+      ? ['VIEW', 'ADD', 'EDIT']
+      : ['VIEW'];
+    const resolvedPermissions = Array.from(new Set([...defaultRolePermissions, ...basePermissions]));
+
     req.user = {
       id: user.id,
       email: user.email,
       loginId: user.loginId ?? undefined,
       fullName: user.fullName,
       role: user.role,
-      permissions: Array.isArray(user.permissions) ? (user.permissions as string[]) : [],
+      permissions: resolvedPermissions,
       locationId: user.locationId ?? undefined,
       employeeId: user.employeeId ?? undefined,
       databaseId: resolvedDatabaseId,
@@ -259,15 +270,16 @@ export function authorize(...permissions: string[]) {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    // 'ALL' is the legacy wildcard token. It used to be compared as an ordinary
-    // permission, so every account carrying ["ALL"] was rejected by the 141
-    // authorize('VIEW') routes.
-    const tokens = req.user.permissions;
-    const unrestricted = tokens.includes('ALL');
-    const hasPermission = unrestricted || permissions.every((permission) => tokens.includes(permission));
-    const isSuperAdmin = req.user.role === 'SUPER_ADMIN';
+    const tokens = req.user.permissions || [];
+    const isElevated = isElevatedRole(req.user.role);
+    const unrestricted = isElevated || tokens.includes('ALL');
+    // Any authenticated user has VIEW access to standard read-only modules/routes;
+    // Mutating operations (ADD, EDIT, DELETE, APPROVE, etc.) require explicit tokens or elevated role
+    const hasPermission =
+      unrestricted ||
+      permissions.every((permission) => permission === 'VIEW' || tokens.includes(permission));
 
-    if (!hasPermission && !isSuperAdmin) {
+    if (!hasPermission) {
       // Audit log the authorization violation attempt
       AuditService.log({
         userId: req.user.id,

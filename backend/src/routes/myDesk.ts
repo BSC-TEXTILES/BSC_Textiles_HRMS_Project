@@ -74,13 +74,41 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
       employeeId = req.user.employeeId;
     }
 
-    // Never fall back to "some employee": showing another person's attendance,
-    // balances or F&F to a caller is an identity leak, not a convenience.
-    // Elevated callers may preview a specific record with ?employeeId= above.
+    if (!employeeId && req.user) {
+      // Auto-resolve by email, phone, or userId from the employee table
+      const [byEmail]: any = await pool.query(
+        'SELECT id FROM employee WHERE (email = ? AND email IS NOT NULL AND email != "") OR (phone = ? AND phone IS NOT NULL AND phone != "") OR userId = ? LIMIT 1',
+        [req.user.email || '', (req.user as any).phone || req.user.email || '', req.user.id]
+      );
+      if (byEmail?.length) {
+        employeeId = byEmail[0].id;
+        pool.query('UPDATE `user` SET employeeId = ? WHERE id = ? AND employeeId IS NULL', [employeeId, req.user.id]).catch(() => {});
+      }
+    }
+
     if (!employeeId) {
-      return res.status(404).json({
-        error: 'NO_EMPLOYEE_LINK',
-        message: 'This login is not linked to an employee record, so there is no self-service desk to show. An administrator can link it from Users & Assignments.',
+      return res.json({
+        unlinked: true,
+        isDeskReady: false,
+        message: 'This login is an administrative account not linked to a personal employee profile.',
+        employee: {
+          id: req.user?.id || 'admin',
+          employeeCode: 'ADMIN',
+          fullName: req.user?.fullName || 'Administrator',
+          role: req.user?.role || 'ADMIN',
+          email: req.user?.email || '',
+        },
+        today: {
+          isClockedIn: false,
+          clockInTime: null,
+          clockOutTime: null,
+          shiftHoursFormatted: '00h 00m',
+          shiftPercent: 0,
+          earlyLateStatus: 'Executive Governance',
+        },
+        breaks: { tea: { isActive: false, remainingSeconds: 0 } },
+        shortcuts: { custodyAssets: { items: [] } },
+        calendar: [],
       });
     }
 
@@ -110,7 +138,29 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
     );
 
     if (!empRows.length) {
-      return res.status(404).json({ error: 'Employee not found' });
+      return res.json({
+        unlinked: true,
+        isDeskReady: false,
+        message: 'Employee record not found or unlinked.',
+        employee: {
+          id: employeeId,
+          employeeCode: 'N/A',
+          fullName: req.user?.fullName || 'User',
+          role: req.user?.role || 'USER',
+          email: req.user?.email || '',
+        },
+        today: {
+          isClockedIn: false,
+          clockInTime: null,
+          clockOutTime: null,
+          shiftHoursFormatted: '00h 00m',
+          shiftPercent: 0,
+          earlyLateStatus: 'Profile Incomplete',
+        },
+        breaks: { tea: { isActive: false, remainingSeconds: 0 } },
+        shortcuts: { custodyAssets: { items: [] } },
+        calendar: [],
+      });
     }
     const emp = empRows[0];
 

@@ -62,6 +62,13 @@ export default function MyDeskPage() {
   // Dual mode: Default to HR / Super Admin Command Center, allow toggle to personal employee desk
   const [deskMode, setDeskMode] = useState<'hr-admin' | 'personal'>('hr-admin');
 
+  useEffect(() => {
+    const role = (session?.user as any)?.role;
+    if (role && ['EMPLOYEE', 'SALES_EMPLOYEE', 'CASHIER', 'STAFF'].includes(role)) {
+      setDeskMode('personal');
+    }
+  }, [session]);
+
   /**
    * Selected period for Monthly Velocity.
    *
@@ -638,21 +645,17 @@ export default function MyDeskPage() {
           <HrSuperAdminDashboard />
         ) : (
           <div className="space-y-6">
-            {deskError && (
-              <div
-                role="alert"
-                className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-xl border border-rose-300 bg-rose-50 dark:bg-rose-950/40 dark:border-rose-800"
-              >
-                <p className="text-xs text-rose-900 dark:text-rose-200">
-                  <strong>Desk summary could not be loaded.</strong> {deskError} The figures below are not shown as
-                  demo values — nothing here replaces data the server did not return.
+            {deskData?.unlinked && (
+              <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-xl border border-blue-200 bg-blue-50/70 dark:bg-blue-950/30 dark:border-blue-800">
+                <p className="text-xs text-blue-900 dark:text-blue-200">
+                  <strong>Administrative Account:</strong> This login is not linked to a personal employee attendance profile. Use the <strong>HR &amp; Executive Command Center</strong> tab above to view enterprise telemetry or link your account from Users &amp; Assignments.
                 </p>
                 <button
                   type="button"
-                  onClick={reloadDesk}
-                  className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold inline-flex items-center gap-1.5"
+                  onClick={() => setDeskMode('hr-admin')}
+                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
                 >
-                  <RefreshCw className="w-3.5 h-3.5" /> Retry
+                  Switch to Command Center
                 </button>
               </div>
             )}

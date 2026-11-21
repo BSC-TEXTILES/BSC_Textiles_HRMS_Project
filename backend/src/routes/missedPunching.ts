@@ -65,6 +65,12 @@ router.get('/stats', authorize('VIEW'), async (req: AuthRequest, res) => {
     let whereClause = 'WHERE 1=1';
     const params: any[] = [];
 
+    const isRegularStaff = ['EMPLOYEE', 'SALES_EMPLOYEE', 'CASHIER', 'STAFF'].includes(req.user?.role || '');
+    if (isRegularStaff && req.user?.employeeId) {
+      whereClause += ' AND a.employeeId = ?';
+      params.push(req.user.employeeId);
+    }
+
     if (filterLoc && filterLoc !== 'all') {
       whereClause += ' AND (a.locationId = ? OR l.code = ?)';
       params.push(filterLoc, String(filterLoc).toUpperCase());
@@ -130,6 +136,10 @@ router.get('/stats', authorize('VIEW'), async (req: AuthRequest, res) => {
     // 3. Pending corrections
     let corrWhere = 'WHERE c.status = "PENDING"';
     const corrParams: any[] = [];
+    if (isRegularStaff && req.user?.employeeId) {
+      corrWhere += ' AND c.employeeId = ?';
+      corrParams.push(req.user.employeeId);
+    }
     if (filterLoc && filterLoc !== 'all') {
       corrWhere += ' AND (c.locationId = ? OR l.code = ?)';
       corrParams.push(filterLoc, String(filterLoc).toUpperCase());
@@ -160,6 +170,10 @@ router.get('/stats', authorize('VIEW'), async (req: AuthRequest, res) => {
     // 4. Resolved
     let resolvedWhere = 'WHERE c.status = "APPROVED"';
     const resolvedParams: any[] = [];
+    if (isRegularStaff && req.user?.employeeId) {
+      resolvedWhere += ' AND c.employeeId = ?';
+      resolvedParams.push(req.user.employeeId);
+    }
     if (filterLoc && filterLoc !== 'all') {
       resolvedWhere += ' AND (c.locationId = ? OR l.code = ?)';
       resolvedParams.push(filterLoc, String(filterLoc).toUpperCase());
@@ -405,6 +419,12 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
     let whereClause = 'WHERE 1=1';
     const params: any[] = [];
 
+    const isRegularStaff = ['EMPLOYEE', 'SALES_EMPLOYEE', 'CASHIER', 'STAFF'].includes(req.user?.role || '');
+    if (isRegularStaff && req.user?.employeeId) {
+      whereClause += ' AND a.employeeId = ?';
+      params.push(req.user.employeeId);
+    }
+
     // Store / Location isolation
     if (effectiveLoc && effectiveLoc !== 'all') {
       whereClause += ' AND (a.locationId = ? OR l.code = ?)';
@@ -645,6 +665,12 @@ router.get('/export', authorize('VIEW'), async (req: AuthRequest, res) => {
 
     let whereClause = 'WHERE 1=1';
     const params: any[] = [];
+
+    const isRegularStaff = ['EMPLOYEE', 'SALES_EMPLOYEE', 'CASHIER', 'STAFF'].includes(req.user?.role || '');
+    if (isRegularStaff && req.user?.employeeId) {
+      whereClause += ' AND a.employeeId = ?';
+      params.push(req.user.employeeId);
+    }
 
     if (effectiveLoc && effectiveLoc !== 'all') {
       whereClause += ' AND (a.locationId = ? OR l.code = ?)';

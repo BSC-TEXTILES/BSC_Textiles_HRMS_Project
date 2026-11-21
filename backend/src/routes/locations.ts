@@ -55,7 +55,7 @@ router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
   }
 });
 
-router.get('/all', authorize('VIEW'), async (req: AuthRequest, res) => {
+router.get('/all', async (req: AuthRequest, res) => {
   try {
     const userRole = req.user?.role || 'EMPLOYEE';
     const userLocId = req.user?.locationId || 'none';
