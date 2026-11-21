@@ -167,19 +167,41 @@ export default function MyDeskPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 1c. Deep-link handling for restricted Employee Dashboard navigation
+  // 1c. Deep-link & live click handling for Employee Dashboard navigation
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const q = new URLSearchParams(window.location.search);
-    const tab = q.get('tab');
-    const action = q.get('action');
+    const handleUrlQuery = (queryString?: string) => {
+      if (typeof window === 'undefined') return;
+      const q = new URLSearchParams(queryString ?? window.location.search);
+      const tab = q.get('tab');
+      const action = q.get('action');
 
-    if (tab === 'leave') setIsLeaveModalOpen(true);
-    if (tab === 'correction') setIsPunchModalOpen(true);
-    if (tab === 'salary' || tab === 'payslip') setIsPayslipModalOpen(true);
-    if (action === 'mark-attendance') {
-      setIsFacePunchModalOpen(true);
-    }
+      if (tab === 'leave') setIsLeaveModalOpen(true);
+      if (tab === 'correction') setIsPunchModalOpen(true);
+      if (tab === 'salary' || tab === 'payslip') setIsPayslipModalOpen(true);
+      if (action === 'mark-attendance') {
+        setIsFacePunchModalOpen(true);
+      }
+      if (tab === 'attendance') {
+        const el = document.getElementById('monthly-velocity-section');
+        el?.scrollIntoView({ behavior: 'smooth' });
+      }
+    };
+
+    handleUrlQuery();
+    window.addEventListener('popstate', () => handleUrlQuery());
+    const onNavClick = (e: any) => {
+      const href = e?.detail?.href || '';
+      const queryIdx = href.indexOf('?');
+      if (queryIdx !== -1) {
+        handleUrlQuery(href.slice(queryIdx));
+      }
+    };
+    window.addEventListener('bsc:nav-click', onNavClick);
+
+    return () => {
+      window.removeEventListener('popstate', () => handleUrlQuery());
+      window.removeEventListener('bsc:nav-click', onNavClick);
+    };
   }, []);
 
   // Camera stream for Mobile Face Punch with Geofencing
@@ -868,7 +890,7 @@ export default function MyDeskPage() {
             </div>
 
             {/* CARD 2: MONTHLY PERFORMANCE DOSSIER */}
-            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-5 sm:p-6 space-y-5 transition-colors">
+            <div id="monthly-velocity-section" className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm p-5 sm:p-6 space-y-5 transition-colors">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100/80 dark:border-indigo-900/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 flex-shrink-0">

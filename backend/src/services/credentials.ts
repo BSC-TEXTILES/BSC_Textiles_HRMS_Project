@@ -84,11 +84,11 @@ async function assertEmailAvailable(email: string, exceptUserId?: string): Promi
 }
 
 function requireAdmin(actor: CredentialActor): void {
-  if (!actor.canManageCredentials) {
+  if (!actor.canManageCredentials && actor.role !== 'SUPER_ADMIN' && actor.role !== 'ADMIN') {
     throw new CredentialError(
       403,
       'CREDENTIALS_ADMIN_ONLY',
-      'Only an Admin may create or change login credentials. A Super Admin governs roles, not passwords.'
+      'Only an Administrator may create or change login credentials.'
     );
   }
 }

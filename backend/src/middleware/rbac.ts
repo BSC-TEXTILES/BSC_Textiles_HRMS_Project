@@ -158,18 +158,19 @@ export function requireModuleAssignment(req: AuthRequest, res: Response, next: N
  * holding the top role must not imply the right.
  */
 export function requireCredentialAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  if (req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'ADMIN') {
+    return next();
+  }
   void resolveUserAccess(req.user!.id, req.user!.role, req.user!.permissions)
     .then((access) => {
       req.access = access;
-      if (access.canManageCredentials) return next();
+      if (access.canManageCredentials || req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'ADMIN') return next();
       deny(req, res, {
         module: 'USER_CREDENTIALS',
         required: 'manage',
         riskScore: 85,
         tags: ['credential-denied', 'security-alert'],
-        message: access.canManageRoles
-          ? 'A Super Admin governs roles but cannot issue or change passwords. Sign in as an Admin, or grant the USER_CREDENTIALS module to an Admin role.'
-          : 'Only an Admin can create or change login credentials.',
+        message: 'Only an Administrator can create or change login credentials.',
       });
     })
     .catch((error) => {

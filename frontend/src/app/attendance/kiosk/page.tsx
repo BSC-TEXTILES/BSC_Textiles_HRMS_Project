@@ -220,7 +220,7 @@ export default function OfficeAttendanceKioskPage() {
     try {
       const res = await api.post('/face-verification/punch', {
         queryEmbedding,
-        locationId: 'loc_dav',
+        locationId: 'DAV',
         deviceId: deviceCode,
         sourceChannel: 'KIOSK',
         livenessData: { blinkDetected: true, movementScore: 92.0, textureScore: 95.0, challengePassed: true },

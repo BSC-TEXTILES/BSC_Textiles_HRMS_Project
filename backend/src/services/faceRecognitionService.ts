@@ -243,6 +243,15 @@ export class FaceRecognitionService {
     let bestMatchPercentage = 0;
     let targetEmployee: any = null;
 
+    let resolvedLocId = locationId;
+    if (resolvedLocId && resolvedLocId !== 'all') {
+      const [lRows]: any = await pool.query(
+        "SELECT id FROM location WHERE id = ? OR code = ? OR (code = 'DAV' AND ? IN ('loc_dav', 'dav')) OR (code = 'BEL' AND ? IN ('loc_bel', 'bel')) OR (code = 'SHI' AND ? IN ('loc_shi', 'shi')) LIMIT 1",
+        [resolvedLocId, resolvedLocId, resolvedLocId, resolvedLocId, resolvedLocId]
+      ).catch(() => [[]]);
+      if (lRows?.[0]?.id) resolvedLocId = lRows[0].id;
+    }
+
     // 2. Identify employee if not provided, or verify specified employee
     if (targetEmployeeId) {
       const [empRows]: any = await pool.query(
@@ -307,7 +316,7 @@ export class FaceRecognitionService {
           [
             `fv_${crypto.randomBytes(12).toString('hex')}`,
             targetEmployeeId,
-            locationId || targetEmployee.locationId,
+            resolvedLocId || targetEmployee.locationId,
             deviceId || null,
             bestMatchPercentage,
             threshold,
@@ -325,16 +334,31 @@ export class FaceRecognitionService {
       }
     } else {
       // 1:N Identification across all enrolled profiles in location
-      const [profiles]: any = await pool.query(
+      let [profiles]: any = await pool.query(
         `SELECT e.id, e.employeeCode, e.fullName, e.locationId, d.name as departmentName, l.code as locationCode, fp.threshold, fs.embedding
          FROM face_registration_sample fs
          JOIN employee e ON e.id = fs.employeeId
          LEFT JOIN department d ON d.id = e.departmentId
          LEFT JOIN location l ON l.id = e.locationId
          LEFT JOIN faceprofile fp ON fp.employeeId = e.id
-         WHERE e.status = 'ACTIVE' ${locationId ? 'AND (e.locationId = ? OR ? = "all")' : ''}`,
-        locationId ? [locationId, locationId] : []
-      );
+         WHERE e.status = 'ACTIVE' ${resolvedLocId && resolvedLocId !== 'all' ? 'AND (e.locationId = ? OR l.code = ?)' : ''}`,
+        resolvedLocId && resolvedLocId !== 'all' ? [resolvedLocId, resolvedLocId] : []
+      ).catch(() => [[]]);
+
+      if (!profiles || profiles.length === 0) {
+        // Fallback to faceprofile table if face_registration_sample is empty
+        const [fpRows]: any = await pool.query(
+          `SELECT e.id, e.employeeCode, e.fullName, e.locationId, d.name as departmentName, l.code as locationCode, fp.threshold, fp.embedding
+           FROM faceprofile fp
+           JOIN employee e ON e.id = fp.employeeId
+           LEFT JOIN department d ON d.id = e.departmentId
+           LEFT JOIN location l ON l.id = e.locationId
+           WHERE e.status = 'ACTIVE' AND fp.embedding IS NOT NULL
+           ${resolvedLocId && resolvedLocId !== 'all' ? 'AND (e.locationId = ? OR l.code = ?)' : ''}`,
+          resolvedLocId && resolvedLocId !== 'all' ? [resolvedLocId, resolvedLocId] : []
+        ).catch(() => [[]]);
+        profiles = fpRows || [];
+      }
 
       for (const row of profiles) {
         try {

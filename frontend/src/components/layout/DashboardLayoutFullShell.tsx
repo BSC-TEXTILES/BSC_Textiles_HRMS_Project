@@ -309,6 +309,9 @@ export function DashboardLayoutFullShell({
   };
 
   const handleLinkClick = (href: string, e: React.MouseEvent) => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('bsc:nav-click', { detail: { href } }));
+    }
     const isCurrent = (pathname || '') === href || (href === '/dashboard' && (pathname || '') === '/dashboard');
     if (isCurrent) {
       e.preventDefault();

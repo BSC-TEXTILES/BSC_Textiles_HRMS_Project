@@ -327,7 +327,7 @@ export async function resolveUserAccess(
     unrestricted: isSuperAdmin || (roleIds.length === 0 && legacyUnrestricted),
     canManageRoles: isSuperAdmin,
     canAssignModuleAccess: isSuperAdmin || roleNames.includes('ADMIN') || String(legacyRole || '').toUpperCase() === 'ADMIN',
-    canManageCredentials: roleNames.includes('ADMIN') || String(legacyRole || '').toUpperCase() === 'ADMIN',
+    canManageCredentials: isSuperAdmin || roleNames.includes('ADMIN') || String(legacyRole || '').toUpperCase() === 'ADMIN',
     grants: {},
     widgets: [],
     legacyPermissions: permissions,

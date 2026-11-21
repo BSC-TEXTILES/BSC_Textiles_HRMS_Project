@@ -370,7 +370,7 @@ router.post('/punch', async (req: AuthRequest, res) => {
     const { employeeId, queryEmbedding, locationId, deviceId, sourceChannel, livenessData, forcedPunchType } = req.body || {};
 
     const targetEmpId = employeeId || req.user?.employeeId;
-    const targetLocId = locationId || req.user?.locationId || 'loc_dav';
+    const targetLocId = locationId || req.user?.locationId || 'DAV';
 
     if (!Array.isArray(queryEmbedding) || queryEmbedding.length === 0) {
       return res.status(400).json({ error: 'queryEmbedding vector is required for biometric face recognition' });
