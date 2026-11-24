@@ -3,14 +3,6 @@ try {
   dns.setDefaultResultOrder('ipv4first');
 } catch {}
 
-// Prototype Pollution Defense: Prevent pollution gadgets targeting Object.prototype (e.g. Object.prototype.max = 1e9)
-try {
-  Object.defineProperty(Object.prototype, 'max', {
-    value: undefined,
-    writable: false,
-    configurable: false,
-  });
-} catch {}
 
 import dotenv from 'dotenv';
 dotenv.config();
