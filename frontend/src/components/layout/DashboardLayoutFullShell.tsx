@@ -26,6 +26,7 @@ import {
   AlertTriangle,
   Info,
   XCircle,
+  Search,
 } from 'lucide-react';
 import {
   buildVisibleNavigation,
@@ -246,6 +247,20 @@ export function DashboardLayoutFullShell({
   /** Single active entry for nested/dynamic routes (longest prefix wins). */
   const activeHref = useMemo(() => computeActiveHref(pathname, visibleNavigation), [pathname, visibleNavigation]);
 
+  /** Sidebar menu search: filters items by title (or section title) as the user types. */
+  const [navQuery, setNavQuery] = useState('');
+  const filteredNavigation = useMemo<NavSectionConfig[]>(() => {
+    const q = navQuery.trim().toLowerCase();
+    if (!q) return visibleNavigation;
+    return visibleNavigation
+      .map((section) =>
+        section.title.toLowerCase().includes(q)
+          ? section
+          : { ...section, items: section.items.filter((item) => item.title.toLowerCase().includes(q)) }
+      )
+      .filter((section) => section.items.length > 0);
+  }, [navQuery, visibleNavigation]);
+
   if (status === 'loading') {
     return (
       <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#111317] flex items-center justify-center">
@@ -347,9 +362,40 @@ export function DashboardLayoutFullShell({
             </div>
           </div>
 
+          {/* Sidebar menu search */}
+          {!isCollapsed && (
+            <div className="px-3 pt-3">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-blue-200/80 pointer-events-none" />
+                <input
+                  type="text"
+                  value={navQuery}
+                  onChange={(e) => setNavQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Escape' && setNavQuery('')}
+                  placeholder="Search menu..."
+                  aria-label="Search menu"
+                  className="w-full pl-8 pr-7 py-2 rounded-lg text-xs bg-white/10 border border-white/15 text-white placeholder:text-blue-200/70 focus:outline-none focus:ring-2 focus:ring-white/30 focus:bg-white/15 transition-all"
+                />
+                {navQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setNavQuery('')}
+                    aria-label="Clear search"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-200 hover:text-white"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Navigation Links with Category Theme Accents */}
           <nav className={`flex flex-col gap-1 ${isCollapsed ? 'px-2 py-3' : 'px-3 py-3'}`}>
-            {visibleNavigation.map((section) => {
+            {!isCollapsed && filteredNavigation.length === 0 && (
+              <p className="px-3 py-4 text-xs text-blue-200/80 text-center">No menu items match &quot;{navQuery}&quot;</p>
+            )}
+            {(isCollapsed ? visibleNavigation : filteredNavigation).map((section) => {
               const theme = section.theme;
               return (
                 <div key={section.title} className="mb-2.5">
@@ -462,8 +508,22 @@ export function DashboardLayoutFullShell({
                 <ThemeToggle showLabel={true} size="sm" />
               </div>
 
+              <div className="px-3 pt-1">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-blue-200/80 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={navQuery}
+                    onChange={(e) => setNavQuery(e.target.value)}
+                    placeholder="Search menu..."
+                    aria-label="Search menu"
+                    className="w-full pl-8 pr-3 py-2 rounded-lg text-xs bg-white/10 border border-white/15 text-white placeholder:text-blue-200/70 focus:outline-none focus:ring-2 focus:ring-white/30"
+                  />
+                </div>
+              </div>
+
               <nav className="p-3 space-y-2">
-                {visibleNavigation.map((sec) => (
+                {filteredNavigation.map((sec) => (
                   <div key={sec.title}>
                     <div className="px-3 py-1 text-[10.5px] font-extrabold uppercase tracking-wider text-blue-200/90">
                       {sec.title}

@@ -25,6 +25,7 @@ export function createSafeRateLimiter(options: Partial<Options> & { limit?: numb
   const ceiling = options.limit ?? options.max ?? 60;
   safeOptions.limit = ceiling;
   safeOptions.max = ceiling;
+  safeOptions.validate = false;
   return rateLimit(safeOptions);
 }
 

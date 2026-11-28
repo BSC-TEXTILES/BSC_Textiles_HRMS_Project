@@ -44,12 +44,30 @@ export async function getAllDesignations(): Promise<{
     maxCompensation: number;
   };
 }> {
-  const [desigRows]: any = await pool.query(
-    `SELECT id, title, code, grade, band, minSalary, maxSalary, description, icon, department, aliases
-       FROM designations
-      WHERE isActive = 1
-      ORDER BY minSalary DESC`
-  );
+  let desigRows: any[] = [];
+  try {
+    const [rows]: any = await pool.query(
+      `SELECT id, title, code, grade, band, minSalary, maxSalary, description, icon, department, aliases
+         FROM designations
+        WHERE isActive = 1
+        ORDER BY minSalary DESC`
+    );
+    desigRows = rows || [];
+  } catch (err: any) {
+    if (err?.code === 'ER_NO_SUCH_TABLE' || err?.message?.includes("doesn't exist")) {
+      const { setupDesignationsSchema } = await import('../scripts/setupDesignationsTable.js');
+      await setupDesignationsSchema();
+      const [rows]: any = await pool.query(
+        `SELECT id, title, code, grade, band, minSalary, maxSalary, description, icon, department, aliases
+           FROM designations
+          WHERE isActive = 1
+          ORDER BY minSalary DESC`
+      );
+      desigRows = rows || [];
+    } else {
+      throw err;
+    }
+  }
 
   const [empRows]: any = await pool.query(
     `SELECT e.id, e.employeeCode, e.fullName, e.designation, e.gender, e.phone, e.email,

@@ -43,6 +43,7 @@ import { bootFixturesAllowed } from './config/bootFixtures.js';
 import { setupFormerEmployees } from './scripts/setupFormerEmployees.js';
 import { removeHubballiLocation } from './scripts/removeHubballiLocation.js';
 import { setupOrganizationHubs } from './scripts/setupOrganizationHubs.js';
+import { setupDesignationsSchema } from './scripts/setupDesignationsTable.js';
 import { ensureEmployeeImportSchema } from './scripts/setupEmployeeImportSchema.js';
 import { setupPayrollSchema } from './scripts/setupPayrollSchema.js';
 import { setupLateFines } from './scripts/setupLateFines.js';
@@ -370,6 +371,7 @@ if (!process.env.VERCEL) {
         { name: 'shardRegistry', run: () => shardManager.initialize() },
         { name: 'setupViews', run: () => setupViews() },
         { name: 'setupOrganizationHubs', run: () => setupOrganizationHubs() },
+        { name: 'setupDesignationsSchema', run: () => setupDesignationsSchema() },
         { name: 'setupKycSchema', run: () => setupKycSchema() },
         { name: 'ensureEmployeeImportSchema', run: () => ensureEmployeeImportSchema() },
         { name: 'setupPayrollSchema', run: () => setupPayrollSchema() },

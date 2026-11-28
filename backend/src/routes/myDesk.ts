@@ -75,10 +75,10 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
     }
 
     if (!employeeId && req.user) {
-      // Auto-resolve by email, phone, or userId from the employee table
+      // Auto-resolve by email or phone from the employee table
       const [byEmail]: any = await pool.query(
-        'SELECT id FROM employee WHERE (email = ? AND email IS NOT NULL AND email != "") OR (phone = ? AND phone IS NOT NULL AND phone != "") OR userId = ? LIMIT 1',
-        [req.user.email || '', (req.user as any).phone || req.user.email || '', req.user.id]
+        'SELECT id FROM employee WHERE (email = ? AND email IS NOT NULL AND email != "") OR (phone = ? AND phone IS NOT NULL AND phone != "") LIMIT 1',
+        [req.user.email || '', (req.user as any).phone || req.user.email || '']
       );
       if (byEmail?.length) {
         employeeId = byEmail[0].id;

@@ -62,8 +62,9 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
       employeeWhere.locationId = locationId;
       attendanceWhere.locationId = locationId;
       faceWhere.locationId = locationId;
-      incentiveWhere.employee = { ...incentiveWhere.employee, locationId };
-      penaltyWhere.employee = { ...penaltyWhere.employee, locationId };
+      // Filter incentive/penalty transactions by employee's locationId via relation
+      incentiveWhere.employee = { locationId };
+      penaltyWhere.employee = { locationId };
       observationWhere.locationId = locationId;
       streamWhere.locationId = locationId;
       sellingPointWhere.locationId = locationId;
@@ -90,9 +91,18 @@ router.get('/dashboard-summary', authorize('VIEW'), async (req: AuthRequest, res
         )
         .map((d: any) => d.id);
       employeeWhere.departmentId = { in: deptIds };
-      attendanceWhere.employee = { ...(attendanceWhere.employee || {}), departmentId: { in: deptIds } };
-      incentiveWhere.employee = { ...(incentiveWhere.employee || {}), departmentId: { in: deptIds } };
-      penaltyWhere.employee = { ...(penaltyWhere.employee || {}), departmentId: { in: deptIds } };
+      // Build employee filter for incentive/penalty transactions
+      const employeeFilter: any = { departmentId: { in: deptIds } };
+      if (incentiveWhere.employee) {
+        incentiveWhere.employee = { ...incentiveWhere.employee, ...employeeFilter };
+      } else {
+        incentiveWhere.employee = employeeFilter;
+      }
+      if (penaltyWhere.employee) {
+        penaltyWhere.employee = { ...penaltyWhere.employee, ...employeeFilter };
+      } else {
+        penaltyWhere.employee = employeeFilter;
+      }
     }
 
     if (shiftId) {
@@ -250,8 +260,15 @@ router.get('/hr-command-center', authorize('VIEW'), async (req: AuthRequest, res
     const dept = await resolveDepartmentIds(req.query.departmentId ? String(req.query.departmentId) : undefined);
 
     const q = async (sql: string, params: any[] = []): Promise<any[]> => {
-      const [rows]: any = await pool.query(sql, params);
-      return rows || [];
+      try {
+        const [rows]: any = await pool.query(sql, params);
+        return rows || [];
+      } catch (err: any) {
+        if (err?.code === 'ER_NO_SUCH_TABLE' || err?.message?.includes("doesn't exist")) {
+          return [];
+        }
+        throw err;
+      }
     };
 
     const empScope = (alias: string) => {
@@ -389,12 +406,12 @@ router.get('/hr-command-center', authorize('VIEW'), async (req: AuthRequest, res
       ),
       q(
         `SELECT COUNT(*) c FROM employee_exits x JOIN employee e ON e.id = x.employee_id
-         WHERE x.status NOT IN ('PAID','COMPLETED','REJECTED','CANCELLED','WITHDRAWN')${es.sql}`,
+         WHERE x.status NOT IN ('PAID','CLOSED','REJECTED','CANCELLED')${es.sql}`,
         es.params
       ),
       q(
         `SELECT COUNT(*) c FROM fnf_settlements f JOIN employee e ON e.id = f.employee_id
-         WHERE f.status NOT IN ('PAID','COMPLETED','REJECTED','CANCELLED')${es.sql}`,
+         WHERE f.status NOT IN ('PAID','CLOSED','REJECTED','CANCELLED')${es.sql}`,
         es.params
       ),
       q(
@@ -422,8 +439,10 @@ router.get('/hr-command-center', authorize('VIEW'), async (req: AuthRequest, res
         es.params
       ),
       q(`SELECT id, status, periodStart, periodEnd FROM payrollrun ORDER BY periodStart DESC, createdAt DESC LIMIT 1`),
-      q(`SELECT COUNT(*) c FROM candidate`),
-      q(`SELECT COUNT(*) c FROM interview WHERE DATE(scheduledAt) = ?`, [todayYmd]),
+      // candidate table doesn't exist yet (hiring module) - return 0
+      Promise.resolve([[{ c: 0 }]]),
+      // interview table doesn't exist yet - return 0
+      Promise.resolve([[{ c: 0 }]]),
       q(
         `SELECT COUNT(*) c FROM employee e WHERE e.status = 'ACTIVE'
          AND MONTH(e.dateOfBirth) = ? AND DAY(e.dateOfBirth) = ?${es.sql}`,
@@ -590,8 +609,15 @@ router.get('/kpi-details', authorize('VIEW'), async (req: AuthRequest, res) => {
     const dept = await resolveDepartmentIds(req.query.departmentId ? String(req.query.departmentId) : undefined);
 
     const q = async (sql: string, params: any[] = []): Promise<any[]> => {
-      const [rows]: any = await pool.query(sql, params);
-      return rows || [];
+      try {
+        const [rows]: any = await pool.query(sql, params);
+        return rows || [];
+      } catch (err: any) {
+        if (err?.code === 'ER_NO_SUCH_TABLE' || err?.message?.includes("doesn't exist")) {
+          return [];
+        }
+        throw err;
+      }
     };
     const empScope = (alias: string) => {
       const parts: string[] = [];

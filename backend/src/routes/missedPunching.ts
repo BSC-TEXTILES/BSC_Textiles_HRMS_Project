@@ -247,30 +247,32 @@ router.get('/folders', authorize('VIEW'), async (req: AuthRequest, res) => {
     }
 
     const [rows]: any = await pool.query(
-      `SELECT 
-        MIN(d.id) as folderId,
-        d.name as folderName,
-        GROUP_CONCAT(DISTINCT COALESCE(l.code, 'BEL') ORDER BY l.code SEPARATOR ', ') as storeCodes,
-        MAX(COALESCE(l.code, 'BEL')) as storeCode,
-        MAX(COALESCE(l.name, 'Belagavi Head Store')) as storeName,
-        COUNT(DISTINCT e.id) as totalAssigned,
-        COUNT(DISTINCT CASE WHEN (a.actualLogin IS NULL AND a.actualLogout IS NOT NULL) THEN a.id END) as missedIn,
-        COUNT(DISTINCT CASE WHEN (a.actualLogin IS NOT NULL AND a.actualLogout IS NULL) THEN a.id END) as missedOut,
-        COUNT(DISTINCT CASE WHEN (a.status = 'INCOMPLETE') THEN a.id END) as incomplete,
-        COUNT(DISTINCT CASE WHEN (a.actualLogin IS NOT NULL AND a.actualLogout IS NOT NULL AND (
-          (a.effectiveWorkingSeconds > 0 AND a.effectiveWorkingSeconds < 32400) OR
-          (a.effectiveWorkingSeconds = 0 AND a.totalWorkingSeconds > 0 AND a.totalWorkingSeconds < 32400)
-        )) THEN a.id END) as under9Hours,
-        COUNT(DISTINCT CASE WHEN c.status = 'PENDING' THEN c.id END) as pendingCorrections,
-        COUNT(DISTINCT CASE WHEN c.status = 'APPROVED' THEN c.id END) as resolvedIssues
-      FROM department d
-      JOIN employee e ON e.departmentId = d.id
-      LEFT JOIN location l ON e.locationId = l.id
-      LEFT JOIN attendance a ON a.employeeId = e.id ${attDateFilter}
-      LEFT JOIN attendancecorrection c ON c.employeeId = e.id AND DATE(c.attendanceDate) = DATE(a.attendanceDate)
-      WHERE 1=1 ${locFilter}
-      GROUP BY d.name
-      ORDER BY (missedIn + missedOut + under9Hours + pendingCorrections) DESC, d.name ASC`,
+      `SELECT sub.* FROM (
+        SELECT 
+          MIN(d.id) as folderId,
+          d.name as folderName,
+          GROUP_CONCAT(DISTINCT COALESCE(l.code, 'BEL') ORDER BY l.code SEPARATOR ', ') as storeCodes,
+          MAX(COALESCE(l.code, 'BEL')) as storeCode,
+          MAX(COALESCE(l.name, 'Belagavi Head Store')) as storeName,
+          COUNT(DISTINCT e.id) as totalAssigned,
+          COUNT(DISTINCT CASE WHEN (a.actualLogin IS NULL AND a.actualLogout IS NOT NULL) THEN a.id END) as missedIn,
+          COUNT(DISTINCT CASE WHEN (a.actualLogin IS NOT NULL AND a.actualLogout IS NULL) THEN a.id END) as missedOut,
+          COUNT(DISTINCT CASE WHEN (a.status = 'INCOMPLETE') THEN a.id END) as incomplete,
+          COUNT(DISTINCT CASE WHEN (a.actualLogin IS NOT NULL AND a.actualLogout IS NOT NULL AND (
+            (a.effectiveWorkingSeconds > 0 AND a.effectiveWorkingSeconds < 32400) OR
+            (a.effectiveWorkingSeconds = 0 AND a.totalWorkingSeconds > 0 AND a.totalWorkingSeconds < 32400)
+          )) THEN a.id END) as under9Hours,
+          COUNT(DISTINCT CASE WHEN c.status = 'PENDING' THEN c.id END) as pendingCorrections,
+          COUNT(DISTINCT CASE WHEN c.status = 'APPROVED' THEN c.id END) as resolvedIssues
+        FROM department d
+        JOIN employee e ON e.departmentId = d.id
+        LEFT JOIN location l ON e.locationId = l.id
+        LEFT JOIN attendance a ON a.employeeId = e.id ${attDateFilter}
+        LEFT JOIN attendancecorrection c ON c.employeeId = e.id AND DATE(c.attendanceDate) = DATE(a.attendanceDate)
+        WHERE 1=1 ${locFilter}
+        GROUP BY d.name
+      ) sub
+      ORDER BY (sub.missedIn + sub.missedOut + sub.under9Hours + sub.pendingCorrections) DESC, sub.folderName ASC`,
       params
     );
 
@@ -337,32 +339,34 @@ router.get('/floors', authorize('VIEW'), async (req: AuthRequest, res) => {
     }
 
     const [rows]: any = await pool.query(
-      `SELECT 
-        fl.id as floorId,
-        fl.name as floorName,
-        fl.floorNumber,
-        l.code as storeCode,
-        l.name as storeName,
-        fm.fullName as floorManagerName,
-        COUNT(DISTINCT e.id) as totalAssigned,
-        COUNT(DISTINCT CASE WHEN (a.actualLogin IS NULL AND a.actualLogout IS NOT NULL) THEN a.id END) as missedIn,
-        COUNT(DISTINCT CASE WHEN (a.actualLogin IS NOT NULL AND a.actualLogout IS NULL) THEN a.id END) as missedOut,
-        COUNT(DISTINCT CASE WHEN (a.status = 'INCOMPLETE') THEN a.id END) as incomplete,
-        COUNT(DISTINCT CASE WHEN (a.actualLogin IS NOT NULL AND a.actualLogout IS NOT NULL AND (
-          (a.effectiveWorkingSeconds > 0 AND a.effectiveWorkingSeconds < 32400) OR
-          (a.effectiveWorkingSeconds = 0 AND a.totalWorkingSeconds > 0 AND a.totalWorkingSeconds < 32400)
-        )) THEN a.id END) as under9Hours,
-        COUNT(DISTINCT CASE WHEN c.status = 'PENDING' THEN c.id END) as pendingCorrections,
-        COUNT(DISTINCT CASE WHEN c.status = 'APPROVED' THEN c.id END) as resolvedIssues
-      FROM floor fl
-      JOIN employee e ON e.floorId = fl.id
-      LEFT JOIN location l ON e.locationId = l.id
-      LEFT JOIN employee fm ON fl.floorManagerId = fm.id
-      LEFT JOIN attendance a ON a.employeeId = e.id ${attDateFilter}
-      LEFT JOIN attendancecorrection c ON c.employeeId = e.id AND DATE(c.attendanceDate) = DATE(a.attendanceDate)
-      WHERE 1=1 ${locFilter}
-      GROUP BY fl.id, fl.name, fl.floorNumber, l.code, l.name, fm.fullName
-      ORDER BY (missedIn + missedOut + under9Hours + pendingCorrections) DESC, fl.floorNumber ASC`,
+      `SELECT sub.* FROM (
+        SELECT 
+          fl.id as floorId,
+          fl.name as floorName,
+          fl.floorNumber,
+          l.code as storeCode,
+          l.name as storeName,
+          fm.fullName as floorManagerName,
+          COUNT(DISTINCT e.id) as totalAssigned,
+          COUNT(DISTINCT CASE WHEN (a.actualLogin IS NULL AND a.actualLogout IS NOT NULL) THEN a.id END) as missedIn,
+          COUNT(DISTINCT CASE WHEN (a.actualLogin IS NOT NULL AND a.actualLogout IS NULL) THEN a.id END) as missedOut,
+          COUNT(DISTINCT CASE WHEN (a.status = 'INCOMPLETE') THEN a.id END) as incomplete,
+          COUNT(DISTINCT CASE WHEN (a.actualLogin IS NOT NULL AND a.actualLogout IS NOT NULL AND (
+            (a.effectiveWorkingSeconds > 0 AND a.effectiveWorkingSeconds < 32400) OR
+            (a.effectiveWorkingSeconds = 0 AND a.totalWorkingSeconds > 0 AND a.totalWorkingSeconds < 32400)
+          )) THEN a.id END) as under9Hours,
+          COUNT(DISTINCT CASE WHEN c.status = 'PENDING' THEN c.id END) as pendingCorrections,
+          COUNT(DISTINCT CASE WHEN c.status = 'APPROVED' THEN c.id END) as resolvedIssues
+        FROM floor fl
+        JOIN employee e ON e.floorId = fl.id
+        LEFT JOIN location l ON e.locationId = l.id
+        LEFT JOIN employee fm ON fl.floorManagerId = fm.id
+        LEFT JOIN attendance a ON a.employeeId = e.id ${attDateFilter}
+        LEFT JOIN attendancecorrection c ON c.employeeId = e.id AND DATE(c.attendanceDate) = DATE(a.attendanceDate)
+        WHERE 1=1 ${locFilter}
+        GROUP BY fl.id, fl.name, fl.floorNumber, l.code, l.name, fm.fullName
+      ) sub
+      ORDER BY (sub.missedIn + sub.missedOut + sub.under9Hours + sub.pendingCorrections) DESC, sub.floorNumber ASC`,
       params
     );
 

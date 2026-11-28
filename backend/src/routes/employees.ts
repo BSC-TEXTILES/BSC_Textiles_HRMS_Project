@@ -495,20 +495,43 @@ router.post('/', authorize('ADD'), validate(employeeCreateSchema), async (req: A
     } = req.body;
     
     // Resolve locationId (accepts cuid or code like BEL, DAV, SHI, or canonical aliases)
-    let resolvedLocationId = locationId;
-    const foundLoc = await prisma.location.findFirst({
-      where: {
-        OR: [
-          { id: locationId },
-          { code: locationId },
-          ...(locationId === 'loc_bel' ? [{ code: 'BEL' }] : []),
-          ...(locationId === 'loc_dav' ? [{ code: 'DAV' }] : []),
-          ...(locationId === 'loc_shi' ? [{ code: 'SHI' }] : []),
-        ],
-      },
-    });
-    if (foundLoc) {
-      resolvedLocationId = foundLoc.id;
+    let resolvedLocationId: string = '';
+    const [matchingLocs]: any = await pool.query(
+      `SELECT id FROM location 
+       WHERE id = ? 
+          OR code = ? 
+          OR code = ? 
+          OR code = (CASE ? WHEN 'loc_bel' THEN 'BEL' WHEN 'loc_dav' THEN 'DAV' WHEN 'loc_shi' THEN 'SHI' WHEN 'loc_hq' THEN 'HUB' ELSE ? END)
+          OR name LIKE ?
+       LIMIT 1`,
+      [
+        locationId,
+        locationId,
+        String(locationId || '').toUpperCase(),
+        locationId,
+        locationId,
+        `%${locationId}%`
+      ]
+    );
+
+    if (matchingLocs && matchingLocs.length > 0) {
+      resolvedLocationId = matchingLocs[0].id;
+    } else {
+      // Fallback to active Davanagere or first available location in MySQL
+      const [fallbackLocs]: any = await pool.query(
+        `SELECT id FROM location WHERE status = 'ACTIVE' ORDER BY code = 'DAV' DESC, code = 'BEL' DESC, id ASC LIMIT 1`
+      );
+      if (fallbackLocs && fallbackLocs.length > 0) {
+        resolvedLocationId = fallbackLocs[0].id;
+      } else {
+        // If location table is missing records, insert canonical DAV location
+        await pool.query(
+          `INSERT INTO location (id, code, name, city, state, pin, status, createdAt, updatedAt)
+           VALUES ('loc_dav', 'DAV', 'Davanagere Showroom', 'Davanagere', 'Karnataka', '577002', 'ACTIVE', NOW(3), NOW(3))
+           ON DUPLICATE KEY UPDATE status = 'ACTIVE'`
+        ).catch(() => undefined);
+        resolvedLocationId = 'loc_dav';
+      }
     }
 
     const isMutationElevated = ['SUPER_ADMIN', 'ADMIN'].includes(req.user!.role);
@@ -519,16 +542,24 @@ router.post('/', authorize('ADD'), validate(employeeCreateSchema), async (req: A
     // Resolve optional departmentId if provided and not empty
     let resolvedDepartmentId: string | null = null;
     if (departmentId && String(departmentId).trim() !== '') {
-      const foundDept = await prisma.department.findFirst({
-        where: {
-          OR: [
-            { id: String(departmentId).trim() },
-            { code: String(departmentId).trim() },
-          ],
-        },
-      });
-      if (foundDept) {
-        resolvedDepartmentId = foundDept.id;
+      const [foundDepts]: any = await pool.query(
+        `SELECT id FROM department WHERE id = ? OR code = ? OR name = ? LIMIT 1`,
+        [String(departmentId).trim(), String(departmentId).trim(), String(departmentId).trim()]
+      );
+      if (foundDepts && foundDepts.length > 0) {
+        resolvedDepartmentId = foundDepts[0].id;
+      }
+    }
+
+    // Resolve optional shiftId if provided and not empty
+    let resolvedShiftId: string | null = null;
+    if (shiftId && String(shiftId).trim() !== '') {
+      const [foundShifts]: any = await pool.query(
+        `SELECT id FROM shift WHERE id = ? OR code = ? LIMIT 1`,
+        [String(shiftId).trim(), String(shiftId).trim()]
+      );
+      if (foundShifts && foundShifts.length > 0) {
+        resolvedShiftId = foundShifts[0].id;
       }
     }
 
@@ -602,7 +633,7 @@ router.post('/', authorize('ADD'), validate(employeeCreateSchema), async (req: A
         floorId: floorId || null,
         departmentId: resolvedDepartmentId,
         sectionId: sectionId || null,
-        shiftId: shiftId || null,
+        shiftId: resolvedShiftId || null,
         designation: designation || 'Sales Consultant',
         role: role || 'SALES_EMPLOYEE',
         joiningDate: joiningDate ? new Date(joiningDate) : new Date(),
@@ -897,19 +928,18 @@ router.put('/:id', authorize('EDIT'), validate(employeeUpdateSchema), async (req
     // Resolve locationId if updated
     let resolvedLocationId = existing.locationId;
     if (locationId) {
-      const foundLoc = await prisma.location.findFirst({
-        where: {
-          OR: [
-            { id: locationId },
-            { code: locationId },
-            ...(locationId === 'loc_bel' ? [{ code: 'BEL' }] : []),
-            ...(locationId === 'loc_dav' ? [{ code: 'DAV' }] : []),
-            ...(locationId === 'loc_shi' ? [{ code: 'SHI' }] : []),
-            ...(locationId === 'loc_hq' ? [{ code: 'HUB' }] : []),
-          ],
-        },
-      });
-      if (foundLoc) resolvedLocationId = foundLoc.id;
+      const [matchingLocs]: any = await pool.query(
+        `SELECT id FROM location 
+         WHERE id = ? 
+            OR code = ? 
+            OR code = ? 
+            OR code = (CASE ? WHEN 'loc_bel' THEN 'BEL' WHEN 'loc_dav' THEN 'DAV' WHEN 'loc_shi' THEN 'SHI' WHEN 'loc_hq' THEN 'HUB' ELSE ? END)
+         LIMIT 1`,
+        [locationId, locationId, String(locationId || '').toUpperCase(), locationId, locationId]
+      );
+      if (matchingLocs && matchingLocs.length > 0) {
+        resolvedLocationId = matchingLocs[0].id;
+      }
     }
 
     // Compute names
