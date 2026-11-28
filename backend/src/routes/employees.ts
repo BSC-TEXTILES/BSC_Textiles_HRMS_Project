@@ -64,6 +64,7 @@ const employeeBody = z.object({
   address: z.string().optional(),
   emergencyContactName: z.string().optional(),
   emergencyContactPhone: z.string().optional(),
+  emergencyContactNumber: z.string().optional(),
   emergencyContactRelation: z.string().optional(),
   employmentType: z.string().optional(),
   reportingManager: z.string().optional(),
@@ -107,7 +108,7 @@ const employeeUpdateSchema = z.object({ body: employeeBody });
 router.get('/', authorize('VIEW'), async (req: AuthRequest, res) => {
   try {
     const { locationId, floorId, departmentId, sectionId, shiftId, status, page = 1, limit = 20, search } = req.query;
-    const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+    const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 1000);
     const skip = (Number(page) - 1) * safeLimit;
     
     const isElevated = ['SUPER_ADMIN', 'ADMIN', 'HR_AUDITOR'].includes(req.user!.role);
@@ -189,7 +190,7 @@ router.get('/lookup', authorize('VIEW'), async (req: AuthRequest, res) => {
     }
     const employees = await prisma.employee.findMany({
       where,
-      select: { id: true, employeeCode: true, fullName: true, locationId: true, departmentId: true, shiftId: true },
+      select: { id: true, employeeCode: true, fullName: true, designation: true, role: true, locationId: true, departmentId: true, shiftId: true },
       orderBy: { employeeCode: 'asc' },
     });
     res.setHeader('Cache-Control', 'public, max-age=60');
@@ -197,6 +198,53 @@ router.get('/lookup', authorize('VIEW'), async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('Get employee lookup error:', error);
     res.status(500).json({ error: 'Failed to get employee lookup' });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /managers — list registered managers and HR leaders for dropdown selection
+// ─────────────────────────────────────────────────────────────────────────────
+router.get('/managers', authorize('VIEW'), async (req: AuthRequest, res) => {
+  try {
+    const { locationId } = req.query;
+    const isElevated = ['SUPER_ADMIN', 'ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE', 'HR_AUDITOR'].includes(req.user!.role);
+    const where: any = { status: 'ACTIVE' };
+    
+    if (!isElevated && req.user!.locationId) {
+      where.locationId = req.user!.locationId;
+    } else if (locationId && locationId !== 'all') {
+      where.locationId = String(locationId);
+    }
+
+    const employees = await prisma.employee.findMany({
+      where,
+      select: {
+        id: true,
+        employeeCode: true,
+        fullName: true,
+        designation: true,
+        role: true,
+        locationId: true,
+        location: { select: { id: true, code: true, name: true } },
+        department: { select: { id: true, name: true, code: true } },
+      },
+      orderBy: { fullName: 'asc' },
+    });
+
+    const hrRoles = ['HR_MANAGER', 'HR_EXECUTIVE', 'ADMIN', 'SUPER_ADMIN', 'HR_AUDITOR'];
+    const hrManagers = employees.filter((m: any) =>
+      hrRoles.includes(m.role) ||
+      (m.designation && /hr|human resource|admin|talent/i.test(m.designation))
+    );
+
+    res.json({
+      success: true,
+      reportingManagers: employees,
+      hrManagers: hrManagers.length > 0 ? hrManagers : employees,
+    });
+  } catch (error: any) {
+    console.error('Error fetching managers:', error);
+    res.status(500).json({ error: 'Failed to fetch managers' });
   }
 });
 
@@ -403,7 +451,32 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res) => {
       recentPunches,
     };
     
-    res.json({ ...employee, biometricSync });
+    // Query linked user account credentials and weekly off config
+    const [userRows]: any = await pool.query(
+      `SELECT id, email, role, isActive, status, mustChangePassword, lastLoginAt FROM \`user\` WHERE employeeId = ? LIMIT 1`,
+      [employee.id]
+    );
+    const userAccount = userRows[0] || null;
+
+    const [weeklyOffRows]: any = await pool.query(
+      `SELECT primaryDay, offType FROM employee_weekly_off_config WHERE employeeId = ? LIMIT 1`,
+      [employee.id]
+    );
+    const weeklyOffConfig = weeklyOffRows[0] || null;
+
+    const enriched = {
+      ...employee,
+      currentAddress: employee.address || employee.currentAddress || null,
+      emergencyContact: employee.emergencyContactName
+        ? `${employee.emergencyContactName}${employee.emergencyContactRelation ? ` (${employee.emergencyContactRelation})` : ''}${employee.emergencyContactPhone ? ` - ${employee.emergencyContactPhone}` : ''}`
+        : (employee.emergencyContact || null),
+      bankAccount: employee.bankAccountNumber || employee.bankAccount || null,
+      weeklyOff: weeklyOffConfig?.primaryDay || employee.weeklyOff || 'SUNDAY',
+      user: userAccount,
+      biometricSync,
+    };
+    
+    res.json(enriched);
   } catch (error) {
     console.error('Get employee error:', error);
     res.status(500).json({ error: 'Failed to get employee' });
@@ -575,15 +648,15 @@ router.post('/', authorize('ADD'), validate(employeeCreateSchema), async (req: A
          WHERE id = ?`,
         [
           dateOfBirth ? new Date(dateOfBirth) : null,
-          address || null,
+          address || (req.body as any).addressLine1 || (req.body as any).currentAddress || null,
           emergencyContactName || null,
-          emergencyContactPhone || null,
+          emergencyContactPhone || (req.body as any).emergencyContactNumber || null,
           emergencyContactRelation || null,
-          reportingManager || req.body.manager || null,
+          reportingManager || (req.body as any).manager || null,
           hrManager || null,
           employmentType || 'FULL_TIME',
           bankName || null,
-          bankAccountNumber || null,
+          bankAccountNumber || (req.body as any).bankAccount || null,
           bankIfsc || null,
           previousCompany || null,
           Number(previousExperienceYears) || 0.0,
@@ -688,8 +761,13 @@ router.post('/', authorize('ADD'), validate(employeeCreateSchema), async (req: A
           locationId: resolvedLocationId,
           isActive: true,
           status: 'ACTIVE',
+          mustChangePassword: true,
         },
       });
+
+      if (generatedUser?.id) {
+        await pool.query('UPDATE `user` SET mustChangePassword = 1 WHERE id = ?', [generatedUser.id]);
+      }
 
       // Dispatch welcome notification with credentials & activation link
       if (trimmedEmail) {
@@ -762,14 +840,24 @@ router.post('/', authorize('ADD'), validate(employeeCreateSchema), async (req: A
 
 router.put('/:id', authorize('EDIT'), validate(employeeUpdateSchema), async (req: AuthRequest, res) => {
   try {
-    const { firstName, lastName, email, phone, gender, floorId, departmentId, sectionId, shiftId, designation, role, expectedUpdatedAt } = req.body;
+    const {
+      firstName, lastName, name, fullName: reqFullName, email, phone, gender,
+      locationId, floorId, departmentId, sectionId, shiftId, designation, role,
+      dateOfBirth, joiningDate, address, addressLine1, currentAddress,
+      emergencyContactName, emergencyContactPhone, emergencyContactNumber, emergencyContactRelation, emergencyContact,
+      reportingManager, manager, hrManager, employmentType, status,
+      bankName, bankAccountNumber, bankAccount, bankIfsc,
+      previousCompany, previousExperienceYears, photoUrl,
+      fixedGrossSalary, salary, basicSalary, dailyRate, weeklyOff,
+      expectedUpdatedAt
+    } = req.body;
 
     const existing = await prisma.employee.findUnique({ where: { id: req.params.id } });
     if (!existing) {
       return res.status(404).json({ error: 'Employee not found' });
     }
 
-    const isEditElevated = ['SUPER_ADMIN', 'ADMIN'].includes(req.user!.role);
+    const isEditElevated = ['SUPER_ADMIN', 'ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE'].includes(req.user!.role);
     if (!isEditElevated && existing.locationId !== req.user!.locationId) {
       return res.status(403).json({ error: 'Access denied' });
     }
@@ -786,63 +874,172 @@ router.put('/:id', authorize('EDIT'), validate(employeeUpdateSchema), async (req
       }
     }
 
-    // Role assignment is HR-controlled: ordinary employees/managers may not
-    // promote themselves or their peers.
+    // Role assignment is HR-controlled: ordinary employees/managers may not promote themselves
     const ROLE_EDIT_ROLES = ['SUPER_ADMIN', 'ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE'];
     if (role && role !== existing.role && !ROLE_EDIT_ROLES.includes(req.user!.role)) {
       return res.status(403).json({ error: 'Only HR/admin roles may change an employee role assignment.' });
     }
 
-    const trimmedEmail = email ? String(email).trim().toLowerCase() || null : null;
+    const trimmedEmail = email !== undefined ? (email ? String(email).trim().toLowerCase() : null) : existing.email;
     if (trimmedEmail && trimmedEmail !== existing.email) {
       const [dupeEmp, dupeUser] = await Promise.all([
         prisma.employee.findFirst({ where: { email: trimmedEmail, NOT: { id: existing.id } } }),
-        prisma.user.findFirst({ where: { email: trimmedEmail } }),
+        prisma.user.findFirst({ where: { email: trimmedEmail, NOT: { employeeId: existing.id } } }),
       ]);
       if (dupeEmp || dupeUser) {
         return res.status(409).json({ error: 'This email is already registered', field: 'email' });
       }
     }
 
-    const digits = phone ? String(phone).replace(/\D/g, '') : '';
-    const normalizedPhone = digits.length === 10 ? digits : phone ? String(phone).trim() : existing.phone;
+    const digits = phone !== undefined ? String(phone).replace(/\D/g, '').slice(-10) : '';
+    const normalizedPhone = digits.length === 10 ? digits : (phone ? String(phone).trim() : existing.phone);
 
-    const fullName = `${firstName} ${lastName}`;
+    // Resolve locationId if updated
+    let resolvedLocationId = existing.locationId;
+    if (locationId) {
+      const foundLoc = await prisma.location.findFirst({
+        where: {
+          OR: [
+            { id: locationId },
+            { code: locationId },
+            ...(locationId === 'loc_bel' ? [{ code: 'BEL' }] : []),
+            ...(locationId === 'loc_dav' ? [{ code: 'DAV' }] : []),
+            ...(locationId === 'loc_shi' ? [{ code: 'SHI' }] : []),
+            ...(locationId === 'loc_hq' ? [{ code: 'HUB' }] : []),
+          ],
+        },
+      });
+      if (foundLoc) resolvedLocationId = foundLoc.id;
+    }
 
-    // Field-level diff for the audit trail (sensitive changes are recorded).
+    // Compute names
+    const finalFirst = firstName !== undefined ? String(firstName || '').trim() : existing.firstName;
+    const finalLast = lastName !== undefined ? String(lastName || '').trim() : existing.lastName;
+    const fullName = reqFullName || name || (finalFirst || finalLast ? `${finalFirst} ${finalLast}`.trim() : existing.fullName);
+
+    // Field-level diff for the audit trail
     const changes: Record<string, { from: any; to: any }> = {};
     const track = (key: string, from: any, to: any) => {
       if ((from ?? null) !== (to ?? null)) changes[key] = { from, to };
     };
-    track('firstName', existing.firstName, firstName);
-    track('lastName', existing.lastName, lastName);
+    track('firstName', existing.firstName, finalFirst);
+    track('lastName', existing.lastName, finalLast);
     track('email', existing.email, trimmedEmail);
     track('phone', existing.phone, normalizedPhone);
-    track('gender', existing.gender, gender);
-    track('floorId', existing.floorId, floorId ?? null);
-    track('departmentId', existing.departmentId, departmentId ?? null);
-    track('sectionId', existing.sectionId, sectionId ?? null);
-    track('shiftId', existing.shiftId, shiftId ?? null);
-    track('designation', existing.designation, designation);
-    track('role', existing.role, role);
+    track('gender', existing.gender, gender ?? existing.gender);
+    track('locationId', existing.locationId, resolvedLocationId);
+    track('floorId', existing.floorId, floorId ?? existing.floorId);
+    track('departmentId', existing.departmentId, departmentId ?? existing.departmentId);
+    track('sectionId', existing.sectionId, sectionId ?? existing.sectionId);
+    track('shiftId', existing.shiftId, shiftId ?? existing.shiftId);
+    track('designation', existing.designation, designation ?? existing.designation);
+    track('role', existing.role, role ?? existing.role);
 
     const employee = await prisma.employee.update({
       where: { id: req.params.id },
       data: {
-        firstName,
-        lastName,
+        firstName: finalFirst,
+        lastName: finalLast,
         fullName,
         email: trimmedEmail,
         phone: normalizedPhone,
-        gender,
-        floorId,
-        departmentId,
-        sectionId,
-        shiftId,
-        designation,
-        role,
+        gender: gender || existing.gender,
+        locationId: resolvedLocationId,
+        floorId: floorId !== undefined ? floorId : existing.floorId,
+        departmentId: departmentId !== undefined ? departmentId : existing.departmentId,
+        sectionId: sectionId !== undefined ? sectionId : existing.sectionId,
+        shiftId: shiftId !== undefined ? shiftId : existing.shiftId,
+        designation: designation || existing.designation,
+        role: role || existing.role,
       },
     });
+
+    // Update extended employee profile fields directly in MySQL
+    const finalAddress = address || addressLine1 || currentAddress || null;
+    const finalEmergencyName = emergencyContactName || (emergencyContact && !emergencyContactName ? emergencyContact : null);
+    const finalEmergencyPhone = emergencyContactPhone || emergencyContactNumber || null;
+    const finalEmergencyRel = emergencyContactRelation || null;
+    const finalBank = bankName || null;
+    const finalBankAcc = bankAccountNumber || bankAccount || null;
+    const finalIfsc = bankIfsc || null;
+    const finalGross = Number(fixedGrossSalary || salary || 0);
+    const finalBasic = Number(basicSalary || (finalGross > 0 ? finalGross * 0.75 : 0));
+    const finalDaily = Number(dailyRate || (finalGross > 0 ? finalGross / 30.0 : 0));
+
+    try {
+      await pool.query(
+        `UPDATE employee SET
+          address = COALESCE(?, address),
+          emergencyContactName = COALESCE(?, emergencyContactName),
+          emergencyContactPhone = COALESCE(?, emergencyContactPhone),
+          emergencyContactRelation = COALESCE(?, emergencyContactRelation),
+          reportingManager = COALESCE(?, reportingManager),
+          hrManager = COALESCE(?, hrManager),
+          employmentType = COALESCE(?, employmentType),
+          bankName = COALESCE(?, bankName),
+          bankAccountNumber = COALESCE(?, bankAccountNumber),
+          bankIfsc = COALESCE(?, bankIfsc),
+          previousCompany = COALESCE(?, previousCompany),
+          previousExperienceYears = COALESCE(?, previousExperienceYears),
+          photoUrl = COALESCE(?, photoUrl),
+          dateOfBirth = COALESCE(?, dateOfBirth),
+          joiningDate = COALESCE(?, joiningDate),
+          fixedGrossSalary = CASE WHEN ? > 0 THEN ? ELSE fixedGrossSalary END,
+          basicSalary = CASE WHEN ? > 0 THEN ? ELSE basicSalary END,
+          perDaySalary = CASE WHEN ? > 0 THEN ? ELSE perDaySalary END
+         WHERE id = ?`,
+        [
+          finalAddress,
+          finalEmergencyName,
+          finalEmergencyPhone,
+          finalEmergencyRel,
+          reportingManager || manager || null,
+          hrManager || null,
+          employmentType || null,
+          finalBank,
+          finalBankAcc,
+          finalIfsc,
+          previousCompany || null,
+          previousExperienceYears !== undefined ? Number(previousExperienceYears) : null,
+          photoUrl || null,
+          dateOfBirth ? new Date(dateOfBirth) : null,
+          joiningDate ? new Date(joiningDate) : null,
+          finalGross, finalGross,
+          finalBasic, finalBasic,
+          finalDaily, finalDaily,
+          existing.id,
+        ]
+      );
+    } catch (extErr: any) {
+      console.warn('Extended profile update warning:', extErr?.message);
+    }
+
+    // Update weekly off configuration if passed
+    if (weeklyOff) {
+      try {
+        const woffId = `woff_${crypto.randomBytes(8).toString('hex')}`;
+        await pool.query(
+          `INSERT INTO employee_weekly_off_config (id, employeeId, offType, primaryDay, createdAt, updatedAt)
+           VALUES (?, ?, 'FIXED', ?, NOW(3), NOW(3))
+           ON DUPLICATE KEY UPDATE primaryDay = VALUES(primaryDay), updatedAt = NOW(3)`,
+          [woffId, existing.id, String(weeklyOff).toUpperCase().trim()]
+        );
+      } catch (woffErr: any) {
+        console.warn('Weekly off update warning:', woffErr?.message);
+      }
+    }
+
+    // Update linked user credentials if present
+    try {
+      await pool.query(
+        `UPDATE \`user\` SET
+          fullName = ?,
+          email = COALESCE(?, email),
+          locationId = ?
+         WHERE employeeId = ?`,
+        [fullName, trimmedEmail, resolvedLocationId, existing.id]
+      );
+    } catch {}
 
     if (Object.keys(changes).length > 0) {
       await AuditService.log({
@@ -916,6 +1113,17 @@ router.patch('/:id/status', authorize('EDIT'), async (req: AuthRequest, res) => 
       data: { status, exitDate: status === 'TERMINATED' ? new Date() : null },
     });
 
+    // Synchronize account access in user table
+    try {
+      if (['TERMINATED', 'INACTIVE', 'RESIGNED', 'RETIRED', 'EX_EMPLOYEE'].includes(status)) {
+        await pool.query('UPDATE `user` SET isActive = 0, status = "INACTIVE" WHERE employeeId = ?', [employee.id]);
+      } else if (status === 'ACTIVE') {
+        await pool.query('UPDATE `user` SET isActive = 1, status = "ACTIVE" WHERE employeeId = ?', [employee.id]);
+      }
+    } catch (uErr: any) {
+      console.warn('User status sync notice:', uErr?.message);
+    }
+
     // Publish notification for status change
     const eventId = status === 'TERMINATED' ? 'EMP.RESIGNATION' : 'EMP.STATUS_CHANGED';
     await container.notificationService.publishEvent({
@@ -969,12 +1177,24 @@ router.delete('/:id', authorize('DELETE'), async (req: AuthRequest, res) => {
       prisma.faceVerification.count({ where: { employeeId: req.params.id } }),
     ]);
     
-    if (attCount > 0 || breakCount > 0 || fvCount > 0) {
-      return res.status(400).json({ error: 'Cannot delete employee with existing records. Set status to TERMINATED instead.' });
+    // Perform safe deactivation (soft delete) when records exist or requested
+    if (req.query.soft === 'true' || attCount > 0 || breakCount > 0 || fvCount > 0) {
+      await prisma.employee.update({
+        where: { id: req.params.id },
+        data: { status: 'INACTIVE', exitDate: new Date() },
+      });
+      await pool.query('UPDATE `user` SET isActive = 0, status = "INACTIVE" WHERE employeeId = ?', [req.params.id]);
+      try {
+        socketIO.emit('employee:updated', { id: existing.id, employeeCode: existing.employeeCode, status: 'INACTIVE' });
+      } catch {}
+      return res.json({ success: true, message: 'Employee deactivated (soft-deleted). Historical attendance, biometric and payroll records preserved.' });
     }
     
     await prisma.employee.delete({ where: { id: req.params.id } });
-    res.json({ message: 'Employee deleted successfully' });
+    try {
+      socketIO.emit('employee:deleted', { id: req.params.id, employeeCode: existing.employeeCode });
+    } catch {}
+    res.json({ success: true, message: 'Employee deleted successfully' });
   } catch (error) {
     console.error('Delete employee error:', error);
     res.status(500).json({ error: 'Failed to delete employee' });

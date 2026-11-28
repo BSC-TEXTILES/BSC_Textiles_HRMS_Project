@@ -3,17 +3,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { 
-  UserPlus, 
-  Building2, 
-  MapPin, 
-  Mail, 
-  Phone, 
-  Calendar, 
-  DollarSign, 
-  ShieldCheck, 
-  Clock, 
-  CheckCircle2, 
+import {
+  UserPlus,
+  Building2,
+  MapPin,
+  Mail,
+  Phone,
+  Calendar,
+  DollarSign,
+  ShieldCheck,
+  Clock,
+  CheckCircle2,
   AlertCircle,
   ArrowLeft,
   KeyRound,
@@ -54,14 +54,14 @@ interface UploadedDoc {
 
 export default function CreateEmployeePage() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'profile' | 'biometric' | 'compensation' | 'documents'>('profile');
   const [loading, setLoading] = useState(false);
   const [fetchingNextId, setFetchingNextId] = useState(false);
   const [locations, setLocations] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [shifts, setShifts] = useState<any[]>([]);
-
-  // Active Form Tab
-  const [activeTab, setActiveTab] = useState<'profile' | 'biometric' | 'compensation' | 'documents'>('profile');
+  const [reportingManagers, setReportingManagers] = useState<any[]>([]);
+  const [hrManagers, setHrManagers] = useState<any[]>([]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -86,7 +86,7 @@ export default function CreateEmployeePage() {
     hrManager: '',
     employmentType: 'FULL_TIME',
     employmentStatus: 'ACTIVE',
-    joiningDate: new Date().toISOString().slice(0, 10),
+    joiningDate: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date()),
     // Compensation & Bank
     fixedGrossSalary: '16000',
     basicSalary: '12000',
@@ -123,16 +123,19 @@ export default function CreateEmployeePage() {
   useEffect(() => {
     const loadRefs = async () => {
       try {
-        const [locRes, deptRes, shiftRes] = await Promise.all([
+        const [locRes, deptRes, shiftRes, mgrRes] = await Promise.all([
           api.get('/locations/all').catch(() => ({ data: [] })),
           api.get('/departments').catch(() => ({ data: [] })),
           api.get('/shifts').catch(() => ({ data: [] })),
+          api.get('/employees/managers').catch(() => ({ data: { reportingManagers: [], hrManagers: [] } })),
         ]);
 
         const locList = Array.isArray(locRes.data) ? locRes.data : locRes.data?.locations || [];
         setLocations(locList);
         if (locList.length > 0) {
-          setFormData((prev) => ({ ...prev, locationId: prev.locationId || locList[0].id }));
+          const davLoc = locList.find((l: any) => l.code === 'DAV' || l.id === 'loc_dav' || l.name?.toUpperCase().includes('DAVANAGERE'));
+          const defaultLocId = davLoc ? davLoc.id : locList[0].id;
+          setFormData((prev) => ({ ...prev, locationId: prev.locationId || defaultLocId }));
         }
 
         const deptList = Array.isArray(deptRes.data) ? deptRes.data : deptRes.data?.departments || [];
@@ -145,6 +148,17 @@ export default function CreateEmployeePage() {
         setShifts(shiftList);
         if (shiftList.length > 0) {
           setFormData((prev) => ({ ...prev, shiftId: prev.shiftId || shiftList[0].id }));
+        }
+
+        const repMgrs = mgrRes.data?.reportingManagers || [];
+        const hrMgrs = mgrRes.data?.hrManagers || [];
+        setReportingManagers(repMgrs);
+        setHrManagers(hrMgrs);
+        if (repMgrs.length > 0) {
+          setFormData((prev) => ({ ...prev, reportingManager: prev.reportingManager || `${repMgrs[0].fullName} (${repMgrs[0].designation || 'Manager'})` }));
+        }
+        if (hrMgrs.length > 0) {
+          setFormData((prev) => ({ ...prev, hrManager: prev.hrManager || `${hrMgrs[0].fullName} (${hrMgrs[0].designation || 'HR Lead'})` }));
         }
       } catch (err) {
         console.warn('Error loading form reference data:', err);
@@ -468,11 +482,10 @@ export default function CreateEmployeePage() {
           <button
             type="button"
             onClick={() => setActiveTab('profile')}
-            className={`px-4 py-2.5 text-sm font-semibold rounded-t-lg flex items-center gap-2 border-b-2 transition-colors ${
-              activeTab === 'profile'
+            className={`px-4 py-2.5 text-sm font-semibold rounded-t-lg flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'profile'
                 ? 'border-sky-600 text-sky-600 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-950/20'
                 : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             <User className="w-4 h-4" />
             1. Personal & Placement
@@ -481,11 +494,10 @@ export default function CreateEmployeePage() {
           <button
             type="button"
             onClick={() => setActiveTab('biometric')}
-            className={`px-4 py-2.5 text-sm font-semibold rounded-t-lg flex items-center gap-2 border-b-2 transition-colors ${
-              activeTab === 'biometric'
+            className={`px-4 py-2.5 text-sm font-semibold rounded-t-lg flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'biometric'
                 ? 'border-sky-600 text-sky-600 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-950/20'
                 : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             <ScanFace className="w-4 h-4" />
             2. Face Biometric Enrollment
@@ -499,11 +511,10 @@ export default function CreateEmployeePage() {
           <button
             type="button"
             onClick={() => setActiveTab('compensation')}
-            className={`px-4 py-2.5 text-sm font-semibold rounded-t-lg flex items-center gap-2 border-b-2 transition-colors ${
-              activeTab === 'compensation'
+            className={`px-4 py-2.5 text-sm font-semibold rounded-t-lg flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'compensation'
                 ? 'border-sky-600 text-sky-600 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-950/20'
                 : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             <DollarSign className="w-4 h-4" />
             3. Salary & Bank Details
@@ -512,11 +523,10 @@ export default function CreateEmployeePage() {
           <button
             type="button"
             onClick={() => setActiveTab('documents')}
-            className={`px-4 py-2.5 text-sm font-semibold rounded-t-lg flex items-center gap-2 border-b-2 transition-colors ${
-              activeTab === 'documents'
+            className={`px-4 py-2.5 text-sm font-semibold rounded-t-lg flex items-center gap-2 border-b-2 transition-colors ${activeTab === 'documents'
                 ? 'border-sky-600 text-sky-600 dark:text-sky-400 bg-sky-50/50 dark:bg-sky-950/20'
                 : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-            }`}
+              }`}
           >
             <FileText className="w-4 h-4" />
             4. KYC Documents ({documents.length})
@@ -547,9 +557,8 @@ export default function CreateEmployeePage() {
                         placeholder="e.g. 100201"
                         value={formData.employeeCode}
                         onChange={(e) => handleEmployeeCodeChange(e.target.value)}
-                        className={`w-full px-3.5 py-2.5 rounded-lg border text-sm font-mono bg-slate-50 dark:bg-slate-800/60 text-slate-900 dark:text-white ${
-                          formErrors.employeeCode ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'
-                        }`}
+                        className={`w-full px-3.5 py-2.5 rounded-lg border text-sm font-mono bg-slate-50 dark:bg-slate-800/60 text-slate-900 dark:text-white ${formErrors.employeeCode ? 'border-red-500' : 'border-slate-300 dark:border-slate-700'
+                          }`}
                       />
                       <button
                         type="button"
@@ -661,26 +670,50 @@ export default function CreateEmployeePage() {
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                       Reporting Manager
                     </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Store General Manager"
+                    <select
                       value={formData.reportingManager}
                       onChange={(e) => setFormData({ ...formData, reportingManager: e.target.value })}
                       className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 text-sm bg-slate-50 dark:bg-slate-800/60 text-slate-900 dark:text-white"
-                    />
+                    >
+                      <option value="">Select Reporting Manager</option>
+                      {reportingManagers.map((m) => (
+                        <option key={m.id} value={`${m.fullName} (${m.designation || 'Manager'})`}>
+                          {m.fullName} — {m.designation || 'Manager'} ({m.location?.code || 'Store'})
+                        </option>
+                      ))}
+                      {reportingManagers.length === 0 && (
+                        <>
+                          <option value="Store General Manager">Store General Manager</option>
+                          <option value="Floor Operations Lead">Floor Operations Lead</option>
+                          <option value="Showroom Head">Showroom Head</option>
+                        </>
+                      )}
+                    </select>
                   </div>
 
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                       HR Manager
                     </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Lead HR Officer"
+                    <select
                       value={formData.hrManager}
                       onChange={(e) => setFormData({ ...formData, hrManager: e.target.value })}
                       className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 text-sm bg-slate-50 dark:bg-slate-800/60 text-slate-900 dark:text-white"
-                    />
+                    >
+                      <option value="">Select HR Manager</option>
+                      {hrManagers.map((m) => (
+                        <option key={m.id} value={`${m.fullName} (${m.designation || 'HR Officer'})`}>
+                          {m.fullName} — {m.designation || 'HR Officer'}
+                        </option>
+                      ))}
+                      {hrManagers.length === 0 && (
+                        <>
+                          <option value="Lead HR Officer">Lead HR Officer</option>
+                          <option value="Regional HR Partner">Regional HR Partner</option>
+                          <option value="HR Operations Lead">HR Operations Lead</option>
+                        </>
+                      )}
+                    </select>
                   </div>
 
                   <div>
@@ -1044,13 +1077,12 @@ export default function CreateEmployeePage() {
                       return (
                         <div
                           key={pose.id}
-                          className={`p-3.5 rounded-xl border flex items-center justify-between transition-all ${
-                            sample
+                          className={`p-3.5 rounded-xl border flex items-center justify-between transition-all ${sample
                               ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800'
                               : isCurrent
-                              ? 'bg-sky-50 dark:bg-sky-950/20 border-sky-300 dark:border-sky-800'
-                              : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 opacity-60'
-                          }`}
+                                ? 'bg-sky-50 dark:bg-sky-950/20 border-sky-300 dark:border-sky-800'
+                                : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800 opacity-60'
+                            }`}
                         >
                           <div className="flex items-center gap-3">
                             {sample?.preview ? (

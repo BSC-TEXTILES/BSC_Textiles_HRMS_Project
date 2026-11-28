@@ -1,0 +1,27 @@
+-- ===========================================================================
+-- 050: EMPLOYEE ONBOARDING EXTENDED FIELDS & REPOSITORY SCHEMA COMPLETION
+-- ===========================================================================
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- Safe idempotent column additions on employee
+ALTER TABLE `employee`
+  ADD COLUMN IF NOT EXISTS `photoUrl` VARCHAR(500) NULL,
+  ADD COLUMN IF NOT EXISTS `address` TEXT NULL,
+  ADD COLUMN IF NOT EXISTS `emergencyContactName` VARCHAR(191) NULL,
+  ADD COLUMN IF NOT EXISTS `emergencyContactPhone` VARCHAR(191) NULL,
+  ADD COLUMN IF NOT EXISTS `emergencyContactRelation` VARCHAR(100) NULL,
+  ADD COLUMN IF NOT EXISTS `reportingManager` VARCHAR(191) NULL,
+  ADD COLUMN IF NOT EXISTS `hrManager` VARCHAR(191) NULL,
+  ADD COLUMN IF NOT EXISTS `employmentType` VARCHAR(50) NOT NULL DEFAULT 'FULL_TIME',
+  ADD COLUMN IF NOT EXISTS `bankName` VARCHAR(191) NULL,
+  ADD COLUMN IF NOT EXISTS `bankAccountNumber` VARCHAR(191) NULL,
+  ADD COLUMN IF NOT EXISTS `bankIfsc` VARCHAR(50) NULL,
+  ADD COLUMN IF NOT EXISTS `previousCompany` VARCHAR(191) NULL,
+  ADD COLUMN IF NOT EXISTS `previousExperienceYears` DECIMAL(4,1) NOT NULL DEFAULT 0.0,
+  ADD COLUMN IF NOT EXISTS `onboardingStatus` VARCHAR(50) NOT NULL DEFAULT 'ACTIVE',
+  ADD COLUMN IF NOT EXISTS `fixedGrossSalary` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS `basicSalary` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+  ADD COLUMN IF NOT EXISTS `perDaySalary` DECIMAL(10,2) NOT NULL DEFAULT 0.00;
+
+SET FOREIGN_KEY_CHECKS = 1;

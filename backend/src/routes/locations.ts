@@ -72,7 +72,8 @@ router.get('/all', async (req: AuthRequest, res) => {
     }
 
     const where: any = { status: 'ACTIVE' };
-    if (userRole !== 'SUPER_ADMIN' && userLocId !== 'none') {
+    const isElevated = ['SUPER_ADMIN', 'ADMIN', 'HR_MANAGER', 'HR_EXECUTIVE', 'HR_AUDITOR'].includes(userRole);
+    if (!isElevated && userLocId !== 'none') {
       where.id = userLocId;
     }
     

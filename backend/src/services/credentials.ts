@@ -606,6 +606,10 @@ export async function setAccountActive(
     await SessionService.revokeAllUserSessions(userId, 'ADMIN_REVOKE').catch(() => undefined);
   }
 
+  if (user.employeeId) {
+    await pool.query('UPDATE employee SET status = ? WHERE id = ?', [active ? 'ACTIVE' : 'INACTIVE', user.employeeId]).catch(() => undefined);
+  }
+
   await audit(
     actor,
     'UPDATE',
