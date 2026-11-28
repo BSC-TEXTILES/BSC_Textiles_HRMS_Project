@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { pool } from '../nativeDb.js';
+import { socketIO } from '../socket.js';
 
 export interface FaceSampleInput {
   pose: 'STRAIGHT' | 'RIGHT' | 'LEFT' | 'UP_DOWN';
@@ -165,6 +166,15 @@ export class FaceRecognitionService {
          embedding = VALUES(embedding)`,
       [faceProfileId, employeeId, dummyBlob, primaryEmbeddingStr]
     );
+
+    // Real-time live synchronization
+    try {
+      socketIO.emit('face:enrolled', {
+        employeeId,
+        enrolledPoses,
+        fullName: empRows[0].fullName,
+      });
+    } catch {}
 
     return {
       success: true,
@@ -445,9 +455,20 @@ export class FaceRecognitionService {
       }
 
       if (recordedPunchType === 'OUT') {
+        const [timeRows]: any = await pool.query(
+          `SELECT actualLogin, TIMESTAMPDIFF(SECOND, actualLogin, NOW(3)) as diffSec, breakSeconds 
+           FROM attendance WHERE id = ?`,
+          [existing.id]
+        );
+        const totalSec = Math.max(0, Number(timeRows?.[0]?.diffSec || 0));
+        const brkSec = Number(timeRows?.[0]?.breakSeconds || 0);
+        const effSec = Math.max(0, totalSec - brkSec);
+
         await pool.query(
           `UPDATE attendance 
            SET actualLogout = NOW(3), 
+               totalWorkingSeconds = ?,
+               effectiveWorkingSeconds = ?,
                status = 'PRESENT',
                faceVerified = 1,
                faceMatchPercentage = ?,
@@ -455,7 +476,7 @@ export class FaceRecognitionService {
                cooldownUntil = DATE_ADD(NOW(3), INTERVAL 300 SECOND),
                updatedAt = NOW(3)
            WHERE id = ?`,
-          [bestMatchPercentage, sourceChannel, existing.id]
+          [totalSec, effSec, bestMatchPercentage, sourceChannel, existing.id]
         );
       } else {
         await pool.query(
@@ -485,6 +506,29 @@ export class FaceRecognitionService {
         [attId, targetEmployeeId, effectiveLoc, todayStr, bestMatchPercentage, sourceChannel]
       );
     }
+
+    // Real-time live synchronization for attendance punch
+    try {
+      socketIO.emit('attendance:punch', {
+        employee: {
+          id: targetEmployee.id,
+          employeeCode: targetEmployee.employeeCode,
+          fullName: targetEmployee.fullName,
+          department: targetEmployee.departmentName,
+          locationCode: targetEmployee.locationCode,
+        },
+        punchType: recordedPunchType,
+        locationId: effectiveLoc,
+        punchTime: new Date().toISOString(),
+        matchPercentage: bestMatchPercentage,
+      });
+      socketIO.emit('workforce:event', {
+        type: 'ATTENDANCE_PUNCH',
+        employeeId: targetEmployee.id,
+        punchType: recordedPunchType,
+        locationId: effectiveLoc,
+      });
+    } catch {}
 
     return {
       success: true,

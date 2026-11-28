@@ -39,6 +39,7 @@ import { AddEmployeeDialog } from '@/components/employees/AddEmployeeDialog';
 import { BulkImportModal } from '@/components/employees/BulkImportModal';
 
 import { useSession } from 'next-auth/react';
+import { useSocket } from '@/context/SocketContext';
 
 export default function EmployeesPage() {
   const { data: session, status: authStatus } = useSession();
@@ -169,6 +170,43 @@ export default function EmployeesPage() {
       fetchEmployees();
     }
   }, [authStatus, fetchMetadata, fetchEmployees]);
+
+  // Live real-time synchronisation across HRMS modules
+  const { socket } = useSocket();
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleEmployeeCreated = (data: any) => {
+      fetchEmployees();
+      if (data?.fullName) {
+        toast.success(`Live sync: ${data.fullName} (${data.employeeCode}) added to directory`);
+      }
+    };
+
+    const handleEmployeeUpdated = (data: any) => {
+      fetchEmployees();
+      if (data?.fullName) {
+        toast.success(`Live sync: ${data.fullName} profile updated`);
+      }
+    };
+
+    const handleFaceEnrolled = (data: any) => {
+      fetchEmployees();
+      if (data?.fullName) {
+        toast.success(`Live sync: Face biometrics enrolled for ${data.fullName}`);
+      }
+    };
+
+    socket.on('employee:created', handleEmployeeCreated);
+    socket.on('employee:updated', handleEmployeeUpdated);
+    socket.on('face:enrolled', handleFaceEnrolled);
+
+    return () => {
+      socket.off('employee:created', handleEmployeeCreated);
+      socket.off('employee:updated', handleEmployeeUpdated);
+      socket.off('face:enrolled', handleFaceEnrolled);
+    };
+  }, [socket, fetchEmployees]);
 
   // Drawer handlers with caching and AbortController cancellation
   const handleOpenDrawer = (type: DrawerType) => {

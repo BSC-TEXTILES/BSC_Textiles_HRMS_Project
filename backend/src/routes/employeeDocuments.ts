@@ -3,6 +3,7 @@ import { pool } from '../db.js';
 import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 import { FileSecurityService } from '../services/fileSecurityService.js';
 import { UserUploadService } from '../services/userUploadService.js';
+import { socketIO } from '../socket.js';
 import { safeJsonParse } from '../utils/safeJson.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -496,6 +497,14 @@ router.post('/upload', authorize('EDIT'), async (req: AuthRequest, res) => {
       JSON.stringify(auditEntry)
     ]);
 
+    socketIO.emit('document:uploaded', {
+      documentId: docId,
+      employeeId: emp.id,
+      documentType,
+      title,
+      fileName: originalName,
+    });
+
     res.status(201).json({
       success: true,
       message: 'Document uploaded successfully and queued for HR verification.',
@@ -708,6 +717,40 @@ router.post('/:id/verify', authorize('EDIT'), async (req: AuthRequest, res) => {
   } catch (err: any) {
     console.error('Error verifying document:', err);
     res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+/**
+ * 9. DELETE /:id
+ * Authorised deletion of an employee document
+ */
+router.delete('/:id', authorize('EDIT'), async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const [rows]: any = await pool.query('SELECT * FROM employee_documents WHERE id = ?', [id]);
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Document not found.' });
+    }
+    const doc = rows[0];
+
+    try {
+      if (doc.filePath) {
+        await fs.unlink(doc.filePath).catch(() => {});
+      }
+    } catch {}
+
+    await pool.query('DELETE FROM employee_documents WHERE id = ?', [id]);
+
+    socketIO.emit('document:deleted', {
+      id,
+      employeeId: doc.employeeId,
+      documentType: doc.documentType,
+    });
+
+    return res.json({ success: true, message: 'Document deleted successfully.' });
+  } catch (err: any) {
+    console.error('Delete document error:', err);
+    return res.status(500).json({ success: false, message: err?.message || 'Failed to delete document' });
   }
 });
 

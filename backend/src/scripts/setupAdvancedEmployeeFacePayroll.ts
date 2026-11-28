@@ -108,7 +108,57 @@ export async function setupAdvancedEmployeeFacePayroll(options?: { schemaOnly?: 
       console.warn('[setupAdvancedSchema] attendance column check notice:', e?.message || e);
     }
 
-    // 7. Safe idempotent column additions on faceprofile
+    // 7. Safe idempotent column additions on employee
+    try {
+      const [empCols]: any = await conn.query('SHOW COLUMNS FROM `employee`');
+      const empFields = (empCols || []).map((c: any) => c.Field.toLowerCase());
+      if (!empFields.includes('photourl')) {
+        await conn.query('ALTER TABLE `employee` ADD COLUMN `photoUrl` VARCHAR(500) NULL');
+      }
+      if (!empFields.includes('address')) {
+        await conn.query('ALTER TABLE `employee` ADD COLUMN `address` TEXT NULL');
+      }
+      if (!empFields.includes('emergencycontactname')) {
+        await conn.query('ALTER TABLE `employee` ADD COLUMN `emergencyContactName` VARCHAR(191) NULL');
+      }
+      if (!empFields.includes('emergencycontactphone')) {
+        await conn.query('ALTER TABLE `employee` ADD COLUMN `emergencyContactPhone` VARCHAR(191) NULL');
+      }
+      if (!empFields.includes('emergencycontactrelation')) {
+        await conn.query('ALTER TABLE `employee` ADD COLUMN `emergencyContactRelation` VARCHAR(100) NULL');
+      }
+      if (!empFields.includes('reportingmanager')) {
+        await conn.query('ALTER TABLE `employee` ADD COLUMN `reportingManager` VARCHAR(191) NULL');
+      }
+      if (!empFields.includes('hrmanager')) {
+        await conn.query('ALTER TABLE `employee` ADD COLUMN `hrManager` VARCHAR(191) NULL');
+      }
+      if (!empFields.includes('employmenttype')) {
+        await conn.query("ALTER TABLE `employee` ADD COLUMN `employmentType` VARCHAR(50) NOT NULL DEFAULT 'FULL_TIME'");
+      }
+      if (!empFields.includes('bankname')) {
+        await conn.query('ALTER TABLE `employee` ADD COLUMN `bankName` VARCHAR(191) NULL');
+      }
+      if (!empFields.includes('bankaccountnumber')) {
+        await conn.query('ALTER TABLE `employee` ADD COLUMN `bankAccountNumber` VARCHAR(191) NULL');
+      }
+      if (!empFields.includes('bankifsc')) {
+        await conn.query('ALTER TABLE `employee` ADD COLUMN `bankIfsc` VARCHAR(50) NULL');
+      }
+      if (!empFields.includes('previouscompany')) {
+        await conn.query('ALTER TABLE `employee` ADD COLUMN `previousCompany` VARCHAR(191) NULL');
+      }
+      if (!empFields.includes('previousexperienceyears')) {
+        await conn.query('ALTER TABLE `employee` ADD COLUMN `previousExperienceYears` DECIMAL(4,1) NOT NULL DEFAULT 0.0');
+      }
+      if (!empFields.includes('onboardingstatus')) {
+        await conn.query("ALTER TABLE `employee` ADD COLUMN `onboardingStatus` VARCHAR(50) NOT NULL DEFAULT 'ACTIVE'");
+      }
+    } catch (e: any) {
+      console.warn('[setupAdvancedSchema] employee column check notice:', e?.message || e);
+    }
+
+    // 8. Safe idempotent column additions on faceprofile
     try {
       const [fpCols]: any = await conn.query('SHOW COLUMNS FROM `faceprofile`');
       const fpFields = (fpCols || []).map((c: any) => c.Field.toLowerCase());
@@ -125,7 +175,7 @@ export async function setupAdvancedEmployeeFacePayroll(options?: { schemaOnly?: 
       console.warn('[setupAdvancedSchema] faceprofile column check notice:', e?.message || e);
     }
 
-    // 8. Ensure default Davanagere kiosk terminal device is registered with PIN 1234
+    // 9. Ensure default Davanagere kiosk terminal device is registered with PIN 1234
     try {
       const [kioskRows]: any = await conn.query("SELECT id FROM kiosk_device WHERE deviceCode = 'DAV-KIOSK-01' LIMIT 1");
       if (!kioskRows || kioskRows.length === 0) {
