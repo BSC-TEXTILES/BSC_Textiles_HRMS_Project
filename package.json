@@ -60,7 +60,7 @@
     "engine.io": "^6.6.12",
     "next": "15.5.29",
     "eslint-config-next": "15.5.29",
-    "eslint": "^8.57.1",
+    "eslint": "^9.26.0",
     "next-auth": {
       ".": "4.24.15",
       "nodemailer": "^10.1.0",
