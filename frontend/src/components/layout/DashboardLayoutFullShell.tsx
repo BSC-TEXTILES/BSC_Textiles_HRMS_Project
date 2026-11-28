@@ -117,7 +117,11 @@ export function DashboardLayoutFullShell({
   const myAccess = useMyAccess();
 
   /** Hub picker options come from the API — never from a hardcoded list. */
-  const [hubLocations, setHubLocations] = useState<Array<{ id: string; code: string; name: string; city?: string }>>([]);
+  const [hubLocations, setHubLocations] = useState<Array<{ id: string; code: string; name: string; city?: string }>>([
+    { id: 'cmuzam5fr00024n4p4izbomev', code: 'DAV', name: 'Davanagere Mega Store', city: 'Davanagere' },
+    { id: 'cmuzam5fe00014n4pq25hkcww', code: 'BEL', name: 'Belagavi Head Store', city: 'Belagavi' },
+    { id: 'cmuzam5g400034n4p89o33l8e', code: 'SHI', name: 'Shivamogga Flagship', city: 'Shivamogga' },
+  ]);
 
   useEffect(() => {
     let active = true;

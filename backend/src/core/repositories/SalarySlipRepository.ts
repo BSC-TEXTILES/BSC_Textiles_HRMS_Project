@@ -59,9 +59,9 @@ export class SalarySlipRepository extends BaseRepository<PayslipItemEntity> {
              l.name as location_name, d.name as department_name
       FROM payroll_items pi
       JOIN payroll_runs pr ON pi.payroll_run_id = pr.id
-      JOIN employees e ON pi.employee_id = e.id
-      LEFT JOIN locations l ON e.location_id = l.id
-      LEFT JOIN departments d ON e.department_id = d.id
+      JOIN employee e ON pi.employee_id = e.id
+      LEFT JOIN location l ON e.location_id = l.id
+      LEFT JOIN department d ON e.department_id = d.id
       WHERE pi.id = ? LIMIT 1
     `;
     return this.queryOne<PayslipItemEntity>(sql, [id]);
@@ -74,9 +74,9 @@ export class SalarySlipRepository extends BaseRepository<PayslipItemEntity> {
              l.name as location_name, d.name as department_name
       FROM payroll_items pi
       JOIN payroll_runs pr ON pi.payroll_run_id = pr.id
-      JOIN employees e ON pi.employee_id = e.id
-      LEFT JOIN locations l ON e.location_id = l.id
-      LEFT JOIN departments d ON e.department_id = d.id
+      JOIN employee e ON pi.employee_id = e.id
+      LEFT JOIN location l ON e.location_id = l.id
+      LEFT JOIN department d ON e.department_id = d.id
       WHERE pi.employee_id = ?
       ORDER BY pr.period_start DESC
     `;

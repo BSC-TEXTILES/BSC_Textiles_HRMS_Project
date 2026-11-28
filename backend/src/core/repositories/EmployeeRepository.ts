@@ -118,9 +118,9 @@ export class EmployeeRepository extends BaseRepository<EmployeeEntity> {
 
   public async listActive(locationId?: string): Promise<EmployeeEntity[]> {
     let sql = `SELECT e.*, l.name as location_name, d.name as department_name 
-               FROM employees e 
-               LEFT JOIN locations l ON e.location_id = l.id
-               LEFT JOIN departments d ON e.department_id = d.id
+               FROM employee e 
+               LEFT JOIN location l ON e.location_id = l.id
+               LEFT JOIN department d ON e.department_id = d.id
                WHERE e.status = 'ACTIVE'`;
     const params: any[] = [];
     if (locationId) {
@@ -163,7 +163,7 @@ export class EmployeeRepository extends BaseRepository<EmployeeEntity> {
     const whereSql = whereClauses.join(' AND ');
 
     const countRes = await this.queryOne<{ count: number }>(
-      `SELECT COUNT(*) as count FROM employees e WHERE ${whereSql}`,
+      `SELECT COUNT(*) as count FROM employee e WHERE ${whereSql}`,
       params
     );
     const total = Number(countRes?.count || 0);
@@ -172,10 +172,10 @@ export class EmployeeRepository extends BaseRepository<EmployeeEntity> {
       SELECT e.*, l.name as location_name, d.name as department_name, s.name as shift_name,
              ex.id as exit_id, ex.exit_type, ex.resignation_date, ex.last_working_day, ex.status as exit_status,
              fnf.id as settlement_id, fnf.status as settlement_status, fnf.net_payable as settlement_amount, fnf.payment_date
-      FROM employees e
-      LEFT JOIN locations l ON e.location_id = l.id
-      LEFT JOIN departments d ON e.department_id = d.id
-      LEFT JOIN shifts s ON e.shift_id = s.id
+      FROM employee e
+      LEFT JOIN location l ON e.location_id = l.id
+      LEFT JOIN department d ON e.department_id = d.id
+      LEFT JOIN shift s ON e.shift_id = s.id
       LEFT JOIN employee_exits ex ON ex.employee_id = e.id
       LEFT JOIN fnf_settlements fnf ON fnf.exit_id = ex.id
       WHERE ${whereSql}

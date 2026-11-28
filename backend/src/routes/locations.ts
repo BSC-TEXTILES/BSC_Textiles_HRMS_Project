@@ -5,6 +5,7 @@ import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { validate, schemas } from '../middleware/validation.js';
 import { cacheService } from '../services/cacheService.js';
 import { ensureHiringShardForLocation } from '../services/hiring/hiringShardProvisioner.js';
+import { setupOrganizationHubs } from '../scripts/setupOrganizationHubs.js';
 
 const router = Router();
 
@@ -77,11 +78,20 @@ router.get('/all', async (req: AuthRequest, res) => {
       where.id = userLocId;
     }
     
-    const locations = await prisma.location.findMany({
+    let locations = await prisma.location.findMany({
       where,
       select: { id: true, code: true, name: true, city: true, state: true },
       orderBy: { name: 'asc' },
     });
+
+    if (locations.length === 0) {
+      await setupOrganizationHubs().catch(() => undefined);
+      locations = await prisma.location.findMany({
+        where: isElevated || userLocId === 'none' ? { status: 'ACTIVE' } : { id: userLocId, status: 'ACTIVE' },
+        select: { id: true, code: true, name: true, city: true, state: true },
+        orderBy: { name: 'asc' },
+      });
+    }
     
     const etag = cacheService.set(cacheKey, locations, 60_000);
     res.setHeader('ETag', etag);

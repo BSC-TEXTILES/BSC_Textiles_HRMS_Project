@@ -36,7 +36,7 @@ export class HrmDashboardService extends BaseRepository<any> {
         COUNT(CASE WHEN e.status = 'RESIGNED' OR ex.exit_type = 'RESIGNATION' THEN 1 END) as resigned,
         COUNT(CASE WHEN e.status = 'TERMINATED' OR ex.exit_type = 'TERMINATION' THEN 1 END) as \`terminated\`,
         COUNT(CASE WHEN e.status = 'RETIRED' OR ex.exit_type = 'RETIREMENT' THEN 1 END) as retired
-       FROM employees e
+       FROM employee e
        LEFT JOIN employee_exits ex ON ex.employee_id = e.id
        WHERE 1=1 ${locFilter}`,
       params
@@ -53,7 +53,7 @@ export class HrmDashboardService extends BaseRepository<any> {
         COUNT(CASE WHEN fnf.status = 'PAID' OR fnf.status = 'CLOSED' THEN 1 END) as closedAndPaid,
         COUNT(CASE WHEN fnf.status NOT IN ('PAID', 'CLOSED', 'CANCELLED') AND ex.last_working_day < DATE_SUB(CURDATE(), INTERVAL 30 DAY) THEN 1 END) as overdue
        FROM employee_exits ex
-       JOIN employees e ON ex.employee_id = e.id
+       JOIN employee e ON ex.employee_id = e.id
        LEFT JOIN fnf_settlements fnf ON fnf.exit_id = ex.id
        WHERE 1=1 ${locFilter}`,
       params
@@ -63,7 +63,7 @@ export class HrmDashboardService extends BaseRepository<any> {
     const leaveStats = await this.queryOne<{ pendingCount: number }>(
       `SELECT COUNT(*) as pendingCount 
        FROM leave_applications la
-       JOIN employees e ON la.employee_id = e.id
+       JOIN employee e ON la.employee_id = e.id
        WHERE la.status = 'PENDING' ${locFilter}`,
       params
     );

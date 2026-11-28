@@ -78,7 +78,7 @@ export default function CreateEmployeePage() {
     emergencyContactPhone: '',
     emergencyContactRelation: 'Spouse',
     // Organization
-    locationId: '',
+    locationId: 'DAV',
     departmentId: '',
     designation: 'Sales Consultant',
     shiftId: '',
@@ -135,7 +135,9 @@ export default function CreateEmployeePage() {
         if (locList.length > 0) {
           const davLoc = locList.find((l: any) => l.code === 'DAV' || l.id === 'loc_dav' || l.name?.toUpperCase().includes('DAVANAGERE'));
           const defaultLocId = davLoc ? davLoc.id : locList[0].id;
-          setFormData((prev) => ({ ...prev, locationId: prev.locationId || defaultLocId }));
+          setFormData((prev) => ({ ...prev, locationId: defaultLocId }));
+        } else {
+          setFormData((prev) => ({ ...prev, locationId: prev.locationId || 'DAV' }));
         }
 
         const deptList = Array.isArray(deptRes.data) ? deptRes.data : deptRes.data?.departments || [];
@@ -607,10 +609,9 @@ export default function CreateEmployeePage() {
                       ))}
                       {locations.length === 0 && (
                         <>
-                          <option value="loc_bel">BELAGAVI SHOWROOM (BEL)</option>
-                          <option value="loc_dav">DAVANAGERE SHOWROOM (DAV)</option>
-                          <option value="loc_shi">SHIVAMOGGA SHOWROOM (SHI)</option>
-                          <option value="loc_hq">HUBBALLI HQ (HUB)</option>
+                          <option value="DAV">DAVANAGERE SHOWROOM (DAV)</option>
+                          <option value="BEL">BELAGAVI SHOWROOM (BEL)</option>
+                          <option value="SHI">SHIVAMOGGA SHOWROOM (SHI)</option>
                         </>
                       )}
                     </select>

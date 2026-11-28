@@ -116,7 +116,7 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
     const [empRows]: any = await pool.query(
       `SELECT e.id, e.employeeCode, e.fullName, e.firstName, e.lastName, e.email, e.phone, e.gender,
               e.designation, e.role, e.status, e.joiningDate,
-              e.panNumber, e.uanNo, e.bankAccount, e.bankIfsc, e.aadhaarVerificationStatus,
+              e.panNumber, e.uanNo, e.bankAccountNumber, e.bankIfsc, e.aadhaarVerificationStatus,
               l.id as locationId, l.name as locationName, l.code as locationCode,
               f.name as floorName,
               d.name as departmentName,
@@ -579,7 +579,7 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
           disbursedAt: latestPayroll?.processedAt
             ? new Date(latestPayroll.processedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
             : null,
-          creditAccount: emp.bankAccount ? `••••${String(emp.bankAccount).slice(-4)}` : null,
+          creditAccount: emp.bankAccountNumber ? `••••${String(emp.bankAccountNumber).slice(-4)}` : null,
         },
         punchCorrection: {
           label: 'Punch Correction',
@@ -601,8 +601,8 @@ myDeskRouter.get('/summary', async (req: AuthRequest, res) => {
           pan: emp.panNumber ? String(emp.panNumber) : null,
           uan: emp.uanNo ? String(emp.uanNo) : null,
           esic: null,
-          bank: emp.bankAccount
-            ? `${emp.bankIfsc ? `${emp.bankIfsc} • ` : ''}••••${String(emp.bankAccount).slice(-4)}`
+          bank: emp.bankAccountNumber
+            ? `${emp.bankIfsc ? `${emp.bankIfsc} • ` : ''}••••${String(emp.bankAccountNumber).slice(-4)}`
             : null,
         },
       },

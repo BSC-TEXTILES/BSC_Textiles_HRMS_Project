@@ -201,7 +201,7 @@ export class LeaveRepository extends BaseRepository<LeaveApplicationEntity> {
     const countRes = await this.queryOne<{ count: number }>(
       `SELECT COUNT(*) as count 
        FROM leave_applications la
-       JOIN employees e ON la.employee_id = e.id
+       JOIN employee e ON la.employee_id = e.id
        WHERE ${whereSql}`,
       params
     );
@@ -211,7 +211,7 @@ export class LeaveRepository extends BaseRepository<LeaveApplicationEntity> {
       SELECT la.*, e.employee_code, e.full_name as employee_name,
              lt.code as leave_type_code, lt.name as leave_type_name
       FROM leave_applications la
-      JOIN employees e ON la.employee_id = e.id
+      JOIN employee e ON la.employee_id = e.id
       JOIN leave_types lt ON la.leave_type_id = lt.id
       WHERE ${whereSql}
       ORDER BY la.created_at DESC

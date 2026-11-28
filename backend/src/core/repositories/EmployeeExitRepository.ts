@@ -47,9 +47,9 @@ export class EmployeeExitRepository extends BaseRepository<EmployeeExitEntity> {
       SELECT ex.*, e.employee_code, e.full_name as employee_name, e.base_salary,
              l.name as location_name, d.name as department_name
       FROM employee_exits ex
-      JOIN employees e ON ex.employee_id = e.id
-      LEFT JOIN locations l ON e.location_id = l.id
-      LEFT JOIN departments d ON e.department_id = d.id
+      JOIN employee e ON ex.employee_id = e.id
+      LEFT JOIN location l ON e.location_id = l.id
+      LEFT JOIN department d ON e.department_id = d.id
       WHERE ex.id = ? LIMIT 1
     `;
     return this.queryOne<EmployeeExitEntity>(sql, [exitId]);

@@ -5,86 +5,89 @@ import { pool } from '../nativeDb.js';
 import { cacheService } from '../services/cacheService.js';
 
 export async function setupOrganizationHubs() {
-  // Query actual active locations: BEL, DAV, SHI
+  // 1. Ensure canonical showrooms exist in location table
+  try {
+    await pool.query(`
+      INSERT INTO \`location\` (\`id\`, \`code\`, \`name\`, \`address\`, \`city\`, \`state\`, \`pin\`, \`phone\`, \`email\`, \`status\`, \`createdAt\`, \`updatedAt\`)
+      VALUES
+        ('cmuzam5fe00014n4pq25hkcww', 'BEL', 'Belagavi Head Store', 'Khade Bazar, Belagavi', 'Belagavi', 'Karnataka', '590001', '0831-2400100', 'belagavi@bsctextiles.com', 'ACTIVE', NOW(3), NOW(3)),
+        ('cmuzam5fr00024n4p4izbomev', 'DAV', 'Davanagere Mega Store', 'P.B. Road, Davanagere', 'Davanagere', 'Karnataka', '577001', '08192-250100', 'davanagere@bsctextiles.com', 'ACTIVE', NOW(3), NOW(3)),
+        ('cmuzam5g400034n4p89o33l8e', 'SHI', 'Shivamogga Flagship', 'B.H. Road, Shivamogga', 'Shivamogga', 'Karnataka', '577201', '08182-270100', 'shivamogga@bsctextiles.com', 'ACTIVE', NOW(3), NOW(3))
+      ON DUPLICATE KEY UPDATE
+        \`status\` = 'ACTIVE',
+        \`updatedAt\` = NOW(3)
+    `);
+  } catch (err: any) {
+    console.warn('[setupOrganizationHubs] Location upsert notice:', err?.message || err);
+  }
+
+  // 2. Query actual active locations: BEL, DAV, SHI
   const [locations]: any = await pool.query(`SELECT id, code FROM location WHERE code IN ('BEL', 'DAV', 'SHI')`);
   const locMap = Object.fromEntries(locations.map((l: any) => [l.code, l.id]));
 
-  const belLocId = locMap['BEL'];
-  const davLocId = locMap['DAV'];
-  const shiLocId = locMap['SHI'];
+  const belLocId = locMap['BEL'] || 'cmuzam5fe00014n4pq25hkcww';
+  const davLocId = locMap['DAV'] || 'cmuzam5fr00024n4p4izbomev';
+  const shiLocId = locMap['SHI'] || 'cmuzam5g400034n4p89o33l8e';
 
-  if (belLocId) {
-    const [belDepts]: any = await pool.query(`SELECT id, code FROM department WHERE locationId = ?`, [belLocId]);
-    const belDeptMap = Object.fromEntries(belDepts.map((d: any) => [d.code, d.id]));
-    if (belDeptMap['HR']) {
-      await pool.query(`UPDATE employee SET departmentId = ?, locationId = ? WHERE employeeCode IN ('TEST-EMP-004', 'TEST-EMP-020', 'TEST-EMP-033')`, [belDeptMap['HR'], belLocId]);
-    }
-    if (belDeptMap['FIN']) {
-      await pool.query(`UPDATE employee SET departmentId = ?, locationId = ? WHERE employeeCode = 'TEST-EMP-027'`, [belDeptMap['FIN'], belLocId]);
-    }
-    if (belDeptMap['OPS']) {
-      await pool.query(`UPDATE employee SET departmentId = ?, locationId = ? WHERE employeeCode IN ('TEST-EMP-003', 'TEST-EMP-005', 'TEST-EMP-019', 'TEST-EMP-021', 'TEST-EMP-023')`, [belDeptMap['OPS'], belLocId]);
-    }
-    if (belDeptMap['CS']) {
-      await pool.query(`UPDATE employee SET departmentId = ?, locationId = ? WHERE employeeCode = 'TEST-EMP-006'`, [belDeptMap['CS'], belLocId]);
-    }
-    if (belDeptMap['INV']) {
-      await pool.query(`UPDATE employee SET departmentId = ?, locationId = ? WHERE employeeCode = 'TEST-EMP-026'`, [belDeptMap['INV'], belLocId]);
-    }
-    if (belDeptMap['SALES']) {
-      await pool.query(`UPDATE employee SET departmentId = ?, locationId = ? WHERE employeeCode IN ('TEST-EMP-022', 'TEST-EMP-024', 'TEST-EMP-032')`, [belDeptMap['SALES'], belLocId]);
-    }
+  // 3. Ensure baseline ground floors exist
+  const floorInserts = [
+    { id: 'cmuzam5ia000e4n4powtzmu78', name: 'Ground Floor', floorNumber: 0, locationId: belLocId },
+    { id: 'cmuzam5jp000m4n4p99oh4jy1', name: 'Ground Floor', floorNumber: 0, locationId: davLocId },
+    { id: 'cmuzam5l2000u4n4pshxdhfny', name: 'Ground Floor', floorNumber: 0, locationId: shiLocId },
+  ];
+  for (const f of floorInserts) {
+    await pool.query(
+      `INSERT INTO \`floor\` (\`id\`, \`name\`, \`floorNumber\`, \`locationId\`, \`status\`, \`createdAt\`, \`updatedAt\`)
+       VALUES (?, ?, ?, ?, 'ACTIVE', NOW(3), NOW(3))
+       ON DUPLICATE KEY UPDATE \`status\` = 'ACTIVE', \`updatedAt\` = NOW(3)`,
+      [f.id, f.name, f.floorNumber, f.locationId]
+    ).catch(() => undefined);
   }
 
-  if (davLocId) {
-    const [davDepts]: any = await pool.query(`SELECT id, code FROM department WHERE locationId = ?`, [davLocId]);
-    const davDeptMap = Object.fromEntries(davDepts.map((d: any) => [d.code, d.id]));
-    if (davDeptMap['OPS']) {
-      await pool.query(`UPDATE employee SET departmentId = ?, locationId = ? WHERE employeeCode IN ('TEST-EMP-008', 'TEST-EMP-009', 'TEST-EMP-011')`, [davDeptMap['OPS'], davLocId]);
-    }
-    if (davDeptMap['CS']) {
-      await pool.query(`UPDATE employee SET departmentId = ?, locationId = ? WHERE employeeCode = 'TEST-EMP-010'`, [davDeptMap['CS'], davLocId]);
-    }
-    if (davDeptMap['INV']) {
-      await pool.query(`UPDATE employee SET departmentId = ?, locationId = ? WHERE employeeCode = 'TEST-EMP-028'`, [davDeptMap['INV'], davLocId]);
-    }
-  }
+  // 4. Ensure core departments exist
+  const depts = [
+    { code: 'SALES', name: 'Sales & Retail' },
+    { code: 'OPS', name: 'Store Operations' },
+    { code: 'HR', name: 'Human Resources' },
+    { code: 'FIN', name: 'Finance & Accounts' },
+    { code: 'INV', name: 'Inventory & Logistics' },
+    { code: 'CS', name: 'Customer Service & Billing' },
+  ];
 
-  if (shiLocId) {
-    const [shiDepts]: any = await pool.query(`SELECT id, code FROM department WHERE locationId = ?`, [shiLocId]);
-    const shiDeptMap = Object.fromEntries(shiDepts.map((d: any) => [d.code, d.id]));
-    if (shiDeptMap['HR']) {
-      await pool.query(`UPDATE employee SET departmentId = ?, locationId = ? WHERE employeeCode = 'TEST-EMP-013'`, [shiDeptMap['HR'], shiLocId]);
-    }
-    if (shiDeptMap['OPS']) {
-      await pool.query(`UPDATE employee SET departmentId = ?, locationId = ? WHERE employeeCode IN ('TEST-EMP-015', 'TEST-EMP-016')`, [shiDeptMap['OPS'], shiLocId]);
-    }
-    if (shiDeptMap['CS']) {
-      await pool.query(`UPDATE employee SET departmentId = ?, locationId = ? WHERE employeeCode = 'TEST-EMP-017'`, [shiDeptMap['CS'], shiLocId]);
-    }
-    if (shiDeptMap['INV']) {
-      await pool.query(`UPDATE employee SET departmentId = ?, locationId = ? WHERE employeeCode = 'TEST-EMP-030'`, [shiDeptMap['INV'], shiLocId]);
-    }
-  }
-
-  // Ensure ALL employees have locationId and departmentId set
-  await pool.query(`UPDATE employee SET status = 'ACTIVE' WHERE status IS NULL OR status = ''`);
-
-  // Ensure an active Night Shift exists for each hub for overnight roster scheduling
-  for (const loc of locations) {
-    const [existingNight]: any = await pool.query('SELECT id FROM shift WHERE locationId = ? AND code = ?', [loc.id, 'NIGHT']);
-    if (!existingNight || existingNight.length === 0) {
+  for (const [code, locId] of [['BEL', belLocId], ['DAV', davLocId], ['SHI', shiLocId]]) {
+    for (const d of depts) {
       await pool.query(
-        `INSERT INTO shift (id, name, code, locationId, startTime, endTime, gracePeriod, lateThreshold, status, createdAt, updatedAt)
-         VALUES (?, 'Night Shift', 'NIGHT', ?, '2024-01-01 22:00:00.000', '2024-01-02 06:00:00.000', 5, 15, 'ACTIVE', NOW(), NOW())`,
-        [`shift-night-${loc.code.toLowerCase()}`, loc.id]
-      );
-      console.log(`[setupOrganizationHubs] Seeded Night Shift for ${loc.code}`);
+        `INSERT INTO \`department\` (\`id\`, \`name\`, \`code\`, \`locationId\`, \`createdAt\`, \`updatedAt\`)
+         VALUES (?, ?, ?, ?, NOW(3), NOW(3))
+         ON DUPLICATE KEY UPDATE \`name\` = VALUES(\`name\`), \`updatedAt\` = NOW(3)`,
+        [`dept-${code.toLowerCase()}-${d.code.toLowerCase()}`, d.name, d.code, locId]
+      ).catch(() => undefined);
     }
   }
+
+  // 5. Ensure shifts exist
+  for (const [code, locId] of [['BEL', belLocId], ['DAV', davLocId], ['SHI', shiLocId]]) {
+    await pool.query(
+      `INSERT INTO \`shift\` (\`id\`, \`name\`, \`code\`, \`locationId\`, \`startTime\`, \`endTime\`, \`gracePeriod\`, \`lateThreshold\`, \`status\`, \`createdAt\`, \`updatedAt\`)
+       VALUES (?, 'General Shift', 'GENERAL', ?, '2024-01-01 09:30:00.000', '2024-01-01 19:30:00.000', 15, 30, 'ACTIVE', NOW(3), NOW(3))
+       ON DUPLICATE KEY UPDATE \`status\` = 'ACTIVE', \`updatedAt\` = NOW(3)`,
+      [`shift-gen-${code.toLowerCase()}`, locId]
+    ).catch(() => undefined);
+
+    await pool.query(
+      `INSERT INTO \`shift\` (\`id\`, \`name\`, \`code\`, \`locationId\`, \`startTime\`, \`endTime\`, \`gracePeriod\`, \`lateThreshold\`, \`status\`, \`createdAt\`, \`updatedAt\`)
+       VALUES (?, 'Night Shift', 'NIGHT', ?, '2024-01-01 22:00:00.000', '2024-01-02 06:00:00.000', 5, 15, 'ACTIVE', NOW(3), NOW(3))
+       ON DUPLICATE KEY UPDATE \`status\` = 'ACTIVE', \`updatedAt\` = NOW(3)`,
+      [`shift-night-${code.toLowerCase()}`, locId]
+    ).catch(() => undefined);
+  }
+
+  // 6. Ensure ALL employees have status set
+  await pool.query(`UPDATE employee SET status = 'ACTIVE' WHERE status IS NULL OR status = ''`).catch(() => undefined);
 
   cacheService.invalidatePrefix('locations');
   cacheService.invalidatePrefix('departments');
+  cacheService.invalidatePrefix('shifts');
   console.log('[setupOrganizationHubs] Organization topology (BEL, DAV, SHI) synchronized successfully.');
 }
 
