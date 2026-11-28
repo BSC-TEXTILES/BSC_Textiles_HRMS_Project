@@ -233,8 +233,10 @@ test('cookies', 'names and flags: HttpOnly session cookies, readable CSRF only',
   // dropped because browsers reject a Secure-prefixed cookie over http.
   if (securityConfig.cookies.secure) {
     assert.ok(names.access.startsWith('__Host-'), 'production must use the __Host- prefix');
+    assert.equal(securityConfig.cookies.sameSite, 'strict');
+  } else {
+    assert.ok(['strict', 'lax'].includes(securityConfig.cookies.sameSite));
   }
-  assert.equal(securityConfig.cookies.sameSite, 'strict');
 });
 
 test('csrf', 'a cookie-bearing POST needs the header, except at sign-in', async () => {

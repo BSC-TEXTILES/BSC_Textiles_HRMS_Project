@@ -36,8 +36,8 @@ function actor(req: AuthRequest): CredentialActor {
     role: req.user!.role,
     ip: clientIpOf(req),
     userAgent: String(req.headers['user-agent'] || 'Client').slice(0, 255),
-    canManageCredentials: Boolean(req.access?.canManageCredentials),
-    canManageRoles: Boolean(req.access?.canManageRoles),
+    canManageCredentials: Boolean(req.access?.canManageCredentials ?? (req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'ADMIN')),
+    canManageRoles: Boolean(req.access?.canManageRoles ?? (req.user?.role === 'SUPER_ADMIN')),
   };
 }
 

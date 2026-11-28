@@ -84,7 +84,7 @@ async function assertEmailAvailable(email: string, exceptUserId?: string): Promi
 }
 
 function requireAdmin(actor: CredentialActor): void {
-  if (!actor.canManageCredentials && actor.role !== 'SUPER_ADMIN' && actor.role !== 'ADMIN') {
+  if (!actor.canManageCredentials) {
     throw new CredentialError(
       403,
       'CREDENTIALS_ADMIN_ONLY',
