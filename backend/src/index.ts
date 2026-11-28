@@ -58,6 +58,11 @@ import { ensureBaselineAccounts } from './services/baselineAccounts.js';
 const app = express();
 const httpServer: HttpServer = (globalThis as any).__HRMS_HTTP_SERVER || createServer(app);
 
+// Defense against GHSA-v775-f652-7rv6: catch unhandled upgrade socket errors like ECONNRESET
+httpServer.on('upgrade', (_req, socket) => {
+  socket.on('error', () => {});
+});
+
 // 0. Strict CORS: an explicit allowlist, credentials only for listed origins.
 //    The previous handler accepted any localhost/192.168 origin and everything
 //    outside production, which is precisely what a credentialed cross-origin

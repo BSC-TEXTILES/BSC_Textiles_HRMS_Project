@@ -16,7 +16,7 @@
     "dev:backend": "npm run dev --workspace=backend",
     "dev:frontend": "npm run dev --workspace=frontend",
     "build": "node backend/scripts/build.cjs && npm run build --workspace=frontend",
-    "postinstall": "node scripts/patch-express-rate-limit.cjs",
+    "postinstall": "node scripts/patch-express-rate-limit.cjs && node scripts/patch-engine-io.cjs",
     "build:hostinger": "npm run db:schema && npm run db:migrate && npm run build",
     "start": "node server.js",
     "build:backend": "node backend/scripts/build.cjs",
@@ -57,6 +57,7 @@
     "tsx": "^4.7.0"
   },
   "overrides": {
+    "engine.io": "^6.6.12",
     "next": "15.5.29",
     "eslint-config-next": "15.5.29",
     "eslint": "^8.57.1",

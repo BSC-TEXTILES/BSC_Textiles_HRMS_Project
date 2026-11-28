@@ -2,9 +2,10 @@
 const http = require('node:http');
 const path = require('node:path');
 
-// Auto-verify security patch for express-rate-limit at startup
+// Auto-verify security patches at startup
 try {
   require(path.join(__dirname, 'scripts', 'patch-express-rate-limit.cjs'));
+  require(path.join(__dirname, 'scripts', 'patch-engine-io.cjs'));
 } catch {}
 
 const { isBackendRequest } = require('./server-routing');
@@ -41,6 +42,11 @@ const server = http.createServer((req, res) => {
     if (!res.headersSent) unavailable(res);
     else res.destroy();
   });
+});
+
+// Defense against GHSA-v775-f652-7rv6: catch unhandled socket errors on HTTP upgrade
+server.on('upgrade', (_req, socket) => {
+  socket.on('error', () => {});
 });
 
 // Bind before loading Next or the API: Hostinger requires listen within 3 seconds.
