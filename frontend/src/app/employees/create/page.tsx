@@ -78,7 +78,7 @@ export default function CreateEmployeePage() {
     emergencyContactPhone: '',
     emergencyContactRelation: 'Spouse',
     // Organization
-    locationId: 'DAV',
+    locationId: 'cmuzam5fr00024n4p4izbomev',
     departmentId: '',
     designation: 'Sales Consultant',
     shiftId: '',
@@ -609,9 +609,9 @@ export default function CreateEmployeePage() {
                       ))}
                       {locations.length === 0 && (
                         <>
-                          <option value="DAV">DAVANAGERE SHOWROOM (DAV)</option>
-                          <option value="BEL">BELAGAVI SHOWROOM (BEL)</option>
-                          <option value="SHI">SHIVAMOGGA SHOWROOM (SHI)</option>
+                          <option value="cmuzam5fr00024n4p4izbomev">DAVANAGERE SHOWROOM (DAV)</option>
+                          <option value="cmuzam5fe00014n4pq25hkcww">BELAGAVI SHOWROOM (BEL)</option>
+                          <option value="cmuzam5g400034n4p89o33l8e">SHIVAMOGGA SHOWROOM (SHI)</option>
                         </>
                       )}
                     </select>

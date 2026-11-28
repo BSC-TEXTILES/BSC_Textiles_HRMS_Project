@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../index.js';
 import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
+import { LocationResolverService } from '../services/locationResolver.js';
 
 const router = Router();
 
@@ -82,20 +83,21 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res) => {
 router.post('/', authorize('ADD'), validate(floorSchema), async (req: AuthRequest, res) => {
   try {
     const { name, floorNumber, locationId, floorManagerId, assistantManagerId } = req.body;
+    const resolvedLocId = await LocationResolverService.resolveLocationId(locationId || req.user!.locationId);
     
-    if (req.user!.role !== 'SUPER_ADMIN' && locationId !== req.user!.locationId) {
+    if (req.user!.role !== 'SUPER_ADMIN' && resolvedLocId !== req.user!.locationId) {
       return res.status(403).json({ error: 'Access denied' });
     }
     
     const existing = await prisma.floor.findUnique({
-      where: { locationId_floorNumber: { locationId, floorNumber } },
+      where: { locationId_floorNumber: { locationId: resolvedLocId, floorNumber } },
     });
     if (existing) {
       return res.status(400).json({ error: 'Floor number already exists for this location' });
     }
     
     const floor = await prisma.floor.create({
-      data: { name, floorNumber, locationId, floorManagerId, assistantManagerId },
+      data: { name, floorNumber, locationId: resolvedLocId, floorManagerId, assistantManagerId },
     });
     
     res.status(201).json(floor);

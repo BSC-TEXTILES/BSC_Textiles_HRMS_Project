@@ -4,6 +4,7 @@ import { prisma } from '../index.js';
 import { authenticate, authorize, AuthRequest } from '../middleware/auth.js';
 import { validate, schemas } from '../middleware/validation.js';
 import { UserUploadService } from '../services/userUploadService.js';
+import { LocationResolverService } from '../services/locationResolver.js';
 
 const router = Router();
 
@@ -124,6 +125,12 @@ router.post('/', authorize('ADD'), validate(schemas.register), async (req: AuthR
     const bcrypt = await import('bcryptjs');
     const passwordHash = await bcrypt.hash(password || 'password123', 12);
 
+    let resolvedUserLocationId: string | null = null;
+    const targetLoc = locationId || req.user!.locationId;
+    if (targetLoc) {
+      resolvedUserLocationId = await LocationResolverService.resolveLocationId(targetLoc);
+    }
+
     const user = await prisma.user.create({
       data: {
         email,
@@ -131,7 +138,7 @@ router.post('/', authorize('ADD'), validate(schemas.register), async (req: AuthR
         fullName,
         role: role || 'EMPLOYEE',
         permissions: permissions || ['VIEW'],
-        locationId: locationId || req.user!.locationId || null,
+        locationId: resolvedUserLocationId,
         employeeId: employeeId || null,
         isActive: 1,
       },
@@ -173,7 +180,7 @@ router.put('/:id', authorize('EDIT'), validate(schemas.register), async (req: Au
     const updateData: any = { email, fullName, isActive };
     if (role) updateData.role = role;
     if (permissions) updateData.permissions = permissions;
-    if (locationId) updateData.locationId = locationId;
+    if (locationId) updateData.locationId = await LocationResolverService.resolveLocationId(locationId);
     if (employeeId) updateData.employeeId = employeeId;
     
     const user = await prisma.user.update({

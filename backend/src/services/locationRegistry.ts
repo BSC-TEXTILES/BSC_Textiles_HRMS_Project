@@ -37,7 +37,38 @@ export interface LocationSummary {
 
 const REFRESH_TTL_MS = 30_000;
 
-let snapshot: RegistrySnapshot = { aliases: new Map(), byId: new Map(), loadedAt: 0 };
+const CANONICAL_SHOWROOMS: LocationSummary[] = [
+  { id: 'cmuzam5fr00024n4p4izbomev', code: 'DAV', name: 'Davanagere Mega Store', status: 'ACTIVE' },
+  { id: 'cmuzam5fe00014n4pq25hkcww', code: 'BEL', name: 'Belagavi Head Store', status: 'ACTIVE' },
+  { id: 'cmuzam5g400034n4p89o33l8e', code: 'SHI', name: 'Shivamogga Flagship', status: 'ACTIVE' },
+];
+
+function buildDefaultSnapshot(): RegistrySnapshot {
+  const snap: RegistrySnapshot = { aliases: new Map(), byId: new Map(), loadedAt: Date.now() };
+  for (const s of CANONICAL_SHOWROOMS) {
+    snap.byId.set(s.id, s);
+    snap.aliases.set(normalise(s.id), s.id);
+    snap.aliases.set(normalise(s.code), s.id);
+    snap.aliases.set(normalise(s.name), s.id);
+  }
+  // Register standard aliases
+  snap.aliases.set('loc_bel', 'cmuzam5fe00014n4pq25hkcww');
+  snap.aliases.set('belagavi', 'cmuzam5fe00014n4pq25hkcww');
+  snap.aliases.set('belgaum', 'cmuzam5fe00014n4pq25hkcww');
+  snap.aliases.set('loc_dav', 'cmuzam5fr00024n4p4izbomev');
+  snap.aliases.set('davanagere', 'cmuzam5fr00024n4p4izbomev');
+  snap.aliases.set('davangere', 'cmuzam5fr00024n4p4izbomev');
+  snap.aliases.set('loc_shi', 'cmuzam5g400034n4p89o33l8e');
+  snap.aliases.set('shivamogga', 'cmuzam5g400034n4p89o33l8e');
+  snap.aliases.set('shimoga', 'cmuzam5g400034n4p89o33l8e');
+  snap.aliases.set('loc_hq', 'cmuzam5fe00014n4pq25hkcww');
+  snap.aliases.set('hub', 'cmuzam5fe00014n4pq25hkcww');
+  snap.aliases.set('hubballi', 'cmuzam5fe00014n4pq25hkcww');
+  snap.aliases.set('hubli', 'cmuzam5fe00014n4pq25hkcww');
+  return snap;
+}
+
+let snapshot: RegistrySnapshot = buildDefaultSnapshot();
 let inflight: Promise<RegistrySnapshot> | null = null;
 
 function normalise(value: unknown): string {
@@ -45,11 +76,28 @@ function normalise(value: unknown): string {
 }
 
 async function load(): Promise<RegistrySnapshot> {
-  const next: RegistrySnapshot = { aliases: new Map(), byId: new Map(), loadedAt: Date.now() };
+  const next: RegistrySnapshot = buildDefaultSnapshot();
 
-  const [rows] = await pool.query<any[]>(
+  let [rows] = await pool.query<any[]>(
     `SELECT \`id\`, \`code\`, \`name\`, \`city\`, \`status\` FROM \`location\` ORDER BY \`code\``
-  );
+  ).catch(() => [[]]);
+
+  if (!rows || rows.length === 0) {
+    // Self-heal MySQL location table with canonical showrooms
+    await pool.query(`
+      INSERT INTO \`location\` (\`id\`, \`code\`, \`name\`, \`city\`, \`state\`, \`status\`, \`createdAt\`, \`updatedAt\`)
+      VALUES
+        ('cmuzam5fe00014n4pq25hkcww', 'BEL', 'Belagavi Head Store', 'Belagavi', 'Karnataka', 'ACTIVE', NOW(3), NOW(3)),
+        ('cmuzam5fr00024n4p4izbomev', 'DAV', 'Davanagere Mega Store', 'Davanagere', 'Karnataka', 'ACTIVE', NOW(3), NOW(3)),
+        ('cmuzam5g400034n4p89o33l8e', 'SHI', 'Shivamogga Flagship', 'Shivamogga', 'Karnataka', 'ACTIVE', NOW(3), NOW(3))
+      ON DUPLICATE KEY UPDATE \`status\` = 'ACTIVE', \`updatedAt\` = NOW(3)
+    `).catch(() => undefined);
+
+    const [healedRows] = await pool.query<any[]>(
+      `SELECT \`id\`, \`code\`, \`name\`, \`city\`, \`status\` FROM \`location\` ORDER BY \`code\``
+    ).catch(() => [[]]);
+    rows = healedRows || [];
+  }
 
   for (const row of rows) {
     const id = String(row.id);
@@ -64,6 +112,7 @@ async function load(): Promise<RegistrySnapshot> {
     next.aliases.set(normalise(id), id);
     if (row.code) next.aliases.set(normalise(row.code), id);
     if (row.city) next.aliases.set(normalise(row.city), id);
+    if (row.name) next.aliases.set(normalise(row.name), id);
   }
 
   // Historical/plural seed ids still appear in old payloads and client routes.

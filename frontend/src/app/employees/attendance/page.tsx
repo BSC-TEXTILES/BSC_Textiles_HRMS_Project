@@ -130,10 +130,9 @@ export default function EmployeeAttendancePage() {
               ))}
               {locations.length === 0 && (
                 <>
-                  <option value="loc_dav">Davanagere (DAV)</option>
-                  <option value="loc_bel">Belagavi (BEL)</option>
-                  <option value="loc_shi">Shivamogga (SHI)</option>
-                  <option value="loc_hq">Hubballi HQ (HUB-HQ)</option>
+                  <option value="cmuzam5fr00024n4p4izbomev">Davanagere (DAV)</option>
+                  <option value="cmuzam5fe00014n4pq25hkcww">Belagavi (BEL)</option>
+                  <option value="cmuzam5g400034n4p89o33l8e">Shivamogga (SHI)</option>
                 </>
               )}
             </select>

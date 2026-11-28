@@ -21,6 +21,7 @@ import { FaceRecognitionService } from '../services/faceRecognitionService.js';
 import { socketIO } from '../socket.js';
 import crypto from 'node:crypto';
 import { setupOrganizationHubs } from '../scripts/setupOrganizationHubs.js';
+import { LocationResolverService } from '../services/locationResolver.js';
 
 const router = Router();
 
@@ -496,116 +497,17 @@ router.post('/', authorize('ADD'), validate(employeeCreateSchema), async (req: A
     } = req.body;
     
     // Resolve locationId (accepts cuid or code like BEL, DAV, SHI, or canonical aliases)
-    let resolvedLocationId: string = '';
-    const rawLocInput = String(locationId || '').trim();
-
-    // 1. Check exact location ID match
-    const [exactId]: any = await pool.query('SELECT id FROM location WHERE id = ? LIMIT 1', [rawLocInput]);
-    if (exactId && exactId.length > 0) {
-      resolvedLocationId = exactId[0].id;
-    } else {
-      // 2. Map aliases to standard hub codes
-      let targetCode = rawLocInput.toUpperCase();
-      if (rawLocInput === 'loc_bel' || targetCode.includes('BELAGAVI') || targetCode.includes('BELGAUM')) targetCode = 'BEL';
-      else if (rawLocInput === 'loc_dav' || targetCode.includes('DAVANAGERE') || targetCode.includes('DAVANGERE')) targetCode = 'DAV';
-      else if (rawLocInput === 'loc_shi' || targetCode.includes('SHIVAMOGGA') || targetCode.includes('SHIMOGA')) targetCode = 'SHI';
-      else if (rawLocInput === 'loc_hq' || targetCode.includes('HUBBALLI') || targetCode.includes('HUBLI')) targetCode = 'DAV';
-
-      const [byCode]: any = await pool.query('SELECT id FROM location WHERE code = ? LIMIT 1', [targetCode]);
-      if (byCode && byCode.length > 0) {
-        resolvedLocationId = byCode[0].id;
-      } else {
-        // 3. Search by name
-        const [byName]: any = await pool.query('SELECT id FROM location WHERE name LIKE ? LIMIT 1', [`%${rawLocInput}%`]);
-        if (byName && byName.length > 0) {
-          resolvedLocationId = byName[0].id;
-        } else {
-          // 4. Fallback to active Davanagere or first available location in MySQL
-          const [fallbackLocs]: any = await pool.query(
-            `SELECT id FROM location WHERE status = 'ACTIVE' ORDER BY code = 'DAV' DESC, code = 'BEL' DESC, id ASC LIMIT 1`
-          );
-          if (fallbackLocs && fallbackLocs.length > 0) {
-            resolvedLocationId = fallbackLocs[0].id;
-          } else {
-            // Self-heal table with canonical locations
-            await setupOrganizationHubs().catch(() => undefined);
-            const [healedLocs]: any = await pool.query(
-              `SELECT id FROM location WHERE status = 'ACTIVE' ORDER BY code = 'DAV' DESC, id ASC LIMIT 1`
-            );
-            resolvedLocationId = healedLocs?.[0]?.id || 'cmuzam5fr00024n4p4izbomev';
-          }
-        }
-      }
-    }
-
-    // Strict validation: Verify resolvedLocationId exists in location table
-    const [verifiedLoc]: any = await pool.query('SELECT id FROM location WHERE id = ? LIMIT 1', [resolvedLocationId]);
-    if (!verifiedLoc || verifiedLoc.length === 0) {
-      await setupOrganizationHubs().catch(() => undefined);
-      const [finalLoc]: any = await pool.query('SELECT id FROM location ORDER BY code = "DAV" DESC, id ASC LIMIT 1');
-      if (finalLoc && finalLoc.length > 0) {
-        resolvedLocationId = finalLoc[0].id;
-      } else {
-        resolvedLocationId = 'cmuzam5fr00024n4p4izbomev';
-      }
-    }
+    const resolvedLocationId = await LocationResolverService.resolveLocationId(locationId || req.user!.locationId);
 
     const isMutationElevated = ['SUPER_ADMIN', 'ADMIN'].includes(req.user!.role);
     if (!isMutationElevated && resolvedLocationId !== req.user!.locationId) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Resolve optional floorId
-    let resolvedFloorId: string | null = null;
-    if (floorId && String(floorId).trim() !== '') {
-      const [foundFloors]: any = await pool.query(
-        `SELECT id FROM floor WHERE (id = ? OR name = ?) AND locationId = ? LIMIT 1`,
-        [String(floorId).trim(), String(floorId).trim(), resolvedLocationId]
-      );
-      if (foundFloors && foundFloors.length > 0) {
-        resolvedFloorId = foundFloors[0].id;
-      }
-    }
-
-    // Resolve optional departmentId if provided and not empty
-    let resolvedDepartmentId: string | null = null;
-    if (departmentId && String(departmentId).trim() !== '') {
-      const [foundDepts]: any = await pool.query(
-        `SELECT id FROM department WHERE (id = ? OR code = ? OR name = ?) AND (locationId = ? OR locationId IS NULL) LIMIT 1`,
-        [String(departmentId).trim(), String(departmentId).trim(), String(departmentId).trim(), resolvedLocationId]
-      );
-      if (foundDepts && foundDepts.length > 0) {
-        resolvedDepartmentId = foundDepts[0].id;
-      } else {
-        const [anyDept]: any = await pool.query(
-          `SELECT id FROM department WHERE id = ? OR code = ? OR name = ? LIMIT 1`,
-          [String(departmentId).trim(), String(departmentId).trim(), String(departmentId).trim()]
-        );
-        if (anyDept && anyDept.length > 0) {
-          resolvedDepartmentId = anyDept[0].id;
-        }
-      }
-    }
-
-    // Resolve optional shiftId if provided and not empty
-    let resolvedShiftId: string | null = null;
-    if (shiftId && String(shiftId).trim() !== '') {
-      const [foundShifts]: any = await pool.query(
-        `SELECT id FROM shift WHERE (id = ? OR code = ?) AND (locationId = ? OR locationId IS NULL) LIMIT 1`,
-        [String(shiftId).trim(), String(shiftId).trim(), resolvedLocationId]
-      );
-      if (foundShifts && foundShifts.length > 0) {
-        resolvedShiftId = foundShifts[0].id;
-      } else {
-        const [anyShift]: any = await pool.query(
-          `SELECT id FROM shift WHERE id = ? OR code = ? LIMIT 1`,
-          [String(shiftId).trim(), String(shiftId).trim()]
-        );
-        if (anyShift && anyShift.length > 0) {
-          resolvedShiftId = anyShift[0].id;
-        }
-      }
-    }
+    // Resolve optional floorId, departmentId, shiftId safely
+    const resolvedFloorId = await LocationResolverService.resolveFloorId(floorId, resolvedLocationId);
+    const resolvedDepartmentId = await LocationResolverService.resolveDepartmentId(departmentId, resolvedLocationId);
+    const resolvedShiftId = await LocationResolverService.resolveShiftId(shiftId, resolvedLocationId);
 
     // Check email uniqueness across users and employees
     const trimmedEmail = email ? String(email).trim().toLowerCase() : null;
@@ -970,21 +872,18 @@ router.put('/:id', authorize('EDIT'), validate(employeeUpdateSchema), async (req
     const normalizedPhone = digits.length === 10 ? digits : (phone ? String(phone).trim() : existing.phone);
 
     // Resolve locationId if updated
-    let resolvedLocationId = existing.locationId;
-    if (locationId) {
-      const [matchingLocs]: any = await pool.query(
-        `SELECT id FROM location 
-         WHERE id = ? 
-            OR code = ? 
-            OR code = ? 
-            OR code = (CASE ? WHEN 'loc_bel' THEN 'BEL' WHEN 'loc_dav' THEN 'DAV' WHEN 'loc_shi' THEN 'SHI' WHEN 'loc_hq' THEN 'HUB' ELSE ? END)
-         LIMIT 1`,
-        [locationId, locationId, String(locationId || '').toUpperCase(), locationId, locationId]
-      );
-      if (matchingLocs && matchingLocs.length > 0) {
-        resolvedLocationId = matchingLocs[0].id;
-      }
-    }
+    const resolvedLocationId = locationId
+      ? await LocationResolverService.resolveLocationId(locationId)
+      : existing.locationId;
+    const resolvedFloorId = floorId !== undefined
+      ? await LocationResolverService.resolveFloorId(floorId, resolvedLocationId)
+      : existing.floorId;
+    const resolvedDepartmentId = departmentId !== undefined
+      ? await LocationResolverService.resolveDepartmentId(departmentId, resolvedLocationId)
+      : existing.departmentId;
+    const resolvedShiftId = shiftId !== undefined
+      ? await LocationResolverService.resolveShiftId(shiftId, resolvedLocationId)
+      : existing.shiftId;
 
     // Compute names
     const finalFirst = firstName !== undefined ? String(firstName || '').trim() : existing.firstName;
@@ -1002,10 +901,10 @@ router.put('/:id', authorize('EDIT'), validate(employeeUpdateSchema), async (req
     track('phone', existing.phone, normalizedPhone);
     track('gender', existing.gender, gender ?? existing.gender);
     track('locationId', existing.locationId, resolvedLocationId);
-    track('floorId', existing.floorId, floorId ?? existing.floorId);
-    track('departmentId', existing.departmentId, departmentId ?? existing.departmentId);
+    track('floorId', existing.floorId, resolvedFloorId);
+    track('departmentId', existing.departmentId, resolvedDepartmentId);
     track('sectionId', existing.sectionId, sectionId ?? existing.sectionId);
-    track('shiftId', existing.shiftId, shiftId ?? existing.shiftId);
+    track('shiftId', existing.shiftId, resolvedShiftId);
     track('designation', existing.designation, designation ?? existing.designation);
     track('role', existing.role, role ?? existing.role);
 
@@ -1019,10 +918,10 @@ router.put('/:id', authorize('EDIT'), validate(employeeUpdateSchema), async (req
         phone: normalizedPhone,
         gender: gender || existing.gender,
         locationId: resolvedLocationId,
-        floorId: floorId !== undefined ? floorId : existing.floorId,
-        departmentId: departmentId !== undefined ? departmentId : existing.departmentId,
+        floorId: resolvedFloorId,
+        departmentId: resolvedDepartmentId,
         sectionId: sectionId !== undefined ? sectionId : existing.sectionId,
-        shiftId: shiftId !== undefined ? shiftId : existing.shiftId,
+        shiftId: resolvedShiftId,
         designation: designation || existing.designation,
         role: role || existing.role,
       },

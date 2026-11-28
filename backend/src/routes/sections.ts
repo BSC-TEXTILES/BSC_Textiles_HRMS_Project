@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../index.js';
 import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
+import { LocationResolverService } from '../services/locationResolver.js';
 
 const router = Router();
 
@@ -84,20 +85,23 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res) => {
 router.post('/', authorize('ADD'), validate(sectionSchema), async (req: AuthRequest, res) => {
   try {
     const { name, code, locationId, floorId, departmentId, supervisorId } = req.body;
+    const resolvedLocId = await LocationResolverService.resolveLocationId(locationId || req.user!.locationId);
+    const resolvedFloorId = await LocationResolverService.resolveFloorId(floorId, resolvedLocId);
+    const resolvedDeptId = await LocationResolverService.resolveDepartmentId(departmentId, resolvedLocId);
     
-    if (req.user!.role !== 'SUPER_ADMIN' && locationId !== req.user!.locationId) {
+    if (req.user!.role !== 'SUPER_ADMIN' && resolvedLocId !== req.user!.locationId) {
       return res.status(403).json({ error: 'Access denied' });
     }
     
     const existing = await prisma.section.findUnique({
-      where: { locationId_code: { locationId, code } },
+      where: { locationId_code: { locationId: resolvedLocId, code } },
     });
     if (existing) {
       return res.status(400).json({ error: 'Section code already exists for this location' });
     }
     
     const section = await prisma.section.create({
-      data: { name, code, locationId, floorId, departmentId, supervisorId },
+      data: { name, code, locationId: resolvedLocId, floorId: resolvedFloorId, departmentId: resolvedDeptId, supervisorId: supervisorId || null },
     });
     
     res.status(201).json(section);

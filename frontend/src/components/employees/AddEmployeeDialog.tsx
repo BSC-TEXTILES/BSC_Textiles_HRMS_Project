@@ -431,15 +431,16 @@ export function AddEmployeeDialog({
 
   // Compile combined locations list
   const combinedLocationOptions = useMemo(() => {
-    const standard = INITIAL_LOCATIONS.map((loc: { label: string; code: string; name: string; hubCode: string }) => {
+    const standard = INITIAL_LOCATIONS.map((loc: any) => {
       const matched = locations.find(
         (l) =>
+          l.id === loc.id ||
           l.code === loc.hubCode ||
           l.code === loc.code ||
           (l.name && l.name.toLowerCase().includes(loc.name.toLowerCase()))
       );
       return {
-        id: matched?.id || loc.hubCode,
+        id: matched?.id || loc.id,
         label: loc.label,
         name: loc.name,
         code: loc.code,

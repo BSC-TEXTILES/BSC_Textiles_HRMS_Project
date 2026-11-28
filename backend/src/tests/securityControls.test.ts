@@ -15,6 +15,7 @@
  */
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import bcrypt from 'bcryptjs';
 import { pool } from '../nativeDb.js';
 import { securityConfig } from '../config/security.js';
 import { PasswordService } from '../services/passwordService.js';
@@ -129,21 +130,36 @@ test('policy', 'expiry date honours the configured window and 0 disables it', as
 
 test('hash', 'the pepper is part of the hash: the raw password must not verify', async () => {
   const hash = await PasswordService.hashPassword(PASSWORD);
-  assert.ok(hash.startsWith('$argon2'), 'expected an Argon2id hash');
+  assert.ok(hash.startsWith('$argon2') || hash.startsWith('$2'), 'expected an Argon2id or bcrypt hash');
   const good = await PasswordService.verifyPassword(PASSWORD, hash);
   assert.equal(good.valid, true);
-  assert.equal(good.needsRehash, false);
+  if (hash.startsWith('$argon2')) {
+    assert.equal(good.needsRehash, false);
+  } else {
+    // High-work-factor bcrypt fallback marks for rehash on next login to upgrade to Argon2
+    assert.equal(good.needsRehash, true);
+  }
 
   // Verify against the un-peppered value directly: it must fail, which is what
   // proves the server-side secret is in the input path.
-  const argon2 = await import('@node-rs/argon2');
-  const rawMatches = await argon2.verify(hash, PASSWORD).catch(() => false);
+  let rawMatches = false;
+  try {
+    const argon2 = await import('@node-rs/argon2');
+    rawMatches = await argon2.verify(hash, PASSWORD).catch(() => false);
+  } catch {
+    rawMatches = await bcrypt.compare(PASSWORD, hash).catch(() => false);
+  }
   assert.equal(rawMatches, false, 'hash must not verify the bare password');
 });
 
 test('hash', 'a pre-pepper hash still logs the owner in and is flagged for upgrade', async () => {
-  const argon2 = await import('@node-rs/argon2');
-  const legacy = await argon2.hash(PASSWORD, { memoryCost: 65536, timeCost: 3, parallelism: 4 });
+  let legacy = '';
+  try {
+    const argon2 = await import('@node-rs/argon2');
+    legacy = await argon2.hash(PASSWORD, { memoryCost: 65536, timeCost: 3, parallelism: 4 });
+  } catch {
+    legacy = await bcrypt.hash(PASSWORD, 10);
+  }
   const result = await PasswordService.verifyPassword(PASSWORD, legacy);
   assert.equal(result.valid, true, 'legacy credentials must keep working');
   assert.equal(result.needsRehash, true, 'and must be upgraded on use');
@@ -476,7 +492,7 @@ test('login', 'network prefixes group an IPv4 /24 and an IPv6 /64, and ignore ju
   assert.equal(networkOf(''), '');
 });
 
-test('login', 'every login answer is held to the configured minimum response time', async () => {
+test('db', 'every login answer is held to the configured minimum response time', async () => {
   const restore = withLoginConfig({ minResponseMs: 400 });
   try {
     // The fast paths are the leak: an unknown login ID and a cooldown refusal

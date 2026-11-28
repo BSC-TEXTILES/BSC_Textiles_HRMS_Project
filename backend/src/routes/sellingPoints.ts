@@ -5,6 +5,7 @@ import { pool } from '../db.js';
 import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
 import crypto from 'crypto';
+import { LocationResolverService } from '../services/locationResolver.js';
 
 const router = Router();
 
@@ -660,14 +661,16 @@ router.get('/:id', authorize('VIEW'), async (req: AuthRequest, res) => {
 router.post('/', authorize('ADD'), validate(spSchema), async (req: AuthRequest, res) => {
   try {
     const { name, code, locationId, floorId, sectionId, category, managerId, targetAmount, incentiveRuleId } = req.body;
+    const resolvedLocId = await LocationResolverService.resolveLocationId(locationId || req.user!.locationId);
+    const resolvedFloorId = await LocationResolverService.resolveFloorId(floorId, resolvedLocId);
 
-    if (req.user!.role !== 'SUPER_ADMIN' && locationId !== req.user!.locationId) {
+    if (req.user!.role !== 'SUPER_ADMIN' && resolvedLocId !== req.user!.locationId) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
     const [existing]: any = await pool.query(
       'SELECT id FROM sellingpoint WHERE locationId = ? AND code = ?',
-      [locationId, code]
+      [resolvedLocId, code]
     );
     if (existing.length > 0) {
       return res.status(400).json({ error: 'Selling point code already exists for this location' });
@@ -683,7 +686,7 @@ router.post('/', authorize('ADD'), validate(spSchema), async (req: AuthRequest, 
         ?, ?, ?, 1, NOW(3), NOW(3)
       )
     `, [
-      newId, name, code, locationId, floorId, sectionId, category || 'Sales',
+      newId, name, code, resolvedLocId, resolvedFloorId, sectionId || null, category || 'Sales',
       managerId || null, targetAmount || 1000000, incentiveRuleId || null
     ]);
 
@@ -691,9 +694,9 @@ router.post('/', authorize('ADD'), validate(spSchema), async (req: AuthRequest, 
     await pool.query(`
       INSERT INTO auditlog (id, userId, locationId, action, entityType, entityId, newValue, createdAt)
       VALUES (?, ?, ?, 'CREATE_SELLING_POINT', 'sellingpoint', ?, ?, NOW(3))
-    `, [genId('aud'), req.user!.id, locationId, newId, JSON.stringify({ name, code, category, floorId })]);
+    `, [genId('aud'), req.user!.id, resolvedLocId, newId, JSON.stringify({ name, code, category, floorId: resolvedFloorId })]);
 
-    res.status(201).json({ id: newId, name, code, locationId, floorId, sectionId, category });
+    res.status(201).json({ id: newId, name, code, locationId: resolvedLocId, floorId: resolvedFloorId, sectionId, category });
   } catch (error) {
     console.error('Create selling point error:', error);
     res.status(500).json({ error: 'Failed to create selling point' });
@@ -903,9 +906,13 @@ router.delete('/:id', authorize('DELETE'), async (req: AuthRequest, res) => {
 router.post('/sections', authorize('ADD'), async (req: AuthRequest, res) => {
   try {
     const { name, code, locationId, floorId, departmentId } = req.body;
-    if (!name || !locationId || !floorId) {
-      return res.status(400).json({ error: 'Section name, locationId, and floorId are required' });
+    if (!name) {
+      return res.status(400).json({ error: 'Section name is required' });
     }
+
+    const resolvedLocId = await LocationResolverService.resolveLocationId(locationId || req.user!.locationId);
+    const resolvedFloorId = await LocationResolverService.resolveFloorId(floorId, resolvedLocId);
+    const resolvedDeptId = await LocationResolverService.resolveDepartmentId(departmentId, resolvedLocId);
 
     const secCode = (code || `SEC-${name.slice(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}`).toUpperCase();
     const id = genId('sec');
@@ -913,10 +920,10 @@ router.post('/sections', authorize('ADD'), async (req: AuthRequest, res) => {
     await pool.query(
       `INSERT INTO section (id, name, code, locationId, floorId, departmentId, createdAt, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, NOW(3), NOW(3))`,
-      [id, name, secCode, locationId, floorId, departmentId || null]
+      [id, name, secCode, resolvedLocId, resolvedFloorId, resolvedDeptId]
     );
 
-    res.status(201).json({ id, name, code: secCode, locationId, floorId, message: 'Section created successfully' });
+    res.status(201).json({ id, name, code: secCode, locationId: resolvedLocId, floorId: resolvedFloorId, message: 'Section created successfully' });
   } catch (error: any) {
     console.error('Create section error:', error);
     res.status(500).json({ error: 'Failed to create section', message: error.message });

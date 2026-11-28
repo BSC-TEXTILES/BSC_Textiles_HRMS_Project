@@ -4,6 +4,7 @@ import { prisma, pool } from '../db.js';
 import { authenticate, authorize, AuthRequest, getScopedLocationId } from '../middleware/auth.js';
 import { validate } from '../middleware/validation.js';
 import { cacheService } from '../services/cacheService.js';
+import { LocationResolverService } from '../services/locationResolver.js';
 
 const router = Router();
 
@@ -363,23 +364,8 @@ router.post('/', authorize('ADD'), validate(shiftSchema), async (req: AuthReques
       ...rest
     } = req.body;
 
-    let resolvedLocId = locationId;
-    if (!resolvedLocId || resolvedLocId === 'all') {
-      resolvedLocId = req.user?.locationId;
-      if (!resolvedLocId) {
-        // Fallback to first active location
-        const [firstLoc]: any = await pool.query('SELECT id FROM location ORDER BY code ASC LIMIT 1');
-        resolvedLocId = firstLoc?.[0]?.id;
-      }
-    } else {
-      const [locMatch]: any = await pool.query(
-        'SELECT id, code, name FROM location WHERE id = ? OR code = ? LIMIT 1',
-        [resolvedLocId, String(resolvedLocId).toUpperCase()]
-      );
-      if (locMatch && locMatch.length > 0) {
-        resolvedLocId = locMatch[0].id;
-      }
-    }
+    const resolvedLocId = await LocationResolverService.resolveLocationId(locationId || req.user?.locationId);
+    const resolvedDeptId = await LocationResolverService.resolveDepartmentId(departmentId, resolvedLocId);
 
     if (!resolvedLocId) {
       return res.status(400).json({ error: 'Valid location hub is required' });
@@ -441,7 +427,7 @@ router.post('/', authorize('ADD'), validate(shiftSchema), async (req: AuthReques
         trimmedName,
         cleanCode,
         resolvedLocId,
-        departmentId || null,
+        resolvedDeptId,
         startDateTime,
         endDateTime,
         gracePeriod,

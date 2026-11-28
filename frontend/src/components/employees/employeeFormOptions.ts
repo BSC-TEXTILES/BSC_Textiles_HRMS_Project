@@ -82,9 +82,9 @@ export const EMPLOYEE_FORM_DESIGNATIONS = [
 ] as const;
 
 export const INITIAL_LOCATIONS = [
-  { label: 'Davanagere (BSC-DVG)', code: 'BSC-DVG', name: 'Davanagere', hubCode: 'DAV' },
-  { label: 'Belagavi (BSC-BEL)', code: 'BSC-BEL', name: 'Belagavi', hubCode: 'BEL' },
-  { label: 'Shivamogga (BSC-SMG)', code: 'BSC-SMG', name: 'Shivamogga', hubCode: 'SHI' },
+  { label: 'Davanagere (BSC-DVG)', code: 'BSC-DVG', name: 'Davanagere', hubCode: 'DAV', id: 'cmuzam5fr00024n4p4izbomev' },
+  { label: 'Belagavi (BSC-BEL)', code: 'BSC-BEL', name: 'Belagavi', hubCode: 'BEL', id: 'cmuzam5fe00014n4pq25hkcww' },
+  { label: 'Shivamogga (BSC-SMG)', code: 'BSC-SMG', name: 'Shivamogga', hubCode: 'SHI', id: 'cmuzam5g400034n4p89o33l8e' },
 ] as const;
 
 export const INITIAL_DIVISIONS = [

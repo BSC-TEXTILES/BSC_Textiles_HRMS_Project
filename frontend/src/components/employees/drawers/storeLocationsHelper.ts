@@ -18,9 +18,9 @@ export interface CanonicalHubStore {
 }
 
 export const CANONICAL_HUB_STORES: CanonicalHubStore[] = [
-  { id: 'BEL', code: 'BEL', name: 'Belagavi', city: 'Belagavi', status: 'ACTIVE' },
-  { id: 'DAV', code: 'DAV', name: 'Davanagere', city: 'Davanagere', status: 'ACTIVE' },
-  { id: 'SHI', code: 'SHI', name: 'Shivamogga', city: 'Shivamogga', status: 'ACTIVE' },
+  { id: 'cmuzam5fe00014n4pq25hkcww', code: 'BEL', name: 'Belagavi', city: 'Belagavi', status: 'ACTIVE' },
+  { id: 'cmuzam5fr00024n4p4izbomev', code: 'DAV', name: 'Davanagere', city: 'Davanagere', status: 'ACTIVE' },
+  { id: 'cmuzam5g400034n4p89o33l8e', code: 'SHI', name: 'Shivamogga', city: 'Shivamogga', status: 'ACTIVE' },
 ];
 
 export interface StoreHubItem {

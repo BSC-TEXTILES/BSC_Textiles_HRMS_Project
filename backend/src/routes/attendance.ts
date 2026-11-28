@@ -24,6 +24,7 @@ import {
 import lateFineRoutes from './lateFines.js';
 import missedPunchingRoutes from './missedPunching.js';
 import employeeAttendanceRoutes from './employeeAttendance.js';
+import { LocationResolverService } from '../services/locationResolver.js';
 
 const router = Router();
 
@@ -334,6 +335,8 @@ router.put('/update-day', authorize('EDIT'), async (req: AuthRequest, res) => {
     }
 
     const id = `att_${employeeId}_${date.replace(/-/g, '')}`;
+    const validLocationId = await LocationResolverService.resolveLocationId(emp.locationId);
+    const validShiftId = await LocationResolverService.resolveShiftId(emp.shiftId, validLocationId);
 
     await pool.query(
       `INSERT INTO attendance (
@@ -348,8 +351,8 @@ router.put('/update-day', authorize('EDIT'), async (req: AuthRequest, res) => {
       [
         id,
         employeeId,
-        emp.locationId,
-        emp.shiftId || null,
+        validLocationId,
+        validShiftId,
         date,
         loginDt,
         logoutDt,
@@ -458,6 +461,7 @@ router.post('/corrections', async (req: AuthRequest, res) => {
 
     const attDate = attendanceDate || new Date().toISOString().slice(0, 10);
     const id = `corr_${crypto.randomUUID()}`;
+    const corrLocationId = await LocationResolverService.resolveLocationId(emp.locationId);
 
     await pool.query(
       `INSERT INTO attendancecorrection 
@@ -466,7 +470,7 @@ router.post('/corrections', async (req: AuthRequest, res) => {
       [
         id,
         targetEmpId,
-        emp.locationId,
+        corrLocationId,
         attDate,
         requestedLogin ? new Date(requestedLogin) : null,
         requestedLogout ? new Date(requestedLogout) : null,
